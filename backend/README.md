@@ -58,3 +58,22 @@ tests/             # API checks
 Add domain modules as features are implemented. Routes should delegate business
 logic to services. Inject `get_session` into routes and commit explicitly at the
 service transaction boundary; closing a session rolls back uncommitted changes.
+
+## Migrations
+
+There are no application tables or initial migrations yet. Define models using
+`app.db.base.Base` and import their modules in `alembic/env.py` so autogeneration
+can discover them:
+
+```sh
+uv run alembic revision --autogenerate -m "create initial tables"
+uv run alembic upgrade head
+```
+
+Review generated migrations before applying them, especially against a Supabase
+project containing existing tables. Migrations are run explicitly, never on
+every API startup. From the repository root, deploy migrations with:
+
+```sh
+docker compose --profile tools run --rm migrate
+```
