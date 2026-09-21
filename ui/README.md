@@ -59,3 +59,7 @@ to the `backend` service on the Compose network. Run from the repository root:
 ```sh
 docker compose up --build -d
 ```
+
+For a separate API deployment, override the `VITE_API_BASE_URL` Docker build
+argument and configure CORS. The API documentation link uses the default
+same-origin `/api/docs` route. See the root README for environment setup.
