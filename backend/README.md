@@ -77,3 +77,13 @@ every API startup. From the repository root, deploy migrations with:
 ```sh
 docker compose --profile tools run --rm migrate
 ```
+
+## Checks
+
+```sh
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+```
+
+Tests use dependency overrides and do not require a live database.
