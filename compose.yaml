@@ -61,6 +61,14 @@ services:
     logging: *default-logging
     networks:
       - app
+
+  migrate:
+    # Explicit one-off job: docker compose --profile tools run --rm migrate
+    image: dms-backend:local
+    build:
+      context: ./backend
+      target: runtime
+    env_file:
       - ./backend/.env
     command: ["alembic", "upgrade", "head"]
     profiles: ["tools"]
