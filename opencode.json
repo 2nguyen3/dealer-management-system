@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".agent/workflows/verify.md"],
+  "share": "manual",
+  "compaction": {
+    "auto": true
+  }
+}

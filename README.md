@@ -1,5 +1,7 @@
 # Dealer Management System
 
+AI development setup: [OpenCode and Claude Code guide](.agent/README.md).
+
 > Đồ án môn Nhập môn Công nghệ Phần mềm  
 > Trường Đại học Công nghệ Thông tin, ĐHQG-HCM
 
