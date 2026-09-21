@@ -11,8 +11,8 @@ Run from `backend/`:
 uv sync --frozen
 ```
 
-Copy `.env.example` to `.env`, then set `DATABASE_URL` using your Supabase
-dashboard's **Connect** panel. Start the server:
+Copy `.env.example` to `.env`, then fill in `DB_PASSWORD` and verify `DB_HOST`,
+`DB_PORT`, `DB_NAME`, and `DB_USER` using Supabase's **Connect** panel. Start the server:
 
 ```sh
 uv run uvicorn app.main:create_app --factory --reload
