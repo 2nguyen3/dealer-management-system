@@ -15,8 +15,9 @@ services:
       target: runtime
     env_file:
       - ./backend/.env
-    expose:
-      - "8000"
+    # Direct API/docs access from this machine; frontend proxies over the network.
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
     init: true
 
