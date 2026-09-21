@@ -17,3 +17,10 @@ dashboard's **Connect** panel. Start the server:
 ```sh
 uv run uvicorn app.main:create_app --factory --reload
 ```
+
+- Swagger UI: http://localhost:8000/api/docs
+- Liveness: http://localhost:8000/api/v1/health
+- Database readiness: http://localhost:8000/api/v1/health/ready
+
+Liveness does not open a database connection. Readiness executes `SELECT 1`
+and returns 503 if Postgres is unavailable.
