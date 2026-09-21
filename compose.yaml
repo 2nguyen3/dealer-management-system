@@ -1,5 +1,12 @@
 name: dms
 
+# Bound container logs so long-running development services do not grow indefinitely.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   backend:
     build:
