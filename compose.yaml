@@ -50,11 +50,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
-
-  migrate:
-    build:
-      context: ./backend
-    env_file:
     init: true
     stop_grace_period: 15s
     healthcheck:
