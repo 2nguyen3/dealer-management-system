@@ -27,11 +27,19 @@ and returns 503 if Postgres is unavailable.
 
 ## Supabase connection
 
-Use `postgresql+psycopg://` as the URL scheme and include `?sslmode=require`.
-The **session pooler** on port 5432 is a good default, including on IPv4-only
-hosts. Use the exact hostname and username shown for your project; the values
-in `.env.example` are placeholders. Percent-encode reserved password characters
-such as `@`, `:`, `/`, `#`, and `%`.
+Configure the database with separate environment variables:
+
+- `DB_HOST`: Supabase pooler hostname.
+- `DB_PORT`: PostgreSQL port, default `5432`.
+- `DB_NAME`: Database name, default `postgres`.
+- `DB_USER`: Supabase database username, including the project suffix for the pooler.
+- `DB_PASSWORD`: Required raw password; do not URL-encode it. Use single quotes in `.env`.
+- `DB_SSLMODE`: SSL mode, default `require`.
+
+The example contains this project's session-pooler host and username but no password.
+The **session pooler** on port 5432 supports IPv4 hosts. Settings build a SQLAlchemy
+URL object internally, preserving reserved characters in the password. Empty
+passwords are rejected. `DATABASE_URL` and `MIGRATION_DATABASE_URL` are no longer used.
 
 The application disables psycopg prepared statements and uses `NullPool` so
 Supabase handles connection pooling. A transaction-pooler runtime URL is also
