@@ -146,8 +146,12 @@ settings, and caches `get_settings()`. Run backend commands from `backend/`.
 | Variable | Requirement/default |
 | --- | --- |
 | `APP_NAME` | Optional; defaults to `Dealer Management System API`. |
-| `DATABASE_URL` | Required; must use the `postgresql+psycopg://` scheme. |
-| `MIGRATION_DATABASE_URL` | Optional migration-specific URL; Alembic otherwise uses `DATABASE_URL`. |
+| `DB_HOST` | Required PostgreSQL hostname. |
+| `DB_PORT` | Defaults to `5432`; must be between 1 and 65535. |
+| `DB_NAME` | Defaults to `postgres`. |
+| `DB_USER` | Required database username. |
+| `DB_PASSWORD` | Required nonempty raw password, stored as `SecretStr`. |
+| `DB_SSLMODE` | Defaults to `require`. |
 | `CORS_ORIGINS` | JSON array; defaults to `["http://localhost:5173"]`. |
 
 Copy `.env.example` to `.env` and use the actual connection string from Supabase's
