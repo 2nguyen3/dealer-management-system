@@ -32,7 +32,7 @@ rules should be established when implementing each feature.
 | Python | Python 3.12 is the development/container target; `pyproject.toml` permits `>=3.12,<3.14`. |
 | Dependencies | `uv`, with dependency definitions in `pyproject.toml` and resolved versions in `uv.lock`. |
 | HTTP API | FastAPI, served by Uvicorn using an application factory. |
-| Validation/configuration | Pydantic models and Pydantic Settings; database URLs use `SecretStr`. |
+| Validation/configuration | Pydantic models and Pydantic Settings; database passwords use `SecretStr`. |
 | Database | Supabase-hosted PostgreSQL, accessed directly from the backend. |
 | ORM/driver | SQLAlchemy 2 synchronous engines and sessions, with psycopg 3. |
 | Schema migrations | Alembic, using SQLAlchemy model metadata. |
