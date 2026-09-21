@@ -73,7 +73,8 @@ docker compose ps
 - Direct backend docs: http://localhost:8000/api/docs
 - Database readiness: http://localhost:8080/api/v1/health/ready
 
-Only the frontend port is published. Nginx forwards `/api/` requests to FastAPI
+The frontend port is published, and backend port 8000 is bound to localhost for
+direct API and documentation access. Nginx forwards `/api/` requests to FastAPI
 over the internal Docker network. Both containers run as non-root users and
 have health checks. Set `WEB_PORT` in your shell (or a root `.env`) to change
 the default 8080 port. For an internet deployment, terminate HTTPS at your
