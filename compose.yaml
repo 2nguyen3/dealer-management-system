@@ -20,6 +20,21 @@ services:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
     init: true
+    stop_grace_period: 30s
+    healthcheck:
+      # Readiness includes Supabase connectivity, not just a running API process.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=8)"
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging: *default-logging
+    networks:
+      - app
 
   frontend:
     build:
@@ -35,7 +50,31 @@ services:
     build:
       context: ./backend
     env_file:
+    init: true
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging: *default-logging
+    networks:
+      - app
       - ./backend/.env
     command: ["alembic", "upgrade", "head"]
     profiles: ["tools"]
     restart: "no"
+    init: true
+    stop_grace_period: 30s
+    # This job does not run an HTTP server; disable the image's API health check.
+    healthcheck:
+      disable: true
+    logging: *default-logging
+    networks:
+      - app
+
+networks:
+  # Outbound access remains enabled for the external Supabase database.
+  app:
+    driver: bridge
