@@ -55,3 +55,7 @@ production-build smoke test. `npm run format` applies Prettier formatting.
 The multi-stage Dockerfile builds static assets and serves them with unprivileged
 Nginx on port 8080. Nginx provides SPA fallback, asset caching, and `/api/` proxying
 to the `backend` service on the Compose network. Run from the repository root:
+
+```sh
+docker compose up --build -d
+```
