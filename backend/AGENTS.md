@@ -234,6 +234,10 @@ docker compose ps
 - `migrate` is a one-off service in the `tools` profile running `alembic upgrade head`.
 - PostgreSQL remains external on Supabase; Compose does not start a local database.
 - The default application URL is `http://localhost:8080`, with docs at `/api/docs`.
+- Compose health checks run every 30 seconds; the migration job disables HTTP health
+  checks. All services use the `app` bridge network and rotated JSON logs (10 MB,
+  three files). Shutdown grace periods are 30 seconds for backend/migrations and
+  15 seconds for frontend. An unhealthy status alone does not restart a container.
 
 ## Conventions for extending the backend
 
