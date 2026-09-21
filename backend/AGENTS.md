@@ -227,8 +227,10 @@ docker compose up -d --wait --wait-timeout 120
 docker compose ps
 ```
 
-- `backend` runs Uvicorn on internal port `8000` as a non-root user.
-- `frontend` publishes `${WEB_PORT:-8080}:8080` and waits for backend container health.
+- `backend` runs Uvicorn on port `8000` as a non-root user, published on
+  `127.0.0.1:8000` for direct local access. Docs: `http://localhost:8000/api/docs`.
+- `API_PORT` can override the default localhost-only backend port.
+- `frontend` publishes `${WEB_PORT:-8080}:8080` and waits for backend database readiness.
 - `migrate` is a one-off service in the `tools` profile running `alembic upgrade head`.
 - PostgreSQL remains external on Supabase; Compose does not start a local database.
 - The default application URL is `http://localhost:8080`, with docs at `/api/docs`.
