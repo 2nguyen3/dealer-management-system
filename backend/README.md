@@ -42,3 +42,15 @@ This is a server-side Postgres connection. Supabase API keys are not needed.
 Keep database credentials on the backend. Authentication and user-level
 authorization must be implemented before exposing business data; connecting
 with the database's `postgres` role does not enforce end-user RLS policies.
+
+## Structure
+
+```text
+app/
+  main.py          # Application factory and resource lifecycle
+  api/             # HTTP routes and request/response schemas
+  core/            # Validated environment configuration
+  db/              # SQLAlchemy base and request-scoped sessions
+alembic/           # Versioned database migrations
+tests/             # API checks
+```
