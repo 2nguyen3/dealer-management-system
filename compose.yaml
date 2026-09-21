@@ -12,6 +12,7 @@ services:
     image: dms-backend:local
     build:
       context: ./backend
+      target: runtime
     env_file:
       - ./backend/.env
     expose:
