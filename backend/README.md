@@ -37,3 +37,8 @@ The application disables psycopg prepared statements and uses `NullPool` so
 Supabase handles connection pooling. A transaction-pooler runtime URL is also
 supported. For migrations, use a direct or session-pooler connection through
 `MIGRATION_DATABASE_URL`; the direct endpoint may require IPv6.
+
+This is a server-side Postgres connection. Supabase API keys are not needed.
+Keep database credentials on the backend. Authentication and user-level
+authorization must be implemented before exposing business data; connecting
+with the database's `postgres` role does not enforce end-user RLS policies.
