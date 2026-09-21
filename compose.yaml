@@ -9,6 +9,7 @@ x-logging: &default-logging
 
 services:
   backend:
+    image: dms-backend:local
     build:
       context: ./backend
     env_file:
