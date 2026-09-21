@@ -134,8 +134,9 @@ Supabase client SDK integration; Supabase API keys are not required.
 | `/api/openapi.json` | OpenAPI schema. |
 
 Readiness failures log a generic warning and return a generic error rather than
-database exception details. The backend Docker health check uses **liveness**,
-so container health alone does not establish database readiness.
+database exception details. The Docker image defaults to a **liveness** check;
+Compose overrides it with **database readiness**, so Compose startup requires
+valid database credentials and a reachable Supabase database.
 
 ## Environment configuration
 
