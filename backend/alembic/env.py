@@ -8,7 +8,7 @@ from app.db.base import Base
 # Import all model modules here before autogenerating migrations.
 target_metadata = Base.metadata
 settings = get_settings()
-url = (settings.migration_database_url or settings.database_url).get_secret_value()
+url = settings.database_url()
 
 if context.is_offline_mode():
     context.configure(

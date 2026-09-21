@@ -10,7 +10,13 @@ from app.main import create_app
 
 def make_app():
     return create_app(
-        Settings(_env_file=None, database_url="postgresql+psycopg://test:test@localhost/test")
+        Settings(
+            _env_file=None,
+            db_host="localhost",
+            db_user="test",
+            db_password="test",
+            db_name="test",
+        )
     )
 
 

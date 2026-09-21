@@ -1,26 +1,33 @@
 from functools import lru_cache
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "Dealer Management System API"
-    database_url: SecretStr
-    migration_database_url: SecretStr | None = None
+    db_host: str = Field(min_length=1)
+    db_port: int = Field(default=5432, ge=1, le=65535)
+    db_name: str = "postgres"
+    db_user: str = Field(min_length=1)
+    db_password: SecretStr = Field(min_length=1)
+    db_sslmode: str = "require"
     cors_origins: list[str] = ["http://localhost:5173"]
 
-    @field_validator("database_url", "migration_database_url")
-    @classmethod
-    def validate_database_url(cls, value: SecretStr | None) -> SecretStr | None:
-        if value is not None:
-            url = make_url(value.get_secret_value())
-            if url.drivername != "postgresql+psycopg":
-                raise ValueError("Use a postgresql+psycopg connection URL")
-        return value
+    def database_url(self) -> URL:
+        """Build a driver URL without requiring password URL-encoding."""
+        return URL.create(
+            drivername="postgresql+psycopg",
+            username=self.db_user,
+            password=self.db_password.get_secret_value(),
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+            query={"sslmode": self.db_sslmode},
+        )
 
 
 @lru_cache

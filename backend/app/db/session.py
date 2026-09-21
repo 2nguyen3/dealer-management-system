@@ -2,12 +2,12 @@ from collections.abc import Iterator
 
 from fastapi import Request
 from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import URL, Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 
-def build_engine(database_url: str) -> Engine:
+def build_engine(database_url: URL) -> Engine:
     # Supabase manages pooling. Disable prepared statements for transaction pooler support.
     return create_engine(
         database_url,

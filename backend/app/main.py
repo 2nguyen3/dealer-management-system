@@ -14,7 +14,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        engine = build_engine(settings.database_url.get_secret_value())
+        engine = build_engine(settings.database_url())
         app.state.engine = engine
         try:
             yield
