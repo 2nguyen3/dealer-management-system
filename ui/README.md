@@ -35,3 +35,13 @@ src/
 
 Group future features under `src/features/<feature>/`, keeping their components,
 hooks, and types together. Promote code to shared modules when it is reused.
+
+## Commands
+
+```sh
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+npm run preview
+```
