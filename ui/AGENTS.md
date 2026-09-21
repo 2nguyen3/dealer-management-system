@@ -220,7 +220,8 @@ docker compose ps
 
 The frontend Dockerfile installs locked dependencies with `npm ci`, builds using
 Node.js 24 Alpine, and copies `dist/` into an unprivileged Nginx container.
-`VITE_API_BASE_URL` is a Docker build argument defaulting to `/api/v1`.
+`VITE_API_BASE_URL` is a Docker build argument defaulting to `/api/v1`. Compose
+reads its override from the shell or root `.env`; `ui/.env` is for local Vite.
 
 Nginx behavior in `nginx.conf`:
 
