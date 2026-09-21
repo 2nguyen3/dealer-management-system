@@ -235,8 +235,15 @@ Nginx behavior in `nginx.conf`:
   not API or database readiness.
 
 Compose publishes the frontend as `${WEB_PORT:-8080}:8080` and waits for the backend
-container to be healthy. The default application URL is `http://localhost:8080`.
-Only the frontend port is published; Supabase remains an external managed database.
+container's database readiness check to pass before starting the frontend. Valid
+database credentials are therefore required for Compose startup. The default
+application URL is `http://localhost:8080`.
+The backend is also published on `127.0.0.1:8000` for direct local access, including
+docs at `http://localhost:8000/api/docs`. Supabase remains an external managed database.
+`API_PORT` overrides the backend's published port. Compose uses an `app` bridge
+network, explicit 30-second health-check intervals, and rotated logs (10 MB,
+three files per service). Nginx gets a 15-second graceful shutdown period.
+Unhealthy status alone does not trigger a container restart.
 
 ## Conventions for extending the frontend
 
