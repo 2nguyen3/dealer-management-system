@@ -80,6 +80,24 @@ have health checks. Set `WEB_PORT` in your shell (or a root `.env`) to change
 the default 8080 port. For an internet deployment, terminate HTTPS at your
 hosting platform's ingress or reverse proxy.
 
+Compose defines the following runtime settings:
+
+- Backend health checks call `/api/v1/health/ready`, including database connectivity,
+  every 30 seconds. The frontend starts after the backend is healthy, so valid
+  `DB_*` settings and a reachable Supabase database are required.
+- Frontend health checks call Nginx `/healthz` every 30 seconds.
+- The one-off migration service has HTTP health checks disabled.
+- All services use the `app` bridge network, with outbound access to Supabase.
+- Container logs rotate at 10 MB, keeping three files per container.
+- Graceful shutdown allows 30 seconds for the backend/migrations and 15 for Nginx.
+- `API_PORT` overrides the localhost-only backend port (default `8000`).
+- `VITE_API_BASE_URL` overrides the frontend Docker build argument (default `/api/v1`).
+  Set Compose overrides in your shell or a root `.env`; `ui/.env` is for local Vite.
+
+A failed health check marks a container unhealthy; it does not itself restart it.
+`unless-stopped` restarts the long-running services when their processes exit.
+The frontend dependency is a startup gate, not ongoing monitoring of the backend.
+
 ```sh
 docker compose logs -f
 docker compose down
