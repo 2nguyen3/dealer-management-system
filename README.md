@@ -70,6 +70,7 @@ docker compose ps
 
 - Application: http://localhost:8080
 - API docs: http://localhost:8080/api/docs
+- Direct backend docs: http://localhost:8000/api/docs
 - Database readiness: http://localhost:8080/api/v1/health/ready
 
 Only the frontend port is published. Nginx forwards `/api/` requests to FastAPI
