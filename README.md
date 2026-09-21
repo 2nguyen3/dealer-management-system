@@ -64,7 +64,7 @@ From the repository root:
 ```sh
 docker compose build
 docker compose --profile tools run --rm migrate
-docker compose up -d
+docker compose up -d --wait --wait-timeout 120
 docker compose ps
 ```
 
