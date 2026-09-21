@@ -60,6 +60,11 @@ to the `backend` service on the Compose network. Run from the repository root:
 docker compose up --build -d --wait --wait-timeout 120
 ```
 
-For a separate API deployment, override the `VITE_API_BASE_URL` Docker build
-argument and configure CORS. The API documentation link uses the default
+Compose waits for backend database readiness before starting the frontend. Fill
+in `backend/.env` with valid Supabase settings first. The frontend's own health
+check calls Nginx `/healthz`.
+
+For a separate API deployment, set `VITE_API_BASE_URL` in the shell or root `.env`
+to override the Docker build argument and configure CORS. `ui/.env` configures
+local Vite, not Compose build arguments. The API documentation link uses the default
 same-origin `/api/docs` route. See the root README for environment setup.
