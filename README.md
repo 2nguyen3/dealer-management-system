@@ -35,8 +35,8 @@ Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xu�
 
 Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
 
-1. Copy `backend/.env.example` to `backend/.env` and replace the database URL
-   with your Supabase connection string.
+1. Copy `backend/.env.example` to `backend/.env`, verify the Supabase `DB_HOST`,
+   `DB_PORT`, `DB_NAME`, and `DB_USER`, and fill in `DB_PASSWORD`.
 2. In `backend/`, run:
 
    ```sh
