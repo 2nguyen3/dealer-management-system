@@ -17,3 +17,8 @@ Vite proxies `/api` to FastAPI so local requests use the same origin.
 
 The starter page checks API liveness and links to Swagger UI. It does not check
 the database; use `/api/v1/health/ready` to verify Supabase connectivity.
+
+The default API base URL is `/api/v1`. To override it, copy `.env.example` to
+`.env` and set `VITE_API_BASE_URL`. Vite variables are public and are embedded
+at build time. Never put database credentials or service-role keys in them.
+An external API origin also needs the frontend origin in backend `CORS_ORIGINS`.
