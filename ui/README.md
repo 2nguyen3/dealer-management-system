@@ -22,3 +22,13 @@ The default API base URL is `/api/v1`. To override it, copy `.env.example` to
 `.env` and set `VITE_API_BASE_URL`. Vite variables are public and are embedded
 at build time. Never put database credentials or service-role keys in them.
 An external API origin also needs the frontend origin in backend `CORS_ORIGINS`.
+
+## Structure
+
+```text
+src/
+  app/          # Application composition
+  lib/          # Shared infrastructure, including API calls
+  main.tsx      # React entry point
+  styles.css    # Global styles
+```
