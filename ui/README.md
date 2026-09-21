@@ -45,3 +45,7 @@ npm run format:check
 npm run build
 npm run preview
 ```
+
+`preview` serves a local production build; it is not a production server and
+does not provide the development API proxy. Use Docker Compose for a full-stack
+production-build smoke test. `npm run format` applies Prettier formatting.
