@@ -154,11 +154,15 @@ settings, and caches `get_settings()`. Run backend commands from `backend/`.
 | `DB_SSLMODE` | Defaults to `require`. |
 | `CORS_ORIGINS` | JSON array; defaults to `["http://localhost:5173"]`. |
 
-Copy `.env.example` to `.env` and use the actual connection string from Supabase's
-Connect panel. Keep `sslmode=require` and URL-encode reserved password characters.
-The session pooler on port `5432` is the documented default for IPv4 connectivity.
-A transaction-pooler runtime URL is supported; migrations should use a direct or
-session-pooler URL. The direct endpoint may require IPv6.
+Copy `.env.example` to `.env`, verify the connection fields against Supabase's
+Connect panel, and fill in `DB_PASSWORD`. The template includes the project's
+session-pooler host and username but leaves the password blank. Keep
+`DB_SSLMODE=require`; enter the raw password in single quotes without URL-encoding.
+`Settings.database_url()` builds a SQLAlchemy URL object internally. Both the API
+and Alembic use these `DB_*` fields; connection-string environment settings are no
+longer used. The session pooler on port `5432` supports IPv4. If runtime uses
+transaction pooling, override the host/port for migrations to use a direct or
+session-pooler connection. The direct endpoint may require IPv6.
 
 Keep credentials in backend environment files, which are ignored by Git, and
 commit only example templates. Frontend `VITE_*` settings are browser-visible.
