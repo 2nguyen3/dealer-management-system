@@ -43,8 +43,9 @@ passwords are rejected. `DATABASE_URL` and `MIGRATION_DATABASE_URL` are no longe
 
 The application disables psycopg prepared statements and uses `NullPool` so
 Supabase handles connection pooling. A transaction-pooler runtime URL is also
-supported. For migrations, use a direct or session-pooler connection through
-`MIGRATION_DATABASE_URL`; the direct endpoint may require IPv6.
+supported. Alembic uses the same `DB_*` settings; run migrations with a direct or
+session-pooler host and port. If runtime uses transaction pooling, override those
+settings for the migration process. The direct endpoint may require IPv6.
 
 This is a server-side Postgres connection. Supabase API keys are not needed.
 Keep database credentials on the backend. Authentication and user-level
