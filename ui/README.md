@@ -32,3 +32,6 @@ src/
   main.tsx      # React entry point
   styles.css    # Global styles
 ```
+
+Group future features under `src/features/<feature>/`, keeping their components,
+hooks, and types together. Promote code to shared modules when it is reused.
