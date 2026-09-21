@@ -54,3 +54,7 @@ app/
 alembic/           # Versioned database migrations
 tests/             # API checks
 ```
+
+Add domain modules as features are implemented. Routes should delegate business
+logic to services. Inject `get_session` into routes and commit explicitly at the
+service transaction boundary; closing a session rolls back uncommitted changes.
