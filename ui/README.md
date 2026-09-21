@@ -57,7 +57,7 @@ Nginx on port 8080. Nginx provides SPA fallback, asset caching, and `/api/` prox
 to the `backend` service on the Compose network. Run from the repository root:
 
 ```sh
-docker compose up --build -d
+docker compose up --build -d --wait --wait-timeout 120
 ```
 
 For a separate API deployment, override the `VITE_API_BASE_URL` Docker build
