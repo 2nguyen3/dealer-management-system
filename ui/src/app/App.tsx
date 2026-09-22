@@ -31,7 +31,7 @@ export function App() {
   return (
     <main>
       <header>
-        <span className="wordmark">DMS</span>
+        <span className="wordmark">Agentra</span>
         <span>Development workspace</span>
       </header>
       <section aria-labelledby="title">

@@ -1,7 +1,7 @@
 [project]
 name = "dms-backend"
 version = "0.1.0"
-description = "Dealer Management System API"
+description = "Agentra Dealer Management System API"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "alembic>=1.16,<2",

@@ -1,4 +1,4 @@
-# Dealer Management System
+# Agentra - Dealer Management System
 
 AI development setup: [OpenCode and Claude Code guide](.agent/README.md).
 
@@ -7,7 +7,7 @@ AI development setup: [OpenCode and Claude Code guide](.agent/README.md).
 
 ## Giới thiệu
 
-Dealer Management System là hệ thống hỗ trợ quản lý hoạt động phân phối hàng hóa cho các đại lý.
+Agentra là hệ thống quản lý đại lý (Dealer Management System), hỗ trợ quản lý hoạt động phân phối hàng hóa cho các đại lý.
 
 Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xuất hàng, thanh toán, công nợ và báo cáo kinh doanh. Dự án được thực hiện nhằm vận dụng các kiến thức về khảo sát yêu cầu, phân tích, thiết kế, xây dựng và kiểm thử phần mềm.
 

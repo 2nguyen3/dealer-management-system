@@ -6,7 +6,7 @@ from `ui/` unless stated otherwise.
 
 ## Project purpose and current state
 
-DMS means **Dealer Management System**: an application for managing the
+**Agentra** is the app name. DMS means **Dealer Management System**, for managing the
 distribution of goods to dealers. It is an Introduction to Software Engineering
 course project at the University of Information Technology, Vietnam National
 University Ho Chi Minh City. The root `README.md` contains team and course details.
@@ -22,19 +22,19 @@ authentication, and authorization have not been implemented yet.
 
 ## Technology stack
 
-| Area | Technology and role |
-| --- | --- |
-| Runtime/tooling | Node.js 24 LTS recommended and used in Docker; `package.json` requires Node.js `>=22.12.0`. |
-| Dependencies | npm with `package-lock.json` for reproducible installs. |
-| UI | React 19 and React DOM 19; function components and built-in hooks. |
-| Language | TypeScript 5.9 with strict checking; ECMAScript modules. |
-| Build/dev server | Vite 7 with `@vitejs/plugin-react` 5. |
-| Styling | Plain global CSS in `src/styles.css`; no CSS framework or component library is installed. |
-| HTTP | Browser `fetch`, `AbortController`, and `AbortSignal`; no API client library is installed. |
-| Quality | ESLint 9, typescript-eslint, React Hooks/Refresh rules, and Prettier 3. |
-| Backend | Python 3.12, FastAPI, Pydantic Settings, synchronous SQLAlchemy 2, psycopg 3, and Alembic. |
-| Database | Supabase-hosted PostgreSQL, accessed by the backend. |
-| Deployment | Docker Compose and unprivileged Nginx 1.28 serving static assets. |
+| Area             | Technology and role                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| Runtime/tooling  | Node.js 24 LTS recommended and used in Docker; `package.json` requires Node.js `>=22.12.0`. |
+| Dependencies     | npm with `package-lock.json` for reproducible installs.                                     |
+| UI               | React 19 and React DOM 19; function components and built-in hooks.                          |
+| Language         | TypeScript 5.9 with strict checking; ECMAScript modules.                                    |
+| Build/dev server | Vite 7 with `@vitejs/plugin-react` 5.                                                       |
+| Styling          | Plain global CSS in `src/styles.css`; no CSS framework or component library is installed.   |
+| HTTP             | Browser `fetch`, `AbortController`, and `AbortSignal`; no API client library is installed.  |
+| Quality          | ESLint 9, typescript-eslint, React Hooks/Refresh rules, and Prettier 3.                     |
+| Backend          | Python 3.12, FastAPI, Pydantic Settings, synchronous SQLAlchemy 2, psycopg 3, and Alembic.  |
+| Database         | Supabase-hosted PostgreSQL, accessed by the backend.                                        |
+| Deployment       | Docker Compose and unprivileged Nginx 1.28 serving static assets.                           |
 
 There is currently no client-side router, global state library, frontend test
 runner, or end-to-end test framework configured. Exact dependency resolutions
@@ -119,13 +119,13 @@ React StrictMode can rerun effects during development, so preserve request clean
 `src/lib/api.ts` reads `import.meta.env.VITE_API_BASE_URL`, falls back to
 `/api/v1`, and removes a trailing slash before appending endpoint paths.
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/health` | API liveness; returns `200` with `{"status":"ok"}` without querying the database. |
+| Endpoint                   | Purpose                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/health`       | API liveness; returns `200` with `{"status":"ok"}` without querying the database.                          |
 | `GET /api/v1/health/ready` | Database readiness; executes `SELECT 1`, returning `200` or a generic `503` database-unavailable response. |
-| `/api/docs` | Swagger UI; linked from the starter page. |
-| `/api/redoc` | ReDoc documentation. |
-| `/api/openapi.json` | API schema. |
+| `/api/docs`                | Swagger UI; linked from the starter page.                                                                  |
+| `/api/redoc`               | ReDoc documentation.                                                                                       |
+| `/api/openapi.json`        | API schema.                                                                                                |
 
 ### Local development
 
@@ -180,14 +180,14 @@ uv run uvicorn app.main:create_app --factory --reload
 
 Frontend commands:
 
-| Command | Purpose |
-| --- | --- |
-| `npm run typecheck` | Run `tsc -b` across the TypeScript project references. |
-| `npm run lint` | Run ESLint with zero warnings allowed. |
-| `npm run format:check` | Check Prettier formatting. |
-| `npm run format` | Apply Prettier formatting. |
-| `npm run build` | Run TypeScript checks and build static assets into `dist/`. |
-| `npm run preview` | Serve the production build locally after building. |
+| Command                | Purpose                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `npm run typecheck`    | Run `tsc -b` across the TypeScript project references.      |
+| `npm run lint`         | Run ESLint with zero warnings allowed.                      |
+| `npm run format:check` | Check Prettier formatting.                                  |
+| `npm run format`       | Apply Prettier formatting.                                  |
+| `npm run build`        | Run TypeScript checks and build static assets into `dist/`. |
+| `npm run preview`      | Serve the production build locally after building.          |
 
 `preview` is not a production server and does not provide the documented development
 API proxy. Use Docker Compose for a full-stack production-build smoke test.

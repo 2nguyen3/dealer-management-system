@@ -1,8 +1,8 @@
-# DMS project instructions
+# Agentra project instructions
 
 ## Context
 
-Dealer Management System is a software engineering course project for managing
+Agentra is a Dealer Management System (DMS) software engineering course project for managing
 dealer distribution, incoming/outgoing goods, inventory, payments, debt, and
 business reports. The current implementation is an infrastructure scaffold:
 FastAPI health endpoints, database configuration, migration tooling, and a React

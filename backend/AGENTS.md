@@ -6,7 +6,7 @@ Paths in commands are relative to `backend/` unless stated otherwise.
 
 ## Project purpose and current state
 
-DMS means **Dealer Management System**: an application for managing the distribution
+**Agentra** is the app name. DMS means **Dealer Management System**, for managing the distribution
 of goods to dealers. It is an Introduction to Software Engineering course project
 at the University of Information Technology, Vietnam National University Ho Chi
 Minh City. The root `README.md` contains the team and course information.
@@ -145,7 +145,7 @@ settings, and caches `get_settings()`. Run backend commands from `backend/`.
 
 | Variable | Requirement/default |
 | --- | --- |
-| `APP_NAME` | Optional; defaults to `Dealer Management System API`. |
+| `APP_NAME` | Optional; defaults to `Agentra API`. |
 | `DB_HOST` | Required PostgreSQL hostname. |
 | `DB_PORT` | Defaults to `5432`; must be between 1 and 65535. |
 | `DB_NAME` | Defaults to `postgres`. |
