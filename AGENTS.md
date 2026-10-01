@@ -38,6 +38,8 @@ setup details and source/configuration as the authority for current behavior.
 - Update documentation when changing settings, commands, endpoints, or structure.
 - Never commit `.env` files or credentials. `DB_PASSWORD` remains blank in the
   example template. Avoid printing resolved Compose configuration with secrets.
+  Synthetic demo app passwords are intentionally documented in the root README;
+  they are not Supabase/PostgreSQL or provider credentials.
 - Keep provider credentials and personal model choices in user-level tool settings.
 - Commit and push only when requested. Review status, diff, and recent history;
   stage intended files and use conventional messages matching this repository.
@@ -46,11 +48,28 @@ setup details and source/configuration as the authority for current behavior.
 ## Verification
 
 Run checks from the owning directory, using the tool's working-directory option
-where available. Consult `.agent/workflows/verify.md` for the command list.
+where available. Consult `.agents/workflows/verify.md` for the command list.
 Report commands actually run, their results, and any unverified behavior.
 
 Backend uses `uv.lock`; frontend uses `package-lock.json`. Preserve locked installs
 and update the corresponding lockfile when changing dependencies.
+
+## Database workflow
+
+- Schema authority: immutable reviewed DDL in `backend/alembic/sql/`; migrations
+  `0001` (complete DMS objects/core RBAC) and `0002` (pg_trgm search indexes).
+  `openwiki/database-design/*.sql` are psql entry points, not duplicate DDL copies.
+- From `backend/`: `uv sync --frozen`, `uv run alembic upgrade head`, then
+  `uv run python -m app.db.seed` for the complete demo.
+- Verify database work with `uv run python -m app.db.verify --seeded --regression`.
+  The 54 regression checks use a separate schema and roll back all fixtures.
+- The demo covers all 29 tables, 30 agencies, 24 products, 410 documents and
+  June–September 2026 history. Account credentials and exact counts are in README.
+- Seed v1 is atomic and repeatable; it verifies existing demo data on rerun.
+  It does not reset a populated database, disable triggers or write balance caches.
+- Add new revisions for schema changes; do not edit deployed SQL snapshots or
+  rerun initial DDL over an existing schema. ORM models are not mapped yet;
+  autogeneration only compares explicitly mapped tables. HTTP auth is still future work.
 
 ## Runtime context
 
@@ -61,4 +80,4 @@ Passwords are raw values, not URL-encoded connection strings.
 Compose publishes the UI at `http://localhost:8080` and the API on localhost port
 `8000` by default. Docs are at `/api/docs` on either port. Backend readiness checks
 include the database; the frontend waits for readiness at startup. Migrations run
-explicitly, never on API startup. See `.agent/workflows/docker.md` for operations.
+explicitly, never on API startup. See `.agents/workflows/docker.md` for operations.
