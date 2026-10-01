@@ -106,6 +106,28 @@ tháng và so sánh tồn/công nợ/doanh số nhiều kỳ. Chứng từ có n
 là bằng chứng **mô phỏng** có đánh dấu `demo`, không gọi cổng thanh toán thật.
 Các tên quận là danh mục demo theo mô hình quận trong thiết kế.
 
+### Tài khoản đăng nhập mẫu
+
+Đây là tài khoản **demo của ứng dụng** trong `dms.app_user`, không phải tài khoản
+Supabase Auth hoặc tài khoản kết nối PostgreSQL. Mật khẩu được lưu dưới dạng
+**Argon2id**. Backend/UI hiện chưa triển khai API hay màn hình đăng nhập; bảng
+dưới đây cung cấp thông tin để sử dụng khi tích hợp authentication.
+
+| Email | Mật khẩu demo | Nhóm | Trạng thái |
+|---|---|---|---|
+| `quanly@agentra.demo` | `AgentraDemo!2026#QL` | Quản lý | ACTIVE |
+| `kinhdoanh@agentra.demo` | `AgentraDemo!2026#KD` | Kinh doanh | ACTIVE |
+| `kho@agentra.demo` | `AgentraDemo!2026#KHO` | Kho | ACTIVE |
+| `ketoan@agentra.demo` | `AgentraDemo!2026#KT` | Kế toán | ACTIVE |
+| `kinhdoanh2@agentra.demo` | `AgentraDemo!2026#KD2` | Kinh doanh | ACTIVE |
+| `kho2@agentra.demo` | `AgentraDemo!2026#KHO2` | Kho | ACTIVE |
+| `ketoan2@agentra.demo` | `AgentraDemo!2026#KT2` | Kế toán | ACTIVE |
+| `locked@agentra.demo` | `AgentraDemo!2026#LOCK` | Kinh doanh | LOCKED — kiểm thử từ chối đăng nhập |
+
+`python -m app.db.verify --seeded` kiểm tra các hash mật khẩu mẫu, số liệu
+ledger/cache/chứng từ và báo cáo. `--regression` chạy thêm 54 assertions/rejections
+PostgreSQL trong schema kiểm thử riêng rồi rollback toàn bộ fixture.
+
 ### Docker deployment
 
 Prerequisites: Docker Engine/Desktop with Compose v2 and a configured
