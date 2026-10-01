@@ -24,6 +24,9 @@ authentication are not implemented yet.
   dependency graph, staged integration and module completion gates.
 - `openwiki/frontend-design/GENERAL_PLAN.md`: frontend module order, dependency
   graph, API integration contract and strict UI completion gates; child plans follow on request.
+- `openwiki/backend-design/GENERAL_CHECKLIST.md` and
+  `openwiki/frontend-design/GENERAL_CHECKLIST.md`: roadmap slice, deferred-integration
+  and release tracking; close items only with linked implementation evidence.
 - `openwiki/backend-design/API/openapi.json`: target business API contract;
   distinguish it from the currently implemented health-only runtime API.
 - `openwiki/backend-design/plan/authentication/`: authentication implementation
@@ -68,10 +71,12 @@ Before planning or implementing frontend modules, read
 `openwiki/frontend-design/GENERAL_PLAN.md`. Start with frontend/API/test foundations,
 then authentication and the permission-aware shell, then business features in
 dependency order. Reuse the target backend OpenAPI contract; do not duplicate it.
+Track slice/integration status in `openwiki/frontend-design/GENERAL_CHECKLIST.md`;
+mocked UI is not live completion. Keep general and child checklists/evidence aligned.
 
 Prepare detailed child plans under `openwiki/frontend-design/plan/<module_name>/`
-when requested. The current deliverable is the General Plan only; child plans
-and business UI remain unimplemented. Every completed frontend function/component/
+when requested. General documents now include the General Plan and General Checklist;
+child plans and business UI remain unimplemented. Every completed frontend function/component/
 hook/adapter must have strict success/failure/boundary tests and recorded evidence.
 Distinguish contract-mocked slices from real backend/browser integration; do not
 close a module with missing API, deferred operations or required unrun tests.
@@ -83,6 +88,8 @@ Before planning or implementing any backend module, read
 slices. Authentication is first; shared API conventions and administration follow,
 then master data, document/settlement workflows, corrections, and read products.
 Only infrastructure/database work is implemented today; the roadmap is future work.
+Track verified slices and deferred/full-module gates in
+`openwiki/backend-design/GENERAL_CHECKLIST.md`. Core delivery is not whole-module completion.
 
 Prepare each module's detailed plan under `openwiki/backend-design/plan/<module_name>/`
 before code. Register actual functions with strict success/failure/boundary tests;
