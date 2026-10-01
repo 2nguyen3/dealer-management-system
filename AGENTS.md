@@ -4,9 +4,10 @@
 
 Agentra is a Dealer Management System (DMS) software engineering course project for managing
 dealer distribution, incoming/outgoing goods, inventory, payments, debt, and
-business reports. The current implementation is an infrastructure scaffold:
-FastAPI health endpoints, database configuration, migration tooling, and a React
-starter page. Business workflows and authentication are not implemented yet.
+business reports. The implementation includes FastAPI health endpoints, database
+configuration, reviewed Alembic migrations for the complete DMS schema, full demo
+seed/live SQL verification, and a React starter page. Business APIs and HTTP
+authentication are not implemented yet.
 
 ## Project map
 
@@ -16,9 +17,10 @@ starter page. Business workflows and authentication are not implemented yet.
   Read `ui/AGENTS.md` before frontend work.
 - `compose.yaml`: backend, Nginx frontend, and an explicit migration job.
 - `openwiki/BA/`: business analysis documentation.
-- `openwiki/backend-design/`, `openwiki/database-design/`, and
-  `openwiki/frontend-design/`: design documentation areas, currently placeholders.
-- `.agent/`: shared agent workflow references, explicitly loaded by tool configs.
+- `openwiki/database-design/`: complete PostgreSQL/DBML design and psql entry points
+  linking to versioned backend DDL and regression SQL.
+- `openwiki/backend-design/` and `openwiki/frontend-design/`: design documentation areas.
+- `.agents/`: shared verification/Docker workflows and project-local skills.
 - `opencode.json` and `.opencode/commands/`: OpenCode project configuration.
 - `CLAUDE.md` and `.claude/`: Claude Code entry points and project configuration.
 
