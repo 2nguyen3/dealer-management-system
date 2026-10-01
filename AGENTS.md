@@ -22,6 +22,8 @@ authentication are not implemented yet.
 - `openwiki/backend-design/` and `openwiki/frontend-design/`: design documentation areas.
 - `openwiki/backend-design/GENERAL_PLAN.md`: backend module implementation order,
   dependency graph, staged integration and module completion gates.
+- `openwiki/frontend-design/GENERAL_PLAN.md`: frontend module order, dependency
+  graph, API integration contract and strict UI completion gates; child plans follow on request.
 - `openwiki/backend-design/API/openapi.json`: target business API contract;
   distinguish it from the currently implemented health-only runtime API.
 - `openwiki/backend-design/plan/authentication/`: authentication implementation
@@ -59,6 +61,20 @@ Report commands actually run, their results, and any unverified behavior.
 
 Backend uses `uv.lock`; frontend uses `package-lock.json`. Preserve locked installs
 and update the corresponding lockfile when changing dependencies.
+
+## Frontend implementation roadmap
+
+Before planning or implementing frontend modules, read
+`openwiki/frontend-design/GENERAL_PLAN.md`. Start with frontend/API/test foundations,
+then authentication and the permission-aware shell, then business features in
+dependency order. Reuse the target backend OpenAPI contract; do not duplicate it.
+
+Prepare detailed child plans under `openwiki/frontend-design/plan/<module_name>/`
+when requested. The current deliverable is the General Plan only; child plans
+and business UI remain unimplemented. Every completed frontend function/component/
+hook/adapter must have strict success/failure/boundary tests and recorded evidence.
+Distinguish contract-mocked slices from real backend/browser integration; do not
+close a module with missing API, deferred operations or required unrun tests.
 
 ## Backend implementation roadmap
 
