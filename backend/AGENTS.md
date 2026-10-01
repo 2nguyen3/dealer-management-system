@@ -185,6 +185,8 @@ From `backend/`, after configuring `.env`:
 
 ```sh
 uv sync --frozen
+uv run alembic upgrade head
+uv run python -m app.db.seed
 uv run uvicorn app.main:create_app --factory --reload
 ```
 
@@ -198,6 +200,19 @@ uv run ruff format --check .
 uv run pytest
 ```
 
+For database changes, additionally run from `backend/` with configured `.env`:
+
+```sh
+uv run alembic current
+uv run python -m app.db.verify --seeded --regression
+```
+
+Live verification reconciles 29 tables, 58 timestamp columns, documents, balances,
+credit reservations, audit redaction and reports. It verifies all demo account
+password hashes. Regression adds 54 assertions/rejections in an isolated schema
+that is always rolled back; it requires schema-creation privileges. Unit tests
+remain independent of Supabase. See `../.agents/workflows/verify.md` for shared checks.
+
 Ruff targets Python 3.12, uses a 100-character line length, and enables `E`, `F`,
 `I`, `UP`, and `B` rules. pytest discovers tests in `tests/` with the backend root
 on the Python path. Existing tests supply settings with `_env_file=None`, override
@@ -210,19 +225,47 @@ and `npm run build`.
 
 ## Database migrations
 
-Define application models using `app.db.base.Base`, which provides consistent
-index and constraint names. Import new model modules in `alembic/env.py` before
-autogeneration so their tables are registered in `Base.metadata`.
+The complete schema is versioned in `alembic/sql/0001_initial.sql` and
+`alembic/sql/0002_search_indexes.sql`. Revisions execute those snapshots inside
+Alembic's transaction; revision tracking is in `public.alembic_version` so the
+DDL's local search path cannot hide it.
 
 ```sh
-uv run alembic revision --autogenerate -m "create initial tables"
 uv run alembic upgrade head
+uv run alembic current
 ```
 
-There is currently no initial revision. Review generated migrations before
-applying them, especially when the Supabase project already contains tables.
+Revisions `0001` and `0002` contain the reviewed initial DDL and search indexes.
+Use `uv run alembic upgrade head`, then `uv run python -m app.db.seed` for the
+demo. Verify with `uv run python -m app.db.verify --seeded --regression`.
+Do not edit deployed SQL snapshots; add a new revision. Autogeneration includes
+only explicitly mapped tables so it does not drop SQL-managed/Supabase objects.
+Review generated migrations before applying them.
 Run migrations explicitly; application startup does not apply migrations or
 create tables.
+
+When adding ORM models, use `app.db.base.Base`, `schema="dms"` and the existing
+quoted camelCase SQL column names. Register models in `alembic/env.py`.
+Domains, triggers, functions and views need explicit reviewed SQL; Alembic cannot
+infer their full behavior. Downgrading `0001` removes the schema and all its data.
+
+## Demo seed conventions
+
+`app/db/seed.py` seeds all 29 tables transactionally with a stable dataset marker
+and an advisory lock. A first run requires empty application data; a repeat run
+verifies demo v1 and leaves its row counts/passwords unchanged. Session-local
+`pg_temp` helpers in `app/db/sql/seed_helpers.sql` are not business API services.
+
+Keep the seed realistic and internally reconciled: include multi-line documents,
+historical price snapshots, FIFO payments, upfront evidence, returns, credit,
+refund states/reservations, counts, corrections, cancellations and audit. Never
+disable constraints/triggers or write caches directly to make seed data pass.
+Force deferred constraints at business boundaries and report success after commit.
+
+Use Argon2id for app passwords. Seed token digests are random and revoked; raw
+tokens are discarded. Payment/refund evidence is explicitly simulated under
+`DEMO_SANDBOX`; no real provider calls. These users belong to `dms.app_user`, not
+Supabase Auth. Root README lists all 8 credentials, including one locked user.
 
 ## Docker deployment
 
@@ -231,6 +274,7 @@ From the repository root, with `backend/.env` configured:
 ```sh
 docker compose build
 docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm migrate python -m app.db.seed
 docker compose up -d --wait --wait-timeout 120
 docker compose ps
 ```
