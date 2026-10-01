@@ -293,6 +293,54 @@ docker compose ps
 
 ## Conventions for extending the backend
 
+### General Plan and module dependencies
+
+Read `../openwiki/backend-design/GENERAL_PLAN.md` before planning or implementing
+a module. It defines the recommended order, direct prerequisite slices, shared
+service ownership and full-module completion gates. The next module is
+authentication; business HTTP modules remain unimplemented.
+
+- Create the owning `../openwiki/backend-design/plan/<module_name>/` materials
+  before code; include requirements, design, actual-symbol tests, checklist and evidence.
+- Follow the roadmap's split stock-issue/receipt/upfront integration and later
+  cross-document correction gates. A delivered core slice is not a completed module.
+- Test every completed function with success/failure/boundary assertions. Require
+  real PostgreSQL persisted-state/rollback tests and appropriate multi-connection
+  tests for caps, locks, retries and money consumption; declare scoped coverage gates.
+- Reuse shared auth/API/document/settlement services with explicit caller-owned
+  transactions. Do not call another HTTP endpoint to complete an atomic write.
+- Update roadmap progress and dependency table/graph with the owning plan when
+  implementation advances. Required skipped/xfailed/unrun tests leave gates open.
+
+### Authentication plan and strict test gates
+
+Authentication is planned in
+`../openwiki/backend-design/plan/authentication/PLAN.md`. Read its REQUIREMENTS,
+DESIGN, TESTS, CHECKLIST and VERIFICATION files before implementation. The source
+contract is `../openwiki/backend-design/API/openapi.json`; its seven Authentication
+operations are target behavior, not currently available runtime endpoints.
+
+- Follow the plan's ordered phases and additive session/version migration design;
+  recheck current Alembic head before choosing a new revision. Preserve deployed
+  SQL snapshots and demo seed compatibility. Authentication uses `dms.app_user`.
+- Every completed auth function, helper, method, validator, route and generated
+  dependency must be registered by actual symbol with passing behavior tests.
+  Include success, failure/boundary and secret-redaction assertions as applicable.
+- Repository/transaction behavior requires isolated real PostgreSQL tests,
+  including persisted-state/rollback assertions. Session rotation, reset consumption
+  and invalidation races require independent connections, not mocked concurrency.
+- Meet the auth statement/branch coverage gate in TESTS.md. Required skipped,
+  xfailed or unrun tests leave the function/phase incomplete. Keep offline tests
+  independent of Supabase; explicitly selected integration tests must fail setup
+  when their disposable environment is missing rather than silently skip.
+- Update CHECKLIST.md only after the function's required tests pass and record exact
+  commands/results in VERIFICATION.md. Register and test newly introduced symbols
+  before closing them. Do not present proposed files/settings as implemented.
+- Preserve source response schemas and nonempty-password policy; never log or
+  echo password/token/hash values in validation errors, audit or delivery failures.
+
+### General extension conventions
+
 - Preserve the `create_app(settings: Settings | None = None)` factory and lifespan
   resource management so tests can inject configuration.
 - Keep HTTP routes and request/response schemas in the API layer. Add domain
