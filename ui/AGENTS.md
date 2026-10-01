@@ -17,8 +17,8 @@ goods, inventory, payments, outstanding dealer debt, and business reports.
 The repository currently contains an infrastructure scaffold. The frontend shows
 a development starter page with API connection status and a link to API docs.
 The backend provides health endpoints, database configuration, session management,
-and migration tooling. Business screens, domain API endpoints, application tables,
-authentication, and authorization have not been implemented yet.
+migration tooling and the reviewed DMS schema/demo seed. Business screens, domain
+HTTP endpoints, authentication and user-level authorization have not been implemented yet.
 
 ## Technology stack
 
@@ -246,6 +246,35 @@ three files per service). Nginx gets a 15-second graceful shutdown period.
 Unhealthy status alone does not trigger a container restart.
 
 ## Conventions for extending the frontend
+
+### General Plan and strict integration gates
+
+Read `../openwiki/frontend-design/GENERAL_PLAN.md` before planning or implementing
+frontend features. It defines the module order, frontend dependencies, backend
+slice readiness, common API/UX contract and strict testing/completion rules.
+The next frontend module is `frontend_foundations`; the current roadmap has no
+detailed child-module plans. Prepare those under
+`../openwiki/frontend-design/plan/<module_name>/` only when requested.
+
+- Use `../openwiki/backend-design/API/openapi.json` as the single target HTTP
+  contract and the backend General Plan for operation readiness. A plan or mock
+  does not mean that a business endpoint is implemented.
+- Before child-module code, define PLAN/REQUIREMENTS/DESIGN/TESTS/CHECKLIST/
+  VERIFICATION materials with screen/action-to-operation/permission mapping.
+- Register/test every completed actual function, component, hook, adapter,
+  validator and callback with success/failure/boundary assertions; declare scoped
+  coverage gates and record exact commands/results before closing items.
+- Add the frontend test/browser harness in the foundations module; none exists
+  today. Required skipped/xfailed/unrun tests keep completion gates open.
+- Keep contract-mocked and live-integrated slices distinct. Full completion
+  requires relevant backend gates, real-browser critical-flow tests, keyboard/
+  responsive behavior and all deferred workflow integrations.
+- Preserve exact IDs/numeric strings/business dates, parent ETags and stable
+  intent keys; treat the server as stock/debt/payment/permission authority.
+- Keep roadmap progress/dependencies and owning plans/evidence aligned. Do not
+  duplicate the backend API spec or turn provider redirects into payment success.
+
+### General extension conventions
 
 - Keep application composition in `src/app/` and shared infrastructure such as API
   communication in `src/lib/`.
