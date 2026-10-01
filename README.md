@@ -43,6 +43,8 @@ Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
 
    ```sh
    uv sync --frozen
+   uv run alembic upgrade head
+   uv run python -m app.db.seed
    uv run uvicorn app.main:create_app --factory --reload
    ```
 
