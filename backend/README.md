@@ -107,6 +107,41 @@ docker compose --profile tools run --rm migrate
 docker compose --profile tools run --rm migrate python -m app.db.seed
 ```
 
+## Demo seed and live database verification
+
+```sh
+uv run python -m app.db.seed
+uv run python -m app.db.verify --seeded
+uv run python -m app.db.verify --seeded --regression
+```
+
+The demo populates all 29 tables with 30 agencies, 24 products, 410 documents and
+four months of trading history (June–September 2026). It covers multi-line receipts/
+issues, current/historical price snapshots, FIFO cash/bank/online collections,
+upfront evidence, returns, credit lots/application, cash/online refunds and pending
+reservations, stock counts, drafts, cancellations, correction revisions, reversals
+and automatic audit logs. Full counts and all 8 demo account credentials are in
+the [root README](../README.md#tài-khoản-đăng-nhập-mẫu).
+
+Passwords are hashed with Argon2id. Seeded tokens are random digests, all revoked;
+raw tokens are discarded. Provider evidence uses `DEMO_SANDBOX` and explicitly
+marked simulated payloads; the seed never calls a real gateway. These app users
+are not Supabase Auth users. HTTP authentication remains unimplemented.
+
+Seed requires revision `0002` and an empty application dataset on first run, keeps
+core rules/groups/permissions created by the migration, and commits the complete
+dataset atomically. An advisory transaction lock serializes seed runs. Re-running
+uses a stable document creation key to identify demo v1, verifies the existing
+data/password hashes, and does not append duplicates or overwrite data. Trigger
+checks are forced at each posting boundary; balance caches are never written
+directly. History creation runs in PostgreSQL to avoid hundreds of network trips.
+
+The verifier reconciles documents, ledgers, balance caches, credit reservations,
+audit redaction and report totals. `--regression` creates an isolated temporary
+schema from the initial DDL, executes the 54 SQL checks, then rolls back the
+schema and every fixture, so demo/business data are not part of the regression.
+The regression requires schema-creation privileges, as migrations do.
+
 ## Checks
 
 ```sh
@@ -116,3 +151,10 @@ uv run pytest
 ```
 
 Tests use dependency overrides and do not require a live database.
+
+Verified for this deployment: `uv sync --frozen`, `uv run alembic upgrade head`
+and `uv run alembic current` (head `0002`), full seed and a second seed run with
+unchanged row counts, `uv run python -m app.db.verify --seeded --regression`
+(54 PostgreSQL checks passed), Ruff lint/format and pytest (5 tests passed).
+The live database is Supabase PostgreSQL 17.6. Real gateway calls, concurrent
+load/performance tests and Docker runtime have not been verified in this run.
