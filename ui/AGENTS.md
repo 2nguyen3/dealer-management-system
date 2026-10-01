@@ -256,6 +256,10 @@ The next frontend module is `frontend_foundations`; the current roadmap has no
 detailed child-module plans. Prepare those under
 `../openwiki/frontend-design/plan/<module_name>/` only when requested.
 
+Track slices, actual backend readiness and release gates in
+`../openwiki/frontend-design/GENERAL_CHECKLIST.md`. Keep it aligned with the
+General Plan and owning child evidence; mocked slices do not close live gates.
+
 - Use `../openwiki/backend-design/API/openapi.json` as the single target HTTP
   contract and the backend General Plan for operation readiness. A plan or mock
   does not mean that a business endpoint is implemented.
