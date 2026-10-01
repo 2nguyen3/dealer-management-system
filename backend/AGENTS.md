@@ -18,12 +18,14 @@ The intended business scope includes:
 - Payments and outstanding dealer debt.
 - Business reports.
 
-The repository currently contains an infrastructure scaffold. The backend has
+The repository contains API infrastructure and a deployed database. The backend has
 configuration, database/session setup, health endpoints, migration tooling, and
 health-check tests. The frontend is a starter page that checks API availability.
-There are no application ORM models, domain tables, migration revisions, business
-endpoints, authentication, or user-level authorization yet. Detailed business
-rules should be established when implementing each feature.
+The database now has 29 domain tables, PostgreSQL domains/routines/triggers/views,
+two reviewed SQL Alembic revisions, core RBAC/rules and a full transactional demo
+seed. Application ORM models, business endpoints, HTTP authentication and
+user-level authorization are not implemented yet. Database rules are specified
+in `../openwiki/database-design/`; use the versioned DDL as the schema authority.
 
 ## Technology stack
 
@@ -35,7 +37,8 @@ rules should be established when implementing each feature.
 | Validation/configuration | Pydantic models and Pydantic Settings; database passwords use `SecretStr`. |
 | Database | Supabase-hosted PostgreSQL, accessed directly from the backend. |
 | ORM/driver | SQLAlchemy 2 synchronous engines and sessions, with psycopg 3. |
-| Schema migrations | Alembic, using SQLAlchemy model metadata. |
+| Schema migrations | Alembic with reviewed SQL snapshots; metadata for future mapped models. |
+| Demo passwords | Argon2id via argon2-cffi; demo credentials are in the root README. |
 | Tests | pytest, FastAPI `TestClient`, HTTPX, and standard-library mocks. |
 | Python quality | Ruff linting, import sorting, and formatting. |
 | Frontend | React 19, TypeScript 5.9, Vite 7; ESLint and Prettier. Root setup recommends Node.js 24 LTS. |
@@ -61,7 +64,8 @@ DMS/
 │   ├── alembic/
 │   │   ├── env.py              # Migration connection and model metadata setup
 │   │   ├── script.py.mako      # Migration revision template
-│   │   └── versions/           # Migration revisions; currently only .gitkeep
+│   │   ├── sql/                # Immutable DDL snapshots for revisions 0001/0002
+│   │   └── versions/           # Initial DMS objects and pg_trgm indexes
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py             # create_app factory, lifespan, CORS, API mounting
@@ -74,8 +78,12 @@ DMS/
 │   │   └── db/
 │   │       ├── __init__.py
 │   │       ├── base.py         # Declarative Base and constraint naming conventions
-│   │       └── session.py      # Engine builder and request-scoped get_session
+│   │       ├── session.py      # Engine builder and request-scoped get_session
+│   │       ├── seed.py         # Complete transactional demo seed
+│   │       ├── verify.py       # Live integrity checks and isolated regression
+│   │       └── sql/            # Session-local seed helpers and SQL regression
 │   └── tests/
+│       ├── test_config.py      # Credential/configuration handling
 │       └── test_health.py      # Liveness, readiness, and database-error responses
 └── ui/
     ├── AGENTS.md               # Frontend-local agent guide
