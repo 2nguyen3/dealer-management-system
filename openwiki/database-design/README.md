@@ -451,7 +451,23 @@ business_decision_making, không âm thầm diễn giải schema là y hệt 17 
 
 ## 10. Chạy và kiểm chứng
 
-Từ `openwiki/database-design/`, với PostgreSQL trống và connection được cấu
+**Triển khai backend/Supabase bằng Alembic**, từ `backend/`:
+
+```sh
+uv sync --frozen
+uv run alembic upgrade head
+uv run python -m app.db.seed
+uv run python -m app.db.verify --seeded --regression
+```
+
+DDL đầy đủ và search indexes là snapshot trong `backend/alembic/sql/` để
+revision luôn tự chứa, kể cả trong Docker. `DMS.sql`, `search-indexes.sql` và
+`verify.sql` ở thư mục này là entry point psql dùng `\ir` trỏ tới các file đó
+và bộ regression trong backend. Bộ seed đầy đủ ở `backend/app/db/seed.py`;
+[README root](../../README.md#database-và-dữ-liệu-demo) có độ phủ và tài khoản mẫu.
+
+Để thực thi tham chiếu độc lập bằng psql, từ `openwiki/database-design/`,
+với PostgreSQL trống và connection được cấu
 hình qua các biến PG* hoặc service của psql:
 
 ```sh
