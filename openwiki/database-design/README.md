@@ -491,8 +491,12 @@ upfront atomic/fallback tiền đã nhận, làm tròn trả từng phần, tái
 hủy phiếu, đơn vị lịch sử, kiểm kê không chênh lệch và chỉnh kho/nợ làm âm
 lịch sử dù hiện tại hợp lệ.
 
-Docker engine chưa hoạt động khi kiểm tra. Chưa chạy trực tiếp trên PostgreSQL
-16/Supabase, chưa gọi cổng sandbox, chưa stress-test nhiều session hoặc đo
+**Kiểm chứng bổ sung trên Supabase PostgreSQL 17.6:** Alembic lên revision `0002`,
+seed đủ 29 bảng (410 chứng từ, 30 đại lý, 24 hàng, 8 tài khoản), đối chiếu
+ledger/cache/audit/report và 54 kiểm tra SQL trong schema riêng rollback.
+Tài khoản app được hash Argon2id, không phải Supabase Auth users.
+
+Chưa gọi cổng sandbox, chưa stress-test nhiều session hoặc đo
 hiệu năng dữ liệu lớn. PGlite chạy PostgreSQL thực nhưng không thay những
 kiểm chứng tích hợp này. Các business services/API/auth hiện vẫn là bước triển
 khai tiếp theo của repository.
