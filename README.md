@@ -58,6 +58,54 @@ Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
 Open http://localhost:5173. API docs are at http://localhost:8000/api/docs.
 Environment files are ignored by Git; commit only the example templates.
 
+### Database và dữ liệu demo
+
+Schema `dms` đã được triển khai lên Supabase bằng Alembic, revision hiện tại
+`0002`. Thiết kế ở [openwiki/database-design](openwiki/database-design/README.md);
+DDL có version nằm trong `backend/alembic/sql/`. Migration tạo đầy đủ 29 bảng,
+3 domain số chính xác, sequence, FK/CHECK/index, trigger toàn vẹn/audit,
+5 view và các hàm báo cáo; revision `0002` thêm index tìm kiếm `pg_trgm`.
+
+Từ `backend/`, sử dụng môi trường ảo và dependency lockfile:
+
+```powershell
+uv sync --frozen
+. .\.venv\Scripts\Activate.ps1
+alembic upgrade head
+python -m app.db.seed
+python -m app.db.verify --seeded --regression
+```
+
+Có thể dùng `uv run` thay cho activate, ví dụ `uv run python -m app.db.seed`.
+Seed chạy trong **một transaction**, không tắt trigger và không sửa cache tồn/nợ
+trực tiếp. Chạy lại bộ demo v1 chỉ kiểm tra dữ liệu hiện có, không tạo trùng hay
+ghi đè mật khẩu. Lần seed đầu yêu cầu các bảng dữ liệu ứng dụng còn trống; bộ
+seed không tự xóa database đã có dữ liệu khác.
+
+**Dữ liệu đã seed và kiểm chứng trên Supabase PostgreSQL 17.6:**
+
+| Nội dung | Số lượng / độ phủ |
+|---|---|
+| Nhóm / chức năng / phân quyền | 4 nhóm, 33 chức năng, 132 phân quyền |
+| Tài khoản / token | 8 tài khoản; 16 token digest đã thu hồi, không có session demo đang sống |
+| Quy định / danh mục | 1 quy định, 2 loại đại lý, 20 quận mẫu, 6 đơn vị |
+| Đại lý | 30; có đại lý mới chưa giao dịch, trùng tên khác quận và ngừng hợp tác |
+| Mặt hàng | 24; có đơn vị lẻ, hàng ngừng bán, tồn thấp và hàng chưa nhập |
+| Chứng từ | 410 chứng từ, 411 phiên bản, 766 dòng; đủ 7 loại chứng từ |
+| Sổ kho / phải thu / dư có | 753 / 486 / 5 bút toán; cache đối chiếu được với ledger |
+| Thu tiền | Tiền mặt, chuyển khoản, online; FIFO, trả ngay và tiền online dư thành dư có |
+| Thanh toán online | 20 payment, 19 event mô phỏng; PENDING / SUCCESS / FAILED / EXPIRED |
+| Trả hàng / bù / hoàn tiền | Giảm nợ chưa trả, dư có từ hàng đã trả tiền, bù nợ, hoàn cash/online |
+| Hoàn tiền online | 4 attempt: SUCCESS / PENDING / UNKNOWN / FAILED; 5 reservation giữ/tiêu/giải phóng tiền |
+| Kiểm kê | 3 biên bản, 36 dòng; có chênh lệch, không chênh lệch và nháp |
+| Audit | 3.740 bản ghi tự sinh, không chứa password/token hash |
+
+Lịch sử nghiệp vụ trải từ **01/06/2026 đến 30/09/2026**, đủ dữ liệu xem báo cáo
+tháng và so sánh tồn/công nợ/doanh số nhiều kỳ. Chứng từ có nháp, chờ xác nhận,
+đã ghi nhận, đã hủy; có sửa phiên bản và bút toán đảo. Các callback/refund đều
+là bằng chứng **mô phỏng** có đánh dấu `demo`, không gọi cổng thanh toán thật.
+Các tên quận là danh mục demo theo mô hình quận trong thiết kế.
+
 ### Docker deployment
 
 Prerequisites: Docker Engine/Desktop with Compose v2 and a configured
