@@ -8,6 +8,10 @@ and completion gates**
 **Scope of this document:** general planning contract. Detailed child-module plans
 will be prepared when requested; none are created by this roadmap.
 
+Track slices, backend readiness, deferred integrations and release gates in the
+[Frontend General Checklist](GENERAL_CHECKLIST.md). It is general tracking,
+not a child-module plan.
+
 ## 1. Where to start
 
 Build the shared frontend/API/test foundations first, then authentication and the
@@ -404,7 +408,7 @@ ordered dependencies and Mermaid/table agreement, then run `git diff --check`
 from the repository root. Code/build/browser checks do not verify a document's
 future runtime behavior and are not needed just to add this roadmap.
 
-**Documentation validation, 2026-10-01:** passed source JSON/API-area coverage
+**Initial General Plan validation, 2026-10-01:** passed source JSON/API-area coverage
 (28 areas), all 32 frontend slices, 39 acyclic edges matching the graph, references
 to the 32 backend slices, 10 local links, whitespace and root/UI agent guidance.
 The read-only session validator and `git diff --check` were run from the repository
@@ -418,7 +422,7 @@ roadmap-only change. No child-plan directory or duplicate API contract was creat
 | F01–F32 child plans and implementation | Not started; no child plans created | Prepare only the requested module's detailed plan; then execute strict tests and backend gates. |
 | Backend business integration | Backend roadmap/auth detailed plan exists; runtime still health-only | Coordinate actual operation availability; fixtures are not proof of integration. |
 
-When progress changes, update this file, the owning child checklist/evidence and
-root/UI agent guidance. Keep frontend/backend dependency references aligned;
-record reasons for changes and update graph/table together. Do not automatically
-mark frontend complete when a backend plan or endpoint is merely written.
+When progress changes, update this file, the General Checklist, the owning child
+checklist/evidence and root/UI agent guidance. Keep frontend/backend dependency
+references aligned; record reasons for changes and update graph/table together.
+Do not automatically mark frontend complete when a backend plan or endpoint is merely written.
