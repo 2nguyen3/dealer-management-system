@@ -300,6 +300,10 @@ a module. It defines the recommended order, direct prerequisite slices, shared
 service ownership and full-module completion gates. The next module is
 authentication; business HTTP modules remain unimplemented.
 
+Track roadmap progress in `../openwiki/backend-design/GENERAL_CHECKLIST.md` as well
+as the owning child checklist/VERIFICATION. General slice checkboxes require linked
+passing evidence; core delivery and deferred integrations remain separate.
+
 - Create the owning `../openwiki/backend-design/plan/<module_name>/` materials
   before code; include requirements, design, actual-symbol tests, checklist and evidence.
 - Follow the roadmap's split stock-issue/receipt/upfront integration and later
