@@ -18,3 +18,8 @@ dist/
 **/.claude/settings.local.json
 **/CLAUDE.local.md
 .claude/worktrees/
+
+# AI dot folder
+.claude/
+.opencode/
+.agents/
