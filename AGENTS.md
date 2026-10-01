@@ -20,6 +20,12 @@ authentication are not implemented yet.
 - `openwiki/database-design/`: complete PostgreSQL/DBML design and psql entry points
   linking to versioned backend DDL and regression SQL.
 - `openwiki/backend-design/` and `openwiki/frontend-design/`: design documentation areas.
+- `openwiki/backend-design/GENERAL_PLAN.md`: backend module implementation order,
+  dependency graph, staged integration and module completion gates.
+- `openwiki/backend-design/API/openapi.json`: target business API contract;
+  distinguish it from the currently implemented health-only runtime API.
+- `openwiki/backend-design/plan/authentication/`: authentication implementation
+  plan, requirement traceability, design, per-function tests, checklist and evidence log.
 - `.agents/`: shared verification/Docker workflows and project-local skills.
 - `opencode.json` and `.opencode/commands/`: OpenCode project configuration.
 - `CLAUDE.md` and `.claude/`: Claude Code entry points and project configuration.
@@ -53,6 +59,41 @@ Report commands actually run, their results, and any unverified behavior.
 
 Backend uses `uv.lock`; frontend uses `package-lock.json`. Preserve locked installs
 and update the corresponding lockfile when changing dependencies.
+
+## Backend implementation roadmap
+
+Before planning or implementing any backend module, read
+`openwiki/backend-design/GENERAL_PLAN.md` for the recommended order and prerequisite
+slices. Authentication is first; shared API conventions and administration follow,
+then master data, document/settlement workflows, corrections, and read products.
+Only infrastructure/database work is implemented today; the roadmap is future work.
+
+Prepare each module's detailed plan under `openwiki/backend-design/plan/<module_name>/`
+before code. Register actual functions with strict success/failure/boundary tests;
+database mutations require persisted-state/rollback evidence and relevant real
+PostgreSQL concurrency tests. Never close a module while its deferred operations
+or dependency gates remain incomplete. Record exact verification results and keep
+the roadmap's progress, dependency table/graph and owning plan aligned.
+
+## Authentication implementation plan
+
+Before implementing authentication, read
+`openwiki/backend-design/plan/authentication/PLAN.md` and its linked REQUIREMENTS,
+DESIGN, TESTS, CHECKLIST and VERIFICATION materials. The plan covers the seven
+Authentication operations in the target API contract and reusable authorization
+dependencies. It is planned work; HTTP authentication remains unimplemented.
+
+For this module, every completed function must have passing success, failure and
+boundary tests mapped to its actual symbol. Add new helpers/methods/validators to
+the function test register as they are introduced. Database mutations require
+persisted-state and rollback tests on isolated PostgreSQL; rotation/reset/lock
+claims require real multi-connection concurrency tests. Do not close a checklist
+item using skipped, xfailed or unrun required tests. Record exact commands/results
+in the plan's VERIFICATION.md and require the scoped coverage gate in TESTS.md.
+
+Keep module plans under `openwiki/backend-design/plan/<module_name>/`, with PLAN.md
+and related requirement, design, checklist, test and verification materials. Keep
+plans and agent guidance aligned with actual implementation progress.
 
 ## Database workflow
 
