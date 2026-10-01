@@ -1,0 +1,749 @@
+// DBML cho dbdiagram.io, chuyển từ DMS.sql.
+// Giữ tên schema/bảng/cột, nullability, PK/FK, CHECK, default và index.
+// Generated columns, PostgreSQL domains, partial indexes, DEFERRABLE và
+// trigger/routine được chú thích; DMS.sql là nguồn thực thi chính thức.
+
+Project Agentra_DMS {
+  database_type: 'PostgreSQL'
+  Note: '''
+    Mô hình ERP/SME của Agentra DMS: 29 bảng trong schema dms.
+    Dán toàn bộ file vào dbdiagram.io để xem sơ đồ.
+
+    Các kiểu money_vnd, quantity_value và price_rate là PostgreSQL DOMAIN
+    trên NUMERIC không typmod, không phải enum hoặc bảng danh mục:
+    - money_vnd: tiền nguyên VNĐ, abs(value) < 10^18, loại NaN/infinity.
+    - quantity_value: tối đa 3 số lẻ có nghĩa, abs(value) < 10^15, loại NaN/infinity.
+    - price_rate: 0 < value < 1000, tối đa 6 số lẻ có nghĩa, loại NaN/infinity.
+
+    increment biểu diễn identity; SQL dùng GENERATED ALWAYS AS IDENTITY.
+    Cột generated stored chỉ có ghi chú, không giả thành DEFAULT.
+    Mọi bảng có createdAt/updatedAt; stamp_row đặt và cập nhật thời gian.
+    Bảng ledger, batch, lô dư có, callback và audit là append-only.
+
+    DBML không tái tạo trigger, routine, sequence, seed, quyền DB hoặc
+    DEFERRABLE. Predicate/opclass của index được lưu trong note.
+    Partial UNIQUE chỉ được ghi chú khi không tương đương UNIQUE toàn bảng,
+    tránh biến điều kiện nghiệp vụ thành ràng buộc toàn cục sai.
+    Đây là sơ đồ của bảng gốc; các view/hàm báo cáo nằm trong DMS.sql.
+    Không dùng SQL export từ DBML để thay thế DMS.sql khi triển khai.
+  '''
+}
+
+// -----------------------------------------------------------------------------
+// Người dùng và phân quyền
+// -----------------------------------------------------------------------------
+
+Table dms.user_group {
+  id integer [pk, not null, increment]
+  code text [not null, unique, check: `btrim(code) <> ''`]
+  name text [not null, unique, check: `btrim(name) <> ''`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Nhóm người dùng; ban đầu Quản lý, Kinh doanh, Kho, Kế toán.'
+}
+
+Table dms.app_function {
+  id integer [pk, not null, increment]
+  code text [not null, unique, check: `btrim(code) <> ''`]
+  name text [not null, check: `btrim(name) <> ''`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Chức năng có mã ổn định, dùng cho phân quyền và nhật ký.'
+}
+
+Table dms.app_user {
+  id bigint [pk, not null, increment]
+  "fullName" text [not null, check: `btrim("fullName") <> ''`]
+  email text [not null, check: `email = btrim(email) AND position('@' IN email) > 1`]
+  "passwordHash" text [not null, check: `btrim("passwordHash") <> ''`]
+  "groupId" integer [not null]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'LOCKED')`]
+  "authVersion" integer [not null, default: 1, check: `"authVersion" > 0`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (`lower(email)`) [unique, name: 'uq_app_user_email_ci']
+    (groupId, id) [name: 'ix_app_user_group']
+  }
+  Note: 'Email đăng nhập duy nhất không phân biệt hoa/thường. Trigger tăng authVersion khi đổi mật khẩu, nhóm hoặc trạng thái.'
+}
+
+Table dms.group_permission {
+  id bigint [pk, not null, increment]
+  "groupId" integer [not null]
+  "functionId" integer [not null]
+  "isAllowed" boolean [not null, default: false]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (groupId, functionId) [unique]
+    functionId [name: 'ix_group_permission_function']
+  }
+}
+
+Table dms.auth_token {
+  id bigint [pk, not null, increment]
+  "userId" bigint [not null]
+  purpose text [not null, check: `purpose IN ('REFRESH', 'PASSWORD_RESET')`]
+  "tokenDigest" bytea [not null, unique, check: `octet_length("tokenDigest") = 32`]
+  "expiresAt" timestamptz [not null]
+  "revokedAt" timestamptz
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `"expiresAt" > "createdAt"`
+  }
+  indexes {
+    (userId, purpose) [name: 'ix_auth_token_user']
+    expiresAt [name: 'ix_auth_token_expiry', note: 'PARTIAL: WHERE "revokedAt" IS NULL']
+  }
+  Note: 'Chỉ lưu digest token ngẫu nhiên, không lưu token thô.'
+}
+
+// -----------------------------------------------------------------------------
+// Quy định, danh mục và hồ sơ đại lý
+// -----------------------------------------------------------------------------
+
+Table dms.business_rule {
+  id boolean [pk, not null, default: true, check: `id`]
+  "maxAgenciesPerDistrict" integer [not null, default: 4, check: `"maxAgenciesPerDistrict" > 0`]
+  "sellingPriceRate" price_rate [not null, default: 1.02]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Singleton id=true. Trigger chặn giảm giới hạn quận dưới số đại lý đang hoạt động.'
+}
+
+Table dms.district {
+  id integer [pk, not null, increment]
+  code text [not null, unique, check: `btrim(code) <> ''`]
+  name text [not null, unique, check: `btrim(name) <> ''`]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+}
+
+Table dms.agency_type {
+  id integer [pk, not null, increment]
+  code text [not null, unique, check: `btrim(code) <> ''`]
+  name text [not null, unique, check: `btrim(name) <> ''`]
+  "maxDebt" money_vnd [not null, check: `"maxDebt" >= 0`]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Hạn mức gắn với từng loại. Trigger chặn giảm xuống dưới nợ hiện tại của đại lý thuộc loại.'
+}
+
+Table dms.unit {
+  id integer [pk, not null, increment]
+  code text [not null, unique, check: `btrim(code) <> ''`]
+  name text [not null, unique, check: `btrim(name) <> ''`]
+  "allowsFraction" boolean [not null, default: false]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Đơn vị đếm chỉ nhận số nguyên. Không đổi chính sách phần lẻ sau khi đã ghi nhận sử dụng.'
+}
+
+Table dms.agency {
+  id bigint [pk, not null, increment]
+  code text [unique, note: 'Generated stored: tiền tố DL- ghép id; không phải default.']
+  name text [not null, check: `btrim(name) <> ''`]
+  "typeId" integer [not null]
+  "districtId" integer [not null]
+  phone text [check: `phone IS NULL OR btrim(phone) <> ''`]
+  address text
+  email text [not null, check: `email = btrim(email) AND position('@' IN email) > 1`]
+  "acceptedDate" date [not null]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'TERMINATED')`]
+  "terminatedAt" timestamptz
+  "terminationReason" text
+  "createdBy" bigint
+  "updatedBy" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `(status = 'TERMINATED') = ("terminatedAt" IS NOT NULL)`
+    `status <> 'TERMINATED' OR btrim(coalesce("terminationReason", '')) <> ''`
+  }
+  indexes {
+    (districtId, id) [name: 'ix_agency_district_active', note: 'PARTIAL: WHERE status = ACTIVE']
+    (typeId, id) [name: 'ix_agency_type']
+    (districtId, id) [name: 'ix_agency_district']
+    (`lower(name)`) [name: 'ix_agency_name_prefix', note: 'PostgreSQL opclass: text_pattern_ops']
+    phone [name: 'ix_agency_phone', note: 'PARTIAL: WHERE phone IS NOT NULL']
+  }
+  Note: 'Tên không cần duy nhất. Đại lý mới ACTIVE, nợ ban đầu 0. Trigger kiểm tra sức chứa quận và hạn mức khi đổi loại; TERMINATED không mở lại.'
+}
+
+Table dms.product {
+  id bigint [pk, not null, increment]
+  code text [unique, note: 'Generated stored: tiền tố MH- ghép id; không phải default.']
+  name text [not null, check: `btrim(name) <> ''`]
+  "unitId" integer [not null]
+  "lowStockThreshold" quantity_value [not null, default: 0, check: `"lowStockThreshold" >= 0`]
+  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    unitId [name: 'ix_product_unit']
+    (`lower(name)`) [name: 'ix_product_name_prefix', note: 'PostgreSQL opclass: text_pattern_ops']
+  }
+  Note: 'Một đơn vị tính mỗi hàng. Không đổi đơn vị sau khi đã ghi nhận; tồn và giá nhập nằm trong inventory_balance.'
+}
+
+// -----------------------------------------------------------------------------
+// Chứng từ, phiên bản và chi tiết
+// -----------------------------------------------------------------------------
+
+Table dms.document {
+  id bigint [pk, not null, increment]
+  "creationKey" uuid [not null, unique, default: `gen_random_uuid()`]
+  kind text [not null, check: `kind IN ('STOCK_RECEIPT', 'STOCK_ISSUE', 'PAYMENT_RECEIPT', 'STOCK_ADJUSTMENT', 'SALES_RETURN', 'CREDIT_APPLICATION', 'REFUND')`]
+  code text [unique, note: 'Generated stored theo kind: PN-/PX-/PT-/DC-/TH-/BT-/HT- ghép id.']
+  "agencyId" bigint
+  "originDocumentId" bigint
+  "receiptType" text [check: `"receiptType" IN ('AUTO_FROM_ISSUE', 'DEBT_COLLECTION', 'RECEIVED_UNAPPLIED')`]
+  status text [not null, default: 'DRAFT', check: `status IN ('DRAFT', 'PENDING', 'POSTED', 'CANCELLED')`]
+  "currentRevisionId" bigint [note: 'FK composite DEFERRABLE INITIALLY DEFERRED; đảm bảo phiên bản thuộc đúng phiếu.']
+  "businessOrder" bigint [unique, note: 'Sinh bởi trigger từ business_order_seq khi ghi nhận lần đầu; không thay qua các phiên bản.']
+  "cancelledBy" bigint
+  "cancelledAt" timestamptz
+  "cancelReason" text
+  "createdBy" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `(kind IN ('STOCK_RECEIPT', 'STOCK_ADJUSTMENT')) = ("agencyId" IS NULL)`
+    `(kind = 'PAYMENT_RECEIPT') = ("receiptType" IS NOT NULL)`
+    `"receiptType" IS DISTINCT FROM 'AUTO_FROM_ISSUE' OR "originDocumentId" IS NOT NULL`
+    `kind NOT IN ('SALES_RETURN', 'REFUND') OR "originDocumentId" IS NOT NULL`
+    `"originDocumentId" IS DISTINCT FROM id`
+    `(status = 'CANCELLED') = ("cancelledAt" IS NOT NULL)`
+    `status <> 'CANCELLED' OR ("cancelledBy" IS NOT NULL AND btrim(coalesce("cancelReason", '')) <> '')`
+    `status <> 'POSTED' OR "businessOrder" IS NOT NULL`
+  }
+  indexes {
+    (id, agencyId) [unique]
+    originDocumentId [name: 'uq_document_auto_receipt', note: 'PARTIAL UNIQUE trong SQL: WHERE receiptType = AUTO_FROM_ISSUE. Không UNIQUE cho tất cả phiếu nguồn.']
+    (agencyId, id) [name: 'ix_document_agency']
+    (kind, status, id) [name: 'ix_document_queue', note: 'PARTIAL: WHERE status IN (DRAFT, PENDING)']
+    originDocumentId [name: 'ix_document_origin', note: 'PARTIAL: WHERE originDocumentId IS NOT NULL']
+    currentRevisionId [unique, name: 'uq_document_current_revision', note: 'SQL có WHERE currentRevisionId IS NOT NULL; UNIQUE nullable tương đương cho các giá trị khác NULL.']
+    (kind, id) [name: 'ix_document_posted_kind', note: 'PARTIAL: WHERE status = POSTED']
+  }
+  Note: 'Định danh nghiệp vụ ổn định, không xóa vật lý. Trigger bảo vệ đại lý/kind/nguồn, kiểm tra hủy và đối chiếu ledger với phiên bản hiện hành.'
+}
+
+Table dms.document_revision {
+  id bigint [pk, not null, increment]
+  "documentId" bigint [not null]
+  "revisionNo" integer [not null, check: `"revisionNo" > 0`]
+  state text [not null, default: 'DRAFT', check: `state IN ('DRAFT', 'READY', 'POSTED')`]
+  "businessDate" date [not null]
+  "totalAmount" money_vnd [not null, default: 0, check: `"totalAmount" >= 0`]
+  "immediatePayment" money_vnd [not null, default: 0, check: `"immediatePayment" >= 0 AND "immediatePayment" <= "totalAmount"`]
+  "sellingPriceRate" price_rate
+  "maxDebtSnapshot" money_vnd [check: `"maxDebtSnapshot" >= 0`]
+  "paymentMethod" text [check: `"paymentMethod" IN ('CASH', 'BANK_TRANSFER', 'ONLINE')`]
+  "agencyName" text
+  "agencyAddress" text
+  "agencyPhone" text
+  "agencyEmail" text
+  reason text
+  note text
+  "createdBy" bigint
+  "readyBy" bigint
+  "readyAt" timestamptz
+  "postedBy" bigint
+  "postedAt" timestamptz
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `state <> 'READY' OR ("readyBy" IS NOT NULL AND "readyAt" IS NOT NULL)`
+    `(state = 'POSTED') = ("postedAt" IS NOT NULL)`
+    `"revisionNo" = 1 OR btrim(coalesce(reason, '')) <> ''`
+  }
+  indexes {
+    (documentId, revisionNo) [unique]
+    (id, documentId) [unique]
+    (businessDate, documentId) [name: 'ix_revision_date', note: 'PARTIAL: WHERE state = POSTED']
+  }
+  Note: 'Nội dung có phiên bản; READY chốt giá, POSTED bất biến. Sửa tạo phiên bản mới dưới cùng số phiếu, đảo ảnh hưởng cũ trong transaction.'
+}
+
+Table dms.document_line {
+  id bigint [pk, not null, increment]
+  "revisionId" bigint [not null]
+  "lineNo" integer [not null, check: `"lineNo" > 0`]
+  "productId" bigint [not null]
+  "unitId" integer [not null]
+  "productName" text [not null, check: `btrim("productName") <> ''`]
+  "unitName" text [not null, check: `btrim("unitName") <> ''`]
+  quantity quantity_value [not null, check: `quantity <> 0`]
+  "unitPrice" money_vnd [not null, check: `"unitPrice" >= 0`]
+  "basePurchasePrice" money_vnd [check: `"basePurchasePrice" > 0`]
+  "returnAmount" money_vnd [check: `"returnAmount" >= 0`, note: 'Giá trị trả lũy kế đã làm tròn trừ giá trị các lần trước; chỉ cho dòng SALES_RETURN.']
+  "lineAmount" money_vnd [note: 'Generated stored: coalesce(returnAmount, round(abs(quantity) * unitPrice, 0)).']
+  "originLineId" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (revisionId, lineNo) [unique]
+    (revisionId, productId) [unique]
+    (id, productId, unitId) [unique]
+    (id, productId, unitId, unitPrice) [unique]
+    (productId, revisionId) [name: 'ix_document_line_product']
+    unitId [name: 'ix_document_line_unit']
+    originLineId [name: 'ix_document_line_origin', note: 'PARTIAL: WHERE originLineId IS NOT NULL']
+  }
+  Note: 'Một mặt hàng một dòng mỗi phiên bản. Trigger kiểm tra đơn vị, phần lẻ, dấu số lượng/giá theo kind và khóa dòng khi READY/POSTED. FK trả hàng bảo toàn mặt hàng, đơn vị và giá dòng gốc.'
+}
+
+Table dms.upfront_confirmation {
+  id bigint [pk, not null, increment]
+  "issueRevisionId" bigint [not null, unique]
+  amount money_vnd [not null, check: `amount > 0`]
+  method text [not null, check: `method IN ('CASH', 'BANK_TRANSFER')`]
+  "receivedAt" timestamptz [not null]
+  "verifiedBy" bigint [not null]
+  "verifiedAt" timestamptz [not null, default: `clock_timestamp()`]
+  "evidenceReference" text
+  state text [not null, default: 'VERIFIED', check: `state IN ('VERIFIED', 'CONSUMED', 'RECEIVED_SEPARATELY')`]
+  "receiptDocumentId" bigint [unique]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `(state = 'VERIFIED') = ("receiptDocumentId" IS NULL)`
+  }
+  Note: 'Bằng chứng tiền trả ngay gắn phiên bản chờ xuất. Chưa giảm nợ khi VERIFIED; khi xuất tạo phiếu thu tự sinh atomic hoặc xử lý tiền riêng nếu không xuất được.'
+}
+
+// -----------------------------------------------------------------------------
+// Thanh toán online và hoàn tiền
+// -----------------------------------------------------------------------------
+
+Table dms.online_payment {
+  id bigint [pk, not null, increment]
+  "agencyId" bigint [not null]
+  provider text [not null, check: `btrim(provider) <> ''`]
+  "merchantReference" text [not null, unique, check: `btrim("merchantReference") <> ''`]
+  "idempotencyKey" uuid [not null, unique]
+  "providerTransactionId" text
+  amount money_vnd [not null, check: `amount > 0`]
+  status text [not null, default: 'PENDING', check: `status IN ('PENDING', 'SUCCESS', 'FAILED', 'EXPIRED')`]
+  "expiresAt" timestamptz [not null]
+  "paymentTime" timestamptz
+  "receiptDocumentId" bigint [unique, note: 'FK DEFERRABLE INITIALLY DEFERRED trong SQL.']
+  "createdBy" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `"expiresAt" > "createdAt"`
+    `(status = 'SUCCESS') = ("receiptDocumentId" IS NOT NULL)`
+    `status <> 'SUCCESS' OR ("paymentTime" IS NOT NULL AND "providerTransactionId" IS NOT NULL)`
+  }
+  indexes {
+    (provider, providerTransactionId) [unique]
+    (agencyId, id) [name: 'ix_online_payment_agency']
+    (expiresAt, id) [name: 'ix_online_payment_pending', note: 'PARTIAL: WHERE status = PENDING']
+  }
+  Note: 'Khởi tạo không vượt nợ hiện tại. Thành công tạo một phiếu thu đủ tiền; FIFO phần nợ, phần dư thành dư có. SUCCESS bất biến, callback cần bằng chứng đã xác minh.'
+}
+
+Table dms.payment_event {
+  id bigint [pk, not null, increment]
+  "paymentId" bigint [not null]
+  "eventKey" text [not null, check: `btrim("eventKey") <> ''`]
+  "providerStatus" text [not null]
+  "verifiedPayload" jsonb [not null, default: `'{}'::jsonb`, check: `jsonb_typeof("verifiedPayload") = 'object'`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (paymentId, eventKey) [unique]
+  }
+  Note: 'Append-only. Callback đã xác minh, chống nhận lặp bằng paymentId/eventKey; chỉ lưu payload tối thiểu.'
+}
+
+Table dms.refund_reservation {
+  id bigint [pk, not null, increment]
+  "refundRevisionId" bigint [not null]
+  "lotId" bigint [not null]
+  amount money_vnd [not null, check: `amount > 0`]
+  state text [not null, default: 'ACTIVE', check: `state IN ('ACTIVE', 'RELEASED', 'CONSUMED')`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (refundRevisionId, lotId) [unique]
+    lotId [name: 'ix_refund_reservation_lot', note: 'PARTIAL: WHERE state = ACTIVE']
+  }
+  Note: 'Giữ dư có cho refund đang chờ; không dùng đồng thời để bù trừ. Trigger khóa chủ sở hữu/nguồn tiền/lô và kiểm tra khả dụng.'
+}
+
+Table dms.refund_attempt {
+  id bigint [pk, not null, increment]
+  "refundRevisionId" bigint [not null]
+  "onlinePaymentId" bigint [not null]
+  "idempotencyKey" uuid [not null, unique]
+  "merchantRefundReference" text [not null, unique]
+  "providerRefundId" text
+  amount money_vnd [not null, check: `amount > 0`]
+  state text [not null, default: 'PENDING', check: `state IN ('PENDING', 'UNKNOWN', 'SUCCESS', 'FAILED')`]
+  "completedAt" timestamptz
+  "failureReason" text
+  "verifiedResponse" jsonb
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `state NOT IN ('SUCCESS', 'FAILED') OR "completedAt" IS NOT NULL`
+    `state <> 'SUCCESS' OR ("providerRefundId" IS NOT NULL AND "verifiedResponse" IS NOT NULL)`
+  }
+  indexes {
+    (onlinePaymentId, providerRefundId) [unique]
+    refundRevisionId [name: 'uq_refund_attempt_inflight', note: 'PARTIAL UNIQUE trong SQL: WHERE state IN (PENDING, UNKNOWN, SUCCESS). FAILED cho phép attempt mới.']
+    onlinePaymentId [name: 'ix_refund_attempt_payment']
+    (createdAt, id) [name: 'ix_refund_attempt_pending', note: 'PARTIAL: WHERE state IN (PENDING, UNKNOWN)']
+  }
+  Note: 'Yêu cầu hoàn online gắn nguồn payment. UNKNOWN giữ reservation; SUCCESS ghi refund và tiêu dư có đồng thời. Không giả timeout là thất bại chắc chắn.'
+}
+
+// -----------------------------------------------------------------------------
+// Batch, sổ kho, phải thu và dư có
+// -----------------------------------------------------------------------------
+
+Table dms.posting_batch {
+  id bigint [pk, not null, increment]
+  "revisionId" bigint [not null]
+  kind text [not null, check: `kind IN ('POST', 'REVERSE', 'REALLOCATE')`]
+  "idempotencyKey" uuid [not null, unique]
+  "createdBy" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    revisionId [name: 'uq_posting_batch_post', note: 'PARTIAL UNIQUE trong SQL: WHERE kind = POST. Một POST mỗi revision; vẫn có nhiều REVERSE/REALLOCATE.']
+    (revisionId, id) [name: 'ix_posting_batch_revision']
+  }
+  Note: 'Append-only. Batch ghi sổ gắn phiên bản; idempotency bảo vệ retry transaction.'
+}
+
+Table dms.inventory_balance {
+  "productId" bigint [pk, not null]
+  "currentStock" quantity_value [not null, default: 0, check: `"currentStock" >= 0`]
+  "currentPurchasePrice" money_vnd [not null, default: 0, check: `"currentPurchasePrice" >= 0`]
+  "priceSourceLineId" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Cache một record mỗi hàng, SQL tự khởi tạo và cập nhật từ ledger. Giá theo phiếu nhập hiệu lực mới nhất về ngày nghiệp vụ; không sửa trực tiếp cache.'
+}
+
+Table dms.agency_balance {
+  "agencyId" bigint [pk, not null]
+  "currentDebt" money_vnd [not null, default: 0, check: `"currentDebt" >= 0`]
+  "currentCredit" money_vnd [not null, default: 0, check: `"currentCredit" >= 0`]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (currentDebt, agencyId) [name: 'ix_agency_balance_debt']
+  }
+  Note: 'Cache phải thu và dư có riêng, một record mỗi đại lý. SQL tự khởi tạo/cập nhật, kiểm tra hạn mức; không sửa trực tiếp.'
+}
+
+Table dms.inventory_entry {
+  id bigint [pk, not null, increment]
+  "batchId" bigint [not null]
+  "lineId" bigint [not null]
+  "productId" bigint [not null]
+  "unitId" integer [not null]
+  quantity quantity_value [not null, check: `quantity <> 0`]
+  "businessDate" date [not null]
+  "businessOrder" bigint [not null]
+  "reversesEntryId" bigint [unique]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (productId, businessDate, businessOrder, id) [name: 'ix_inventory_entry_timeline']
+    batchId [name: 'ix_inventory_entry_batch']
+    lineId [name: 'ix_inventory_entry_line']
+  }
+  Note: 'Append-only. Delta kho có dấu; đảo phải đối dấu và giữ ngày/thứ tự/định danh gốc, không đảo reversal. SQL kiểm tra cả lịch sử không âm.'
+}
+
+Table dms.receivable_entry {
+  id bigint [pk, not null, increment]
+  "batchId" bigint [not null]
+  "agencyId" bigint [not null]
+  "issueDocumentId" bigint [not null]
+  kind text [not null, check: `kind IN ('CHARGE', 'PAYMENT', 'RETURN', 'CREDIT')`]
+  amount money_vnd [not null, check: `amount <> 0`]
+  "businessDate" date [not null]
+  "businessOrder" bigint [not null]
+  "reversesEntryId" bigint [unique]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (agencyId, businessDate, businessOrder, id) [name: 'ix_receivable_entry_timeline']
+    (issueDocumentId, businessDate, businessOrder) [name: 'ix_receivable_entry_issue']
+    batchId [name: 'ix_receivable_entry_batch']
+  }
+  Note: 'Append-only; đồng thời là phân bổ thanh toán. Nguồn là chứng từ của batch, đích là STOCK_ISSUE cùng đại lý qua FK composite. SQL kiểm FIFO, số dư lịch sử và source reconciliation.'
+}
+
+Table dms.credit_lot {
+  id bigint [pk, not null, increment]
+  "agencyId" bigint [not null]
+  "sourceRevisionId" bigint [not null]
+  "originReceiptId" bigint [not null]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (id, agencyId) [unique]
+    (agencyId, id) [name: 'ix_credit_lot_agency']
+    sourceRevisionId [name: 'ix_credit_lot_source']
+    originReceiptId [name: 'ix_credit_lot_receipt']
+  }
+  Note: 'Append-only. Lô dư có lưu nguồn phiên bản và nguồn tiền phiếu thu cùng đại lý, phục vụ hoàn tiền/bù có truy vết.'
+}
+
+Table dms.credit_entry {
+  id bigint [pk, not null, increment]
+  "batchId" bigint [not null]
+  "agencyId" bigint [not null]
+  "lotId" bigint [not null]
+  kind text [not null, check: `kind IN ('CREATED', 'REFUND', 'OFFSET')`]
+  amount money_vnd [not null, check: `amount <> 0`]
+  "businessDate" date [not null]
+  "businessOrder" bigint [not null]
+  "reversesEntryId" bigint [unique]
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (lotId, businessDate, businessOrder) [name: 'ix_credit_entry_lot']
+    (agencyId, businessDate, businessOrder) [name: 'ix_credit_entry_agency']
+    batchId [name: 'ix_credit_entry_batch']
+  }
+  Note: 'Append-only. Tạo dư có, hoàn và bù có dấu; không dùng nợ âm biểu diễn dư có. FK composite bảo vệ đúng chủ lô; kiểm tra lịch sử và reservation.'
+}
+
+// -----------------------------------------------------------------------------
+// Kiểm kê và nhật ký
+// -----------------------------------------------------------------------------
+
+Table dms.stock_count {
+  id bigint [pk, not null, increment]
+  code text [unique, note: 'Generated stored: tiền tố KK- ghép id; không phải default.']
+  state text [not null, default: 'DRAFT', check: `state IN ('DRAFT', 'CONFIRMED')`]
+  "countedAt" timestamptz [not null]
+  "createdBy" bigint [not null]
+  "confirmedBy" bigint
+  "confirmedAt" timestamptz
+  "adjustmentDocumentId" bigint [unique, note: 'FK DEFERRABLE INITIALLY DEFERRED trong SQL.']
+  reason text
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `(state = 'CONFIRMED') = ("confirmedAt" IS NOT NULL)`
+    `state <> 'CONFIRMED' OR "confirmedBy" IS NOT NULL`
+  }
+  Note: 'Xác nhận kiểm kê cùng adjustment khi có chênh lệch; không tạo adjustment rỗng khi chênh lệch 0. Kiểm kê và adjustment đã xác nhận là bằng chứng lịch sử.'
+}
+
+Table dms.stock_count_line {
+  id bigint [pk, not null, increment]
+  "countId" bigint [not null]
+  "productId" bigint [not null]
+  "unitId" integer [not null]
+  "bookQuantity" quantity_value [not null, check: `"bookQuantity" >= 0`]
+  "countedQuantity" quantity_value [not null, check: `"countedQuantity" >= 0`]
+  difference quantity_value [note: 'Generated stored: countedQuantity - bookQuantity.']
+  "observedLastEntryId" bigint
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  indexes {
+    (countId, productId) [unique]
+    (productId, countId) [name: 'ix_stock_count_line_product']
+  }
+  Note: 'Lưu cả dòng chênh lệch 0. Last-entry snapshot để phát hiện kho thay đổi từ khi đếm; không ghi điều chỉnh trên số liệu đã lỗi thời.'
+}
+
+Table dms.audit_log {
+  id bigint [pk, not null, increment]
+  "actorId" bigint
+  "actorType" text [not null, check: `"actorType" IN ('USER', 'SYSTEM')`]
+  "functionCode" text [not null]
+  action text [not null, check: `action IN ('INSERT', 'UPDATE', 'DELETE')`]
+  "entityName" text [not null]
+  "entityKey" text [not null]
+  "oldData" jsonb
+  "newData" jsonb
+  "requestId" text
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+
+  checks {
+    `("actorType" = 'USER') = ("actorId" IS NOT NULL)`
+  }
+  indexes {
+    (createdAt, id) [name: 'ix_audit_log_time']
+    (actorId, createdAt) [name: 'ix_audit_log_actor']
+    (entityName, entityKey, id) [name: 'ix_audit_log_entity']
+  }
+  Note: 'Append-only, SQL tự ghi trước/sau; không sao chép passwordHash/tokenDigest. Actor, function và request lấy từ transaction context. entityName/entityKey là địa chỉ audit, không giả thành FK đa hình.'
+}
+
+// -----------------------------------------------------------------------------
+// Quan hệ: khai báo đúng FK SQL, gồm các FK composite và self-reference.
+// Với quan hệ 1:1, đầu bên phải của dấu - là cột FK theo cú pháp DBML.
+// -----------------------------------------------------------------------------
+
+Ref fk_app_user_group: dms.app_user.groupId > dms.user_group.id [delete: restrict]
+Ref fk_permission_group: dms.group_permission.groupId > dms.user_group.id [delete: restrict]
+Ref fk_permission_function: dms.group_permission.functionId > dms.app_function.id [delete: restrict]
+Ref fk_auth_token_user: dms.auth_token.userId > dms.app_user.id [delete: restrict]
+
+Ref fk_agency_type: dms.agency.typeId > dms.agency_type.id [delete: restrict]
+Ref fk_agency_district: dms.agency.districtId > dms.district.id [delete: restrict]
+Ref fk_agency_created_by: dms.agency.createdBy > dms.app_user.id [delete: restrict]
+Ref fk_agency_updated_by: dms.agency.updatedBy > dms.app_user.id [delete: restrict]
+Ref fk_product_unit: dms.product.unitId > dms.unit.id [delete: restrict]
+
+Ref fk_document_agency: dms.document.agencyId > dms.agency.id [delete: restrict]
+Ref fk_document_origin: dms.document.originDocumentId > dms.document.id [delete: restrict]
+Ref fk_document_cancelled_by: dms.document.cancelledBy > dms.app_user.id [delete: restrict]
+Ref fk_document_created_by: dms.document.createdBy > dms.app_user.id [delete: restrict]
+// SQL: DEFERRABLE INITIALLY DEFERRED, ON DELETE NO ACTION.
+Ref fk_document_current_revision: dms.document_revision.(id, documentId) - dms.document.(currentRevisionId, id) [delete: no action]
+
+Ref fk_revision_document: dms.document_revision.documentId > dms.document.id [delete: restrict]
+Ref fk_revision_created_by: dms.document_revision.createdBy > dms.app_user.id [delete: restrict]
+Ref fk_revision_ready_by: dms.document_revision.readyBy > dms.app_user.id [delete: restrict]
+Ref fk_revision_posted_by: dms.document_revision.postedBy > dms.app_user.id [delete: restrict]
+
+Ref fk_line_revision: dms.document_line.revisionId > dms.document_revision.id [delete: restrict]
+Ref fk_line_product: dms.document_line.productId > dms.product.id [delete: restrict]
+Ref fk_line_unit: dms.document_line.unitId > dms.unit.id [delete: restrict]
+Ref fk_line_return_origin: dms.document_line.(originLineId, productId, unitId, unitPrice) > dms.document_line.(id, productId, unitId, unitPrice) [delete: restrict]
+
+Ref fk_upfront_issue_revision: dms.document_revision.id - dms.upfront_confirmation.issueRevisionId [delete: restrict]
+Ref fk_upfront_verified_by: dms.upfront_confirmation.verifiedBy > dms.app_user.id [delete: restrict]
+Ref fk_upfront_receipt: dms.document.id - dms.upfront_confirmation.receiptDocumentId [delete: restrict]
+
+Ref fk_online_payment_agency: dms.online_payment.agencyId > dms.agency.id [delete: restrict]
+// SQL: DEFERRABLE INITIALLY DEFERRED.
+Ref fk_online_payment_receipt: dms.document.id - dms.online_payment.receiptDocumentId [delete: restrict]
+Ref fk_online_payment_created_by: dms.online_payment.createdBy > dms.app_user.id [delete: restrict]
+Ref fk_payment_event_payment: dms.payment_event.paymentId > dms.online_payment.id [delete: restrict]
+
+Ref fk_batch_revision: dms.posting_batch.revisionId > dms.document_revision.id [delete: restrict]
+Ref fk_batch_created_by: dms.posting_batch.createdBy > dms.app_user.id [delete: restrict]
+
+Ref fk_inventory_balance_product: dms.product.id - dms.inventory_balance.productId [delete: restrict]
+Ref fk_inventory_balance_price_source: dms.inventory_balance.priceSourceLineId > dms.document_line.id [delete: restrict]
+Ref fk_agency_balance_agency: dms.agency.id - dms.agency_balance.agencyId [delete: restrict]
+
+Ref fk_inventory_entry_batch: dms.inventory_entry.batchId > dms.posting_batch.id [delete: restrict]
+Ref fk_inventory_entry_product: dms.inventory_entry.productId > dms.product.id [delete: restrict]
+Ref fk_inventory_entry_unit: dms.inventory_entry.unitId > dms.unit.id [delete: restrict]
+Ref fk_inventory_entry_line: dms.inventory_entry.(lineId, productId, unitId) > dms.document_line.(id, productId, unitId) [delete: restrict]
+Ref fk_inventory_entry_reversal: dms.inventory_entry.id - dms.inventory_entry.reversesEntryId [delete: restrict]
+
+Ref fk_receivable_entry_batch: dms.receivable_entry.batchId > dms.posting_batch.id [delete: restrict]
+Ref fk_receivable_entry_agency: dms.receivable_entry.agencyId > dms.agency.id [delete: restrict]
+Ref fk_receivable_entry_issue: dms.receivable_entry.(issueDocumentId, agencyId) > dms.document.(id, agencyId) [delete: restrict]
+Ref fk_receivable_entry_reversal: dms.receivable_entry.id - dms.receivable_entry.reversesEntryId [delete: restrict]
+
+Ref fk_credit_lot_agency: dms.credit_lot.agencyId > dms.agency.id [delete: restrict]
+Ref fk_credit_lot_source: dms.credit_lot.sourceRevisionId > dms.document_revision.id [delete: restrict]
+Ref fk_credit_lot_receipt: dms.credit_lot.(originReceiptId, agencyId) > dms.document.(id, agencyId) [delete: restrict]
+
+Ref fk_credit_entry_batch: dms.credit_entry.batchId > dms.posting_batch.id [delete: restrict]
+Ref fk_credit_entry_agency: dms.credit_entry.agencyId > dms.agency.id [delete: restrict]
+Ref fk_credit_entry_lot: dms.credit_entry.(lotId, agencyId) > dms.credit_lot.(id, agencyId) [delete: restrict]
+Ref fk_credit_entry_reversal: dms.credit_entry.id - dms.credit_entry.reversesEntryId [delete: restrict]
+
+Ref fk_refund_reservation_revision: dms.refund_reservation.refundRevisionId > dms.document_revision.id [delete: restrict]
+Ref fk_refund_reservation_lot: dms.refund_reservation.lotId > dms.credit_lot.id [delete: restrict]
+Ref fk_refund_attempt_revision: dms.refund_attempt.refundRevisionId > dms.document_revision.id [delete: restrict]
+Ref fk_refund_attempt_payment: dms.refund_attempt.onlinePaymentId > dms.online_payment.id [delete: restrict]
+
+Ref fk_stock_count_created_by: dms.stock_count.createdBy > dms.app_user.id [delete: restrict]
+Ref fk_stock_count_confirmed_by: dms.stock_count.confirmedBy > dms.app_user.id [delete: restrict]
+// SQL: DEFERRABLE INITIALLY DEFERRED.
+Ref fk_stock_count_adjustment: dms.document.id - dms.stock_count.adjustmentDocumentId [delete: restrict]
+Ref fk_stock_count_line_count: dms.stock_count_line.countId > dms.stock_count.id [delete: restrict]
+Ref fk_stock_count_line_product: dms.stock_count_line.productId > dms.product.id [delete: restrict]
+Ref fk_stock_count_line_unit: dms.stock_count_line.unitId > dms.unit.id [delete: restrict]
+Ref fk_stock_count_line_observed_entry: dms.stock_count_line.observedLastEntryId > dms.inventory_entry.id [delete: restrict]
+
+Ref fk_audit_actor: dms.audit_log.actorId > dms.app_user.id [delete: restrict]
+Ref fk_audit_function: dms.audit_log.functionCode > dms.app_function.code [delete: restrict]
+
+// Nhóm bảng để dễ đọc sơ đồ, không tạo thêm đối tượng SQL.
+TableGroup identity_and_access {
+  dms.user_group
+  dms.app_function
+  dms.app_user
+  dms.group_permission
+  dms.auth_token
+}
+
+TableGroup master_data {
+  dms.business_rule
+  dms.district
+  dms.agency_type
+  dms.unit
+  dms.agency
+  dms.product
+}
+
+TableGroup business_documents {
+  dms.document
+  dms.document_revision
+  dms.document_line
+  dms.upfront_confirmation
+}
+
+TableGroup payments_and_refunds {
+  dms.online_payment
+  dms.payment_event
+  dms.refund_reservation
+  dms.refund_attempt
+}
+
+TableGroup ledgers_and_balances {
+  dms.posting_batch
+  dms.inventory_balance
+  dms.agency_balance
+  dms.inventory_entry
+  dms.receivable_entry
+  dms.credit_lot
+  dms.credit_entry
+}
+
+TableGroup stocktaking {
+  dms.stock_count
+  dms.stock_count_line
+}
+
+TableGroup system_audit {
+  dms.audit_log
+}
