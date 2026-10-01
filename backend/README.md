@@ -75,21 +75,36 @@ service transaction boundary; closing a session rolls back uncommitted changes.
 
 ## Migrations
 
-There are no application tables or initial migrations yet. Define models using
-`app.db.base.Base` and import their modules in `alembic/env.py` so autogeneration
-can discover them:
+The initial database is implemented with reviewed SQL snapshots:
+
+- `0001`: all 29 `dms` tables, domains, sequence, indexes, integrity/audit triggers,
+  read models, report functions and core rules/RBAC.
+- `0002`: `pg_trgm` substring search indexes, including Supabase extension-schema discovery.
+- Alembic tracks the revision in `public.alembic_version`, independently of the
+  DDL's transaction-local search path.
 
 ```sh
-uv run alembic revision --autogenerate -m "create initial tables"
 uv run alembic upgrade head
+uv run alembic current
 ```
 
-Review generated migrations before applying them, especially against a Supabase
-project containing existing tables. Migrations are run explicitly, never on
-every API startup. From the repository root, deploy migrations with:
+SQL snapshots belong to their revisions and must not be edited after deployment;
+add a new reviewed revision for changes. Initial deployment fails if `dms` already
+exists; it does not overwrite a legacy schema. Downgrading `0001` removes the whole
+`dms` schema and its data. `0002` downgrade retains the potentially shared extension.
+
+Application ORM models have not been mapped yet. Future models must use
+`app.db.base.Base`, `schema="dms"`, the quoted camelCase SQL names and PostgreSQL
+domains, and be imported in `alembic/env.py`. Autogeneration is scoped to mapped
+tables to avoid dropping SQL-managed or Supabase-owned objects. Domains, views,
+functions and triggers require explicit SQL migrations; they are not inferred
+by Alembic. Migrations are explicit, never run on API startup.
+
+From the repository root:
 
 ```sh
 docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm migrate python -m app.db.seed
 ```
 
 ## Checks
