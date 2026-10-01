@@ -15,6 +15,8 @@ Copy `.env.example` to `.env`, then fill in `DB_PASSWORD` and verify `DB_HOST`,
 `DB_PORT`, `DB_NAME`, and `DB_USER` using Supabase's **Connect** panel. Start the server:
 
 ```sh
+uv run alembic upgrade head
+uv run python -m app.db.seed
 uv run uvicorn app.main:create_app --factory --reload
 ```
 
@@ -59,8 +61,11 @@ app/
   main.py          # Application factory and resource lifecycle
   api/             # HTTP routes and request/response schemas
   core/            # Validated environment configuration
-  db/              # SQLAlchemy base and request-scoped sessions
-alembic/           # Versioned database migrations
+  db/              # SQLAlchemy base, sessions, seed and live verification
+    seed.py        # Transactional complete demo dataset
+    verify.py      # Ledger/cache/report checks and isolated SQL regression
+    sql/           # Session-local seed builders and regression fixtures
+alembic/           # Versioned database migrations and immutable SQL snapshots
 tests/             # API checks
 ```
 
