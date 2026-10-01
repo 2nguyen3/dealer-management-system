@@ -5,6 +5,10 @@
 **Updated:** 2026-10-01. **Current next module:** `authentication`.
 **Status:** roadmap; business HTTP APIs and authentication are not implemented yet.
 
+Track slice progress, deferred integrations and release evidence in the
+[Backend General Checklist](GENERAL_CHECKLIST.md). Per-function details remain in
+the owning module checklist and verification log.
+
 ## 1. Where to start
 
 Start with [the authentication plan](plan/authentication/PLAN.md), then shared API
@@ -280,7 +284,8 @@ does not prove business API, concurrency or external sandbox behavior.
 | Authentication M01 | Detailed plan prepared; implementation not started | Execute its P0→P6 gates with strict per-function evidence. |
 | M02–M32 | Roadmap only; detailed plans/HTTP modules not implemented | After prerequisite gates, prepare the owning module plan, then implement/test its slice. |
 
-When work advances, update this file's current module/progress and the owning
-plan's checklist/evidence in the same task. Record dependency changes with a
-reason and update the graph/table together; distinguish prerequisite slices from
-whole-module completion. Keep root/backend AGENTS aligned with this roadmap.
+When work advances, update this file's current module/progress, the General
+Checklist and the owning plan's checklist/evidence in the same task. Record
+dependency changes with a reason and update the graph/table together; distinguish
+prerequisite slices from whole-module completion. Keep root/backend AGENTS aligned
+with this roadmap.
