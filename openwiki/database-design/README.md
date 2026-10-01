@@ -11,7 +11,7 @@ xác minh chữ ký cổng thanh toán hoặc gọi API hoàn tiền.
 | File | Mục đích |
 | --- | --- |
 | [business_decision_making.md](business_decision_making.md) | Toàn bộ interview, phương án, **✅ lựa chọn**, quy ước bổ sung |
-| [DMS.sql](DMS.sql) | DDL PostgreSQL 16+; nguồn chính xác cho cột, FK, CHECK, index và trigger |
+| [DMS.sql](DMS.sql) | Entry point psql; DDL PostgreSQL 16+ có version ở [0001_initial.sql](../../backend/alembic/sql/0001_initial.sql) |
 | [DMS.dbml](DMS.dbml) | Bản DBML để dán vào dbdiagram.io; gồm 29 bảng, cột, khóa/quan hệ, CHECK và ghi chú phần chỉ có trong SQL |
 | [seed.example.sql](seed.example.sql) | 20 quận mẫu, 3 đơn vị, 5 hàng mẫu; tùy chọn cho demo |
 | [search-indexes.sql](search-indexes.sql) | GIN/pg_trgm cho tìm chứa chuỗi; tùy chọn |
@@ -412,8 +412,10 @@ vụ. Token hết hạn có thể purge theo chính sách; audit không lưu tok
 Snapshot được lưu ở revision, không nhân metadata người dùng trong mọi entry.
 
 Nâng cấp bằng Alembic reviewed migrations, không chạy lại DMS.sql lên schema
-đã tồn tại. Backend scaffold chưa có domain models/migrations: cần map 29 bảng,
-domain và trigger; xem lại autogenerate vì Alembic không tự hiểu mọi routine.
+đã tồn tại. Backend có migration `0001` cho đầy đủ object và `0002` cho search
+index; ORM models cho business API chưa được map. Xem lại autogenerate vì
+Alembic không tự hiểu mọi domain/routine. DDL snapshot đã triển khai không
+được sửa; thay đổi schema phải tạo revision mới.
 Nếu có dữ liệu legacy, lập migration riêng: chuẩn hóa dialect/status, map mã
 cũ → PK mới, tạo version/batch/ledger mở đầu từ chứng từ thực, đối chiếu stock,
 debt, credit, totals trước cutover. Không coi cached debt/stock cũ là nguồn duy
