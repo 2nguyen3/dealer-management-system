@@ -138,6 +138,7 @@ From the repository root:
 ```sh
 docker compose build
 docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm migrate python -m app.db.seed
 docker compose up -d --wait --wait-timeout 120
 docker compose ps
 ```
@@ -178,5 +179,5 @@ docker compose down
 ```
 
 Dependency lockfiles (`backend/uv.lock` and `ui/package-lock.json`) are included
-for reproducible installs. The scaffold contains infrastructure and a starter
-screen; domain tables and business workflows can be added incrementally.
+for reproducible installs. The database objects and full demo data are implemented;
+the UI remains a starter screen, and business APIs/authentication are the next steps.
