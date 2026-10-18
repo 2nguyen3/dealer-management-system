@@ -1,15 +1,42 @@
 # Frontend General Checklist
 
-**Updated:** 2026-10-01. **Next slice:** F01 `frontend_foundations`.
-**Status:** health-check starter only; business UI and child-module plans not started.
+Backend readiness checkpoint2026-10-18:103target operations+2health implemented,
+source/configured Supabase0007. M21 adjustments core, M22 counts, M23 returns core
+and M24 credit readers pass declared gates:338offline+84PG+24direct/Nginx,
+affected30-file1162/162 exact100%. No frontend/browser completion is implied.
+M17–M20's80owning/22deployment/705non-deployment evidence remains historical.
+Owning frontend prerequisites and M28/M29 document
+line/cancel/correction gates remain required.
+See [backend availability](../backend-design/plan/full_backend/AVAILABILITY.md).
+This backend handoff closes no frontend implementation/browser checkbox.
+Count APIs retain zero observations, expose parent ETags and offer no delete.
+Return creation accepts originLineId/quantity only; no replacement selling price.
+Credit historical balance strings follow AggregateMoney; lot/current Money remains
+bounded. Reuse the sole agency balance route. M25–M27 consumers and M28/M29
+line/history/posted cancel/correction still require their owning backend gates.
+
+**Updated:** 2026-10-03. **Next implementation slice:** F01 `frontend_foundations`.
+**Status:** health-check starter runtime; detailed child plans and multi-page HTML
+wireframes prepared, business UI implementation not started.
 Checked planning items do not imply passing UI behavior or browser tests.
 
 Use with the [frontend General Plan](GENERAL_PLAN.md),
 [backend General Plan](../backend-design/GENERAL_PLAN.md),
 [backend checklist](../backend-design/GENERAL_CHECKLIST.md) and
 [single target API](../backend-design/API/openapi.json).
-This is general tracking, not a child-module plan. Detailed frontend plans and
-per-symbol test registers will be prepared only when requested.
+This is general tracking, not a child-module plan. The [full planning package](plan/full_frontend/PLAN.md)
+and [paired wireframes](wr/index.html) are prepared. Proposed responsibilities must
+be replaced with actual symbols and per-symbol test nodes during implementation.
+
+Backend readiness is operation-specific: use the
+[full backend inventory](../backend-design/plan/full_backend/OPERATIONS.md).
+Its first/internal delivery gate does not close a frontend live-operation gate.
+Dashboard/chatbot contract decisions D09/D10 are tracked in the
+[backend gap register](../backend-design/plan/full_backend/DECISIONS.md).
+Use its D16 derived-price decision and D17 persisted-history publication gate with
+the [release handoff map](../backend-design/plan/full_backend/EXECUTION.md) before
+closing affected live slices. R3/R4 engineering milestones alone do not deliver
+the complete document workbench; line and posted-cancel gates extend to R5.
 
 ## 1. Tracking rules and planning readiness
 
@@ -30,11 +57,13 @@ per-symbol test registers will be prepared only when requested.
   contract and acyclic dependencies.
 - [x] Existing React/Vite/TypeScript/npm starter and health-request cleanup
   documented in [UI guidance](../../ui/AGENTS.md) and [README](../../ui/README.md).
-- [ ] Request and prepare the F01 `frontend_foundations` detailed plan before code.
+- [x] Prepare the F01 `frontend_foundations` detailed plan and matching wireframes before code.
 - [ ] Establish locked component/hook/HTTP-fixture/browser/coverage tooling in F01;
   no frontend test runner/E2E scripts exist today.
-- [ ] Prepare later requested child materials with screen/action-to-operation/
-  permission mapping and their full success/failure/boundary inventory.
+- [x] Prepare F02–F32 child materials with screen/action-to-operation/permission
+  mapping and proposed success/failure/boundary cases, paired with matching HTML.
+- [ ] Review the wireframes in a real browser at desktop/mobile widths with keyboard
+  and focus; structural link validation alone does not close visual review.
 
 ## 2. Ordered slice checklist
 
@@ -207,8 +236,8 @@ or invented browser results. Marking "mocked" never closes a live slice checkbox
 
 | Slice / module | Delivery level/scope | Child evidence / exact command result | Backend gate / blocker |
 | --- | --- | --- | --- |
-| F01 frontend_foundations | General roadmap ready; no child plan/code | Planning validation only; no frontend behavior tests run | Request detailed foundations plan/test harness. |
-| F02–F32 | Roadmap only | No child implementation/browser evidence | Frontend prerequisites and actual owning backend operations required. |
+| F01 frontend_foundations | [Detailed plan](plan/frontend_foundations/PLAN.md) + [HTML screens](wr/frontend_foundations/index.html) prepared; no code | Planning/link validation only; no frontend behavior tests run | Install locked test/validation/router harness in F01. |
+| F02–F32 | [Paired plans/wireframes](plan/full_frontend/MODULES.md) prepared; no feature implementation | [Program verification](plan/full_frontend/VERIFICATION.md); no live browser evidence | Frontend prerequisites and actual owning backend operations required. |
 
-Current next action: request F01's detailed plan. This general checklist creates
-no child module and marks no business component/hook/adapter complete.
+Current next action: implement F01 with locked tooling and strict tests. Prepared
+plans and static HTML mark no business component/hook/adapter complete.

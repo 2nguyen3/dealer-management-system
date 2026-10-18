@@ -17,8 +17,8 @@ goods, inventory, payments, outstanding dealer debt, and business reports.
 The repository currently contains an infrastructure scaffold. The frontend shows
 a development starter page with API connection status and a link to API docs.
 The backend provides health endpoints, database configuration, session management,
-migration tooling and the reviewed DMS schema/demo seed. Business screens, domain
-HTTP endpoints, authentication and user-level authorization have not been implemented yet.
+migration tooling, reviewed DMS schema/demo seed, authentication and reusable RBAC.
+Business screens, business HTTP endpoints and frontend authentication are future work.
 
 ## Technology stack
 
@@ -252,9 +252,11 @@ Unhealthy status alone does not trigger a container restart.
 Read `../openwiki/frontend-design/GENERAL_PLAN.md` before planning or implementing
 frontend features. It defines the module order, frontend dependencies, backend
 slice readiness, common API/UX contract and strict testing/completion rules.
-The next frontend module is `frontend_foundations`; the current roadmap has no
-detailed child-module plans. Prepare those under
-`../openwiki/frontend-design/plan/<module_name>/` only when requested.
+The next implementation module is `frontend_foundations`. F01–F32 now have paired
+six-file plans in `../openwiki/frontend-design/plan/<module_name>/` and clickable
+static HTML wireframes under `../openwiki/frontend-design/wr/<module_name>/`.
+The [full frontend package](../openwiki/frontend-design/plan/full_frontend/PLAN.md)
+indexes their operations, decisions and validation. They are not implemented UI.
 
 Track slices, actual backend readiness and release gates in
 `../openwiki/frontend-design/GENERAL_CHECKLIST.md`. Keep it aligned with the
@@ -263,6 +265,12 @@ General Plan and owning child evidence; mocked slices do not close live gates.
 - Use `../openwiki/backend-design/API/openapi.json` as the single target HTTP
   contract and the backend General Plan for operation readiness. A plan or mock
   does not mean that a business endpoint is implemented.
+- The backend `plan/full_backend/OPERATIONS.md` lists first/internal and full
+  operation gates; use full published scope for live UI readiness. Its gap register
+  tracks dashboard admission and chatbot candidate-paging decisions before F31/F32.
+  Its EXECUTION release map also tracks D16 derived-price responses and D17 support
+  for persisted later transaction kinds; R3/R4 alone do not close the full live
+  document workbench's line/cancellation/integration gates.
 - Before child-module code, define PLAN/REQUIREMENTS/DESIGN/TESTS/CHECKLIST/
   VERIFICATION materials with screen/action-to-operation/permission mapping.
 - Register/test every completed actual function, component, hook, adapter,

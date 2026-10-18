@@ -3,10 +3,24 @@
 **Frontend implementation order, module dependencies, API integration contract,
 and completion gates**
 
-**Updated:** 2026-10-01. **Current next module:** `frontend_foundations`.
-**Status:** roadmap only; the UI currently has a health-check starter page.
-**Scope of this document:** general planning contract. Detailed child-module plans
-will be prepared when requested; none are created by this roadmap.
+**Updated:** 2026-10-03. **Current next implementation module:** `frontend_foundations`.
+**Status:** paired planning/wireframe package prepared; the UI runtime remains a
+health-check starter page. This document remains the general ordering contract.
+Backend handoff2026-10-18: M21 adjustment core, M22 counts, M23 return core and M24
+credit readers pass declared gates. Source/configured Supabase0007;
+338offline+84PG+24direct/Nginx, affected30-file1162/162 exact100%. Earlier M17–M20 owning80-case/22deployment and705-case
+non-deployment results remain historical. Administration/master data, inventory and receipt APIs remain available
+([availability](../backend-design/plan/full_backend/AVAILABILITY.md)).
+Implemented103/154 target operations enable operation-specific integrations after frontend
+prerequisites; full document lines/cancel/correction remain M28/M29-gated.
+Frontend modules remain unimplemented; this backend handoff closes no frontend gate.
+Use count parent ETags and private server snapshots; no count delete. Return lines
+accept original line IDs/quantities only. Credit historical balance strings may exceed
+single-row Money limits through canonical AggregateMoney; never coerce to JS Number.
+The agency balance resource still has one M20 owner. Deferred M25–M29 actions remain gated.
+The [full frontend execution package](plan/full_frontend/PLAN.md),
+[32 owning child plans](plan/full_frontend/MODULES.md) and
+[clickable multi-page wireframes](wr/index.html) supply the detailed design.
 
 Track slices, backend readiness, deferred integrations and release gates in the
 [Frontend General Checklist](GENERAL_CHECKLIST.md). It is general tracking,
@@ -30,11 +44,17 @@ Existing React / TypeScript / Vite starter
   -> Reports + dashboard + chatbot
 ```
 
-This is the recommended delivery order. The frontend prerequisite column in §4
+This is the recommended implementation delivery order. The frontend prerequisite column in §4
 contains direct dependencies; earlier dependencies are inherited transitively.
 Backend prerequisites identify the owning implementation slices in the
 [backend General Plan](../backend-design/GENERAL_PLAN.md). They mean the relevant
 operations and test gates must actually pass, not merely have a plan file.
+
+Apply the backend [release handoff map](../backend-design/plan/full_backend/EXECUTION.md)
+as well: first/full module gates are lower bounds, and writers must handle the
+later transaction kinds already persisted in the database (D17). The complete
+live document-workflow bundle is R5; R3/R4 alone do not supply every line-edit,
+cancellation and mixed-history replay action required by F14–F29.
 
 A frontend feature can be developed against source-derived fixtures before its
 backend exists. That is a contract-mocked slice, not completed live integration.
@@ -50,7 +70,7 @@ silently into demo data or imply that simulated money was really received.
 | [Database design](../database-design/README.md) and [business decisions](../database-design/business_decision_making.md) | Selected draft/confirmation/version/FIFO/return/credit/refund behavior; persisted states and historical meaning. |
 | [Backend API contract](../backend-design/API/openapi.json) | HTTP methods, operation IDs, JSON schemas, permissions, headers, status codes and content negotiation. |
 | [Backend General Plan](../backend-design/GENERAL_PLAN.md) | API implementation order, prerequisite slices and deferred correction/money integrations. |
-| [Backend authentication design](../backend-design/plan/authentication/DESIGN.md) | Proposed JWT/refresh/reset lifecycle and reset-link fragment; planned work, not implemented HTTP auth. |
+| [Backend authentication design](../backend-design/plan/authentication/DESIGN.md) | Implemented JWT/refresh/reset lifecycle and fragment links; see backend verification for actual settings and evidence. |
 | [UI guidance](../../ui/AGENTS.md), [UI README](../../ui/README.md), [verification workflow](../../.agents/workflows/verify.md) | Current stack, structure, environment and checks. |
 
 Keep **one HTTP contract**: reference the backend OpenAPI rather than copying it
@@ -62,8 +82,11 @@ Current UI: React 19, strict TypeScript, Vite, native fetch/AbortController, pla
 CSS, ESLint/Prettier, npm lockfile, `src/app/App.tsx` and `src/lib/api.ts`. The
 starter checks liveness and links to API docs. There is no client-side router,
 session store, feature directory, component test runner or browser-test framework.
-The backend has reviewed SQL/schema/seed infrastructure; business HTTP endpoints
-and auth remain future work. Liveness does not prove database/API-feature readiness.
+The backend has reviewed SQL/schema/seed infrastructure and implemented M01
+authentication; business HTTP endpoints remain future work. The
+[full backend plan](../backend-design/plan/full_backend/PLAN.md) supplies operation-
+level delivery gates and open contract decisions. Liveness does not prove
+database/API-feature readiness.
 
 Preserve the existing setup and cancellation/StrictMode behavior as foundations
 are added. Choose new routing/validation/test dependencies in the owning detailed
@@ -95,7 +118,8 @@ authoritative inventory, debt, posted totals, payment verification or FIFO alloc
 - Use source request/response schemas and runtime validation at the API boundary;
   TypeScript interfaces alone do not validate remote JSON. Any generated types
   remain synchronized with the source contract; don't hand-maintain a second API.
-- Preserve camelCase keys and decimal-string bigint IDs/money/quantities/rates.
+- Preserve camelCase keys and decimal-string bigint IDs/money/quantities/rates;
+  source `CatalogId` fields are small integer IDs, not bigint strings.
   Do not convert monetary values or bigint identifiers through JavaScript Number.
   Validate/format without losing precision; input text and request strings remain
   distinct from localized display. Totals shown as previews are not commit results.
@@ -182,9 +206,11 @@ never replaces the backend's business or payment-evidence validation.
 
 ## 4. Ordered frontend implementation map
 
-`Fxx` identifies a frontend delivery slice. The module column is a **future** child
-plan folder name, not a newly created directory. `Mxx` refers to backend roadmap
-slices. The operation inventory for each child plan is prepared only when requested.
+`Fxx` identifies a frontend delivery slice. The module column names its existing
+[child plan](plan/full_frontend/MODULES.md) and [wireframe folder](wr/index.html).
+`Mxx` refers to backend roadmap slices. Operation ownership and readiness are in
+the [full frontend inventory](plan/full_frontend/OPERATIONS.md); implementation
+remains pending.
 
 ### Wave A — Foundations, access and administration
 
@@ -314,10 +340,9 @@ flowchart TD
   F31 --> F32[Chatbot]
 ```
 
-## 6. Child-module planning contract (prepare later, when requested)
+## 6. Child-module planning contract (prepared; implementation remains pending)
 
-For each requested child module, create
-`openwiki/frontend-design/plan/<module_name>/` before code, with:
+The 32 prepared `openwiki/frontend-design/plan/<module_name>/` folders each contain:
 
 ```text
 PLAN.md           # Screens/actions, slices, frontend and backend prerequisites
@@ -334,8 +359,9 @@ and response schemas, and visible error/recovery behavior. Document frontend rou
 names and ownership, dependent cache refresh, and which backend slice is available.
 Do not infer details from menu labels or duplicate a whole API implementation in UI.
 
-No child folders, auth plan, empty checklists or detailed per-function registers
-are created now. This document supplies the common contract for those later plans.
+Each prepared plan is paired with multiple linked HTML screens under `wr/<module_name>/`.
+The generated proposed responsibilities are replaced with actual symbols/test nodes
+as code is implemented. Child checklists keep runtime and live-browser gates open.
 
 ## 7. Strict tests and module completion
 
@@ -418,9 +444,19 @@ roadmap-only change. No child-plan directory or duplicate API contract was creat
 | Area | Current state | Next action |
 | --- | --- | --- |
 | React/Vite/TypeScript starter | Implemented; health status and docs link only | Preserve existing setup and request cleanup. |
-| Frontend General Plan | Prepared in this document | Request the first child plan: `frontend_foundations`. |
-| F01–F32 child plans and implementation | Not started; no child plans created | Prepare only the requested module's detailed plan; then execute strict tests and backend gates. |
-| Backend business integration | Backend roadmap/auth detailed plan exists; runtime still health-only | Coordinate actual operation availability; fixtures are not proof of integration. |
+| Frontend General Plan | Prepared in this document | Preserve dependency table/graph while implementing F01 onward. |
+| F01–F32 child plans and implementation | [32 paired child plans and 140 HTML wireframes prepared](plan/full_frontend/PLAN.md); implementation not started | Begin F01 tooling and tests; recheck each child against published backend operations before live integration. |
+| Backend business integration |58 target operations+2health available; M16 settlement internal | Integrate only [published branches](../backend-design/plan/full_backend/AVAILABILITY.md) after frontend foundations/auth; complete document workbenches retain M28/M29 gates. |
+
+Backend planning now includes all target operation IDs and first/full gates in its
+[operation inventory](../backend-design/plan/full_backend/OPERATIONS.md). Resolve
+the backend [D09/D10 decisions](../backend-design/plan/full_backend/DECISIONS.md)
+before final dashboard/chatbot integration: section permission admission and safe
+candidate pagination require a single-source contract decision. This creates no
+completed live slices.
+The backend's D16 also requires a derived selling-price response decision before
+F11/F12/F16/F17/F29 consume those projections; update source-derived types/fixtures
+after that decision, preserving exact strings and stored document-money bounds.
 
 When progress changes, update this file, the General Checklist, the owning child
 checklist/evidence and root/UI agent guidance. Keep frontend/backend dependency
