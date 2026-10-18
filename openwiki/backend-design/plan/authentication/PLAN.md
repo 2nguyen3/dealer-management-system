@@ -1,6 +1,6 @@
 # Authentication module — implementation plan
 
-**Status:** planned; no authentication code or new migrations implemented by this document.
+**Status:** implemented and locally verified; see VERIFICATION for exact evidence and operational limits.
 **Prepared:** 2026-10-01. **Module:** `authentication`. **Owner:** backend.
 
 This is M01 in the backend [General Plan](../../GENERAL_PLAN.md). Authentication
@@ -23,7 +23,7 @@ Read these materials together:
 5. [VERIFICATION.md](VERIFICATION.md): evidence template and current verification status.
 
 The API source is [API/openapi.json](../../API/openapi.json), not the current
-runtime OpenAPI, which only exposes health infrastructure. Database authority is
+runtime OpenAPI, which now exposes health and all seven auth operations. Database authority is
 [0001_initial.sql](../../../../backend/alembic/sql/0001_initial.sql) plus subsequent
 reviewed revisions. Source conflicts and implementation decisions are explicit
 in REQUIREMENTS and DESIGN; this plan does not claim that proposed choices were
@@ -47,27 +47,34 @@ modules. Their required invalidation behavior is covered here through direct
 database integration fixtures and a reusable invalidation service. An SMTP reset
 link can be tested with a local mail sink/API client before the frontend exists.
 
-## 3. Proposed implementation layout
+## 3. Implemented module layout
 
-Paths below are **future files**, unless listed under existing integration points.
+Paths below are implemented files. `modules/auth/permissions.py` holds the shared typed
+function registry used by response schemas and permission-policy construction.
 
 ```text
 backend/
   app/
     api/
-      auth.py                  # Seven thin HTTP handlers
-      schemas/auth.py          # Strict requests and explicit safe responses
-      errors.py                # Auth error/validation translation
-      dependencies/auth.py     # Bearer principal and allOf/anyOf permissions
-    auth/
-      models.py                # Five identity/access ORM mappings
+      router.py                # Aggregates feature routers
+    modules/auth/
+      router.py                # Seven thin HTTP handlers
+      schemas.py               # Strict requests and explicit safe responses
+      dependencies.py          # Bearer principal and allOf/anyOf permissions
+      models.py                # Auth token/function/grant ORM mappings
+      permissions.py           # Typed source FunctionCode registry
       repository.py            # Bound queries, token persistence, row locks
       service.py               # Auth transactions and credential workflows
-      passwords.py             # Argon2id hash/verification
       tokens.py                # Opaque-token digest and JWT codec
       delivery.py              # Reset link composition and SMTP adapter
       rate_limit.py            # Single-process bounded limiter
     core/request_context.py    # Request-ID middleware and audit context
+    core/security.py           # Argon2id hash/verification
+    core/exceptions.py         # Application exception types
+    core/logging.py            # Credential-safe event logger namespaces
+    common/responses.py        # Auth/business error/validation translation
+    modules/users/models.py    # Single AppUser mapping
+    modules/user_groups/models.py # Single UserGroup mapping
   alembic/
     versions/0003_auth_sessions.py
     sql/0003_auth_sessions.sql  # New reviewed additive snapshot
@@ -81,6 +88,9 @@ Existing integration points: `app/main.py`, `app/api/router.py`, `app/core/confi
 `app/db/base.py`, `app/db/session.py`, `alembic/env.py`, `app/db/seed.py`,
 `pyproject.toml`, `uv.lock`, and backend/root setup docs. Keep synchronous services
 and `get_session`; use synchronous route functions for DB, Argon2, and SMTP work.
+
+The 2026-10-04 [refactor evidence](../../../../backend/REFACTOR_VERIFICATION.md)
+records relocation and full regression/coverage/deployment verification.
 
 ## 4. Implementation sequence and exit gates
 
@@ -100,7 +110,7 @@ function count. The function register in TESTS must track actual symbols.
 | P5 — Password workflows | Password change, reset requests, reset completion, SMTP adapter and compensating token revocation. | Remaining three operations pass; reset replay/races, locked-account and mail-failure behavior pass; local SMTP capture test passes. |
 | P6 — Release verification | Full contract/error/header suite, all scoped-function coverage, migration compatibility, docs/config and smoke checks. | Full commands in TESTS pass; every function has evidence; source/runtime contract comparison and isolated lifecycle smoke pass. |
 
-Dependency graph: `P0 -> P1 -> P2 -> P3 -> P4 -> P5 -> P6`.
+Dependency graph: `P0 -> P1 -> P2 -> P3 -> P4 -> P5 -> P6`; local gates now pass.
 P2 pure-helper work can proceed while a disposable PostgreSQL environment is
 prepared, but P1/P3 are not complete until real database tests run.
 
@@ -154,4 +164,7 @@ register with its own assertions before it can be marked complete.
 - Frontend reset-page URL chosen through backend configuration; the frontend page
   itself is a later frontend deliverable.
 
-These prerequisites block the corresponding release gates, not preparation of this plan.
+Disposable PostgreSQL, generated local TLS SMTP and single-worker direct/Nginx
+verification are recorded in VERIFICATION. The provider configuration, actual public
+reset-page URL and Supabase upgrade remain deployment inputs; frontend screens are
+outside this backend module.

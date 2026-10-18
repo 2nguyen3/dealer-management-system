@@ -1,8 +1,8 @@
 # Authentication strict test specification
 
-**Status:** test design only; none of the following auth test files exist yet.
-Every function ID must be connected to actual symbols, tests, and evidence during
-implementation. Proposed names may change; update this register in the same change.
+**Status:** executable suites implemented and locally verified. The minimum-case
+inventory below is preserved; the actual-symbol register in §8 is authoritative
+for implemented names/test ownership. Exact passing commands are in VERIFICATION.
 
 ## 1. Rules for each completed function
 
@@ -169,18 +169,20 @@ rollback tests use a definite transaction failure, distinct from unknown outcome
 
 ## 7. Required implementation commands
 
-Run from `backend/`. These are **future commands**: pytest-cov, auth paths, marker
-and integration URL handling must first be implemented in P0. Keep original checks.
+Run from `backend/`. Paths, coverage tooling, integration markers and disposable
+URL handling are implemented. Keep original checks.
 
 ```sh
 uv sync --frozen
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest -m "not integration"
-uv run pytest tests/auth -m "not integration" --cov=app.auth --cov=app.api.auth --cov=app.api.schemas.auth --cov=app.api.dependencies.auth --cov=app.api.errors --cov=app.core.request_context --cov-branch --cov-report=term-missing
-uv run pytest tests/integration/auth -m integration --cov=app.auth --cov=app.api.auth --cov=app.api.schemas.auth --cov=app.api.dependencies.auth --cov=app.api.errors --cov=app.core.request_context --cov-branch --cov-append --cov-report=term-missing --cov-report=json --cov-fail-under=100
+uv run pytest --cov=app.modules --cov=app.common --cov=app.core --cov=app.api --cov=app.db.base --cov=tests.support --cov-branch --cov-report=term-missing
+uv run pytest tests/integration/auth tests/integration/shared_api tests/integration/user_groups -m integration --cov=app.modules --cov=app.common --cov=app.core --cov=app.api --cov=app.db.base --cov=tests.support --cov-branch --cov-append --cov-report=term-missing --cov-report=json --cov-fail-under=100
 ```
 
+The combined scope now includes M02/M03; configure both guarded auth and business
+test URLs. See the [verification workflow](../../../../.agents/workflows/verify.md).
 Use the function's focused test file/node IDs before recording completion. At P6,
 combine offline and integration coverage as above. Inspect JSON per-file coverage
 to ensure every scoped file has 100% statements and branches, not just aggregate
@@ -213,3 +215,59 @@ docker compose --profile tools config --quiet
 Compose validation requires the actual configured backend `.env`. Do not print
 resolved secret-bearing configuration. Proxied/direct API and external deployment
 mail smoke evidence must be recorded separately from static config success.
+
+## 8. Actual-symbol and executable-case register
+
+Prefixes: `A = app.modules.auth`, `C = app.core`, `R = app.common.responses`; test paths below are
+relative to `backend/tests/`. Each named constructor/helper/nested dependency is
+included; declarative mappings/typed registry have structural/source-contract tests.
+F01 includes existing integration points changed for auth. Failure tests use real
+crypto/HTTP, definite fault injection and persisted PostgreSQL state as applicable.
+
+| IDs | Actual symbols | Passing test files / principal test nodes |
+| --- | --- | --- |
+| F01 | `C.config.Settings.validate_auth`, `validate_auth_startup_settings`, `Settings.database_url`, `get_settings` | `auth/test_primitives.py::test_startup_key_and_db_only_settings`, `test_invalid_settings`, `test_enabled_mail_settings_and_secret_safe_failures`, `test_cached_settings_loader_uses_environment`; baseline `test_config.py` |
+| F02 | `A.schemas.EmailRequest.valid_email` | `auth/test_primitives.py::test_strict_schema_preserves_input`, `test_strict_schema_rejects_without_echo`; `auth/test_http.py::test_all_body_routes_safe_errors` |
+| F03–F04 | `C.security.hash_password`, `verify_password` | `auth/test_primitives.py::test_real_password_round_trip`, `test_bad_hash_fails_closed`; `auth/test_failure_boundaries.py::test_crypto_resource_failure_propagates`; real login/password suites |
+| F05–F06 | `A.tokens.generate_opaque_token`, `digest_opaque_token` | `auth/test_primitives.py::test_opaque_tokens_exact_digest`; resource-failure test; persisted token/digest assertions in `integration/auth/test_sessions.py` |
+| F07–F08 | `A.tokens.encode_access_token`, `decode_access_token` | `auth/test_primitives.py::test_access_round_trip_and_expiry`, `test_claim_manipulation`, `test_fractional_session_expiry_rejected`; JWT header/key/future/missing-claim tests in `auth/test_failure_boundaries.py`; `integration/auth/test_sessions.py::test_fractional_refresh_failure_preserves_original` |
+| F09 | `A.schemas.to_user_response` | `auth/test_primitives.py::test_permission_response_uniqueness_and_bigint`; safe whitelist and source response validation in `integration/auth/test_http_lifecycle.py` |
+| F10–F14 | `A.repository.AuthRepository.find_user_by_email`, `AuthRepository.get_user_with_group`, `AuthRepository.find_token_owner`, `AuthRepository.lock_user`, `AuthRepository.lock_token` | `integration/auth/test_sessions.py::test_repository_queries_and_caller_owned_invalidation`; CI uniqueness test in `test_permissions_audit.py`; stale identity-map and actual user-first wait tests in `test_concurrency.py` |
+| F15–F18 | `AuthRepository.insert_token`, `AuthRepository.revoke_session`, `AuthRepository.revoke_user_tokens`, `AuthRepository.update_password_hash` | `integration/auth/test_sessions.py` lifecycle/password/rollback tests; `test_migrations.py` schema/revocation/identity checks; no independent repository commit |
+| F19–F20 | `AuthRepository.get_allowed_function_codes`, `A.service.invalidate_user_sessions` | `integration/auth/test_permissions_audit.py::test_initial_group_permissions_are_data`, `test_case_insensitive_uniqueness_and_missing_grants`, `test_direct_sql_hash_group_and_profile_semantics`; caller-owned rollback and races in `test_sessions.py`/`test_concurrency.py` |
+| F21–F24 | `A.service.AuthService.login`, `AuthService.refresh_tokens`, `AuthService.logout`, `AuthService.get_current_user` | `integration/auth/test_sessions.py` invalid/locked/rotation/logout/expiry/state/commit-failure cases; C01–C03 in `test_concurrency.py`; live grant/profile cases in `test_permissions_audit.py` |
+| F25–F27 | `AuthService.change_password`, `AuthService.request_password_reset`, `AuthService.reset_password_with_token` | `integration/auth/test_sessions.py` persisted/audit/locked/reset/replay/send-compensation/same-password/expired-reset/rollback cases; C04–C05 in `test_concurrency.py`; privacy HTTP cases in `test_http_lifecycle.py`; no SMTP under locks in `test_permissions_audit.py` |
+| F28 | `C.exceptions.AuthError.__init__`; `R.auth_error_response`, `auth_error_handler`, `http_error_handler`, `validation_error_handler` | `auth/test_http.py` all body/media/error/status/header cases, invalid UTF-8 and safe 500; non-auth compatibility in `auth/test_failure_boundaries.py`; baseline health tests |
+| F29 | `A.dependencies.get_auth_service`, `get_current_principal` | `auth/test_http.py::test_bearer_header_only`; factory/session injection and real-service lifecycle in `integration/auth/test_http_lifecycle.py` |
+| F30 | `A.dependencies.require_permissions`, `require_permissions.dependency` | `auth/test_adapters.py::test_permission_policy_definition`, `test_permission_truth_table`; real four-group checks and next-request HTTP grant revocation in integration suites |
+| F31 | `C.request_context.request_context`, `set_audit_context` | auth HTTP IDs/no-store; `integration/auth/test_sessions.py::test_password_change_persisted_and_audited`; `test_permissions_audit.py::test_audit_context_clears_actor_and_does_not_leak`; reset SYSTEM and rollback audit assertions |
+| F32–F34 | `A.delivery.build_reset_link`, `SmtpResetDelivery.available`, `SmtpResetDelivery.send`, `SmtpResetDelivery.send.deliver`, `SmtpResetDelivery._send`, `pad_reset_response` | `auth/test_adapters.py` link/padding/TLS order/cleanup/deadline/capacity/start-failure tests; `integration/auth/test_delivery.py::test_local_tls_smtp_capture` (STARTTLS/SSL plus withheld-ack timeout compensation) |
+| F35–F36 | `A.rate_limit.build_rate_limit_key`, `AuthRateLimiter.check` | `auth/test_adapters.py` key/CI/thread/capacity/window/bucket tests; all seven HTTP 429s; actual direct/Nginx forwarded-header spoofing in `deployment/test_auth_smoke.py` |
+| F37–F43 | `A.router.login`, `refresh_tokens`, `logout`, `get_current_user`, `change_password`, `request_password_reset`, `reset_password_with_token` | `auth/test_http.py` seven operation/status/security/schema/header comparisons, media/errors/limits; A01–A07 real-service route lifecycle and privacy in `integration/auth/test_http_lifecycle.py`; direct/proxied smoke |
+| F44–F45 | `0003_auth_sessions.upgrade`, `downgrade`; SQL `dms.guard_auth_token` | `integration/auth/test_migrations.py::test_populated_upgrade_downgrade_reupgrade`, `test_token_identity_guard`, `test_revocation_irreversible_and_constraints`, `test_orm_mappings`; fresh migrations in every isolated DB |
+| F46 | `app.db.seed.DemoSeed.catalog`, `app.db.seed.main` auth integration changes | `integration/auth/test_seed_compatibility.py::test_full_seed_twice_and_regression`, `test_seed_requires_new_head`; 29 tables/8 users/16 revoked tokens/410 documents, old passwords/counts and 54 baseline SQL checks |
+| F47 | `AuthRepository.__init__`, `AuthService.__init__`, `SmtpResetDelivery.__init__`, `AuthRateLimiter.__init__`, `A.service.utc_now` | Injected service/settings/repository/clock instances in offline/failure/integration fixtures; adapter availability/capacity and app-local limiter tests; UTC expiries in real lifecycle |
+| F48 | `AuthService.transaction`, `AuthService.require_active`, `AuthService.validate_token`, `AuthService.lock_credential`, `AuthService.issue_response`, `AuthService.authenticate_claims`, `AuthService.authenticate`; `AuthRepository.live_session` | Real lifecycle/version/locked/expired/missing/revoked/wrong-purpose cases; definite flush/sign/insert/commit rollback; defensive collaborator faults in `auth/test_failure_boundaries.py` |
+| F49 | `A.schemas.CurrentUser.unique_functions` | `auth/test_primitives.py::test_permission_response_uniqueness_and_bigint`; rejects duplicate/unknown grants; source `FunctionCode` and `uniqueItems` compared in HTTP schema test |
+| F50 | `A.router.responses`, `check_identity_limit` | `auth/test_http.py::test_all_auth_reachable_schema_and_header_constraints`, operation inventory and body errors; login/reset identity buckets in actual routes; limiter CI key tests |
+| F51 | `app.db.base.include_name` | `integration/auth/test_migrations.py::test_orm_mappings`: actual Alembic comparison returns zero deltas, unmapped tables excluded; 100% branch coverage |
+| F52 | `app.main.create_app`, `create_app.lifespan` integration changes | baseline health tests; `auth/test_http.py` docs/CORS/factory/limiter isolation; `integration/auth/test_http_lifecycle.py` real request-scoped services |
+
+For a pure constructor/declarative mapping with no independent failure branch,
+failure evidence belongs to validated Settings and its actual collaborating workflow,
+not an invented constructor failure. No runtime helper is excluded from coverage.
+
+## 9. Deployment smoke selection
+
+`tests/deployment/test_auth_smoke.py` is both `integration` and `deployment` marked;
+it is excluded from offline selection and separate from the PostgreSQL suite path.
+Point `AUTH_SMOKE_DIRECT_URL` and `AUTH_SMOKE_PROXY_URL` at explicit disposable
+loopback ports backed by a seeded test DB, then run:
+
+```sh
+uv run pytest tests/deployment/test_auth_smoke.py -m deployment
+```
+
+The suite checks real direct/Nginx login→me→refresh→ancestor logout, readiness/docs,
+disabled-mail behavior and 121 requests with varying untrusted forwarding headers.
+It exhausts buckets deliberately; use fresh one-worker test containers.

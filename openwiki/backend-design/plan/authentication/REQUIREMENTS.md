@@ -15,7 +15,7 @@
 | DB-S | [Versioned DDL](../../../../backend/alembic/sql/0001_initial.sql) | Identity tables at lines 20–73; `audit_change`; `guard_auth_version`; four groups/33 functions and grants; audit trigger registrations. |
 | API-A | [Backend API contract](../../API/openapi.json) | Seven `/auth/*` paths; `BearerAuth`; auth request/response schemas and shared responses. |
 | API-U | Same API | `/users/{userId}` and admin reset invalidate sessions; permission updates take effect on the next request. |
-| RUN | [Backend guide](../../../../backend/AGENTS.md), [README](../../../../backend/README.md) | Current app has health only; synchronous sessions, explicit commits, immutable migrations, Argon2id demo passwords. |
+| RUN | [Backend guide](../../../../backend/AGENTS.md), [README](../../../../backend/README.md) | Runtime now has health and seven auth operations; synchronous sessions, explicit commits, immutable migrations, Argon2id demo passwords. |
 | VERIFY | [Verification workflow](../../../../.agents/workflows/verify.md) | Backend checks; documentation-only checks; live database verification limits. |
 
 The psql [DMS.sql](../../../database-design/DMS.sql) and
@@ -94,14 +94,14 @@ updating/reviewing the source contract. Generic database failures are sanitized
 | Gap / apparent conflict | Resolution for this plan |
 | --- | --- |
 | BA describes login but not token format/rotation/reset routes. | API-A defines the HTTP extension; DB-S defines persistence. |
-| Current token row has no issuance version or stable session lineage. | Add version/session metadata in a new migration; see DESIGN §2. Checking only the user's current version during refresh is insufficient. |
+| Pre-0003 token row lacked issuance version/session lineage. | Implemented additive 0003 metadata; see DESIGN §2. Checking only the user's current version during refresh is insufficient. |
 | Bearer scheme says revoked sessions reject access, while logout names only refresh-session revocation. | Validate a stable live session for every access token. Rotating refresh does not invalidate the session; logging it out does. |
 | `guard_auth_version` increments on password hash changes, including Argon2 parameter rehash. | Do not silently rehash at login in this module. Future rehash work must explicitly handle version invalidation. |
 | Locked errors and stale versions may both apply. | First validate token cryptography/purpose and known session; then locked state 403 where allowed, then version/expiry/revocation 401. Unknown/wrong credentials never reveal lock state. |
 | Reset after the account becomes locked. | A previously issued, otherwise valid reset token may reset a LOCKED account if its issuance version is still current; status remains LOCKED. A status-change version bump usually makes earlier tokens stale. |
 | No auth-specific function codes in the 33-function registry. | Password self-change/token reset use existing `users.manage` as audit classification, not a permission requirement; USER actor for self-change, SYSTEM for token reset. Do not introduce unregistered `auth.*` codes. |
-| No mail adapter, throttling, JWT codec, or coverage tooling exists. | Add them during implementation with locked dependencies and per-function tests, as proposed in DESIGN/TESTS. |
-| Current seed hard-codes head `0002` and inserts old token shape. | Adapt seed revision acceptance and token fixture shape during P1; do not edit immutable `0001`/`0002` snapshots or reset the populated demo. |
+| Baseline had no mail adapter, throttling, JWT codec or coverage tooling. | Implemented with locked dependencies and per-function tests; evidence in VERIFICATION. |
+| Baseline seed required `0002` and old token shape. | Seed now requires `0003` and revoked version/session metadata; immutable `0001`/`0002` snapshots and demo credentials remain preserved. |
 
 TTL, signing algorithm, mail transport, limiter limits and the additive schema
 are proposed technical decisions, not claims about additional BA policy.

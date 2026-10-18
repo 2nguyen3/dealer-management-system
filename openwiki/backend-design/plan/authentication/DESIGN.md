@@ -1,7 +1,14 @@
 # Authentication design and implementation decisions
 
-**All new files/settings/schema changes here are proposed work.** Existing source
-behavior is identified separately in [REQUIREMENTS.md](REQUIREMENTS.md).
+**Implemented design, 2026-10-02.** The decisions below describe the auth module;
+actual symbols/tests are registered in TESTS and execution evidence in VERIFICATION.
+
+The 2026-10-04 layout refactor places feature transport/domain code in
+`app.modules.auth`, `AppUser` in `app.modules.users.models`, `UserGroup` in
+`app.modules.user_groups.models`, shared timestamps in `app.db.base`, password
+helpers in `app.core.security`, exception types in `app.core.exceptions` and
+HTTP error projections in `app.common.responses`. Each table still has exactly
+one mapping. See [refactor evidence](../../../../backend/REFACTOR_VERIFICATION.md).
 
 ## 1. Architecture and credential formats
 
@@ -66,6 +73,11 @@ expiry. Only `Authorization: Bearer <JWT>` is accepted, not cookies, query strin
 or a request-body token. Use FastAPI `HTTPBearer(auto_error=False)` so malformed/
 missing headers become documented 401 rather than framework-default 403.
 
+JWT NumericDate is emitted at whole-second precision. If an otherwise unexpired
+session is in its final fractional second and no currently valid clamped JWT can
+be represented, issuance returns 401 and the transaction rolls back rotation.
+It never commits a 200 containing `exp <= now` or extends the absolute session.
+
 ### Opaque refresh/reset tokens
 
 Generate 32 cryptographically random bytes and encode as unpadded URL-safe Base64
@@ -83,13 +95,12 @@ as expired. Use aware UTC instants, with test clocks synchronized to database
 
 ## 2. Additive database revision
 
-Current `auth_token` has purpose/digest/expiry/revocation but no version snapshot
-or session lineage. Both are necessary to implement the source Bearer scheme's
+The pre-0003 `auth_token` had no version snapshot or session lineage. Both are
+implemented to satisfy the source Bearer scheme's
 revoked-session behavior and prevent stale refresh tokens from gaining the new
 user version. Do not implement stateless JWT-only logout.
 
-Proposed `0003_auth_sessions`, `down_revision='0002'` (recheck actual head before
-implementation if another revision has landed):
+Implemented `0003_auth_sessions`, `down_revision='0002'`:
 
 | Addition | Definition / reason |
 | --- | --- |
@@ -110,7 +121,7 @@ triggers to tokens or copy raw reset-email payloads into SQL.
 2. Read the owning user's version into every existing token. Assign a distinct
    random UUID to each existing REFRESH row; leave reset session IDs NULL.
 3. Revoke every previously unrevoked token at the migration instant. There is no
-   implemented HTTP token issuer today; unknown historical tokens must not become
+    implemented HTTP issuer before revision 0003; unknown historical tokens must not become
    valid by retroactively assigning the current version. Preserve existing revokedAt.
 4. Add NOT NULL/check/index/guard constraints after backfill; test on populated
    `0002` fixtures and confirm business rows and account credentials are unchanged.
@@ -225,6 +236,13 @@ logged query string. The future frontend reads the fragment and POSTs the token
 to `/auth/password-resets`. SMTP receives the raw token only in the mail body;
 SQL stores its digest. Never print/reset-token URLs for a development fallback.
 
+The deployed adapter bounds the entire caller wait, rather than relying only on
+per-socket timeouts. A maximum of four daemon delivery workers per app performs
+SMTP setup/commands/cleanup; slot exhaustion/start failure is a sanitized send
+failure. Deadline expiration is an unknown outcome and causes service compensation.
+A worker can later deliver the now-revoked link. Socket timeouts bound individual
+operations; no durable queue or guaranteed delivery is claimed.
+
 1. Validate email and apply identical limiter buckets to known/unknown/locked accounts.
 2. Check adapter/configuration availability independently of account lookup. A
    globally disabled/unavailable adapter returns 503 + Retry-After for every email.
@@ -298,7 +316,7 @@ Allow/expose X-Request-Id and expose Retry-After/WWW-Authenticate through CORS a
 needed by the client. Credentials remain disabled because this API uses headers
 and JSON tokens, not cookies.
 
-Initial limiter: bounded in-memory rolling-window buckets, protected by a thread
+Implemented limiter: bounded in-memory rolling-window buckets, protected by a thread
 lock, monotonic time, eager expired-key cleanup and deterministic injectable clock.
 Application-factory-local state prevents tests/apps sharing buckets. Proposed
 limits (technical defaults, configurable):
@@ -316,14 +334,15 @@ live buckets, reject new keys with 429 instead of evicting live protection.
 Retry-After is `ceil(remaining_window)` with minimum 1. Simultaneous requests must
 not admit more than the limit. Throttling does not change account LOCKED status.
 
-Trust `request.client` by default. Forwarded-header trust must be explicitly
+Trust `request.client`; Docker and documented Uvicorn commands use `--no-proxy-headers`.
+Forwarded-header trust must be explicitly
 restricted to the known reverse proxy; do not trust arbitrary X-Forwarded-For from
 the public client. Verify direct localhost API and Nginx paths; without a trusted
 proxy configuration, limiter safely buckets Nginx traffic together and this limitation
 must be documented. Deployment remains one worker/replica for this limiter. Scaling
 requires shared atomic storage; do not claim multi-worker throttling is complete.
 
-## 6. Proposed settings and dependencies
+## 6. Implemented settings and dependencies
 
 | Setting | Proposed default/validation |
 | --- | --- |
@@ -348,9 +367,11 @@ key once the API includes auth; application liveness still makes no DB query.
 
 Runtime additions: `PyJWT`, `email-validator` for Pydantic email validation.
 Dev additions: `pytest-cov`, `jsonschema` for OpenAPI 3.1 response-validation tests.
+`aiosmtpd` and `cryptography` supply the generated local TLS mail sink in tests.
 SMTP uses the standard library. Update `pyproject.toml` and `uv.lock` together;
 then verify a frozen install. Record actual compatible versions during implementation
-rather than specifying an unverified lock resolution in this plan.
+rather than specifying an unverified lock resolution in this plan. Locked versions
+and frozen-install evidence are recorded in VERIFICATION.
 
 ## 7. Documentation and operational integration
 
