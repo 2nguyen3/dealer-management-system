@@ -7,6 +7,8 @@ dependencies = [
     "alembic>=1.16,<2",
     "argon2-cffi>=25.1,<26",
     "fastapi>=0.115,<1",
+    "email-validator>=2.2,<3",
+    "PyJWT>=2.10,<3",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.9,<3",
     "sqlalchemy>=2.0,<3",
@@ -14,7 +16,16 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx>=0.28,<1", "pytest>=8.3,<10", "ruff>=0.11,<1"]
+dev = [
+    "httpx>=0.28,<1",
+    "pytest>=8.3,<10",
+    "pytest-cov>=6,<8",
+    "jsonschema>=4.23,<5",
+    "ruff>=0.11,<1",
+    "aiosmtpd>=1.4,<2",
+    "cryptography>=45,<49",
+    "rfc3339-validator>=0.1.4,<1",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -30,3 +41,5 @@ known-third-party = ["alembic"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = '-m "not integration"'
+markers = ["integration: disposable PostgreSQL and local transport tests", "deployment: explicit disposable direct/Nginx HTTP smoke"]
