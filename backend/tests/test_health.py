@@ -16,6 +16,7 @@ def make_app():
             db_user="test",
             db_password="test",
             db_name="test",
+            auth_signing_key="synthetic-test-key-32-bytes-or-more",
         )
     )
 

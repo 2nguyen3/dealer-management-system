@@ -1,34 +1,48 @@
-import logging
-from typing import Annotated, Literal
+from fastapi import APIRouter
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from app.modules.agencies.router import router as agencies_router
+from app.modules.agency_credit.router import router as agency_credit_router
+from app.modules.agency_types.router import router as agency_types_router
+from app.modules.audit_logs.router import router as audit_logs_router
+from app.modules.auth.router import router as auth_router
+from app.modules.business_rules.router import router as business_rules_router
+from app.modules.districts.router import router as districts_router
+from app.modules.health.router import router as health_router
+from app.modules.inventory.router import router as inventory_router
+from app.modules.payment_receipts.router import router as payment_receipts_router
+from app.modules.permissions.router import router as permissions_router
+from app.modules.products.router import router as products_router
+from app.modules.receivables.router import router as receivables_router
+from app.modules.sales_returns.router import router as sales_returns_router
+from app.modules.stock_adjustments.router import router as stock_adjustments_router
+from app.modules.stock_counts.router import router as stock_counts_router
+from app.modules.stock_issues.router import router as stock_issues_router
+from app.modules.stock_receipts.router import router as stock_receipts_router
+from app.modules.units.router import router as units_router
+from app.modules.upfront_payments.router import router as upfront_router
+from app.modules.user_groups.router import router as user_groups_router
+from app.modules.users.router import router as users_router
 
-from app.db.session import get_session
-
-logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-class HealthResponse(BaseModel):
-    status: Literal["ok"] = "ok"
-
-
-@router.get("/health", response_model=HealthResponse, tags=["health"])
-def health() -> HealthResponse:
-    """Liveness: the API process is running; no database connection required."""
-    return HealthResponse()
-
-
-@router.get("/health/ready", response_model=HealthResponse, tags=["health"])
-def readiness(session: Annotated[Session, Depends(get_session)]) -> HealthResponse:
-    """Readiness: the configured Postgres database is reachable."""
-    try:
-        session.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        logger.warning("Database readiness check failed")
-        raise HTTPException(status_code=503, detail="Database unavailable") from None
-    return HealthResponse()
+router.include_router(health_router)
+router.include_router(auth_router)
+router.include_router(user_groups_router)
+router.include_router(users_router)
+router.include_router(districts_router)
+router.include_router(agency_types_router)
+router.include_router(units_router)
+router.include_router(permissions_router)
+router.include_router(audit_logs_router)
+router.include_router(business_rules_router)
+router.include_router(products_router)
+router.include_router(agencies_router)
+router.include_router(inventory_router)
+router.include_router(stock_receipts_router)
+router.include_router(stock_issues_router)
+router.include_router(payment_receipts_router)
+router.include_router(upfront_router)
+router.include_router(receivables_router)
+router.include_router(stock_adjustments_router)
+router.include_router(stock_counts_router)
+router.include_router(sales_returns_router)
+router.include_router(agency_credit_router)
