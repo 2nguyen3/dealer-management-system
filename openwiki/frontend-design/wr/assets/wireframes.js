@@ -1,0 +1,1 @@
+document.querySelectorAll('form[data-prototype]').forEach(form => form.addEventListener('submit', event => { event.preventDefault(); const note = form.querySelector('.prototype-feedback'); if (note) { note.hidden = false; note.focus?.(); } }));
