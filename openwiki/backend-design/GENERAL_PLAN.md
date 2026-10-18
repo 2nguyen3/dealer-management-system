@@ -2,16 +2,52 @@
 
 **Backend implementation order, module dependencies, and completion gates**
 
-**Updated:** 2026-10-01. **Current next module:** `authentication`.
-**Status:** roadmap; business HTTP APIs and authentication are not implemented yet.
+**Updated:** 2026-10-18. **Next module:** M25 `credit_applications` core.
+M21 adjustment core → M22 counts → M23 return core → M24 credit readers pass their
+owning gates. Runtime103target+2health; source/isolated/configured Supabase0007.
+Actual packet verification:338offline+84realPG (29owning+55retained)+24direct/Nginx;
+affected30-file production scope exact100%(1162statements/162branches).
+M21/M23 full posted paths stay M29; M28/M29 and whole R4–R6 remain open.
+**Status:** M01–M14, M15 core and M16 internal settlement retain earlier evidence;
+M17 stock issues core, M18 manual receipts core, M19 upfront integration and M20
+receivables pass their owning80-case/exact100% and22-case direct/Nginx gates.
+Retained370PG/TLS and308offline now pass; affected33-file production coverage is
+exact100%(1285statements/306branches). M17–M20/E11–E12 handoff is complete.
+M28/M29 deferred document-history and receipt completion gates remain open.
+The full goal remains active; R2/R3 engineering gates pass, R4–R6 are open.
 
 Track slice progress, deferred integrations and release evidence in the
 [Backend General Checklist](GENERAL_CHECKLIST.md). Per-function details remain in
 the owning module checklist and verification log.
 
+The [Full Backend Implementation Plan](plan/full_backend/PLAN.md) now supplies the
+working-tree assessment, all 154 target operations, 32 detailed work packages,
+transaction/replay design, schema/contract gaps and system verification strategy.
+Its [execution companion](plan/full_backend/EXECUTION.md) defines 22 delivery packets,
+price-range and persisted-history decision gates, and concrete release/UI handoffs.
+M02 and [M03 user groups](plan/user_groups/PLAN.md) now have passing evidence.
+M04 and M07–M09 now have owning six-file plans and passing full local gates.
+M05/M06/M10/M11/M12 now have owning six-file plans and passing evidence.
+M13/M14/M15 now have owning six-file plans and passing evidence.
+M16 now has an owning six-file plan and [passing evidence](plan/settlement_core/VERIFICATION.md).
+M17–M20 have owning six-file plans, actual-symbol registers and
+[scoped evidence](plan/stock_issues/VERIFICATION.md). Retained prerequisite regression
+also passes; see [program verification](plan/full_backend/VERIFICATION.md).
+Follow the active [GOAL](plan/full_backend/GOAL.md).
+Planning readiness does not close implementation gates.
+
+The [module-layout refactor](../../backend/REFACTOR_VERIFICATION.md) preserves M01–M03
+behavior with 159 offline, 108 PostgreSQL/TLS and 8 deployment tests passing.
+Features now own `app/modules/<feature>/{router,schemas,models,service,repository,dependencies}.py`
+as needed; `app/api/router.py` aggregates routes, with shared transport in `app/common/`
+and cross-cutting infrastructure in `app/core/`/`app/db/`. The existing user mapping
+is under `modules/users`; M04 administration and three catalogue APIs are implemented.
+Current evidence: [M04](plan/users/VERIFICATION.md), [M07](plan/districts/VERIFICATION.md),
+[M08](plan/agency_types/VERIFICATION.md), [M09](plan/units/VERIFICATION.md).
+
 ## 1. Where to start
 
-Start with [the authentication plan](plan/authentication/PLAN.md), then shared API
+Reuse [the implemented authentication module](plan/authentication/PLAN.md), then shared API
 conventions and account administration, then master data, then document/ledger
 workflows, and finally reporting and chatbot integration.
 
@@ -50,10 +86,16 @@ Read the sources before creating each module's detailed plan:
   [verification workflow](../../.agents/workflows/verify.md): implementation conventions.
 
 Already implemented: FastAPI application factory, settings, synchronous sessions,
-liveness/readiness, Alembic revisions `0001`/`0002`, all 29 domain tables and SQL
+liveness/readiness, Alembic revisions `0001`–`0007`, all 29 domain tables and SQL
 guards/read models, core groups/function grants, full repeatable demo seed and SQL
 verification. Preserve this baseline. Do not rebuild the database or edit deployed
-snapshots to start a business module. HTTP services/ORM mappings still need work.
+snapshots to start a business module. Identity/access ORM mappings and seven auth
+services/routes are implemented. Shared foundations and five group operations are
+implemented alongside users/districts/agency types/units, issue/manual-receipt/upfront
+workflows and receivables. M21–M24 now pass their linked owning gates; future code starts M25.
+Revision 0004 adds command infrastructure; zero demo
+command rows are legitimate. Revision 0005 serializes unit policy; reviewed0006
+repairs eligible owner deletion, product first-use policy and agency/date races.
 
 The baseline seed is useful for smoke tests, not a substitute for isolated fixtures,
 service implementations, or transaction/concurrency tests. SQL routines protect
@@ -63,8 +105,9 @@ data; backend services must still construct complete authorized workflows.
 
 `Mxx` identifies an implementation slice; `module_name` identifies its future plan
 folder `plan/<module_name>/`. Dependencies are direct prerequisites, with earlier
-dependencies inherited transitively. Only the authentication plan exists today.
-All other folder names below are proposed; create their detailed plan before code.
+dependencies inherited transitively. Authentication/shared_api/user_groups have six-file
+child plans; users/districts/agency_types/units now do too. The full-backend package contains work packages for every remaining
+slice; expand each into its owning detailed child plan before code.
 
 ### Wave A — Access and shared API foundations
 
@@ -103,7 +146,7 @@ transaction modules exist. Do not assume early catalogue work has an empty DB.
 | M13 | `document_core` | Shared identity/revision/line mappings and services; Document History draft-line CRUD foundation, parent ETags, snapshots, Decimal totals, creation keys, batch/reversal primitives and kind-to-permission dispatch. | M11, M12 | Correct parent/revision/line ownership; one product per revision; no changes to READY/POSTED content; financial documents reject goods lines; draft edits remain balance-neutral. |
 | M14 | `inventory` | Inventory: `/products/{productId}/inventory-entries` statement and reusable stock read service; product overview remains owned by products. | M13 | Business-date/order balances, effective/reversed entries and opening totals correct; inventory.read enforced; seeded fixtures can verify reads before new posting endpoints. |
 | M15 | `stock_receipts` — core | Stock Receipts: list/detail/create/draft update/post; draft cancellation. Add the STOCK_RECEIPT draft-line dispatcher in document_core. | M14 | Atomic positive inventory posting and latest-business-date purchase-price source; concurrent writes, snapshot/quantity validation, no success before commit. Posted corrections/cancellation close in M29. |
-| M16 | `settlement_core` | Internal receivable charges/FIFO allocations, AUTO_FROM_ISSUE and RECEIVED_UNAPPLIED receipt posting, credit provenance/lots and reserve/release/consume primitives. No separate public allocation CRUD. | M15 | Real-PG fixtures prove same-agency/source integrity, historical no-overpay/FIFO, nonnegative debt/credit, reservation exclusion and rollback; reusable primitives do not commit caller transactions. |
+| M16 | `settlement_core` | Internal receivable charges/FIFO allocations, AUTO_FROM_ISSUE and RECEIVED_UNAPPLIED receipt posting, credit provenance/lots, reserve/release/consume and chronological replay for supported kinds. No separate public allocation CRUD. | M15 | Real-PG fixtures prove same-agency/source integrity, historical no-overpay/FIFO, backdated-post downstream replay, nonnegative debt/credit, reservation exclusion and rollback; reusable primitives do not commit caller transactions. |
 | M17 | `stock_issues` — core | Stock Issues: list/detail/create/draft update/submit, pending revision replacement without received-money dependencies, zero-upfront posting, draft cancellation without money evidence. | M16 | ACTIVE agency/master rules; READY price snapshots fixed; post rechecks stock/current limit; no stock/debt reservation at submit. Money-dependent paths close in M19; posted correction/cancel close in M29. |
 | M18 | `payment_receipts` — core | Payment Receipts: list/detail/create/draft update/post; draft cancellation. Expose manual DEBT_COLLECTION, reuse internal posting for other receipt kinds. | M17 | FIFO at businessDate, no future invoice payment/manual overpay; no standalone edit/cancel of automatic or online receipts; posted correction/cancel close in M29. |
 | M19 | `upfront_payments` + stock-issue money integration | Upfront Payments: confirmation list/detail/verify/receive-separately; finish Stock Issues post with upfront payment and pending replacement after evidence separation. | M18 | Issue + automatic receipt + inventory/debt + CONSUMED atomic; VERIFIED alone balance-neutral; failed delivery retains evidence; separate receipt records full money and excess credit; retries cannot double count. |
@@ -122,10 +165,10 @@ module's endpoint to complete an atomic operation.
 
 | Step | Module / slice | API scope / deliverable | Depends on | Completion gate |
 | --- | --- | --- | --- | --- |
-| M21 | `stock_adjustments` — core | Stock Adjustments: list/detail/create/draft update/post and draft cancellation; add adjustment line dispatcher. | M15 | Signed nonzero deltas, reason required, no sales/charge or purchase-price source change; historical nonnegative stock; independent posted corrections/cancel close in M29. |
-| M22 | `stock_counts` | Stock Counts: headers/lines/recount/confirm; invokes internal adjustment posting for nonzero differences. | M21 | Capture bookQuantity and last-entry identity; stock changes that return to same quantity still stale; recount requires new observations; zero-difference lines retained with no empty adjustment; conditional posting permission enforced. |
-| M23 | `sales_returns` — core | Sales Returns: list/detail/create/draft update/post/draft cancel; add origin-linked return line dispatcher. | M20 | Cumulative rounding and quantity cap; original selling-price provenance; stock/debt/credit split atomic; real return date, no automatic refund; posted correction/cancel close in M29. |
-| M24 | `agency_credit` | Agency Credit: credit-lot/detail/entry reads and shared available-credit service; reuse M20 agency balance rather than duplicate its route. | M23 | Separate debt/credit; origin receipt provenance; reserved vs available credit, current vs historical balances and permissions correct. |
+| M21 | `stock_adjustments` — core | Stock Adjustments: list/detail/create/draft update/post and internal draft cancellation; adjustment line seam. | M15 | Verified signed stock-only deltas/reason/zero price, historical stock and count-link protection; [owning plan](plan/stock_adjustments/PLAN.md), [evidence](plan/stock_adjustments/VERIFICATION.md). Posted paths M29. |
+| M22 | `stock_counts` | Stock Counts: headers/lines/recount/confirm; internal adjustment posting for nonzero differences. | M21 | Verified movement identity/fresh recount/zero lines/conditional atomic adjustment; [owning plan](plan/stock_counts/PLAN.md), [evidence](plan/stock_counts/VERIFICATION.md). |
+| M23 | `sales_returns` — core | Sales Returns: list/detail/create/draft update/post/internal draft cancel and immutable cumulative-rounding replay. | M20 | Verified cap/zero increments/backdating/original cash and reserved/paid sources, reviewed0007; [owning plan](plan/sales_returns/PLAN.md), [evidence](plan/sales_returns/VERIFICATION.md). Posted correction/cancel M29. |
+| M24 | `agency_credit` | Credit-lot/detail/entry reads and shared available-credit service; sole balance route stays M20-owned. | M23 | Verified separate/reserved/available balances, origin/reversal history and exact aggregate statements; [owning plan](plan/agency_credit/PLAN.md), [evidence](plan/agency_credit/VERIFICATION.md). |
 | M25 | `credit_applications` — core | Credit Applications: list/detail/create/draft update/post and draft cancellation. | M24 | Available unreserved same-agency credit + invoice FIFO; preserve source provenance; cashReceived=0; concurrent consumption/reservation tests; posted correction/cancel close in M29. |
 | M26 | `online_payments` | Online Payments: create/read/list/events/reconcile and provider-signature webhook; sandbox adapter only. | M24 | Commit PENDING before provider call; verified signature/amount/reference; duplicate and late success record one full receipt, FIFO debt and excess credit; browser return is not payment proof; no network under DB locks. |
 | M27 | `refunds` | Refunds: draft/read/list/update/submit/confirm-paid/cancel, reservations, online attempts/detail/reconcile; cash/bank first, online after adapter integration. | M25, M26 | One source receipt per refund; reserve before sending; UNKNOWN retains reservation; confirmed failure releases; success posts/debits/consumes once; refunded money cannot be canceled; retry uses source-defined fresh revision/attempt. |
@@ -182,10 +225,10 @@ flowchart TD
   M17 --> M18[Payment receipts core]
   M18 --> M19[Upfront and issue integration]
   M19 --> M20[Receivables]
-  M15 --> M21[Stock adjustments core]
-  M21 --> M22[Stock counts]
-  M20 --> M23[Sales returns core]
-  M23 --> M24[Agency credit]
+  M15 --> M21[Stock adjustments core verified]
+  M21 --> M22[Stock counts verified]
+  M20 --> M23[Sales returns core verified]
+  M23 --> M24[Agency credit verified]
   M24 --> M25[Credit applications core]
   M24 --> M26[Online payments]
   M25 --> M27[Refunds]
@@ -214,6 +257,9 @@ modules M03–M06 were developed on a separate track.
   specific validation and state transitions; no unrestricted generic posting API.
 - M29 orchestrates cross-document replay, while stock receipts/issues/payment/
   adjustment/return/credit modules own their corrections and cancel endpoints.
+- M16 already supplies chronological replay for valid backdated postings; M23
+  extends it to return rounding/provenance. M29 completes correction orchestration,
+  rather than introducing the first replay support after earlier writers ship.
 - Every business write supplies validated actor/function/request context and calls
   `SET CONSTRAINTS ALL IMMEDIATE` as needed before reading refreshed caches, then
   commits before returning success. Deferred SQL checks are not optional.
@@ -228,6 +274,19 @@ implements the target contract, or return a successful placeholder. Runtime docs
 describe only implemented routes; detailed plans list deferred operation IDs.
 After each later consumer is added, strengthen dependent-state guards and rerun
 affected earlier module tests before claiming integrated completion.
+
+The [operation inventory](plan/full_backend/OPERATIONS.md) distinguishes first
+internal delivery from whole-operation publication. A shared endpoint with valid
+deferred state/kind branches stays internal until those branches are supported;
+the first slice alone is not a fully published target operation.
+
+Publication also depends on the kinds already persisted in the target database
+(D17): the demo contains later return/credit/refund records today. Financial writers
+must support their dependency closure before shipping, even if those kinds' HTTP
+writers come later. R3/R4 are engineering integration milestones; the complete live
+document-workflow handoff is R5, after lines and posted cancellation/corrections.
+D16 is resolved: DerivedSellingPrice represents readable current quotes, while
+common.prices.stored_selling_price enforces positive Money for later issue writers.
 
 Examples: stock receipts cannot be corrected without checking later stock use;
 issues may require receipt separation, FIFO replay and valid return sources;
@@ -281,8 +340,38 @@ does not prove business API, concurrency or external sandbox behavior.
 | Area | Current state | Next action |
 | --- | --- | --- |
 | Runtime/database infrastructure | Implemented baseline | Preserve and rerun relevant checks during business work. |
-| Authentication M01 | Detailed plan prepared; implementation not started | Execute its P0→P6 gates with strict per-function evidence. |
-| M02–M32 | Roadmap only; detailed plans/HTTP modules not implemented | After prerequisite gates, prepare the owning module plan, then implement/test its slice. |
+| Authentication M01 | Seven operations/RBAC implemented; 122 offline + 58 PostgreSQL/TLS tests, 100% scoped coverage and 4 direct/Nginx smoke cases | Preserve [evidence](plan/authentication/VERIFICATION.md); deploy migration/key/mail configuration explicitly. |
+| Whole-backend execution design | Prepared: 154-operation inventory, 32 work packages, 22 delivery packets, 17 gap decisions and verification plans | Use [full-backend package](plan/full_backend/PLAN.md) and [release handoffs](plan/full_backend/EXECUTION.md); resolve gap gates in their owning slices. |
+| M02 shared_api | P0–P5 implemented; exact values/errors/audit/cursors/ETags/commands verified | Preserve [evidence](plan/shared_api/VERIFICATION.md), including 0004/seed/race/coverage compatibility. |
+| M03 user_groups | Five operations implemented; 21 PG cases, symbol register and scoped 100% coverage | Preserve [evidence](plan/user_groups/VERIFICATION.md); M04 reruns assignment/deletion with its real writer. |
+| M04 users | Five operations locally complete, atomic session effects and joined-label locks | Preserve [evidence](plan/users/VERIFICATION.md); M05 prerequisite now verified. |
+| M07–M09 catalogues | Fifteen operations locally complete; populated references, independent races and 0005 unit policy repair | Preserve [districts](plan/districts/VERIFICATION.md), [types](plan/agency_types/VERIFICATION.md), [units](plan/units/VERIFICATION.md); actual M10–M12 consumers/regressions now pass. |
+| M05/M06/M10/M11/M12 | Twenty full operations locally complete, D02/0006 and D16 resolved | Preserve [permissions](plan/permissions/VERIFICATION.md), [audit](plan/audit_logs/VERIFICATION.md), [rules](plan/business_rules/VERIFICATION.md), [products](plan/products/VERIFICATION.md), [agencies](plan/agencies/VERIFICATION.md). |
+| M13 document_core | Internal all-kind readers/draft/revision/line/snapshot/batch foundations locally verified | Preserve [evidence](plan/document_core/VERIFICATION.md); full history/line dispatch remains M28. |
+| M14 inventory | Full statement operation and stock/reversal helpers locally verified; D14 historical aggregate range resolved | Preserve [evidence](plan/inventory/VERIFICATION.md), including all seeded goods kinds and filter-independent atomic balances. |
+| M15 stock_receipts core | Five full operations and internal draft cancel locally verified | Preserve [evidence](plan/stock_receipts/VERIFICATION.md); posted correction/full cancellation remain M29. |
+| M16 settlement_core | E09/E10 internal FIFO/provenance/reservations and chronological replay locally verified | Preserve [evidence](plan/settlement_core/VERIFICATION.md), including existing return/credit/refund financial effects; owning later HTTP/rounding gates remain open. |
+| M17 stock_issues core | Seven operations including M19 posting/replacement implemented; owning tests/races pass | Preserve [evidence](plan/stock_issues/VERIFICATION.md); posted corrections/cancel remain M29. |
+| M18 payment_receipts core | Five manual-receipt operations and protected special receipts implemented | Preserve [evidence](plan/payment_receipts/VERIFICATION.md); posted corrections/cancel remain M29. |
+| M19 upfront_payments | Four operations, full-money consumption/separation and issue integration implemented | Preserve [evidence](plan/upfront_payments/VERIFICATION.md); retain M29 money-preserving cancellation gate. |
+| M20 receivables | Six complete read operations implemented; exact snapshots/atomic ledgers/historical aggregates verified | Preserve [evidence](plan/receivables/VERIFICATION.md); M24 reuses the sole balance route. |
+| M21/M22/M23/M24 | Owning plans/actual symbols and scoped state/rollback/race/coverage/deployment gates pass | [Adjustments](plan/stock_adjustments/VERIFICATION.md), [counts](plan/stock_counts/VERIFICATION.md), [returns](plan/sales_returns/VERIFICATION.md), [credit](plan/agency_credit/VERIFICATION.md); dependency edges unchanged. |
+| M25–M32 | Work packages prepared; remaining HTTP work future | Next M25 credit_applications after M24 verification; preserve D17 and M28/M29 gates. |
+
+Current dependencies are unchanged. M04 and M07–M09 table gates above have passed
+their linked child evidence: 207 offline + 217 PostgreSQL/TLS + 16 deployment
+cases, exact 100% combined coverage. The graph retains all owning prerequisites.
+
+Prior M01–M16 regression: **247 offline +370 PostgreSQL/TLS**, exact100% across
+4096 statements/830 branches; head0006, retained migration/seed/54-check cases.
+Direct/Nginx20-case evidence is retained from M15, not rerun in the internal M16 task.
+At the M17–M20 checkpoint runtime published80/154 target+2health. Its owning gate:
+80cases, exact100%(808statements/98branches),22direct/Nginx. Configured Supabase
+explicitly upgraded0002→0006 and live integrity/demo checks passed. Retained370current
+PG/TLS nodes now pass across checkpointed/resumed runs;308offline passes. E11/E12 and
+the scoped R3 engineering gate close. Affected M16–M20/shared production coverage is
+33files/1285statements/306branches exact100%; this is not untouched-code coverage.
+No dependency edges were removed; M05 precedes M06 and M10 precedes M11/M12.
 
 When work advances, update this file's current module/progress, the General
 Checklist and the owning plan's checklist/evidence in the same task. Record
