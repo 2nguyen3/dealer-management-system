@@ -190,6 +190,9 @@
   },
   "active": "79eda61952c9bcc1",
   "lastOpenFiles": [
+    "database-design/verify.sql",
+    "database-design/search-indexes.sql",
+    "database-design/DMS.sql",
     "backend-design/API/openapi.json",
     "database-design/DMS.dbml",
     "business_decision_making.pdf"
