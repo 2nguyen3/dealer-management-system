@@ -12,13 +12,32 @@ xác minh chữ ký cổng thanh toán hoặc gọi API hoàn tiền.
 | --- | --- |
 | [business_decision_making.md](business_decision_making.md) | Toàn bộ interview, phương án, **✅ lựa chọn**, quy ước bổ sung |
 | [DMS.sql](DMS.sql) | Entry point psql; DDL PostgreSQL 16+ có version ở [0001_initial.sql](../../backend/alembic/sql/0001_initial.sql) |
-| [DMS.dbml](DMS.dbml) | Bản DBML để dán vào dbdiagram.io; gồm 29 bảng, cột, khóa/quan hệ, CHECK và ghi chú phần chỉ có trong SQL |
+| [DMS.dbml](DMS.dbml) | Bản DBML; 29 bảng nghiệp vụ + hạ tầng command, cột, khóa/quan hệ, CHECK và ghi chú SQL |
 | [seed.example.sql](seed.example.sql) | 20 quận mẫu, 3 đơn vị, 5 hàng mẫu; tùy chọn cho demo |
 | [search-indexes.sql](search-indexes.sql) | GIN/pg_trgm cho tìm chứa chuỗi; tùy chọn |
 | [verify.sql](verify.sql) | Kiểm tra hồi quy SQL, fixture rollback |
 | [archive/DMS.legacy.sql](archive/DMS.legacy.sql) | Bảo toàn schema đầu vào để đối chiếu; không dùng triển khai |
 | [DMS_exploration.md](../BA/DMS_exploration.md) | BA đầu vào; các thay đổi cần đồng bộ được liệt kê ở mục 9 |
 | [CONTEXT.md](../../CONTEXT.md) | Thuật ngữ nghiệp vụ đã làm rõ |
+
+Source/configured Supabase head hiện là **0007**:
+[return lot successors](../../backend/alembic/sql/0007_return_lot_successors.sql)
+cho phép phiên bản POSTED hiện hành của cùng phiếu trả hàng tiếp tục nguồn credit lot
+gốc khi tính lại làm tròn; giữ nguyên sourceRevisionId/originReceiptId/lot và bằng chứng
+reservation/refund. Chỉ sửa guard, không ghi đè lịch sử/cache. Fresh/populated upgrade,
+seed lặp,54SQLchecks và down/up đã pass trong schema cô lập.
+[0006 eligible owner/history repair](../../backend/alembic/sql/0006_eligible_owner_deletion.sql)
+cho phép cascade cache0 chỉ khi xóa owner chưa dùng, vẫn chặn DELETE/UPDATE cache
+trực tiếp và mọi lịch sử nghiệp vụ. Khóa first-use product và revision/agency dates
+bảo toàn đơn vị/ngày tiếp nhận khi có concurrent writers.
+[unit policy](../../backend/alembic/sql/0005_unit_policy.sql)
+khóa đơn vị trước kiểm tra số lượng dòng/chỉ tiêu kiểm kê và bảo vệ chính sách phần
+lẻ sau khi có dòng ghi nhận; kiểm chứng cả hai thứ tự concurrent first-use.
+[0004 durable commands](../../backend/alembic/sql/0004_api_commands.sql)
+thêm `api_idempotency` cho actor/operation/resource retry. Tổng 30 bảng vật lý,
+60 timestamp bắt buộc; demo chỉ yêu cầu 29 bảng nghiệp vụ có dữ liệu. Triển khai
+head bằng Alembic; `DMS.sql` vẫn là entry point cho snapshot ban đầu, không phải
+thay thế migration trên database đang có dữ liệu.
 
 Phạm vi: một doanh nghiệp, một kho; không nhà cung cấp/công nợ nhà cung cấp,
 đa kho, đa tiền tệ hoặc sổ cái kế toán tổng hợp. Sổ kho, phải thu và dư có là
@@ -187,7 +206,7 @@ ERD giản lược; các liên kết origin, currentRevision, reversal và FK co
 | RBAC | `app_function` | Code chức năng ổn định; seed quyền theo thao tác |
 | RBAC | `app_user` | Email login unique không phân biệt hoa thường, passwordHash, groupId, status, authVersion |
 | RBAC | `group_permission` | UNIQUE(groupId,functionId), isAllowed BOOLEAN |
-| Auth | `auth_token` | Digest SHA-256 của token ngẫu nhiên, loại refresh/reset, hết hạn/thu hồi; không lưu token thô |
+| Auth | `auth_token` | Digest SHA-256, loại refresh/reset, hết hạn/thu hồi, issuance authVersion và sessionId; không lưu token thô |
 | Quy định | `business_rule` | Một record true: maxAgenciesPerDistrict, sellingPriceRate |
 | Danh mục | `district` | Code/tên/trạng thái; số quận là số record |
 | Danh mục | `agency_type` | Code/tên, maxDebt, trạng thái |
@@ -341,6 +360,27 @@ owner có quyền quản trị; runtime nên dùng non-owner login có grants r�
 Do internal trigger gọi các hàm assert, runtime cần EXECUTE các hàm liên quan
 cùng DML cần thiết; không cấp DDL/TRUNCATE, không cho trình duyệt truy cập DB.
 Read-only reporting role chỉ được SELECT phù hợp và EXECUTE sales/debt_report.
+
+### Authentication revision 0003
+
+Reviewed additive DDL: [`0003_auth_sessions.sql`](../../backend/alembic/sql/0003_auth_sessions.sql).
+It adds required positive `authVersion` and nullable UUID `sessionId` to `auth_token`;
+the session UUID is present exactly for REFRESH. One unrevoked refresh per session
+is enforced by a partial unique index. A guard makes owner/purpose/digest/version/
+session/expiry immutable and revocation irreversible. No new table is introduced.
+
+Upgrade assigns distinct session UUIDs to historical refresh rows, snapshots each
+owner's version and revokes previously live tokens; existing revocation timestamps
+and account/business data are preserved. Downgrade revokes tokens before removing
+new metadata/guards. Stop the auth API before downgrade; re-upgrade requires re-login.
+Initial SQL snapshots remain immutable. New demo seed runs require head `0003`.
+
+Backend authentication and RBAC now enforce these checks on every protected request.
+Fresh/populated migration, ORM autogeneration with no deltas, downgrade/re-upgrade,
+seed twice and the 54 baseline regressions passed in disposable PostgreSQL 16.
+The historical Supabase `0002` verification below is separate from this local
+`0003` evidence; deployment to the configured external database is still explicit.
+See [auth verification](../backend-design/plan/authentication/VERIFICATION.md).
 
 ## 7. Truy vấn, index và phân trang
 
@@ -496,7 +536,10 @@ seed đủ 29 bảng (410 chứng từ, 30 đại lý, 24 hàng, 8 tài khoản)
 ledger/cache/audit/report và 54 kiểm tra SQL trong schema riêng rollback.
 Tài khoản app được hash Argon2id, không phải Supabase Auth users.
 
-Chưa gọi cổng sandbox, chưa stress-test nhiều session hoặc đo
-hiệu năng dữ liệu lớn. PGlite chạy PostgreSQL thực nhưng không thay những
-kiểm chứng tích hợp này. Các business services/API/auth hiện vẫn là bước triển
-khai tiếp theo của repository.
+Các lần kiểm chứng database ban đầu chưa gọi cổng sandbox hoặc đo hiệu năng dữ
+liệu lớn. Authentication sau đó đã có kiểm thử nhiều connection trên PostgreSQL
+và TLS riêng, xem evidence ở mục 6; business services/API vẫn chưa triển khai.
+Kế hoạch triển khai đầy đủ và các gap schema/API được ghi ở
+[Full Backend Plan](../backend-design/plan/full_backend/PLAN.md), gồm idempotency
+bền vững, xóa đại lý/mặt hàng chưa sử dụng và khả năng tương thích seed/verifier
+khi thêm migration. Đây là kế hoạch; chưa thay đổi DDL hiện hành.

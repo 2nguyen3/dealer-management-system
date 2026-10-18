@@ -1,12 +1,12 @@
 // DBML cho dbdiagram.io, chuyển từ DMS.sql.
 // Giữ tên schema/bảng/cột, nullability, PK/FK, CHECK, default và index.
 // Generated columns, PostgreSQL domains, partial indexes, DEFERRABLE và
-// trigger/routine được chú thích; DMS.sql là nguồn thực thi chính thức.
+// trigger/routine được chú thích; backend/alembic/sql là nguồn DDL có version.
 
 Project Agentra_DMS {
   database_type: 'PostgreSQL'
   Note: '''
-    Mô hình ERP/SME của Agentra DMS: 29 bảng trong schema dms.
+    Mô hình ERP/SME của Agentra DMS: 29 bảng nghiệp vụ + 1 bảng hạ tầng command (0004).
     Dán toàn bộ file vào dbdiagram.io để xem sơ đồ.
 
     Các kiểu money_vnd, quantity_value và price_rate là PostgreSQL DOMAIN
@@ -88,6 +88,8 @@ Table dms.auth_token {
   "userId" bigint [not null]
   purpose text [not null, check: `purpose IN ('REFRESH', 'PASSWORD_RESET')`]
   "tokenDigest" bytea [not null, unique, check: `octet_length("tokenDigest") = 32`]
+  "authVersion" integer [not null, check: `"authVersion" > 0`]
+  "sessionId" uuid
   "expiresAt" timestamptz [not null]
   "revokedAt" timestamptz
   "createdAt" timestamptz [not null, default: `clock_timestamp()`]
@@ -95,12 +97,34 @@ Table dms.auth_token {
 
   checks {
     `"expiresAt" > "createdAt"`
+    `(purpose = 'REFRESH') = ("sessionId" IS NOT NULL)`
   }
   indexes {
     (userId, purpose) [name: 'ix_auth_token_user']
     expiresAt [name: 'ix_auth_token_expiry', note: 'PARTIAL: WHERE "revokedAt" IS NULL']
+    (userId, sessionId) [name: 'ix_auth_token_session']
+    sessionId [unique, name: 'uq_auth_token_live_session', note: 'PARTIAL: WHERE purpose=REFRESH AND revokedAt IS NULL']
   }
-  Note: 'Chỉ lưu digest token ngẫu nhiên, không lưu token thô.'
+  Note: 'Chỉ lưu digest token ngẫu nhiên. Revision 0003: version lúc phát hành; REFRESH giữ sessionId qua rotation. Identity/expiry bất biến; revokedAt chỉ chuyển NULL sang thời điểm thu hồi một lần.'
+}
+
+Table dms.api_idempotency {
+  id uuid [pk, not null]
+  "actorId" bigint [not null]
+  "operationId" text [not null, check: `"operationId" ~ '^[A-Za-z][A-Za-z0-9]*$'`]
+  "resourceScope" text [not null, check: `length("resourceScope") > 0`]
+  "clientKey" uuid [not null]
+  "requestDigest" bytea [not null, check: `octet_length("requestDigest") = 32`]
+  "formatVersion" integer [not null, default: 1, check: `"formatVersion" = 1`]
+  state text [not null, default: 'CLAIMED', check: `state IN ('CLAIMED','COMPLETED','ACCEPTED')`]
+  result jsonb
+  recovery jsonb
+  "createdAt" timestamptz [not null, default: `clock_timestamp()`]
+  "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (actorId, operationId, resourceScope, clientKey) [unique, name: 'uq_api_idempotency_scope']
+  }
+  Note: '0004: durable actor/operation/resource intent. Identity and completed result immutable; no DELETE/expiry. CLAIMED has no result/recovery; COMPLETED has object result/no recovery; ACCEPTED has object result/recovery. Safe projections only, never raw requests or credentials. stamp_row installed explicitly. SQL is authoritative for compound state checks and guards.'
 }
 
 // -----------------------------------------------------------------------------
@@ -144,7 +168,7 @@ Table dms.unit {
   status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
   "createdAt" timestamptz [not null, default: `clock_timestamp()`]
   "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
-  Note: 'Đơn vị đếm chỉ nhận số nguyên. Không đổi chính sách phần lẻ sau khi đã ghi nhận sử dụng.'
+  Note: 'Đơn vị đếm chỉ nhận số nguyên. Revision 0005: mọi dòng chứng từ/kiểm kê đã ghi nhận (kể cả nháp/lịch sử hủy) chặn đổi allowsFraction. BEFORE line/count validators lấy unit FOR SHARE để tránh stale policy sau lock wait; snapshot giữ nguyên.'
 }
 
 Table dms.agency {
@@ -446,7 +470,7 @@ Table dms.inventory_balance {
   "priceSourceLineId" bigint
   "createdAt" timestamptz [not null, default: `clock_timestamp()`]
   "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
-  Note: 'Cache một record mỗi hàng, SQL tự khởi tạo và cập nhật từ ledger. Giá theo phiếu nhập hiệu lực mới nhất về ngày nghiệp vụ; không sửa trực tiếp cache.'
+  Note: 'Cache một record mỗi hàng, SQL tự khởi tạo và cập nhật từ ledger. Giá theo phiếu nhập hiệu lực mới nhất về ngày nghiệp vụ; không sửa trực tiếp cache. Revision 0006 chỉ cho cascade cache0 từ xóa owner chưa dùng; direct DELETE vẫn bị chặn.'
 }
 
 Table dms.agency_balance {
@@ -459,7 +483,7 @@ Table dms.agency_balance {
   indexes {
     (currentDebt, agencyId) [name: 'ix_agency_balance_debt']
   }
-  Note: 'Cache phải thu và dư có riêng, một record mỗi đại lý. SQL tự khởi tạo/cập nhật, kiểm tra hạn mức; không sửa trực tiếp.'
+  Note: 'Cache phải thu và dư có riêng, một record mỗi đại lý. SQL tự khởi tạo/cập nhật, kiểm tra hạn mức; không sửa trực tiếp. Revision 0006 chỉ cho cascade cache0 từ xóa owner chưa có lịch sử; direct DELETE vẫn bị chặn.'
 }
 
 Table dms.inventory_entry {
@@ -656,9 +680,9 @@ Ref fk_payment_event_payment: dms.payment_event.paymentId > dms.online_payment.i
 Ref fk_batch_revision: dms.posting_batch.revisionId > dms.document_revision.id [delete: restrict]
 Ref fk_batch_created_by: dms.posting_batch.createdBy > dms.app_user.id [delete: restrict]
 
-Ref fk_inventory_balance_product: dms.product.id - dms.inventory_balance.productId [delete: restrict]
+Ref fk_inventory_balance_product: dms.product.id - dms.inventory_balance.productId [delete: cascade]
 Ref fk_inventory_balance_price_source: dms.inventory_balance.priceSourceLineId > dms.document_line.id [delete: restrict]
-Ref fk_agency_balance_agency: dms.agency.id - dms.agency_balance.agencyId [delete: restrict]
+Ref fk_agency_balance_agency: dms.agency.id - dms.agency_balance.agencyId [delete: cascade]
 
 Ref fk_inventory_entry_batch: dms.inventory_entry.batchId > dms.posting_batch.id [delete: restrict]
 Ref fk_inventory_entry_product: dms.inventory_entry.productId > dms.product.id [delete: restrict]
@@ -695,6 +719,7 @@ Ref fk_stock_count_line_unit: dms.stock_count_line.unitId > dms.unit.id [delete:
 Ref fk_stock_count_line_observed_entry: dms.stock_count_line.observedLastEntryId > dms.inventory_entry.id [delete: restrict]
 
 Ref fk_audit_actor: dms.audit_log.actorId > dms.app_user.id [delete: restrict]
+Ref fk_api_command_actor: dms.api_idempotency.actorId > dms.app_user.id [delete: restrict]
 Ref fk_audit_function: dms.audit_log.functionCode > dms.app_function.code [delete: restrict]
 
 // Nhóm bảng để dễ đọc sơ đồ, không tạo thêm đối tượng SQL.
@@ -704,6 +729,10 @@ TableGroup identity_and_access {
   dms.app_user
   dms.group_permission
   dms.auth_token
+}
+
+TableGroup api_infrastructure {
+  dms.api_idempotency
 }
 
 TableGroup master_data {
