@@ -9,6 +9,7 @@ from argon2 import PasswordHasher
 from sqlalchemy import text
 
 from app.core.config import get_settings
+from app.db.manifest import INFRASTRUCTURE_TABLES
 from app.db.session import build_engine
 
 EXPECTED_TABLES = {
@@ -50,8 +51,9 @@ def check_database(connection, *, seeded: bool = False) -> dict[str, int]:
             text("SELECT tablename FROM pg_tables WHERE schemaname = 'dms'")
         ).scalars()
     )
-    if tables != EXPECTED_TABLES:
-        raise RuntimeError(f"Unexpected DMS tables: {tables ^ EXPECTED_TABLES}")
+    manifest = EXPECTED_TABLES | INFRASTRUCTURE_TABLES
+    if tables != manifest:
+        raise RuntimeError(f"Unexpected DMS tables: {tables ^ manifest}")
     counts = {
         name: connection.exec_driver_sql(f'SELECT count(*) FROM dms."{name}"').scalar_one()
         for name in sorted(tables)
@@ -63,8 +65,8 @@ def check_database(connection, *, seeded: bool = False) -> dict[str, int]:
           AND column_name IN ('createdAt','updatedAt') AND is_nullable='NO'
           AND data_type='timestamp with time zone'
     """).scalar_one()
-    if timestamp_count != 58:
-        raise RuntimeError("All 29 tables must have two required timestamptz columns")
+    if timestamp_count != 2 * len(manifest):
+        raise RuntimeError("All DMS tables must have two required timestamptz columns")
     # assert_document is read-only; assert_agency/product update caches and are
     # deliberately not invoked directly, outside their deferred trigger context.
     connection.exec_driver_sql("SELECT dms.assert_document(id) FROM dms.document")
@@ -110,8 +112,8 @@ def check_database(connection, *, seeded: bool = False) -> dict[str, int]:
         if actual != row["closingDebt"]:
             raise RuntimeError("Debt report does not reconcile to current balances")
     if seeded:
-        if any(value == 0 for value in counts.values()):
-            raise RuntimeError("The full demo must populate every DMS table")
+        if any(counts[name] == 0 for name in EXPECTED_TABLES):
+            raise RuntimeError("The full demo must populate every domain table")
         from app.db.seed import DEMO_USERS
 
         hasher = PasswordHasher()
@@ -170,13 +172,18 @@ def main() -> None:
             counts = check_database(connection, seeded=args.seeded)
             for name, count in counts.items():
                 print(f"{name}: {count}")
-            print("PASS: 29 tables, timestamps, document/ledger/cache/audit/report integrity")
+            print(
+                f"PASS: {len(counts)} tables, timestamps, "
+                "document/ledger/cache/audit/report integrity"
+            )
             connection.rollback()
             if args.regression:
                 transaction = connection.begin()
                 try:
                     checks = run_regression(connection)
-                    print(f"PASS: {checks} PostgreSQL regression assertions/rejections")
+                    print(
+                        f"PASS: {checks} baseline 0001 PostgreSQL regression assertions/rejections"
+                    )
                 finally:
                     transaction.rollback()
     finally:

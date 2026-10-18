@@ -134,8 +134,9 @@ class DemoSeed:
                 self.query(
                     """
                     INSERT INTO dms.auth_token
-                      ("userId",purpose,"tokenDigest","expiresAt","revokedAt")
-                    VALUES (:user,:purpose,:digest,
+                      ("userId",purpose,"tokenDigest","authVersion","sessionId","expiresAt","revokedAt")
+                    VALUES (:user,:purpose,:digest,1,
+                      CASE WHEN :purpose='REFRESH' THEN gen_random_uuid() END,
                       clock_timestamp()+interval '1 day',clock_timestamp())
                 """,
                     user=user_id,
@@ -744,8 +745,12 @@ def main() -> None:
             version = connection.exec_driver_sql(
                 "SELECT version_num FROM public.alembic_version"
             ).scalar_one()
-            if version != "0002":
-                raise RuntimeError("Run alembic upgrade head before seeding (expected 0002)")
+            from app.db.manifest import COMPATIBLE_HEAD
+
+            if version != COMPATIBLE_HEAD:
+                raise RuntimeError(
+                    f"Run alembic upgrade head before seeding (expected {COMPATIBLE_HEAD})"
+                )
             exists = connection.execute(
                 text('SELECT id FROM dms.document WHERE "creationKey"=:key'), {"key": SEED_KEY}
             ).scalar_one_or_none()

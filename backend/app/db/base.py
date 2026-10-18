@@ -1,5 +1,7 @@
-from sqlalchemy import MetaData
-from sqlalchemy.orm import DeclarativeBase
+from datetime import datetime
+
+from sqlalchemy import DateTime, FetchedValue, MetaData, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -12,3 +14,24 @@ class Base(DeclarativeBase):
             "pk": "pk_%(table_name)s",
         }
     )
+
+
+class Timestamps:
+    created_at: Mapped[datetime] = mapped_column(
+        "createdAt", DateTime(timezone=True), server_default=text("clock_timestamp()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updatedAt",
+        DateTime(timezone=True),
+        server_default=text("clock_timestamp()"),
+        server_onupdate=FetchedValue(),
+    )
+
+
+def include_name(name, type_, parent_names):
+    """Never autogenerate deletions of Supabase or SQL-managed unmapped objects."""
+    if type_ == "schema":
+        return name in (None, "dms")
+    if type_ == "table":
+        return parent_names["schema_qualified_table_name"] in Base.metadata.tables
+    return True
