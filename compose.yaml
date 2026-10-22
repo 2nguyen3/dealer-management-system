@@ -1,41 +1,84 @@
 name: dms
 
-# Bound container logs so long-running development services do not grow indefinitely.
+# Run from this repository: docker compose up --build -d --wait --wait-timeout 120
+# PostgreSQL is hosted on Supabase. Only backend/frontend run continuously.
+# Writable service files are bind-mounted beneath ./data; secrets come from backend/.env.
+
+# Docker owns stdout/stderr logs and bounds their disk usage per container.
 x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "3"
 
+# The migration CLI shares the backend image, connection settings and runtime storage.
+x-backend-base: &backend-base
+  image: dms-backend:local
+  build:
+    context: ./backend
+    target: runtime
+  env_file:
+    - ./backend/.env
+  environment:
+    # Standard Python temporary files survive container replacement on the host.
+    TMPDIR: /app/data
+  volumes:
+    - type: bind
+      source: ./data/backend
+      target: /app/data
+      read_only: false
+      bind:
+        create_host_path: true
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  logging: *default-logging
+  networks:
+    - app
+
 services:
+  # FastAPI/Uvicorn: one worker preserves the current process-local limiter semantics.
   backend:
-    image: dms-backend:local
-    build:
-      context: ./backend
-      target: runtime
-    env_file:
-      - ./backend/.env
+    <<: *backend-base
+    command:
+      - uvicorn
+      - app.main:create_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+      - --no-proxy-headers
+    expose:
+      - "8000"
     # Direct API/docs access from this machine; frontend proxies over the network.
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
-    init: true
+    stop_signal: SIGTERM
     stop_grace_period: 30s
     healthcheck:
-      # Readiness includes Supabase connectivity, not just a running API process.
+      # Require writable storage and a successful JSON readiness response from Supabase.
       test:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=8)"
+        - |
+          import json
+          import os
+          import urllib.request
+          assert os.path.isdir('/app/data') and os.access('/app/data', os.W_OK | os.X_OK), 'Runtime storage is not writable'
+          with urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=8) as response:
+              assert response.status == 200 and json.load(response) == {'status': 'ok'}
       interval: 30s
       timeout: 10s
       start_period: 30s
+      start_interval: 5s
       retries: 3
-    logging: *default-logging
-    networks:
-      - app
 
+  # Built React assets are served by non-root Nginx, which also proxies /api/ to backend.
   frontend:
     image: dms-frontend:local
     build:
@@ -44,45 +87,61 @@ services:
       args:
         # Public build-time value; set in the shell or root .env to override.
         VITE_API_BASE_URL: "${VITE_API_BASE_URL:-/api/v1}"
+    volumes:
+      - type: bind
+        source: ./data/frontend
+        target: /var/cache/nginx
+        read_only: false
+        bind:
+          create_host_path: true
+    expose:
+      - "8080"
     ports:
       - "${WEB_PORT:-8080}:8080"
     depends_on:
       backend:
         condition: service_healthy
+        # Explicit Compose backend updates also restart its dependent proxy.
+        restart: true
     restart: unless-stopped
     init: true
+    security_opt:
+      - no-new-privileges:true
+    stop_signal: SIGTERM
     stop_grace_period: 15s
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      # Check the mount, built UI, Nginx itself and end-to-end API/database readiness.
+      test:
+        - CMD-SHELL
+        - >-
+          test -w /var/cache/nginx
+          && test -s /usr/share/nginx/html/index.html
+          && wget -q -T 3 -O /dev/null http://127.0.0.1:8080/healthz
+          && wget -q -T 8 -O /dev/null http://127.0.0.1:8080/api/v1/health/ready
       interval: 30s
-      timeout: 5s
-      start_period: 10s
+      timeout: 15s
+      start_period: 20s
+      start_interval: 5s
       retries: 3
     logging: *default-logging
     networks:
       - app
 
   migrate:
-    # Explicit one-off job: docker compose --profile tools run --rm migrate
-    image: dms-backend:local
-    build:
-      context: ./backend
-      target: runtime
-    env_file:
-      - ./backend/.env
+    <<: *backend-base
+    # Explicit one-off job; normal startup never applies migrations or seeds data.
+    # docker compose --profile tools run --rm migrate
     command: ["alembic", "upgrade", "head"]
     profiles: ["tools"]
     restart: "no"
-    init: true
+    stop_signal: SIGTERM
     stop_grace_period: 30s
     # This job does not run an HTTP server; disable the image's API health check.
     healthcheck:
       disable: true
-    logging: *default-logging
-    networks:
-      - app
 
 networks:
   # Outbound access remains enabled for the external Supabase database.
   app:
     driver: bridge
+    internal: false

@@ -61,8 +61,18 @@ docker compose up --build -d --wait --wait-timeout 120
 ```
 
 Compose waits for backend database readiness before starting the frontend. Fill
-in `backend/.env` with valid Supabase settings first. The frontend's own health
-check calls Nginx `/healthz`.
+in `backend/.env` with valid Supabase settings first. The frontend health check
+verifies writable cache storage, the compiled index, Nginx `/healthz`, and proxied
+API/database readiness. Probes run every 30 seconds with a 15-second timeout, three
+retries, 20-second startup grace period and five-second startup intervals. `/healthz`
+by itself checks only Nginx liveness. Use Engine 25+/Compose 2.20.2+ for startup intervals.
+
+Repository-root `data/frontend/` is bind-mounted to `/var/cache/nginx`; Nginx stores
+request-body and upstream-response buffers under `client_temp/` and `proxy_temp/`.
+Compiled assets come from the image. The entire root `data/` directory is Git-ignored
+and host files survive container recreation. On Linux, grant the current Nginx
+UID/GID `101:101` ownership of the host directory; Docker Desktop on Windows provides
+writable shared folders. Logs use Docker stdout/stderr rotation (10 MB, three files).
 
 For a separate API deployment, set `VITE_API_BASE_URL` in the shell or root `.env`
 to override the Docker build argument and configure CORS. `ui/.env` configures

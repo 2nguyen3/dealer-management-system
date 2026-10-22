@@ -179,11 +179,11 @@ Backend features now use `backend/app/modules/<feature>/`, shared API helpers in
 The initial limiter requires one worker/replica. Forwarded-header trust is disabled;
 Nginx traffic shares its peer-address bucket. Local verification covers real PostgreSQL
 races, TLS SMTP, 100% scoped statements/branches and direct/Nginx smoke. External
-provider mail remains an operational step; configured Supabase now runs source head `0006`.
+provider mail remains an operational step; configured Supabase now runs source head `0007`.
 
 ### Docker deployment
 
-Prerequisites: Docker Engine/Desktop with Compose v2 and a configured
+Prerequisites: Docker Engine 25+/Docker Desktop with Compose 2.20.2+ and a configured
 `backend/.env`. Supabase remains an external managed database.
 `AUTH_SIGNING_KEY` must be configured before starting the backend.
 
@@ -209,16 +209,61 @@ have health checks. Set `WEB_PORT` in your shell (or a root `.env`) to change
 the default 8080 port. For an internet deployment, terminate HTTPS at your
 hosting platform's ingress or reverse proxy.
 
-Compose defines the following runtime settings:
+Compose defines two long-running services and one optional tool:
 
-- Backend health checks call `/api/v1/health/ready`, including database connectivity,
-  every 30 seconds. The frontend starts after the backend is healthy, so valid
+| Service | Role | Host access | Writable host storage |
+| --- | --- | --- | --- |
+| `backend` | Non-root FastAPI/Uvicorn, explicitly one worker | `127.0.0.1:${API_PORT:-8000}` | `data/backend/` → `/app/data` |
+| `frontend` | Non-root Nginx serving the compiled React UI and proxying `/api/` | `${WEB_PORT:-8080}` | `data/frontend/` → `/var/cache/nginx` |
+| `migrate` | Explicit Alembic/seed CLI in the `tools` profile | No published port | Shares `data/backend/` → `/app/data` |
+
+The bind mounts are relative to this repository's root. Backend `TMPDIR` points to
+`/app/data`; Nginx uses `client_temp/` and `proxy_temp/` beneath its mounted directory.
+These files survive image rebuilds, container recreation and `docker compose down`.
+The entire `data/` folder is ignored by Git. Business records live in Supabase;
+application code, dependencies and compiled static assets are included in the images.
+
+```text
+data/                          # Created on the host; ignored by Git
+├── backend/                   # API runtime and Python temporary files
+└── frontend/
+    ├── client_temp/           # Nginx request-body buffers
+    └── proxy_temp/            # Nginx upstream-response buffers
+```
+
+Docker Desktop on Windows provides writable shared folders. For a Linux host, prepare
+the current runtime users' permissions before first startup:
+
+```sh
+mkdir -p data/backend data/frontend
+sudo chown -R 999:999 data/backend
+sudo chown -R 101:101 data/frontend
+```
+
+The current backend runs as UID/GID `999:999`, frontend as `101:101`; inspect `id`
+inside each service if base images change. Compose creates absent bind-source
+directories, which can need the same ownership adjustment on Linux. Temporary-file
+cleanup follows the creating application; check disk usage before removing abandoned
+runtime files while the services are stopped.
+
+Health checks and lifecycle settings:
+
+- Backend checks writable runtime storage and the exact JSON response from
+  `/api/v1/health/ready`, including database connectivity, every 30 seconds with a
+  10-second probe limit and a 30-second startup grace period. The frontend starts
+  after the backend is healthy, so valid
   `DB_*` settings and a reachable Supabase database are required.
-- Frontend health checks call Nginx `/healthz` every 30 seconds.
+- Frontend checks writable cache storage, the compiled index, local Nginx `/healthz`
+  and proxied `/api/v1/health/ready` every 30 seconds, with a 15-second probe limit
+  and 20-second startup grace period. Its Compose health reflects API/DB readiness too.
+- Both probes use five-second intervals during startup and three retries. The public
+  Nginx `/healthz` endpoint itself remains a local Nginx liveness check.
 - The one-off migration service has HTTP health checks disabled.
 - All services use the `app` bridge network, with outbound access to Supabase.
 - Container logs rotate at 10 MB, keeping three files per container.
 - Graceful shutdown allows 30 seconds for the backend/migrations and 15 for Nginx.
+- An explicit Compose backend update also restarts its dependent frontend. Both
+  services use an init process, SIGTERM and `no-new-privileges`.
 - `API_PORT` overrides the localhost-only backend port (default `8000`).
 - `VITE_API_BASE_URL` overrides the frontend Docker build argument (default `/api/v1`).
   Set Compose overrides in your shell or a root `.env`; `ui/.env` is for local Vite.

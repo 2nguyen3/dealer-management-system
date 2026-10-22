@@ -384,11 +384,18 @@ docker compose ps
   `127.0.0.1:8000` for direct local access. Docs: `http://localhost:8000/api/docs`.
 - `API_PORT` can override the default localhost-only backend port.
 - `frontend` publishes `${WEB_PORT:-8080}:8080` and waits for backend database readiness.
+- Backend and migration bind root `data/backend/` to `/app/data` with `TMPDIR` there;
+  frontend binds `data/frontend/` to `/var/cache/nginx` for request/proxy buffers.
+  The entire root `data/` folder is ignored by Git. Linux host ownership follows the
+  current runtime UID/GIDs `999:999` and `101:101`; Docker Desktop shares Windows paths.
 - `migrate` is a one-off service in the `tools` profile running `alembic upgrade head`.
 - PostgreSQL remains external on Supabase; Compose does not start a local database.
 - The default application URL is `http://localhost:8080`, with docs at `/api/docs`.
-- Compose health checks run every 30 seconds; the migration job disables HTTP health
-  checks. All services use the `app` bridge network and rotated JSON logs (10 MB,
+- Compose health checks run every 30 seconds and every five seconds during startup.
+  Backend verifies writable data and JSON database readiness (10s timeout/30s grace);
+  frontend verifies writable cache, static index, local Nginx and proxied readiness
+  (15s timeout/20s grace). Both use three retries; migrate disables HTTP health.
+  All services use the `app` bridge network and rotated JSON logs (10 MB,
   three files). Shutdown grace periods are 30 seconds for backend/migrations and
   15 seconds for frontend. An unhealthy status alone does not restart a container.
 

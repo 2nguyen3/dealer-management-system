@@ -56,6 +56,26 @@ Keep database credentials on the backend. Authentication and reusable group-base
 authorization are implemented; business routes must attach their source permission
 policy. Connecting with the database's `postgres` role does not enforce end-user RLS.
 
+## Docker runtime storage and readiness
+
+The root `compose.yaml` runs backend and frontend continuously; `migrate` remains an
+explicit one-off `tools` profile. Backend and migration CLI share the bind mount
+`../data/backend/` (repository-root `data/backend/`) at `/app/data`. Compose sets
+standard Python `TMPDIR=/app/data`; runtime files survive container recreation.
+The full root `data/` tree is Git-ignored. Business records are stored on Supabase.
+
+Compose runs exactly one Uvicorn worker with forwarded-header trust disabled. Its
+health probe checks writable storage and JSON `{"status":"ok"}` from database
+readiness every 30 seconds, with a 10-second timeout, 30-second startup grace period
+and three retries.
+Startup probing uses five-second intervals. Frontend waits for backend health and
+also checks proxied readiness. Docker stdout/stderr logs rotate at 10 MB/three files.
+
+The image creates `/app/data` owned by its non-root app user. On Linux, the host bind
+directory also needs the runtime user's ownership (currently `999:999`); see the root
+README for setup. Docker Desktop on Windows supplies shared-directory write access.
+The optional migration service never runs automatically during normal startup.
+
 ## Authentication
 
 The seven Authentication operations in the target OpenWiki contract are available:
