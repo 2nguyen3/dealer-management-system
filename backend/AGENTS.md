@@ -1,5 +1,20 @@
 # Backend project context
 
+## Current packet checkpoint — 2026-10-18
+
+M21 adjustment core, M22 counts, M23 return core and M24 credit readers are implemented
+under four owning six-file plans.59new owning cases and packet338offline+84PG+
+24direct/Nginx pass; affected30-file production1162statements/162branches exact100%.
+Latest commands and node checkpoints are in owning VERIFICATION and full-backend
+GOAL. Runtime103target+2health; source/isolated/configured
+Supabase0007. Docker Desktop/backend/frontend are healthy; direct/proxied readiness200
+and live integrity410documents/30agencies/24products pass. Next code after this packet
+is M25. Historical counts below remain prior evidence, not a fresh whole-suite run.
+Reviewed0007 allows current POSTED same-return successors to replenish original
+immutable credit lots, preserving active reservations and paid refund references.
+Historical credit statement balances now use canonical AggregateMoney; current/lot
+Money bounds remain unchanged. M28/M29 and whole R4–R6 gates stay open.
+
 This guide applies to work inside `backend/`. It describes the current repository,
 how the backend fits into the full application, and conventions for extending it.
 Paths in commands are relative to `backend/` unless stated otherwise.
@@ -21,11 +36,38 @@ The intended business scope includes:
 The repository contains API infrastructure and a deployed database. The backend has
 configuration, database/session setup, health endpoints, migration tooling, and
 health-check tests. The frontend is a starter page that checks API availability.
-The database now has 29 domain tables, PostgreSQL domains/routines/triggers/views,
-two reviewed SQL Alembic revisions, core RBAC/rules and a full transactional demo
-seed. Application ORM models, business endpoints, HTTP authentication and
-user-level authorization are not implemented yet. Database rules are specified
+The database now has 29 domain tables plus a durable-command infrastructure table,
+PostgreSQL domains/routines/triggers/views, seven reviewed SQL Alembic revisions,
+core RBAC/rules and a full transactional demo
+seed. Seven authentication endpoints, live session/version checks, reusable group
+authorization and five identity/access ORM mappings are implemented. Full
+administration/audit/master data through M12, M13 document foundations, M14
+inventory, M15 receipt core and M16 internal settlement are implemented;
+M17–M20 issue/manual-receipt/upfront/receivable APIs are now implemented with owning
+and deployment evidence; all370retained PG/TLS and308offline cases pass.
+M21–M24 pass their declared owning gates; M25–M32 remain future.
+M02 exact values/errors/cursors/preconditions/retries and M03 groups are implemented
+with recorded PostgreSQL, coverage and deployment evidence. M04/M07/M08/M09 also
+pass full local gates (207 offline, 217 PG/TLS, 16 smoke, exact 100% combined scope).
+M05/M06/M10–M12 now also pass:209 offline +283 PG/TLS +18 direct/Nginx,
+exact100% (2903 statements/484 branches), source/disposable head0006.
+M13/M14/M15 core retain and extend those gates:219 offline+345 PG/TLS+20 direct/Nginx,
+exact100% (3622 statements/622 branches). M28/M29 deferred gates stay open.
+Database rules are specified
 in `../openwiki/database-design/`; use the versioned DDL as the schema authority.
+
+M16 extends the retained non-deployment gate to617 cases (247 offline+370 PG/TLS),
+exact100% (4096 statements/830 branches), including28 pure+25 PG settlement cases.
+M16 adds no HTTP route or schema revision. Prior20 deployment cases were not rerun.
+
+2026-10-17 M17–M20 checkpoint:80owning cases, exact100%(808statements/98branches),
+22direct/Nginx smoke pass. Runtime80target+2health, source/configured Supabase0006.
+Supabase0002→0006 migration and live integrity check preserve410documents/30agencies/
+24products. All database tests use explicit SUPABASE_TEST_SCHEMAS=1 temporary schemas;
+no Docker database. Retained370PG/TLS nodes pass across checkpointed/resumed runs,
+alongside308offline and27newPG cases (705non-deployment total). Affected M16–M20/shared
+production coverage is33files/1285statements/306branches exact100%; do not equate
+that scope with historical617-case whole-code coverage. E11/E12/R3 engineering gates pass.
 
 ## Technology stack
 
@@ -39,6 +81,7 @@ in `../openwiki/database-design/`; use the versioned DDL as the schema authority
 | ORM/driver | SQLAlchemy 2 synchronous engines and sessions, with psycopg 3. |
 | Schema migrations | Alembic with reviewed SQL snapshots; metadata for future mapped models. |
 | Demo passwords | Argon2id via argon2-cffi; demo credentials are in the root README. |
+| Authentication | PyJWT HS256, opaque digest-only tokens, current PostgreSQL sessions/grants, TLS SMTP and one-process limiter. |
 | Tests | pytest, FastAPI `TestClient`, HTTPX, and standard-library mocks. |
 | Python quality | Ruff linting, import sorting, and formatting. |
 | Frontend | React 19, TypeScript 5.9, Vite 7; ESLint and Prettier. Root setup recommends Node.js 24 LTS. |
@@ -64,17 +107,48 @@ DMS/
 │   ├── alembic/
 │   │   ├── env.py              # Migration connection and model metadata setup
 │   │   ├── script.py.mako      # Migration revision template
-│   │   ├── sql/                # Immutable DDL snapshots for revisions 0001/0002
+│   │   ├── sql/                # Immutable reviewed DDL snapshots for 0001–0007
 │   │   └── versions/           # Initial DMS objects and pg_trgm indexes
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py             # create_app factory, lifespan, CORS, API mounting
 │   │   ├── api/
 │   │   │   ├── __init__.py
-│   │   │   └── router.py       # Health response schema and health routes
+│   │   │   └── router.py       # Aggregate health/auth/admin/catalogue feature routers
+│   │   ├── modules/
+│   │   │   ├── auth/           # Router, schemas, dependencies, models/repository/service
+│   │   │   ├── user_groups/    # Router, schemas, models/repository/service/dependencies
+│   │   │   ├── users/          # AppUser mapping and five administration operations
+│   │   │   ├── permissions/    # Registry and live conditional group grants
+│   │   │   ├── audit_logs/     # Immutable exact redacted reads
+│   │   │   ├── business_rules/ # Locked singleton capacity/rate policy
+│   │   │   ├── products/       # Exact quotes/source and eligible deletion
+│   │   │   ├── agencies/       # Admission/profile and keyed permanent termination
+│   │   │   ├── districts/      # Global capacity and reference/state guards
+│   │   │   ├── agency_types/   # Exact limits/current-debt blocker guards
+│   │   │   ├── units/          # Recorded fraction policy/reference/state guards
+│   │   │   ├── document_core/  # SQL-owned mappings, exact snapshots/revisions/draft lines/batches
+│   │   │   ├── inventory/      # Atomic checkpoint statements and ordered append/reversal helpers
+│   │   │   ├── stock_receipts/ # Neutral keyed drafts and atomic snapshot/stock/price posting
+│   │   │   ├── settlement_core/ # Internal FIFO/provenance/reservations/financial replay
+│   │   │   ├── stock_issues/   # READY snapshots and atomic issue/upfront posting
+│   │   │   ├── payment_receipts/ # Manual debt collection and internal real-cash receipts
+│   │   │   ├── upfront_payments/ # Verification/full-money consumption/separation
+│   │   │   ├── receivables/    # Sole shared balance, invoice and atomic statements
+│   │   │   ├── stock_adjustments/ # Signed stock-only drafts/post and M22 internal seam
+│   │   │   ├── stock_counts/   # Movement-identity snapshots/recount/atomic confirmation
+│   │   │   ├── sales_returns/  # Origin snapshots/cumulative rounding/successor replay
+│   │   │   ├── agency_credit/  # Credit lots/statements and locked available-credit seam
+│   │   │   └── health/         # Public health router and response schema
+│   │   ├── common/             # Schemas/responses/transport, values/dates/cursors/commands
 │   │   ├── core/
 │   │   │   ├── __init__.py
-│   │   │   └── config.py       # Validated settings and cached settings loader
+│   │   │   ├── config.py       # Validated settings and cached settings loader
+│   │   │   ├── security.py     # Shared Argon2id password helpers
+│   │   │   ├── logging.py      # Application loggers; deployment configures handlers
+│   │   │   ├── exceptions.py   # Application exception types
+│   │   │   ├── transactions.py # Shared transaction/error/retry policy
+│   │   │   └── request_context.py # Generated request IDs and transaction-local audit
 │   │   └── db/
 │   │       ├── __init__.py
 │   │       ├── base.py         # Declarative Base and constraint naming conventions
@@ -83,6 +157,9 @@ DMS/
 │   │       ├── verify.py       # Live integrity checks and isolated regression
 │   │       └── sql/            # Session-local seed helpers and SQL regression
 │   └── tests/
+│       ├── auth/               # Offline crypto/schema/HTTP/adapter/limiter tests
+│       ├── integration/auth/   # Isolated real PostgreSQL races/migration/TLS/seed tests
+│       ├── deployment/         # Explicit direct/Nginx lifecycle and spoofing smoke
 │       ├── test_config.py      # Credential/configuration handling
 │       └── test_health.py      # Liveness, readiness, and database-error responses
 └── ui/
@@ -140,6 +217,14 @@ Supabase client SDK integration; Supabase API keys are not required.
 | `/api/docs` | Swagger UI. |
 | `/api/redoc` | ReDoc documentation. |
 | `/api/openapi.json` | OpenAPI schema. |
+| Seven `/api/v1/auth/*` operations | Login, refresh, logout, me, password change, reset request and reset completion; see backend README. |
+| Five `/api/v1/user-groups*` operations | Authorized list/detail/create/update/delete, complete-detail ETags and atomic eligible grant cleanup; see user_groups evidence. |
+| Five `/api/v1/users*` operations | Authorized list/detail/create/patch/admin-reset, joined-group ETags and atomic session invalidation; no delete. |
+| Fifteen `/api/v1/{districts,agency-types,units}*` operations | Catalogue list/detail/create/patch/delete with full state/reference/limit/policy guards; see owning child evidence. |
+| Twenty functions/grants/audit/rules/products/agencies operations | Full M05/M06/M10–M12 contracts, live authorization, exact quotes/audit and reviewed eligible deletion. |
+| Six inventory/stock-receipt operations | Inventory statement plus receipt list/detail/create/draft patch/post. Full shared line/history and receipt correction/cancellation remain M28/M29-gated. |
+| Twenty-two issue/manual-receipt/upfront/receivable operations | Seven issue operations, five manual-receipt operations, four upfront operations and six financial reads. Posted corrections/cancel remain M29. |
+| Twenty-three adjustment/count/return/credit operations | Five adjustment and five return core operations, ten count operations and three credit readers;103target+2health total. Internal draft cancellation, count-linked immutability and protected return successors verified; public posted correction/cancel remain M29. |
 
 Readiness failures log a generic warning and return a generic error rather than
 database exception details. The Docker image defaults to a **liveness** check;
@@ -161,6 +246,7 @@ settings, and caches `get_settings()`. Run backend commands from `backend/`.
 | `DB_PASSWORD` | Required nonempty raw password, stored as `SecretStr`. |
 | `DB_SSLMODE` | Defaults to `require`. |
 | `CORS_ORIGINS` | JSON array; defaults to `["http://localhost:5173"]`. |
+| `AUTH_SIGNING_KEY` | Backend-only SecretStr, at least 32 UTF-8 bytes at API startup; blank example; DB-only CLIs need no key. |
 
 Copy `.env.example` to `.env`, verify the connection fields against Supabase's
 Connect panel, and fill in `DB_PASSWORD`. The template includes the project's
@@ -175,9 +261,12 @@ session-pooler connection. The direct endpoint may require IPv6.
 Keep credentials in backend environment files, which are ignored by Git, and
 commit only example templates. Frontend `VITE_*` settings are browser-visible.
 The current CORS setup disables credentials and allows configured origins,
-common API methods, and `Authorization`/`Content-Type` headers. Authentication
-and authorization still need implementation for business features; a connection
-using the database's `postgres` role does not enforce end-user RLS policies.
+common API methods, and `Authorization`/`Content-Type`/`X-Request-Id` headers;
+If-Match/If-None-Match/Idempotency-Key are also allowed; ETag/Location/export filename
+and request/retry/auth headers are exposed. Business features must use the implemented
+principal and permission dependencies. A connection using `postgres` does not enforce
+end-user RLS. Backend README documents auth/SMTP/TTL/limiter settings and single-worker
+scope. Keep forwarded-header trust disabled unless a trusted proxy is explicitly configured.
 
 ## Development and verification commands
 
@@ -187,7 +276,7 @@ From `backend/`, after configuring `.env`:
 uv sync --frozen
 uv run alembic upgrade head
 uv run python -m app.db.seed
-uv run uvicorn app.main:create_app --factory --reload
+uv run uvicorn app.main:create_app --factory --reload --no-proxy-headers
 ```
 
 The API runs at `http://localhost:8000`; docs are at `/api/docs`.
@@ -207,7 +296,8 @@ uv run alembic current
 uv run python -m app.db.verify --seeded --regression
 ```
 
-Live verification reconciles 29 tables, 58 timestamp columns, documents, balances,
+Live verification reconciles 29 domain + 1 infrastructure tables, 60 timestamp columns,
+documents, balances,
 credit reservations, audit redaction and reports. It verifies all demo account
 password hashes. Regression adds 54 assertions/rejections in an isolated schema
 that is always rolled back; it requires schema-creation privileges. Unit tests
@@ -215,9 +305,13 @@ remain independent of Supabase. See `../.agents/workflows/verify.md` for shared 
 
 Ruff targets Python 3.12, uses a 100-character line length, and enables `E`, `F`,
 `I`, `UP`, and `B` rules. pytest discovers tests in `tests/` with the backend root
-on the Python path. Existing tests supply settings with `_env_file=None`, override
+on the Python path. Offline tests supply settings with `_env_file=None` and a synthetic key, override
 `get_session` with a mock for readiness, and use `TestClient` as a context manager
-to run the application lifespan. They do not require a live database.
+to run the application lifespan. They do not require a live database. Explicit
+integration selection requires a disposable `AUTH_TEST_DATABASE_URL`; missing
+configuration fails setup. The harness creates/drops isolated test databases and
+generates a local TLS SMTP sink. Default pytest deselects integration tests. Use
+TESTS.md for scoped coverage and the separate `deployment` smoke selection.
 
 For the frontend, run `npm ci` and `npm run dev` from `ui/` in another terminal.
 Frontend checks are `npm run typecheck`, `npm run lint`, `npm run format:check`,
@@ -235,7 +329,14 @@ uv run alembic upgrade head
 uv run alembic current
 ```
 
-Revisions `0001` and `0002` contain the reviewed initial DDL and search indexes.
+Revisions `0001`/`0002` contain the reviewed initial DDL/search indexes; `0003` adds
+auth-token issuance versions, session lineage and immutable identity/revocation guards.
+Revision `0004` adds immutable scoped commands, safe result/recovery state and timestamps.
+Revision `0005` protects recorded unit meaning and takes unit locks before quantity validation.
+Revision `0006` repairs eligible zero-cache owner cascades, product first-use locks
+and agency acceptance/history-date serialization; direct cache writes stay denied.
+Revision `0007` preserves original credit lots across same-return rounding successors;
+same-document/current-POSTED guards retain immutable receipt/lot/refund provenance.
 Use `uv run alembic upgrade head`, then `uv run python -m app.db.seed` for the
 demo. Verify with `uv run python -m app.db.verify --seeded --regression`.
 Do not edit deployed SQL snapshots; add a new revision. Autogeneration includes
@@ -297,8 +398,32 @@ docker compose ps
 
 Read `../openwiki/backend-design/GENERAL_PLAN.md` before planning or implementing
 a module. It defines the recommended order, direct prerequisite slices, shared
-service ownership and full-module completion gates. The next module is
-authentication; business HTTP modules remain unimplemented.
+service ownership and full-module completion gates. M01 authentication is implemented;
+M02 shared_api and M03 user_groups are also implemented and locally verified.
+M04/M07–M09, M05/M06/M10–M12, M13/M14, M15 core and M16 internal settlement pass
+local gates. M17–M20 now pass owning/deployment and retained regression gates.
+M21–M24 now have owning plans/implementations and passing declared gates.
+Next M25 needs its owning plan; M25–M32 remain unimplemented.
+M28/M29 close deferred operations.
+
+The full execution design is in `../openwiki/backend-design/plan/full_backend/PLAN.md`,
+with all target operation IDs, 32 work packages, concrete schema/contract gaps and
+integration/race gates. Shared_api and user_groups child plans have actual-symbol
+registers and passing evidence. M04 and later work packages require owning child
+materials and actual-symbol registration before code completion. M04/M07–M09 now
+have those plans and evidence; preserve their combined verification. Chronological
+replay for valid backdated postings starts in M16; M29 closes full corrections.
+M16's owning six-file plan and actual-symbol evidence are under
+`../openwiki/backend-design/plan/settlement_core/`. Reuse SettlementService and
+ReservationService inside a caller-owned transaction: live authorize callback,
+actor/request context, explicit command UUID, ordered master/stock locks before
+document locks, final constraint checks and caller commit. The pure CAPABILITIES
+register handles frozen financial effects of all persisted kinds; return-line
+rounding/new revisions stay M23, domain/provider workflows M17–M27, corrections M29.
+Use the full-backend EXECUTION companion for delivery/release handoffs. Resolve
+D16's selected DerivedSellingPrice/positive stored-price seam in later issue writers;
+D17 requires financial
+writers to support later kinds already in persisted history before publication.
 
 Track roadmap progress in `../openwiki/backend-design/GENERAL_CHECKLIST.md` as well
 as the owning child checklist/VERIFICATION. General slice checkboxes require linked
@@ -318,11 +443,12 @@ passing evidence; core delivery and deferred integrations remain separate.
 
 ### Authentication plan and strict test gates
 
-Authentication is planned in
+Authentication is implemented according to
 `../openwiki/backend-design/plan/authentication/PLAN.md`. Read its REQUIREMENTS,
 DESIGN, TESTS, CHECKLIST and VERIFICATION files before implementation. The source
 contract is `../openwiki/backend-design/API/openapi.json`; its seven Authentication
-operations are target behavior, not currently available runtime endpoints.
+operations are available runtime endpoints. Preserve recorded verification gates
+when extending them; frontend auth and remaining administration/business routes are future work.
 
 - Follow the plan's ordered phases and additive session/version migration design;
   recheck current Alembic head before choosing a new revision. Preserve deployed
@@ -347,13 +473,21 @@ operations are target behavior, not currently available runtime endpoints.
 
 - Preserve the `create_app(settings: Settings | None = None)` factory and lifespan
   resource management so tests can inject configuration.
-- Keep HTTP routes and request/response schemas in the API layer. Add domain
-  modules incrementally and delegate business logic from routes to services,
-  following the guidance in `backend/README.md`.
+- Keep feature HTTP routes, request/response schemas and dependencies in
+  `app/modules/<feature>/`; `app/api/router.py` only aggregates their routers.
+  Add feature-owned models/repositories/services incrementally. Repositories never
+  commit/roll back; routes delegate business logic to services. Shared transport
+  and exact-value helpers belong in `app/common/`, cross-cutting policy in `app/core/`.
+  Reuse existing user/group/auth mappings rather than mapping a table twice.
+  See `README.md` and `REFACTOR_VERIFICATION.md` for layout and verified relocation.
 - Use the existing synchronous SQLAlchemy session dependency and explicit service
   transaction boundaries. Place ORM models on the shared declarative Base.
 - Mount new API routes through the existing `/api/v1` router structure and use
   typed Pydantic request/response models.
+- Use BusinessRoute for modeled JSON bodies; raw signed handlers must read Request
+  bytes before parsing. Use CatalogParameter for catalogue path/query IDs and
+  CatalogId for strict integer JSON fields. Use read_preconditions for duplicate-safe
+  headers; required If-Match bindings map missing values to 428 through safe validation.
 - Add schema changes as reviewed Alembic revisions and register model imports
   for autogeneration.
 - Keep configuration centralized in `Settings`; update `.env.example` when

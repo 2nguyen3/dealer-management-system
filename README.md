@@ -38,14 +38,15 @@ Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xu�
 Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
 
 1. Copy `backend/.env.example` to `backend/.env`, verify the Supabase `DB_HOST`,
-   `DB_PORT`, `DB_NAME`, and `DB_USER`, and fill in `DB_PASSWORD`.
+   `DB_PORT`, `DB_NAME`, and `DB_USER`, and fill in `DB_PASSWORD`. Set a backend-only
+   random `AUTH_SIGNING_KEY` with at least 32 UTF-8 bytes; do not commit either secret.
 2. In `backend/`, run:
 
    ```sh
    uv sync --frozen
    uv run alembic upgrade head
    uv run python -m app.db.seed
-   uv run uvicorn app.main:create_app --factory --reload
+    uv run uvicorn app.main:create_app --factory --reload --no-proxy-headers
    ```
 
 3. In a second terminal, in `ui/`, run:
@@ -60,11 +61,40 @@ Environment files are ignored by Git; commit only the example templates.
 
 ### Database và dữ liệu demo
 
-Schema `dms` đã được triển khai lên Supabase bằng Alembic, revision hiện tại
-`0002`. Thiết kế ở [openwiki/database-design](openwiki/database-design/README.md);
+Schema `dms` đã được nâng cấp tường minh trên Supabase từ `0002` lên `0006`
+ngày2026-10-17, rồi lên`0007` ngày2026-10-18; source/runtime cùng head`0007`. Live verifier đối chiếu
+được dữ liệu demo410chứng từ/30đại lý/24mặt hàng. Thiết kế ở
+[openwiki/database-design](openwiki/database-design/README.md);
 DDL có version nằm trong `backend/alembic/sql/`. Migration tạo đầy đủ 29 bảng,
 3 domain số chính xác, sequence, FK/CHECK/index, trigger toàn vẹn/audit,
-5 view và các hàm báo cáo; revision `0002` thêm index tìm kiếm `pg_trgm`.
+5 view và các hàm báo cáo; revision `0002` thêm index tìm kiếm `pg_trgm`,
+revision `0003` thêm version/session cho token và thu hồi token lịch sử;
+revision `0004` thêm bảng hạ tầng lưu command/retry (tổng 30 bảng vật lý);
+revision `0005` khóa chính sách đơn vị trước khi kiểm tra số lượng, bảo vệ lịch sử.
+Revision `0006` sửa xóa hồ sơ/hàng chưa dùng cùng cache0, khóa first-use mặt hàng
+và ngày tiếp nhận/lịch sử đại lý. Migration không tự chạy khi khởi động API.
+Revision `0007` giữ credit lot gốc khi tạo successor để tính lại làm tròn cùng phiếu trả,
+bảo toàn reservation/refund đã trả và nguồn phiếu thu.
+
+Backend M01–M14, M15 core và M16 settlement nội bộ đã qua gate cục bộ:
+58/154 operation mục tiêu +2health;247 offline +370 PostgreSQL/TLS,
+scoped100% (4096 statements/830 branches).20 direct/Nginx là bằng chứng M15 trước
+đó, không chạy lại trong M16 nội bộ. Đã có FIFO, provenance, reservation và replay
+tài chính. M17–M20 hiện đã thêm22operation xuất hàng/phiếu thu/trả ngay/công nợ:
+80/154operation+2health. Gate riêng80case/exact100%(808statements/98branches)
+và22direct/Nginx đã pass;370casePG/TLS regression trước cũng pass qua các lần chạy
+checkpoint/resume. Tổng mới308offline+397PG/TLS=705case ngoài deployment; scope33file
+production bị ảnh hưởng đạt100%(1285statements/306branches). Đây là checkpoint lịch sử M17–M20.
+Ngày2026-10-18, M21 điều chỉnh kho, M22 kiểm kê, M23 trả hàng core và M24 dư có đã có
+implementation/owning plan và pass59case riêng. Packet338offline+84PG+24direct/Nginx pass,
+scope30file production1162statements/162branches exact100%. Runtime103/154operation+2health,
+source/Supabase0007. Docker Desktop/backend/frontend healthy, API trực tiếp
+và qua Nginx readiness200; live integrity giữ410chứng từ/30đại lý/24mặt hàng.
+M25 credit_applications là module code tiếp theo; M28/M29 và toàn R4–R6 còn mở.
+Sửa/hủy phiếu đã ghi nhận và API dòng/lịch sử đầy đủ còn gate M28/M29.
+[Trạng thái operation](openwiki/backend-design/plan/full_backend/AVAILABILITY.md)
+và [mục tiêu đang chạy](openwiki/backend-design/plan/full_backend/GOAL.md) là nguồn
+handoff hiện tại. UI nghiệp vụ vẫn cần kế hoạch/implementation/test riêng.
 
 Từ `backend/`, sử dụng môi trường ảo và dependency lockfile:
 
@@ -110,8 +140,8 @@ Các tên quận là danh mục demo theo mô hình quận trong thiết kế.
 
 Đây là tài khoản **demo của ứng dụng** trong `dms.app_user`, không phải tài khoản
 Supabase Auth hoặc tài khoản kết nối PostgreSQL. Mật khẩu được lưu dưới dạng
-**Argon2id**. Backend/UI hiện chưa triển khai API hay màn hình đăng nhập; bảng
-dưới đây cung cấp thông tin để sử dụng khi tích hợp authentication.
+**Argon2id**. Backend đã có API đăng nhập; UI vẫn là trang starter, chưa có màn hình
+đăng nhập. Có thể sử dụng các tài khoản sau qua Swagger hoặc API client.
 
 | Email | Mật khẩu demo | Nhóm | Trạng thái |
 |---|---|---|---|
@@ -128,10 +158,34 @@ dưới đây cung cấp thông tin để sử dụng khi tích hợp authentica
 ledger/cache/chứng từ và báo cáo. `--regression` chạy thêm 54 assertions/rejections
 PostgreSQL trong schema kiểm thử riêng rồi rollback toàn bộ fixture.
 
+### Backend authentication
+
+Seven `/api/v1/auth/*` operations are implemented: login, refresh, logout, current
+user/permissions, password change, reset-email request and single-use password reset.
+Each protected request checks the current PostgreSQL session/version and group grants.
+Password/group/status changes invalidate old tokens; logout ends only its session.
+
+Configure `AUTH_SIGNING_KEY` before API startup. Password-reset mail is disabled by
+default and returns account-independent 503 until the SMTP sender/host, TLS mode and
+frontend reset URL are configured. The reset page itself is a later frontend feature.
+See [backend auth configuration](backend/README.md#authentication) and
+[verification evidence](openwiki/backend-design/plan/authentication/VERIFICATION.md).
+
+Backend features now use `backend/app/modules/<feature>/`, shared API helpers in
+`app/common/`, and infrastructure in `app/core/`/`app/db/`. See the
+[backend structure](backend/README.md#structure) and
+[2026-10-04 refactor verification](backend/REFACTOR_VERIFICATION.md).
+
+The initial limiter requires one worker/replica. Forwarded-header trust is disabled;
+Nginx traffic shares its peer-address bucket. Local verification covers real PostgreSQL
+races, TLS SMTP, 100% scoped statements/branches and direct/Nginx smoke. External
+provider mail remains an operational step; configured Supabase now runs source head `0006`.
+
 ### Docker deployment
 
 Prerequisites: Docker Engine/Desktop with Compose v2 and a configured
 `backend/.env`. Supabase remains an external managed database.
+`AUTH_SIGNING_KEY` must be configured before starting the backend.
 
 From the repository root:
 
@@ -179,5 +233,24 @@ docker compose down
 ```
 
 Dependency lockfiles (`backend/uv.lock` and `ui/package-lock.json`) are included
-for reproducible installs. The database objects and full demo data are implemented;
-the UI remains a starter screen, and business APIs/authentication are the next steps.
+for reproducible installs. Database objects, full demo data and backend authentication
+are implemented, together with shared business API conventions, group/user
+administration, master data, document/stock receipt foundations, stock issues,
+manual receipts, upfront payments and receivables (80 target operations plus two
+health operations). The UI remains a starter screen; next backend code is M21
+stock adjustments after the verified M17–M20 handoff.
+
+### Backend implementation planning
+
+The [full backend plan](openwiki/backend-design/plan/full_backend/PLAN.md) covers
+all 154 target operations, 32 implementation slices, transaction/replay design,
+schema/contract gaps and verification gates. Its
+[execution sequence](openwiki/backend-design/plan/full_backend/EXECUTION.md) defines
+22 delivery packets, migration checkpoints and frontend-ready release bundles.
+The active [full-backend goal](openwiki/backend-design/plan/full_backend/GOAL.md)
+tracks delivery through the final R6 gate. M02 foundations and M03 user groups are
+locally verified alongside administration/master data and M13–M16 foundations.
+M17–M20 implementation, scoped gates and retained prerequisite regression pass.
+See [current available operations](openwiki/backend-design/plan/full_backend/AVAILABILITY.md).
+Business implementation progress remains in the
+[backend checklist](openwiki/backend-design/GENERAL_CHECKLIST.md).
