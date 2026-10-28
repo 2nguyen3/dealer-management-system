@@ -123,6 +123,38 @@ consumer enters. No hidden blanket ban on backdated valid source requests.
 
 ## D07 — Sandbox provider and recovery implementation
 
+**Current2026-10-25:** native VNPAY selected/configured and accepted by actual signed
+checkout/automatic IPN/query/refund transport. Payment37/10200VND received automatic
+IPN and committed one receipt774/event. Signed refund request/query for15714325/
+5000VND matches its identity/amount and remains05/PENDING. Missing environment and
+native-protocol publication blockers are resolved; all27M26–M28operations published.
+External terminal bank payout remains an explicit open release item, not SUCCESS.
+See [current M26 evidence](../online_payments/VERIFICATION.md).
+
+**VNPAY preparation2026-10-25:** user selected VNPAY sandbox and reports merchant
+registration complete. Ngrok public database readiness200; native settings in the
+main `backend/.env` are prepared/tested, but TmnCode/HashSecret are still blank in
+the configured container. Native HMAC-SHA512 GET IPN/checkout/query/refund translation
+and accepted-provider evidence remain pending. The canonical JSON POST webhook is
+not a VNPAY IPN. This narrows the environment blocker without closing D07/publication.
+
+**Engineering checkpoint2026-10-24:** M26/M27 code, raw-envelope verification,
+bounded real HTTP transport, existing durable ACCEPTED command recovery and controlled
+Docker direct/Nginx workflows pass their scoped engineering tests. Legacy demo events
+are projected without rewriting evidence. No speculative SQL revision was needed.
+The user-confirmed external environment blocker below is unchanged: accepted service/
+credentials, public callback/key configuration and native-to-canonical proof/query/
+refund/definitive-absence mapping are not available. Full acceptance/publication gates
+remain open; controlled fixtures and DEMO_SANDBOX do not close them.
+
+**2026-10-22 environment inspection:** staging `.env` has configured database access
+but no provider/payment/webhook/callback configuration. User explicitly selected
+“Environment not ready.” Accepted sandbox identity, credentials, reachable callback
+and native-to-envelope mapping remain unavailable. Independent implementation and
+controlled real-HTTP transport/recovery tests can proceed; external acceptance and
+affected full-module/publication gates remain open. DEMO_SANDBOX seed data is not
+accepted external-provider evidence.
+
 **Observed:** no adapter/configured external provider; checkoutUrl is an API
 projection with no persisted setup store; seed evidence is simulated. The target
 defines a normalized HMAC envelope, not a named provider's native webhook protocol.
@@ -256,6 +288,14 @@ and stored/current quantities remain bounded. No DDL change, clamping or float.
 Regression: `test_inventory::test_valid_backdated_receipt_can_make_historical_stock_wider_than_stored_stock`.
 
 ## D15 — Historical snapshot and evidence policies need explicit edge tests
+
+**M29 internal checkpoint2026-10-25:** real0007inactive receipt successor fails23514.
+Source0008 narrowly permits receipt product/unit pairs already in a POSTED revision
+of that document; new/first inactive goods remain blocked. Original line snapshots,
+old revisions and stock chronology remain immutable. Fresh/populated migration,
+downgrade/re-upgrade and repeated isolated seed/54checks pass; runtime stays0007.
+Historical issue/terminated-agency policy is not relaxed by0008 and remains open.
+See [M29 exact evidence](../document_corrections/VERIFICATION.md).
 
 **M22/M23 checkpoint2026-10-18:** counts confirm/link before their adjustment movement.
 Return-rounding successors preserve historical agency/line snapshots. Concrete0006

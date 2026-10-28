@@ -1,5 +1,98 @@
 # Active full-backend delivery goal
 
+## Six-operation M29 publication - 2026-10-28
+
+Existing Docker backend now publishes141target+2health at source/deployed/configured
+Supabase0009: six receipt/independent-adjustment/manual-cash correction/cancel
+operations. Issue/return/credit correction routers remain unmounted.589offline and
+3direct/proxy/public deployment cases pass; release12-file550/96exact100% plus manual
+period oracle and migration5PG evidence. Live411documents/30agencies/24products and
+receipt774/payment37/one-event preserved. Frontend/ngrok routing unchanged. Continue
+remaining six M29 operations then M30-M32; full M29/R5/R6 remain open. See owning
+[current verification](../document_corrections/VERIFICATION.md), not historical logs.
+
+## M29 internal goods/manual checkpoint — 2026-10-25
+
+M29 owning six-file plan now precedes implemented receipt/independent-adjustment
+and manual-cash correction/cancel services.572offline+27owningPG+12retainedPG pass;
+affected9-file310/76exact100%. New source0008 fixes the reproduced inactive historical
+receipt successor; source migration/seed/downgrade evidence passes only in UUID
+Supabase schemas. Runtime remains0007/135target+2health; no new route or live migration.
+Live integrity preserves411documents/30agencies/24products and authorized receipt774.
+Next executable work is zero-upfront issue correction/cancel, then upfront/returns/
+credit/full-race/publication gates; M29–M32/R5/R6 remain open. Exact node/artifact and
+failed-fixture resolution: [M29 evidence](../document_corrections/VERIFICATION.md).
+
+## Native VNPAY publication handoff — 2026-10-25
+
+M26six/M27twelve/M28nine operations mounted:135target+2health.568offline,40uniquePG
+and6deployment pass; packet/config/API1783/408exact100%. Source/configured head0007.
+Automatic provider IPN for payment37/10200VND produced one receipt774/event. Live411
+documents/30agencies/24products, original seeded history preserved. External refund
+15714325/5000VND is verified05/PENDING; terminal bank settlement remains open. Normal
+ngrok still targets8000; old redirecting helper removed. Exact commands/artifacts:
+[M26](../online_payments/VERIFICATION.md), [M27](../refunds/VERIFICATION.md),
+[M28](../document_history/VERIFICATION.md). Next code M29; R5/R6 remain open.
+
+## Historical VNPAY configuration preparation — 2026-10-25
+
+VNPAY sandbox selected by user; merchant registration reported complete. Native
+settings in the main `backend/.env` are prepared with working ngrok IPN/Return
+URL candidates; credentials still absent in safe container inspection.50new settings
+tests pass, fulloffline482passed; changed config121statements/40branches exact100%.
+Docker rebuilt/refreshed healthy, direct/proxy/public readiness200, runtime remains
+108target+2health. [M26 evidence](../online_payments/VERIFICATION.md) records commands.
+Native VNPAY adapter/handlers/query/refund and accepted external evidence remain open;
+configuration preparation does not change publication or close D07/M26/M27/M28.
+
+## Engineering packet handoff — 2026-10-24
+
+M25 core is verified/mounted. All six M26, twelve M27 and nine M28 operation branches
+are implemented and verified in the isolated composition. Final current evidence:
+432offline+82selectedPG(52owning+29retained+1migration)+4direct/Nginx, current node IDs
+independently matched to passing setup/call/teardown. Affected32production files are
+exact1832statements/340branches per-file100%, with no exclusions or partial branches.
+Owning scopes M25=117/4,M26=531/126,M27=514/100,M28=333/78. Detailed commands/artifacts:
+[program verification](VERIFICATION.md) and the four owning VERIFICATION files.
+
+Fresh locked image built and backend refreshed healthy; normal runtime remains
+108target+2health at0007, direct/proxy readiness200. HTTPX/ReportLab/font/data permissions
+pass inside the image. Live integrity and54SQLchecks preserve410documents/30agencies/
+24products. No SQL revision, live reset, commit/push or deletion of data/ occurred.
+Unrelated frontend work is preserved.
+
+**D07 remains external:** user confirmed no accepted provider/sandbox environment.
+Missing accepted identity/credentials, reachable public callback/key configuration and
+native-to-canonical protocol mapping keep M26/M27 and dependent normal publication
+open. Controlled realHTTP fixtures and DEMO_SANDBOX are not external acceptance.
+Frontend live readiness is operation-specific; no browser gates close here.
+**Next roadmap module is M29**, full posted corrections/cancellation; R5/R6 remain open.
+
+The earlier chronological checkpoints below are retained as history.
+
+## Active packet — 2026-10-22
+
+Requested M25 credit_applications core → M26 online_payments → M27 refunds →
+M28 document_history, including strict testing, review and deployment/handoff.
+Initial tree clean on scaffold-project at9578784. Configured Supabase0007(head),
+read-only live410documents/30agencies/24products, Compose backend/frontend healthy,
+direct/proxy readiness200. M25 owning six-file plan prepared before code.
+
+D07 external blocker: user confirmed environment not ready after inspection found no
+provider configuration in staging. Accepted external sandbox identity/credentials,
+reachable callback and native-to-canonical mapping are missing. Controlled real-HTTP
+fixtures may verify engineering behavior; affected M26/M27 acceptance/publication
+and full-module gates stay open. No new module completion is claimed at this point.
+
+2026-10-23 M25 review/reimplementation:14owningPG+13owningoffline tests pass; full
+offline351pass, exact owning117statements/4branches and changed shared schema176/0.
+Direct/Nginx isolated M25 lifecycle2pass. Frozen/Ruff/build/live integrity54checks pass.
+Five M25 core routes mounted and backend recreated healthy:108target+2health, direct/
+proxy readiness200. Internal cancel remains unmounted pending M29. Retained M16/M24
+regression worker still completing; M25 full verification handoff stays open until its
+required nodes finish. M26 six-file design prepared, no provider code yet. New frontend
+edits are unrelated user work and preserved. Evidence: owning M25 VERIFICATION.
+
 ## Completed packet and next handoff — 2026-10-18
 
 User requested M21 stock_adjustments core → M22 stock_counts → M23 sales_returns core

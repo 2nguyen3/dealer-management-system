@@ -1,5 +1,56 @@
 # Published backend operation checkpoint
 
+## M29 source-only internal checkpoint — 2026-10-25
+
+Normal publication is unchanged:135/154target+2health at0007. Internal receipt/
+adjustment/manual-cash correction and cancellation services pass their declared
+state/rollback/race gates; source0008 has isolated migration evidence. None of the
+twelve M29 IDs is mounted;19target operations remain unpublished. Whole-operation
+HTTP/deployment and remaining correction consumers stay open. [Evidence](../document_corrections/VERIFICATION.md).
+
+## Current native VNPAY/M26–M28 publication — 2026-10-25
+
+Runtime135/154target+2health. All6M26online payment,12M27refund and9M28history/line/
+HTML/PDF operations mounted. Native GET IPN/Return are separately documented provider
+transports, not extra business IDs. Automatic IPN for payment37 created receipt774/
+event for10200VND. Live411documents. Signed external refund request/query confirms
+PENDING, not paid. Exact scoped coverage/40uniquePG/6deployment evidence:
+[M26 current verification](../online_payments/VERIFICATION.md).
+
+Frontend may integrate F26/F27/F28 contracts after its own grants/browser gates. M29
+posted corrections/cancel and M30–M32 remain unavailable. External terminal bank
+refund observation remains open; no frontend browser or whole-release gate closes.
+
+## Historical VNPAY preparation — 2026-10-25
+
+Native sandbox settings in the main `backend/.env` are ready; public ngrok readiness
+is200. Merchant credentials remain blank and native VNPAY handlers are unimplemented.
+No new paths mounted:108target+2health. Preparation is not payment/refund availability;
+see [M26 evidence](../online_payments/VERIFICATION.md).
+
+## 2026-10-24 published and gated availability
+
+Normal runtime is108target+2health at0007. M25 listCreditApplications,
+createCreditApplication,getCreditApplication,updateCreditApplicationDraft and
+postCreditApplication are mounted, verified by14owningPG+13offline, exact117/4owning
+coverage and2isolated direct/Nginx workflows. Internal draft cancellation does not
+publish the M29-owned whole cancellation operation.
+
+M26 six, M27 twelve and M28 nine operation branches are implemented and engineering-
+verified in the isolated composition. Source/current node inventory and affected
+production32-file1832/340exact per-file100% evidence are in [program verification](VERIFICATION.md).
+They are **not mounted in normal runtime**: D07 accepted external sandbox/prerequisite
+publication gates remain open. Controlled HTTP and seeded DEMO_SANDBOX evidence are
+not accepted external-provider deployment. No M29 partial handler is mounted.
+
+Frontend API-readiness handoff: F25 may integrate the five published core contracts
+after its own foundations/auth/grant/browser prerequisites. F26/F27/F28 may use the
+canonical types and controlled-composition fixtures; their normal live handoff remains
+blocked until required backend publication/acceptance passes. Backend evidence does
+not close frontend browser gates. Full posted correction/cancel and R5 remain M29-owned.
+
+## Historical M21–M24 checkpoint
+
 **Updated:** 2026-10-18. **Source/isolated-test/configured-Supabase head:** 0007.
 **Runtime:**105 operations, including **103 of154** target operations plus two health.
 M21–M24 handlers pass owning gates:59new owning cases; packet338offline+84realPG+

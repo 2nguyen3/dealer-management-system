@@ -1,5 +1,30 @@
 # Full backend implementation plan
 
+## M29 source-only internal checkpoint — 2026-10-25
+
+Receipt/independent-adjustment and manual-cash correction/cancel services now have
+owning [M29 evidence](../document_corrections/VERIFICATION.md):572offline+27owningPG+
+12retainedPG, affected310/76exact100%. Source0008 is isolated-test verified; configured
+runtime remains0007/135target+2health. No M29 handler is published. Continue zero-upfront
+issue then remaining E19 orchestration/gates; M30–M32 and R5/R6 remain open.
+
+## Current native VNPAY checkpoint — 2026-10-25
+
+M26/M27/M28 APIs published:135target+2health. Native merchant/automatic IPN/payment/
+query/refund transport accepted;568offline/40uniquePG/6deployment, declared packet
+1783/408exact100% pass. Live411documents includes one authorized10200VND receipt774.
+External bank refund remains verifiedPENDING; no paid-refund/full-release claim.
+Next code M29. Exact current evidence is in the owning VERIFICATION files.
+
+## Active delivery checkpoint — 2026-10-24
+
+M25 core is mounted and verified. M26–M28 implementations are exercised through the
+isolated full-branch composition, with owning tests/coverage/reviews and controlled
+HTTP/Docker evidence recorded in their VERIFICATION files. Normal runtime108target+
+2health at0007; accepted external sandbox/prerequisite publication gates remain open.
+M29 is next in roadmap order; R5/full posted correction/cancellation is not closed.
+The chronological assessment below retains its original checkpoint counts.
+
 **Prepared:** 2026-10-02. **Updated:** 2026-10-18. M21–M24 declared scopes pass;
 next code is M25 credit_applications after its owning plan. Source/configured head0007.
 **Status:** active implementation; M01–M14, M15 core and M16 internal settlement pass local gates.

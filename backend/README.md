@@ -1,5 +1,48 @@
 # Agentra backend
 
+## Native VNPAY and M26–M28 publication — 2026-10-25
+
+M26 online payments, M27 refunds and M28 document history/printing are now mounted:
+135/154 canonical operations plus2health. Native VNPAY2.1.0 uses separate GET
+`/api/v1/integrations/vnpay/ipn` and `/return` transports; the canonical JSON/HMAC
+webhook remains for configured normalized providers. These two transport endpoints
+are documented here and excluded from canonical business Swagger accounting.
+
+Native signing, exact VND conversion, original-date checkout recovery, querydr/refund
+response verification and source-bound refund reconciliation are implemented. IPN
+alone or an independently verified query can record cash; browser Return is readonly.
+An actual10200VND sandbox payment37 received automatic IPN and created one receipt774
+and one event. This authorized development business record increases live documents
+410→411; original seeded documents are retained. A separate isolated acceptance refund
+of5000VND is confirmed PENDING by VNPAY request/query; no external paid-refund claim.
+
+All27 published packet operation branches retain owning coverage and PostgreSQL
+evidence. See the current owning VERIFICATION files for exact scopes and open release
+gates; M29 posted corrections/cancellation and M30–M32 remain unavailable. The earlier
+engineering checkpoints below are chronological history, not current publication.
+
+## Active M25–M28 engineering checkpoint
+
+M25 credit applications list/detail/create/draft-update/post are mounted; drafts are
+neutral, posting applies historical unreserved credit/FIFO debt atomically and
+`cashReceived` is always `"0"`. Internal draft cancellation is not a public complete
+cancel operation; posted correction/cancellation remains M29. Evidence:
+`../openwiki/backend-design/plan/credit_applications/VERIFICATION.md`.
+
+At the historical isolated checkpoint, M26 online payments, M27 refunds and M28 document history/printing were implemented
+in the isolated verification composition and **not mounted in the normal API** while
+their provider/prerequisite publication gates remain open. HTTPX and ReportLab are
+locked runtime dependencies; the Vietnamese-capable Noto Sans font and OFL license
+are bundled under `app/modules/document_history/fonts/`. Optional provider settings
+must be supplied together: PAYMENT_PROVIDER,
+PAYMENT_BASE_URL, PAYMENT_CALLBACK_URL, PAYMENT_CREDENTIAL and PAYMENT_WEBHOOK_KEYS
+(JSON key-ID/secret map); timeout/expiry defaults are in `.env.example`. No default
+provider credentials are supplied. The accepted external sandbox is not ready (D07);
+controlled test transport is not accepted deployed-provider verification. The base
+URL must implement the documented normalized sandbox protocol or its explicitly
+accepted native translation; naming a provider alone does not add native integration.
+Source, isolated schemas and configured staging remain at Alembic `0007`.
+
 FastAPI, Pydantic Settings, SQLAlchemy 2, psycopg 3, and Alembic. Python 3.12
 and [uv](https://docs.astral.sh/uv/) are required for local development.
 
@@ -75,6 +118,111 @@ The image creates `/app/data` owned by its non-root app user. On Linux, the host
 directory also needs the runtime user's ownership (currently `999:999`); see the root
 README for setup. Docker Desktop on Windows supplies shared-directory write access.
 The optional migration service never runs automatically during normal startup.
+
+## ngrok backend tunnel (Windows)
+
+Use ngrok on the Windows host to forward a public HTTPS endpoint directly to the
+Compose backend at `http://127.0.0.1:8000`. The backend must already be running and
+its `/api/v1/health/ready` endpoint must return `200`.
+
+The ngrok v3 user configuration is `%LOCALAPPDATA%\ngrok\ngrok.yml`; locate and
+validate it with `ngrok config check`. Configure the named endpoint as follows,
+preserving any existing user credentials or other endpoints:
+
+```yaml
+version: "3"
+
+agent:
+  web_addr: 127.0.0.1:4040
+  inspect_db_size: -1
+
+endpoints:
+  - name: dms-backend
+    upstream:
+      url: http://127.0.0.1:8000
+```
+
+Add your authtoken to that user-level file, then start the endpoint in a terminal:
+
+```powershell
+ngrok config add-authtoken YOUR_NGROK_AUTHTOKEN
+ngrok config check
+ngrok start dms-backend
+```
+
+Keep the terminal open; `Ctrl+C` stops the tunnel. The user-level configuration
+contains the token and must stay outside this repository. The local agent API at
+`http://127.0.0.1:4040/api/tunnels` reports the public URL; request capture is disabled
+by `inspect_db_size: -1`. Check `<public-url>/api/v1/health/ready` and
+`<public-url>/api/docs` after starting. If ngrok displays its browser warning on a
+free endpoint, an API probe can send the `ngrok-skip-browser-warning: true` header.
+If `API_PORT` is overridden in Compose, update the upstream port accordingly.
+
+Use the public HTTPS URL plus the provider's required webhook path when completing
+payment configuration. A tunnel does not enable the currently unmounted M26/M27
+routes: accepted sandbox credentials, native-protocol mapping and publication gates
+still apply. Configure all required `PAYMENT_*` fields together; setting only
+`PAYMENT_CALLBACK_URL` fails settings validation. The public URL alone is not an
+additional browser origin, so direct webhook traffic needs no CORS change.
+
+## VNPAY sandbox preparation
+
+Native VNPAY settings are prepared separately from the controlled `PAYMENT_*`
+adapter. Registration: <https://sandbox.vnpayment.vn/devreg/>. Obtain the eight-character
+`vnp_TmnCode` and `vnp_HashSecret` from the merchant registration information.
+
+Put all VNPAY settings directly in `backend/.env`, alongside the database and auth
+settings. Local Settings reads `.env` from the backend working directory; Compose
+loads `backend/.env` for backend/migration services. There is no extra VNPAY env file.
+Shell environment overrides dotenv for local Settings; Compose's explicit service
+`environment` entries take precedence over its env file. The variable template is
+`backend/.env.example`.
+
+```dotenv
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=''
+VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_API_URL=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+VNPAY_IPN_URL=https://YOUR-NGROK-DOMAIN/api/v1/integrations/vnpay/ipn
+VNPAY_RETURN_URL=https://YOUR-NGROK-DOMAIN/api/v1/integrations/vnpay/return
+```
+
+| Setting | Meaning / validation |
+| --- | --- |
+| `VNPAY_TMN_CODE` | Blank while preparing, otherwise exactly eight alphanumeric characters. |
+| `VNPAY_HASH_SECRET` | Raw merchant signing secret, stored as `SecretStr`; whitespace-only is invalid. |
+| `VNPAY_PAYMENT_URL` | Literal official sandbox checkout endpoint above. |
+| `VNPAY_API_URL` | Literal official sandbox query/refund endpoint above. |
+| `VNPAY_IPN_URL` | Proposed HTTPS server-to-server IPN endpoint; distinct from Return. |
+| `VNPAY_RETURN_URL` | Proposed HTTPS browser return handler; not money-posting evidence. |
+
+URLs cannot contain credentials, whitespace, query strings or fragments. Prepared
+URLs with both credentials blank are allowed. Once either credential is supplied,
+both credentials and both callback URLs are required. The current preparation is
+sandbox-only and does not accept arbitrary or production provider endpoints.
+
+After filling both credentials, rebuild/refresh the backend from the repository root:
+
+```powershell
+docker compose up --build -d --wait --wait-timeout 120
+```
+
+Keep ngrok running and update both local callback URLs if its public domain changes.
+These native handlers and the HMAC-SHA512 adapter are implemented. Register the exact
+IPN URL with VNPAY; Return is passed in the signed checkout request. Native request and
+query results may remain PENDING while the bank processes a refund; ambiguous or
+unsigned outcomes retain reservations and must not be treated as paid or failed.
+Setting `PAYMENT_PROVIDER=VNPAY` does not select the native adapter;
+the existing `PAYMENT_*` JSON/HMAC settings must not be populated with VNPAY values.
+native composition uses the separate `VNPAY_*` credentials when no controlled provider
+is selected. Settings validation itself makes no VNPAY call.
+
+Nginx preserves the backend Referrer-Policy for API responses, so native Return keeps
+one `no-referrer` policy through the proxy. Other API responses retain the default
+`strict-origin-when-cross-origin` fallback.
+
+Official references: [payment/IPN/Return protocol](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html)
+and [query/refund protocol](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr&refund.html).
 
 ## Authentication
 

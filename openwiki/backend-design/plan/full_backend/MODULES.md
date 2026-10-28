@@ -1,5 +1,23 @@
 # Implementation work packages — M01 through M32
 
+## M29 internal continuation — 2026-10-25
+
+Goods/manual-cash internal correction services and six-file M29 plan now exist;
+no M29 operation published. Source0008/tested Supabase UUID schemas, configured
+runtime0007/135target+2health. Current scope/evidence: [M29](../document_corrections/VERIFICATION.md).
+Next zero-upfront issue, then the remaining E19 dependency-ordered slices.
+
+Current2026-10-25: M26/M27/M28 canonical APIs are mounted with native VNPAY acceptance;
+135target+2health.568offline/40uniquePG/6deployment and packet1783/408exact100% pass.
+Automatic IPN receipt774 confirmed; external bank refund15714325 remains PENDING.
+M29 remains next. Earlier unmounted checkpoint below is historical.
+
+Current2026-10-24: M25 core is mounted/verified; M26–M28 code is implemented in the
+isolated verification composition, with D07 external acceptance and dependent normal
+publication still held. Owning VERIFICATION files distinguish completed engineering
+evidence from external/release gates. M29 remains next and unimplemented. The older
+M24 status below is retained as its chronological checkpoint.
+
 **Status:** declared slices through M24 are verified; M15/M17/M18/M21/M23 retain
 their M29 full posted-operation gates. Next code M25. Prerequisites match the
 [General Plan](../../GENERAL_PLAN.md). Operation IDs and first/full gates are in

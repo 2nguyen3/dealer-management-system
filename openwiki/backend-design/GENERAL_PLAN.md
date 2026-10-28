@@ -1,5 +1,50 @@
 # General Plan
 
+## Current M29 internal progress — 2026-10-25
+
+Owning [six-file plan](plan/document_corrections/PLAN.md) now exists. Receipt and
+independent-adjustment correction/cancel plus manual-cash correction/cancel services
+are internal and verified:572offline+27owningPG+12retainedPG; affected9-file310/76exact
+100%. Source0008 permits historical receipt goods only after the reproduced D15
+inactive-source failure; configured runtime remains0007/135target+2health. No M29
+routes published. Next is zero-upfront issue then upfront/return/credit orchestration;
+full M29/R5/R6 and M30–M32 remain open. [Evidence](plan/document_corrections/VERIFICATION.md).
+
+## Current VNPAY/M26–M28 publication — 2026-10-25
+
+All27packet operations mounted;135target+2health at0007. Native merchant/automatic
+IPN/payment/query/refund transport accepted.568offline+40uniquePG+6deployment pass;
+packet/config/API1783/408exact100%. Live411documents/30agencies/24products includes
+authorized normal receipt774 for10200VND. External refund5000VND remains05/PENDING;
+terminal bank settlement stays open. Next M29; dependency graph unchanged. Current
+evidence: [M26](plan/online_payments/VERIFICATION.md), [M27](plan/refunds/VERIFICATION.md),
+[M28](plan/document_history/VERIFICATION.md).
+
+## Historical VNPAY configuration preparation — 2026-10-25
+
+User selected VNPAY sandbox and reports registration complete. Native configuration
+in the main `backend/.env` pass50new tests; fulloffline482passed, changed config
+121/40exact100%. Docker direct/proxy/public-ngrok readiness200. Credentials remain
+blank; native adapter/handlers and external acceptance remain pending. Runtime stays
+108target+2health. See [M26 verification](plan/online_payments/VERIFICATION.md).
+Dependency table/graph and M26/M27/M28 publication gates remain applicable.
+
+## Active M25–M28 packet checkpoint — 2026-10-24
+
+M25 core is verified and mounted:14owningPG+13offline, exact117statements/4branches.
+M26 online payments, M27 refunds and M28 history/printing are implemented in the
+isolated verification composition; final owning evidence is linked in their plans.
+Latest full offline432passed; retained M16/M24 selection29PG and migration/seed/
+integrity checks pass. M26 owns531/126, M27 owns514/100 and M28 owns333/78 exact per-file
+coverage; all32affected production files are1832/340exact100%. Normal runtime108target+2health at0007, direct/
+proxy readiness200, live410documents/30agencies/24products preserved. Controlled
+HTTP/Docker probes do not close D07: accepted provider credentials, reachable public
+callback and native protocol mapping are unavailable (user confirmed not ready).
+M26/M27 publication and the M28 prerequisite handoff remain held. M29 is the next
+roadmap module; full posted corrections/cancellation and R5 remain open.
+
+## Historical M21–M24 checkpoint
+
 **Backend implementation order, module dependencies, and completion gates**
 
 **Updated:** 2026-10-18. **Next module:** M25 `credit_applications` core.
@@ -356,7 +401,9 @@ does not prove business API, concurrency or external sandbox behavior.
 | M19 upfront_payments | Four operations, full-money consumption/separation and issue integration implemented | Preserve [evidence](plan/upfront_payments/VERIFICATION.md); retain M29 money-preserving cancellation gate. |
 | M20 receivables | Six complete read operations implemented; exact snapshots/atomic ledgers/historical aggregates verified | Preserve [evidence](plan/receivables/VERIFICATION.md); M24 reuses the sole balance route. |
 | M21/M22/M23/M24 | Owning plans/actual symbols and scoped state/rollback/race/coverage/deployment gates pass | [Adjustments](plan/stock_adjustments/VERIFICATION.md), [counts](plan/stock_counts/VERIFICATION.md), [returns](plan/sales_returns/VERIFICATION.md), [credit](plan/agency_credit/VERIFICATION.md); dependency edges unchanged. |
-| M25–M32 | Work packages prepared; remaining HTTP work future | Next M25 credit_applications after M24 verification; preserve D17 and M28/M29 gates. |
+| M25 core | Five core operations verified/mounted; internal draft cancellation, zero new cash, protected-source/race/replay evidence | [Owning evidence](plan/credit_applications/VERIFICATION.md); posted correction/full cancel remains M29. |
+| M26/M27/M28 | All27operations published with native VNPAY acceptance and exact owning coverage | [Payments](plan/online_payments/VERIFICATION.md), [refunds](plan/refunds/VERIFICATION.md), [history](plan/document_history/VERIFICATION.md); automatic IPN passes, external bank refund remains PENDING rather than paid. |
+| M29–M32 | Remaining roadmap implementation | Next M29 full posted corrections/cancel; R5/R6 remain open. |
 
 Current dependencies are unchanged. M04 and M07–M09 table gates above have passed
 their linked child evidence: 207 offline + 217 PostgreSQL/TLS + 16 deployment

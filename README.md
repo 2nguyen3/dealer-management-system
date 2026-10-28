@@ -26,6 +26,14 @@ Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xu�
 
 ## Development setup
 
+Current backend checkpoint2026-10-25: M26 online payments/VNPAY, M27 refunds and M28
+history/HTML/PDF APIs are mounted:135/154target operations+2health. Actual automatic
+sandbox IPN payment37 created receipt774 for10200VND; live411documents. Signed external
+refund request/query is still PENDING, not paid. [Current evidence](openwiki/backend-design/plan/online_payments/VERIFICATION.md).
+M29 posted corrections/cancel and M30–M32 remain future work. After this authorized
+development transaction, use ordinary `python -m app.db.verify --regression` for live
+integrity; the original410-document seeded checkpoint is historical, not a reset target.
+
 | Component | Stack | Documentation |
 |---|---|---|
 | API | Python 3.12, FastAPI, SQLAlchemy, Alembic | [Backend setup](backend/README.md) |
@@ -186,6 +194,8 @@ provider mail remains an operational step; configured Supabase now runs source h
 Prerequisites: Docker Engine 25+/Docker Desktop with Compose 2.20.2+ and a configured
 `backend/.env`. Supabase remains an external managed database.
 `AUTH_SIGNING_KEY` must be configured before starting the backend.
+Compose loads native VNPAY sandbox settings directly from `backend/.env`;
+see [VNPAY setup](backend/README.md#vnpay-sandbox-preparation).
 
 From the repository root:
 

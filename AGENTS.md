@@ -1,5 +1,60 @@
 # Agentra project instructions
 
+## Current M29 six-operation publication - 2026-10-28
+
+Runtime141target+2health; source/deployed/configured Supabase0009. Six receipt/
+independent-adjustment/manual-cash correction/cancel operations published; issue/
+return/credit correction routers remain unmounted.589offline+3deployment pass;
+release12files550statements96branches exact100%, manual period oracle/migration
+evidence recorded in M29 VERIFICATION. Live411documents/30agencies/24products and
+receipt774/payment37/one-event preserved. Docker/ngrok healthy; frontend not rebuilt.
+Continue remaining M29 gates then M30-M32; full M29/R5/R6 open. Do not follow older
+source-only checkpoints as current runtime facts or rerun unrelated baselines.
+
+## Current M29 internal checkpoint — 2026-10-25
+
+M29 six-file plan exists; goods receipt/independent-adjustment and manual-cash
+correction/cancel services are internal/unmounted.572offline+27owningPG+12retainedPG
+pass; affected9files310statements/76branches exact100%. Source0008 fixes historical
+receipt inactive-master admission after a real0007witness; deployed runtime remains
+0007/135target+2health. Live411documents/30agencies/24products/receipt774 preserved.
+Next zero-upfront issue then upfront/return/credit/full-operation gates. Use only
+current Supabase UUID test schemas and existing dms services; HANDOFF restrictions
+remain binding. No new DB/container/server/tunnel. See M29 VERIFICATION for exact
+evidence and failed-fixture resolution; M29–M32/R5/R6 remain open.
+
+## Current native VNPAY/M26–M28 publication — 2026-10-25
+
+Runtime135target+2health at0007; all27M26/M27/M28operations mounted. Native SHA512
+GET IPN/Return are separate transports.568offline+40uniquePG+6deployment cases pass;
+packet/config/API1783/408exact per-file100%. Actual dev payment37/10200VND received
+automatic IPN: one receipt774/event; live411documents/30agencies/24products. Preserve
+this authorized immutable receipt;410seeded documents remain historical. External
+refund15714325/5000VND is signed05/PENDING, not paid; terminal bank settlement remains
+open. Ngrok currently targets8000. The old helper no longer redirects ngrok. Read
+current owning VERIFICATION. Next M29; full release/frontend gates remain open.
+
+## Historical VNPAY configuration preparation — 2026-10-25
+
+VNPAY sandbox selected; user reports merchant registration complete. Native Settings
+use backend/.env directly; the separate VNPAY env file was removed at user request.
+TmnCode/HashSecret remain blank.
+50new settings tests and482fulloffline pass; changed config121/40exact100%. Compose
+2.20.2+ required; Docker direct/proxy/public-ngrok readiness200,108target+2health.
+Native VNPAY checkout/IPN/Return/query/refund and acceptance/publication remain pending.
+Read M26 VERIFICATION; keep VNPAY separate from controlled PAYMENT_* credentials.
+
+## Active M25–M28 packet — 2026-10-24
+
+M25 core is mounted:14owningPG+13offline,29retained M16/M24PG and2isolated direct/Nginx
+cases pass. Latest full offline checkpoint:432passed. Normal runtime108target+2health
+at0007; Docker/readiness healthy, live410documents/30agencies/24products and54SQLchecks
+preserved. M26/M27/M28 code is implemented in the isolated verification composition;
+final engineering evidence is in the owning VERIFICATION files. Normal publication
+remains held by D07 accepted external sandbox/prerequisite gates (user confirmed
+unavailable). M29 full posted paths remain deferred. New frontend changes are user
+work; preserve them. No commit/push requested.
+
 ## Current packet checkpoint — 2026-10-18
 
 M21 stock_adjustments core, M22 stock_counts, M23 sales_returns core and M24

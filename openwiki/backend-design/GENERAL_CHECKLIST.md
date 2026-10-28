@@ -1,5 +1,50 @@
 # Backend General Checklist
 
+## Current M29 Publication - 2026-10-28
+
+Six correction/cancel operations for receipts, independent adjustments and manual
+cash are published on existing Docker/Supabase0009,141target+2health.589offline and
+3deployment checks pass; affected release12files550/96exact100% and manual-period
+oracle recorded in [M29 evidence](plan/document_corrections/VERIFICATION.md). Remaining
+issue/return/credit correction routers are unmounted; full M29/R5/R6 remain open.
+
+## Current M29 internal checkpoint — 2026-10-25
+
+[Owning plan](plan/document_corrections/PLAN.md) and internal goods/manual cash services
+are prepared/verified:572offline+27owningPG+12retainedPG, affected310statements/76branches
+exact100% per file. Source0008 is not deployed; normal runtime stays0007/135target+
+2health and411documents. No M29 operation or whole-module checkbox closes here.
+Next zero-upfront issue/upfront/return/credit orchestration; [actual evidence](plan/document_corrections/VERIFICATION.md).
+
+## Current native VNPAY packet — 2026-10-25
+
+M26/M27/M28 APIs published:135target+2health.568offline+40uniquePG+6deployment pass;
+packet/config/API1783/408exact100%. Automatic IPN for payment37 created one10200VND
+receipt774/event; live411documents/30agencies/24products. Signed external refund
+request/query confirms05/PENDING; terminal bank settlement remains open. This is
+operation availability/engineering delivery, not a whole-release/paid-refund claim.
+[Current evidence](plan/online_payments/VERIFICATION.md).
+
+## Historical VNPAY preparation checkpoint — 2026-10-25
+
+VNPAY sandbox selected; registration reported complete. Native settings in the main
+`backend/.env`:50new settings tests,482fulloffline, changed config121/40
+exact100%, Docker direct/proxy/public readiness200. TmnCode/HashSecret still blank.
+Native adapter/IPN/Return/query/refund and accepted sandbox gates remain open; no
+additional operations published. [Owning evidence](plan/online_payments/VERIFICATION.md).
+
+## Active packet checkpoint — 2026-10-24
+
+M25 core is mounted/verified with14owningPG+13offline and117/4 exact owning coverage.
+M26/M27/M28 code and full operation branches exist in the isolated composition;
+M26 owning531/126, M27 owning514/100 and M28 owning333/78 are exact per file;
+all32affected production files are1832/340exact100%. Full offline432passed;29retained M16/M24PG and migration/seed/integrity
+checks pass. Runtime108target+2health at0007. D07 accepted external sandbox inputs are
+unavailable; controlled fixtures do not close M26/M27 or dependent publication gates.
+M29 posted corrections/cancel and whole R5/R6 remain open. See owning VERIFICATION files.
+
+## Historical M21–M24 checkpoint
+
 **Updated:** 2026-10-18. **Next:** M25 credit_applications core.
 M21 core/M22/M23 core/M24 pass owning gates. Source/configured Supabase0007;
 runtime103target+2health. Actual packet338offline+84PG (29owning+55retained)+24deployment,
@@ -115,16 +160,18 @@ per-function cases/results belong in the owning child checklist and VERIFICATION
   quantity cap, backdated return replay and stock/debt/credit split pass. Requires: M20.
 - [x] M24 `agency_credit` — lot/source/statement/available-vs-reserved projections
   and shared agency balance service pass. Requires: M23.
-- [ ] M25 `credit_applications` core — same-agency unreserved credit + invoice
+- [x] M25 `credit_applications` core — same-agency unreserved credit + invoice
   FIFO consumes once, cashReceived stays zero. Requires: M24.
-- [ ] M26 `online_payments` — sandbox setup/read/events/reconcile/webhook prove
+- [x] M26 `online_payments` — sandbox setup/read/events/reconcile/webhook prove
   signature/idempotency/late full success and excess credit. Requires: M24.
 - [ ] M27 `refunds` — source-bound manual/online reserve/send/reconcile/retry
   preserves UNKNOWN reserves and immutable paid money. Requires: M25, M26.
+  All12APIs/engineering gates pass and are published; external terminal bank refund
+  observation remains open (real provider outcome05/PENDING).
 
 ### Wave E — History, corrections and read products
 
-- [ ] M28 `document_history` — complete kind-dispatched lines/history/search
+- [x] M28 `document_history` — complete kind-dispatched lines/history/search
   and authorized snapshot HTML/PDF printing pass. Requires: M13, M22, M27.
 - [ ] M29 `document_corrections` + owning-module completion — posted correction/
   cancel/replay, conditional permissions and downstream guards pass. Requires: M28.
@@ -245,8 +292,12 @@ than "module complete". Do not copy secret-bearing output into this register.
 | M16 settlement_core | E09/E10 internal completion; no new HTTP operation | [Evidence](plan/settlement_core/VERIFICATION.md):28 offline+25 PG added;617 combined, exact100%(4096/830), all seeded financial kinds, state/rollback/observed races and resolved reviews | M17–M19 real writers, M23 rounding and M27/M29 orchestration/publication remain separate gates. |
 | M17–M20 | Four owning implementations verified; all370retained PG/TLS pass | [M17](plan/stock_issues/VERIFICATION.md), [M18](plan/payment_receipts/VERIFICATION.md), [M19](plan/upfront_payments/VERIFICATION.md), [M20](plan/receivables/VERIFICATION.md):80owning cases/exact100%(808/98),308offline,397PG/TLS overall,22direct/Nginx; affected33-file100%(1285/306), Supabase0006 live integrity | M29 posted paths remain deferred; next M21. |
 | M21–M24 | Declared core/count/reader scopes verified | [M21](plan/stock_adjustments/VERIFICATION.md), [M22](plan/stock_counts/VERIFICATION.md), [M23](plan/sales_returns/VERIFICATION.md), [M24](plan/agency_credit/VERIFICATION.md):338offline+84PG+24deployment,30files/1162/162 exact100%, Supabase0007/live integrity/cleanup | M21/M23 posted paths M29; next M25. |
-| M25–M32 | Work packages prepared; runtime work open | No completion evidence | Expand M25 after the active packet; R4–R6 full gates remain open. |
+| M25 core | Five mounted core operations and internal draft cancel verified | [Owning evidence](plan/credit_applications/VERIFICATION.md):14PG+13offline,117/4exact100%,2direct/Nginx | Posted correction/full public cancellation remain M29. |
+| M26/M27/M28 engineering | Complete operation branches verified in isolated composition; normal publication held | [Payments](plan/online_payments/VERIFICATION.md), [refunds](plan/refunds/VERIFICATION.md), [history](plan/document_history/VERIFICATION.md):16+11+11owningPG,531/126+514/100+333/78exact100% | Accepted D07 environment/prerequisite publication remains open; controlled fixtures are not external acceptance. |
+| M29–M32 | Work packages prepared; runtime work open | No completion evidence | Next M29 full posted correction/cancel; R5/R6 remain open. |
 
-Current next action: expand M25 credit_applications' owning six-file plan before code.
+Current next actions: obtain D07 accepted-provider inputs and execute external acceptance
+before normal M26/M27/dependent publication; prepare M29's owning plan for full posted
+correction/cancellation. Preserve the verified M25–M28 engineering packet.
 Runtime availability and remaining
 full gates are recorded in [AVAILABILITY](plan/full_backend/AVAILABILITY.md).

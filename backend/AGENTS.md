@@ -1,5 +1,63 @@
 # Backend project context
 
+## Current M29 six-operation publication - 2026-10-28
+
+Existing Docker runtime141target+2health and configured Supabase0009. Six complete
+goods/manual correction/cancel operations mounted; issue/return/credit handlers live
+on separate unmounted routers, explicitly composed only in in-process tests.589offline
+and3deployment cases pass; release12-file550/96exact100%. Live411documents/30agencies/
+24products/receipt774/payment37 preserved. Frontend/ngrok routing unchanged. Read
+current owning VERIFICATION/HANDOFF; full M29/M30-M32/R5/R6 remain open. No new DB/
+service/server or seed reset; use only existing Supabase and dms services.
+
+## Current M29 source-only checkpoint — 2026-10-25
+
+Internal goods/manual-cash correction/cancel services and owning M29 plan now exist.
+572offline+27owningPG+12retainedPG pass, affected310/76exact100% across9files. Source
+0008 allows previously POSTED receipt products in historical successors; first/new
+inactive goods remain denied. Only UUID Supabase schemas were migrated; configured
+runtime is still0007/135target+2health. No M29 routes mounted or service restarted.
+Live411documents/30agencies/24products and receipt774 retained. Next zero-upfront
+issue, then money/return/credit orchestration; full M29/R5/R6 remain open. Read owning
+VERIFICATION and backend HANDOFF; no new DB/container/service/server/tunnel allowed.
+
+## Current native VNPAY publication — 2026-10-25
+
+M26/M27/M28 mounted:135target+2health at0007. Native SHA512 checkout/GET IPN/Return/
+query/refund implemented separately from PAYMENT_*.568offline/40uniquePG/6deployment
+pass; packet/config/API1783/408exact per-file100%. Automatic dev IPN for payment37
+created one10200VND receipt774/event. Live411documents/30agencies/24products; preserve
+the original seeded history and the new immutable receipt. Use ordinary live integrity,
+not a seed reset. External refund15714325/5000VND remains05/PENDING; terminal bank
+settlement is open. Normal8000/8080/ngrok addresses retained. Isolated helper requires
+a distinct preprovisioned endpoint and never changes ngrok. M29 is next.
+
+## Historical VNPAY preparation — 2026-10-25
+
+User selected VNPAY sandbox and reports merchant registration complete. Native
+Settings fields in the main `.env` prepare credentials plus distinct HTTPS IPN/Return
+URLs; Compose loads the same main file (2.20.2+). The separate VNPAY env file was
+removed at user request. This is
+configuration preparation only. No native adapter or route is enabled, no provider
+acceptance is implied; do not feed VNPAY credentials into controlled `PAYMENT_*`.
+Current preparation evidence belongs in the M26 owning VERIFICATION:50new settings
+tests/482fulloffline pass; changed config121/40exact100%. Rebuilt Docker containers are
+healthy, direct/proxy/public readiness200; safe inspection confirms credentials blank.
+
+## Active M25–M28 packet — 2026-10-24
+
+M25 core five operations are mounted:14owningPG+13offline,29retained M16/M24PG and
+2isolated direct/Nginx pass. Latest full offline432passed. M26/M27/M28 implementations
+and all their operation branches are being verified in the isolated composition;
+normal publication stays held by D07 accepted-provider/prerequisite gates. M27 owns
+exact514statements/100branches, M28 owns333/78 and M26 owns531/126, per-file100%.
+All32affected production files are exact1832statements/340branches. Source/configured Supabase0007; live410documents/30agencies/
+24products and54SQLchecks preserved. Normal runtime108target+2health, direct/proxy
+readiness200, Docker healthy. HTTPX/ReportLab are runtime dependencies; Vietnamese
+NotoSans/OFLfont is bundled. No accepted external sandbox is configured (user confirmed
+not ready). M29 full posted correction/cancel remains next and deferred. Read owning
+VERIFICATION and active GOAL; preserve unrelated frontend changes and data/ contents.
+
 ## Current packet checkpoint — 2026-10-18
 
 M21 adjustment core, M22 counts, M23 return core and M24 credit readers are implemented

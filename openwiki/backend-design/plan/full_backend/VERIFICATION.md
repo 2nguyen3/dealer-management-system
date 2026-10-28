@@ -1,5 +1,168 @@
 # Full backend planning verification
 
+## M29 internal goods/manual cash — 2026-10-25
+
+Actually passed572defaultoffline,27unique owningPG(16goods+11manual) and12retainedPG
+(2goods+10M16). A repeated migration ID and repeated protection IDs are counted once.
+Current affected scope9files/310statements/76branches exact per-file100%; full details,
+commands, actual failed fixture and corrected rerun, JUnit and coverage artifacts:
+[M29 VERIFICATION](../document_corrections/VERIFICATION.md). Ruff lint/format pass.
+Two independent review workers hit quota; no independent review success is claimed.
+
+Source head0008; configured runtime stays0007/135target+2health. No routes published,
+live migration/restart, new runtime/database or provider action. Existing-container
+ordinary live integrity passes411documents/30agencies/24products. Original receipt774
+is retained. Internal progress does not close M29 or R5/R6; next zero-upfront issue.
+
+## Native VNPAY/M26–M28 publication — 2026-10-25
+
+Current runtime135target+2health;27M26/M27/M28canonical operations are mounted.
+Native2GETprovider transports are reachable outside business Swagger accounting.
+Source/configured head0007. Automatic provider IPN for payment37/10200VND created
+one receipt774 and one event. Live411documents/30agencies/24products; original seeded
+documents were preserved. Native external refund15714325/5000VND request/query are
+verified but remain05/PENDING; terminal bank settlement remains an open release item.
+
+Current evidence:568offlinepassed;40unique selectedPG(18M26+11M27+11M28), with2native
+nodes rerun/superseding the sameIDs;6unique direct/proxy/public deployment cases pass.
+Declared27-file packet/config/API scope1783statements/408branches exact per-file100%:
+M26=754/190,M27=517/100,M28=333/78,config121/40,API58/0. Ruff/build/health and Nginx
+configuration pass. Exact commands/artifacts and local standards/specification review
+are in [M26 current evidence](../online_payments/VERIFICATION.md). No unrun whole-suite,
+external paid-refund or whole-release completion claim. M29–M32/R5/R6 remain open.
+
+## 2026-10-24 — M25–M28 engineering packet and gated handoff
+
+M25 core is mounted. M26 online payments, M27 refunds and M28 document history have
+their complete operation branches implemented and verified in the isolated composition.
+**Normal publication remains held by D07 accepted-provider/prerequisite gates.** The
+user confirmed the external environment is not ready. Controlled HTTP fixtures and
+seeded DEMO_SANDBOX evidence are not accepted external-provider deployment evidence.
+
+### Actual tests, unique current nodes and precise coverage
+
+| Selection | Passed cases | Scope |
+| --- | ---: | --- |
+| Complete default/offline backend selection |432| Includes all new contract, exact-value, signature, configuration, real-HTTP transport/deadline and renderer cases. |
+| M25 owning PostgreSQL |14| Neutral drafts, FIFO/original cash, exact/one-over, rollback, competing applications/reservation winners and real grant-wait authorization. |
+| M26 owning PostgreSQL |16| Durable TX1/restart, late full success, callbacks/reconcile both winners, unknown commit, setup recovery, original seeded events and coherent callback/page snapshot. |
+| M27 owning PostgreSQL |11| Manual/online, both cancel/payment winners, both actual M25-application/M27-submit winners, source limits, UNKNOWN, fresh-revision retry, actor attribution, grants and rollback. |
+| M28 owning PostgreSQL |11| Seven persisted kinds, four goods dispatchers, scoped readers/cursors, complete parent tokens, historical snapshots, count protection, rollback and observed authorization wait. |
+| Retained M16/M24 PostgreSQL |29|25settlement+4agency-credit; full-seed financial replay and immutable reserved/paid sources included. |
+| Retained migration/seed/integrity node |1| Fresh/populated upgrade, supported downgrade/re-upgrade, repeated seed and regression/snapshot preservation at0007. |
+| Isolated direct/Nginx deployment |4|2M25+2controlled-provider/refund/history/HTML/PDF workflows. |
+
+Thus **82 selected real-PG cases** passed(52owning+29retained+1migration), alongside
+432offline and4deployment: **518 unique selected cases**. This is a checkpointed union,
+not a fresh run of all historical PostgreSQL/TLS suites or the older705-case baseline.
+Current collection was independently compared with passing setup/call/teardown IDs;
+no required skip/xfail/unrun ID remains in the declared selections.
+
+| Exact affected Python production scope | Files | Statements | Branches | Each file |
+| --- | ---: | ---: | ---: | --- |
+| M25 credit_applications |6|117|4|100% |
+| M26 online_payments |7|531|126|100% |
+| M27 refunds |8|514|100|100% |
+| M28 document_history |7|333|78|100% |
+| Changed/new shared production |4|337|32|100% |
+| **Combined affected production** |**32**|**1832**|**340**|**exact100%** |
+
+The4shared files are app/api/router.py, app/core/config.py,
+app/modules/document_core/schemas.py and app/common/provider_commands.py. Every file
+has zero missing/excluded lines, zero missing branches and zero partial branches in
+coverage JSON. Unchanged production, test infrastructure and SQL text are outside this
+Python scope; SQL behavior is established by real persisted-state/constraint tests.
+No new Python/SQL migration was introduced; deployed0001–0007 snapshots are unchanged.
+
+### Commands and resumable evidence
+
+Working directory backend/. The existing approved helper below starts bounded workers,
+sets SUPABASE_TEST_SCHEMAS=1, and preserves per-node JSON/log/raw-coverage files under
+`C:\Users\23521\AppData\Local\Temp\opencode`. No PostgreSQL container/local database was used.
+
+```powershell
+uv sync --frozen
+uv run --frozen --no-sync ruff check .
+uv run --frozen --no-sync ruff format --check .
+.venv\Scripts\python.exe "C:\Users\23521\AppData\Local\Temp\opencode\agentra_checkpoint.py" start agentra-delivery-offline2 -m "not integration and not deployment" -q --tb=short -o faulthandler_timeout=180 --cov=app.modules.credit_applications --cov=app.modules.online_payments --cov=app.modules.refunds --cov=app.modules.document_history --cov=app.common.provider_commands --cov=app.core.config --cov=app.modules.document_core.schemas --cov=app.api.router --cov-branch --cov-report=json:C:\Users\23521\AppData\Local\Temp\opencode\agentra-delivery-offline2-coverage.json
+.venv\Scripts\python.exe "C:\Users\23521\AppData\Local\Temp\opencode\agentra_checkpoint.py" start agentra-delivery-m26 tests/integration/online_payments -m integration -vv --tb=short --maxfail=1 -o faulthandler_timeout=180 --cov=app.modules.online_payments --cov=app.common.provider_commands --cov=app.core.config --cov-branch --cov-report=json:C:\Users\23521\AppData\Local\Temp\opencode\agentra-delivery-m26-coverage.json
+.venv\Scripts\python.exe "C:\Users\23521\AppData\Local\Temp\opencode\agentra_checkpoint.py" start agentra-release-m27 tests/integration/refunds -m integration -vv --tb=short --maxfail=1 -o faulthandler_timeout=180 --cov=app.modules.refunds --cov=app.common.provider_commands --cov-branch --cov-report=json:C:\Users\23521\AppData\Local\Temp\opencode\agentra-release-m27-coverage.json
+.venv\Scripts\python.exe "C:\Users\23521\AppData\Local\Temp\opencode\agentra_checkpoint.py" start agentra-m27-last-boundaries tests/integration/refunds/test_manual.py tests/integration/refunds/test_online.py -m integration -vv --tb=short --maxfail=1 -o faulthandler_timeout=180 --cov=app.modules.refunds --cov=app.common.provider_commands --cov-branch --cov-report=json:C:\Users\23521\AppData\Local\Temp\opencode\agentra-m27-last-boundaries-coverage.json
+uv run --frozen --no-sync python "C:\Users\23521\AppData\Local\Temp\opencode\agentra_verify_delivery.py"
+uv run --frozen --no-sync python "C:\Users\23521\AppData\Local\Temp\opencode\agentra_final_coverage.py"
+```
+
+M25/M28 retained passing worker names and their exact selections are recorded in owning
+VERIFICATION and the final evidence JSON. `agentra-m25-retained` passed29PG;
+`agentra-packet-migration` passed its explicit master_data/test_migration node.
+The first foreground final offline command hit the tool's120s window and is not counted;
+agentra-delivery-offline2 completed432cases in229.28s. Passing artifacts are retained.
+
+Final artifacts: agentra-delivery-evidence.json(current node inventory),
+agentra-delivery-final-coverage.json, agentra-delivery-final.coverage and
+agentra-delivery-final-coverage-summary.json in the approved temporary directory.
+
+### Review findings and verified corrections
+
+Standards and specification reviews ran separately. Concrete fixes covered by the
+selected tests include shared financial detail schema nullability; independent-
+connection rollback assertions; exact multi-lot/invoice cash provenance; UNKNOWN
+optional-time serialization; original provider binding; pre-dispatch crash recovery;
+terminal-proof conflicts; proper ACCEPTED/terminal reconciliation-result phases;
+lost result-commit replies; setup/reconcile command identity separation; and creation
+returning202 after a committed intent when checkout expiry is invalid.
+
+A read-only staging check reproduced legacy demo-event projection failure, then passed
+after the reader fix. The original immutable event JSON remains unchanged. A real
+independent callback/page-query interleave also verifies PENDING filtering cannot
+return a newly reloaded SUCCESS row. Total transport deadlines are tested against
+regularly arriving slow chunks. No generic404 is accepted as definitive absence proof.
+
+### Docker, Supabase, publication and frontend handoff
+
+Frozen backend image build and backend-only Compose refresh passed. Backend/frontend
+are healthy; direct8000 and proxied8080 liveness/readiness200. Normal runtime remains
+**108target+2health**. Built-image HTTPX0.28.1, ReportLab4.5.1, writable/app/data with
+TMPDIR=/app/data and Vietnamese NotoSans glyph coverage pass. The actual Linux PDF
+response is text-extracted in the controlled direct/Nginx probe. Source-image hashes
+for the payment service/adapter, refund protocol and renderer match the final source.
+
+`uv run --frozen --no-sync alembic current`:0007(head).
+`uv run --frozen --no-sync python -m app.db.verify --seeded --regression`:30table,
+timestamp/document/ledger/cache/audit/report integrity and54SQLchecks pass. Live
+410documents/30agencies/24products remain unchanged; auth_token62 reflects legitimate
+runtime authentication activity and was not reset to a historical count. Fixture
+cleanup used generated namespaces only. A proven-owned Windows-crashed M27 schema
+pair was identified by worker time/data fingerprint and removed only after worker
+exit/no active users. Root data/ and unrelated frontend work are preserved.
+
+M25 five core operations are available to F25 after its prerequisites. M26 six, M27
+twelve and M28 nine operations are verified in the isolated composition only; their
+normal publication/frontend live handoff remains held by the user-confirmed D07
+accepted-provider/prerequisite gate. Missing external inputs: accepted sandbox/service
+identity and credentials, reachable public callback, key configuration and native-to-
+canonical payment/refund/query/absence mapping. Controlled fixtures and DEMO_SANDBOX
+cannot substitute for that evidence. No frontend browser gate is closed here.
+
+**Next roadmap module: M29**, full posted correction/cancellation coordination.
+All12M29-owned full operations remain deferred; R5/R6/full154-operation release stays
+open. No commit/push, live reset, trigger disabling or balance-cache writes occurred.
+
+## Active packet — 2026-10-23
+
+M25 core implemented/reviewed/mounted:14owningPG+13offline,29retained M16/M24PG,
+2isolated direct/Nginx. Exact per-file owning117statements/4branches and changed
+document schema176/0; frozen/Ruff/build/live integrity54checks pass. Runtime
+108target+2health, source/configured Supabase0007, live410documents/30agencies/24products
+preserved. Evidence and durable checkpoints: [M25](../credit_applications/VERIFICATION.md).
+
+M26 engineering remains unmounted/incomplete, D07accepted external sandbox unavailable.
+Current full offline382passed/475deselected61.89s;31M26offline include controlled realHTTP
+transport. Selected PG recovery/late-success/race/rollback/HTTP cases pass checkpointed
+runs; exact module/changed-config coverage gate remains open. [M26](../online_payments/VERIFICATION.md).
+M27 manual slice is internal work-in-progress; M28pending. No full packet completion.
+New frontend changes are user work and preserved. No commits/push or SQL migration.
+
 ## 2026-10-18 — M21–M24 packet verified and deployed
 
 Prepared each owning six-file plan before its code, in M21→M22→M23→M24 order;

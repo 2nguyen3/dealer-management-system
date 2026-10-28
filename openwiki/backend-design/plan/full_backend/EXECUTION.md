@@ -1,5 +1,46 @@
 # Execution sequence and release handoff
 
+## E19 internal progress — 2026-10-25
+
+M29 goods/manual-cash services now pass their internal gates;572offline+27owningPG+
+12retainedPG, affected9-file310/76exact100%. Source0008 is isolated-test verified but
+not deployed; normal runtime0007/135target+2health. No new HTTP operation published.
+Continue §5 item2's zero-upfront issue, then items3–7; whole E19/R5 remains open.
+[Exact M29 evidence](../document_corrections/VERIFICATION.md).
+
+## E16–E18 native publication handoff — 2026-10-25
+
+All27M26/M27/M28operations mounted:135target+2health at0007.568offline+40uniquePG+
+6deployment and packet1783/408exact100% pass. Native automatic IPN for10200VND
+payment37 created receipt774/event; live411documents with original seed retained.
+Signed refund15714325 request/query is05/PENDING, not an external paid outcome.
+Terminal bank settlement remains open; E19/M29 is next. Exact current commands and
+scope are in [M26 evidence](../online_payments/VERIFICATION.md). Frontend browser and
+whole-release gates remain separate.
+
+## E15–E18 engineering handoff — 2026-10-24
+
+M25 core is mounted; M26/M27/M28 have complete isolated operation branches and exact
+owning coverage:117/4,531/126,514/100,333/78 respectively. Current verified union is
+432offline+82selectedPG+4direct/Nginx; affected32production files1832/340exact100%.
+See [current program evidence](VERIFICATION.md) for exact node/coverage scope and
+commands. Normal runtime108target+2health at0007, healthy direct/proxy readiness200;
+live410documents/30agencies/24products and54SQLchecks preserved.
+
+D07 accepted external sandbox remains unavailable. Native credentials/callback/key/
+protocol acceptance must pass before normal provider/dependent publication; controlled
+fixtures are not acceptance. M29 is next; posted correction/cancellation and R5/R6
+remain open. No frontend browser gate closes from backend engineering evidence.
+
+## Active E15–E18 packet — 2026-10-23
+
+M25 core passed14owningPG+13offline,29retained M16/M24PG and2isolated direct/Nginx;
+owning117/4and shared schema176/0exact100%. Runtime108target+2health at0007.
+M26 typed HTTPX adapter/rawHMAC/durable TX1/checkout recovery/completion engineering
+is active, unmounted; accepted external environment unavailable(D07). M27 internal
+manual slice design/code is starting while M26 strict verification remains open;
+no M27 route is published. M28/M29 and R4–R6 remain open. See owning VERIFICATION.
+
 **Reviewed:** 2026-10-02; **progress:** 2026-10-18. E13/M21–M22, E14/M23 and the
 M24-read part of E15 pass their declared gates. Source/configured Supabase0007,
 runtime103target+2health.338offline+84realPG+24direct/Nginx pass; affected30-file

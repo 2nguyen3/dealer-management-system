@@ -1,5 +1,16 @@
 # Complete target operation inventory
 
+Current2026-10-25:135target+2health mounted. M26six/M27twelve/M28nine IDs below are
+published with native merchant/automatic-IPN/payment and signed refund request/query
+evidence. External bank refund is still PENDING; terminal settlement/full release
+remains open. M29–M32 retain19unpublished targets. See current owning VERIFICATION.
+
+Current2026-10-24: ownership/first/full columns below are unchanged. Five M25 core
+operations are mounted (108target+2health normal runtime). M26 six, M27 twelve and
+M28 nine operations have full-branch code in the isolated composition; they remain
+unpublished pending D07/prerequisite release gates. See AVAILABILITY and the owning
+VERIFICATION files; the original M24 checkpoint wording below is historical.
+
 Source: [OpenAPI](../../API/openapi.json). **154 unique operation IDs; 28 tags.**
 Paths below are relative to `/api/v1`. Every row has one implementation owner.
 Exact path parameters, request/response schemas, errors, permissions and headers
