@@ -16,12 +16,16 @@ from app.modules.document_core.schemas import (
     MutationResult,
     SalesReturn,
 )
+from app.modules.document_corrections.returns import ReturnCorrectionService
 from app.modules.sales_returns.dependencies import get_sales_return_service
-from app.modules.sales_returns.schemas import SalesReturnCreate
+from app.modules.sales_returns.schemas import SalesReturnCorrection, SalesReturnCreate
 from app.modules.sales_returns.service import SalesReturnService
-from app.modules.stock_receipts.schemas import StockHeaderUpdate
+from app.modules.stock_receipts.schemas import Reason, StockHeaderUpdate
 
 router = APIRouter(prefix="/sales-returns", tags=["Sales Returns"], route_class=BusinessRoute)
+correction_router = APIRouter(
+    prefix="/sales-returns", tags=["Sales Returns"], route_class=BusinessRoute
+)
 READ = {"anyOf": ["returns.prepare", "returns.post", "debt.read", "sales.read"]}
 PREPARE = {"allOf": ["returns.prepare"]}
 POST = {"allOf": ["returns.post"]}
@@ -30,6 +34,56 @@ Preparer = Annotated[Principal, Depends(require_permissions(all_of=("returns.pre
 Poster = Annotated[Principal, Depends(require_permissions(all_of=("returns.post",)))]
 Service = Annotated[SalesReturnService, Depends(get_sales_return_service)]
 Key = Annotated[UUID, Header(alias="Idempotency-Key")]
+
+Corrector = Annotated[
+    Principal, Depends(require_permissions(all_of=("documents.correct", "returns.post")))
+]
+Canceller = Annotated[Principal, Depends(require_permissions(all_of=("documents.cancel",)))]
+
+
+@correction_router.post(
+    "/{documentId}/corrections",
+    operation_id="correctSalesReturn",
+    response_model=MutationResult,
+    status_code=201,
+    responses=responses(201, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.correct", "returns.post"]}},
+)
+def correct_sales_return(
+    documentId: Id,
+    body: SalesReturnCorrection,
+    principal: Corrector,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = ReturnCorrectionService(service).correct(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+
+
+@correction_router.post(
+    "/{documentId}/cancel",
+    operation_id="cancelSalesReturn",
+    response_model=MutationResult,
+    responses=responses(200, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.cancel"]}},
+)
+def cancel_sales_return(
+    documentId: Id,
+    body: Reason,
+    principal: Canceller,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = ReturnCorrectionService(service).cancel(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
 
 
 @router.get(
