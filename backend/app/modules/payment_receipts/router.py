@@ -18,9 +18,15 @@ from app.modules.document_core.schemas import (
     PaymentReceipt,
     ReceiptType,
 )
+from app.modules.document_corrections.manual_receipts import ManualReceiptCorrectionService
 from app.modules.payment_receipts.dependencies import get_payment_receipt_service
-from app.modules.payment_receipts.schemas import PaymentReceiptCreate, PaymentReceiptUpdate
+from app.modules.payment_receipts.schemas import (
+    PaymentReceiptCorrection,
+    PaymentReceiptCreate,
+    PaymentReceiptUpdate,
+)
 from app.modules.payment_receipts.service import PaymentReceiptService
+from app.modules.stock_receipts.schemas import Reason
 
 router = APIRouter(prefix="/payment-receipts", tags=["Payment Receipts"], route_class=BusinessRoute)
 READ = {"anyOf": ["cash.receipt.prepare", "cash.receipt.post", "debt.read"]}
@@ -31,6 +37,56 @@ Preparer = Annotated[Principal, Depends(require_permissions(all_of=("cash.receip
 Poster = Annotated[Principal, Depends(require_permissions(all_of=("cash.receipt.post",)))]
 Service = Annotated[PaymentReceiptService, Depends(get_payment_receipt_service)]
 Key = Annotated[UUID, Header(alias="Idempotency-Key")]
+
+Corrector = Annotated[
+    Principal, Depends(require_permissions(all_of=("documents.correct", "cash.receipt.post")))
+]
+Canceller = Annotated[Principal, Depends(require_permissions(all_of=("documents.cancel",)))]
+
+
+@router.post(
+    "/{documentId}/corrections",
+    operation_id="correctPaymentReceipt",
+    response_model=MutationResult,
+    status_code=201,
+    responses=responses(201, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.correct", "cash.receipt.post"]}},
+)
+def correct_payment_receipt(
+    documentId: Id,
+    body: PaymentReceiptCorrection,
+    principal: Corrector,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = ManualReceiptCorrectionService(service).correct(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+
+
+@router.post(
+    "/{documentId}/cancel",
+    operation_id="cancelPaymentReceipt",
+    response_model=MutationResult,
+    responses=responses(200, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.cancel"]}},
+)
+def cancel_payment_receipt(
+    documentId: Id,
+    body: Reason,
+    principal: Canceller,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = ManualReceiptCorrectionService(service).cancel(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
 
 
 @router.get(
