@@ -12,6 +12,8 @@ from app.modules.settlement_core.replay import plan_replay
 from app.modules.settlement_core.repository import SettlementRepository
 
 WRITERS = {
+    "documents.correct",
+    "documents.cancel",
     "stock.issue.post",
     "cash.receipt.post",
     "returns.post",

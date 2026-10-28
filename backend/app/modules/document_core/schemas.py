@@ -159,12 +159,18 @@ class SalesReturn(Document):
 
 class CreditApplication(Document):
     kind: Literal["CREDIT_APPLICATION"]
+    agencyId: Id
+    receiptType: None
+    status: Literal["DRAFT", "POSTED", "CANCELLED"]
     cashReceived: Literal["0"]
     creditUsedAmount: Money
 
 
 class Refund(Document):
     kind: Literal["REFUND"]
+    agencyId: Id
+    originDocumentId: Id
+    receiptType: None
     reservedAmount: Money
     refundedAmount: Money
     latestAttemptId: Id | None

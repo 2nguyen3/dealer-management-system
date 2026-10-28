@@ -83,8 +83,11 @@ class SettlementRepository:
                 AS created,
               coalesce((SELECT sum(x.amount) FROM dms.refund_reservation x
                 WHERE x."lotId"=l.id AND x.state='ACTIVE'),0) AS reserved
-            FROM dms.credit_lot l JOIN dms.document_revision r ON r.id=l."sourceRevisionId"
-              JOIN dms.document d ON d.id=r."documentId"
+            FROM dms.credit_lot l JOIN dms.document_revision original
+              ON original.id=l."sourceRevisionId"
+              JOIN dms.document d ON d.id=original."documentId"
+              JOIN dms.document_revision r ON r.id=CASE WHEN d.kind='SALES_RETURN'
+                THEN d."currentRevisionId" ELSE l."sourceRevisionId" END
             WHERE l."agencyId"=:id ORDER BY r."businessDate",l.id
         """),
             {"id": agency_id},
@@ -229,7 +232,11 @@ class SettlementRepository:
               coalesce((SELECT sum(e.amount) FROM dms.credit_entry e WHERE e."lotId"=l.id),0)
               -coalesce((SELECT sum(x.amount) FROM dms.refund_reservation x
                 WHERE x."lotId"=l.id AND x.state='ACTIVE'),0) AS available
-            FROM dms.credit_lot l JOIN dms.document_revision r ON r.id=l."sourceRevisionId"
+            FROM dms.credit_lot l JOIN dms.document_revision original
+              ON original.id=l."sourceRevisionId"
+              JOIN dms.document d ON d.id=original."documentId"
+              JOIN dms.document_revision r ON r.id=CASE WHEN d.kind='SALES_RETURN'
+                THEN d."currentRevisionId" ELSE l."sourceRevisionId" END
             WHERE l."agencyId"=:agency AND
               (CAST(:receipt AS bigint) IS NULL OR l."originReceiptId"=:receipt)
             ORDER BY r."businessDate",l.id
