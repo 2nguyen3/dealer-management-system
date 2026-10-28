@@ -2,14 +2,17 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        hide_input_in_errors=True,
     )
 
     app_name: str = "Agentra API"
@@ -47,9 +50,88 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_tls_mode: Literal["starttls", "ssl"] = "starttls"
     smtp_timeout_seconds: float = Field(default=5, gt=0)
+    payment_provider: str = ""
+    payment_base_url: str = ""
+    payment_callback_url: str = ""
+    payment_credential: SecretStr = SecretStr("")
+    payment_webhook_keys: dict[str, SecretStr] = {}
+    payment_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    payment_expiry_seconds: int = Field(default=1800, gt=0, le=86400)
+    vnpay_payment_url: Literal["https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"] = (
+        "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+    )
+    vnpay_api_url: Literal["https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"] = (
+        "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"
+    )
+    vnpay_tmn_code: str = Field(default="", pattern=r"^(?:[A-Za-z0-9]{8})?$")
+    vnpay_hash_secret: SecretStr = SecretStr("")
+    vnpay_ipn_url: str = ""
+    vnpay_return_url: str = ""
+
+    @field_validator("vnpay_ipn_url", "vnpay_return_url")
+    @classmethod
+    def validate_vnpay_url(cls, value: str) -> str:
+        if not value:
+            return value
+        try:
+            url = urlsplit(value)
+            valid = (
+                url.scheme == "https"
+                and bool(url.hostname)
+                and url.port != 0
+                and url.username is None
+                and url.password is None
+                and "?" not in value
+                and "#" not in value
+                and "\\" not in value
+                and not any(char.isspace() for char in value)
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("VNPAY callbacks must be absolute HTTPS URLs without credentials")
+        return value
+
+    @model_validator(mode="after")
+    def validate_vnpay_credentials(self) -> "Settings":
+        secret = self.vnpay_hash_secret.get_secret_value()
+        if self.vnpay_tmn_code or secret:
+            if not all(
+                (self.vnpay_tmn_code, secret.strip(), self.vnpay_ipn_url, self.vnpay_return_url)
+            ):
+                raise ValueError("VNPAY requires TmnCode, HashSecret, IPN URL and Return URL")
+        if self.vnpay_ipn_url and self.vnpay_ipn_url == self.vnpay_return_url:
+            raise ValueError("VNPAY IPN and Return URLs must differ")
+        return self
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":
+        payment_fields = (
+            self.payment_provider,
+            self.payment_base_url,
+            self.payment_callback_url,
+            self.payment_credential.get_secret_value(),
+            self.payment_webhook_keys,
+        )
+        if any(payment_fields):
+            if not all(payment_fields):
+                raise ValueError("Enabled payment provider requires complete configuration")
+            for value in (self.payment_base_url, self.payment_callback_url):
+                url = urlsplit(value)
+                if (
+                    url.scheme not in ("http", "https")
+                    or not url.hostname
+                    or url.username
+                    or url.password
+                    or url.fragment
+                    or url.query
+                ):
+                    raise ValueError("Payment URLs must be absolute HTTP(S) without credentials")
+            if any(
+                not key or not secret.get_secret_value()
+                for key, secret in self.payment_webhook_keys.items()
+            ):
+                raise ValueError("Webhook key IDs and secrets must be nonempty")
         if self.auth_access_ttl_seconds > self.auth_refresh_ttl_seconds:
             raise ValueError("Access lifetime must not exceed refresh lifetime")
         if self.auth_reset_response_floor_seconds <= self.smtp_timeout_seconds:
