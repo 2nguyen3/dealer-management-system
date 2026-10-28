@@ -96,8 +96,15 @@ def test_owning_operations_match_canonical_contract(runtime, path, method, expec
             )
 
 
-def test_no_partial_cancel_correction_or_line_operations_are_published(runtime):
-    for prefix in ("stock-issues", "payment-receipts"):
+def test_ready_m29_owning_routes_are_present_and_incomplete_routes_are_unmounted(runtime):
+    for prefix in ("stock-receipts", "stock-adjustments", "payment-receipts"):
+        for action in ("cancel", "corrections"):
+            path = f"/api/v1/{prefix}/{{documentId}}/{action}"
+            assert path in runtime["paths"]
+            assert runtime["paths"][path]["post"]["x-permissions"]["allOf"][0] == (
+                "documents.cancel" if action == "cancel" else "documents.correct"
+            )
+    for prefix in ("stock-issues", "sales-returns", "credit-applications"):
         for action in ("cancel", "corrections"):
             assert f"/api/v1/{prefix}/{{documentId}}/{action}" not in runtime["paths"]
     assert len(OWNED) == 22
