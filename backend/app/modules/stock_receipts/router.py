@@ -16,8 +16,14 @@ from app.modules.document_core.schemas import (
     MutationResult,
     StockReceipt,
 )
+from app.modules.document_corrections.goods import GoodsCorrectionService
 from app.modules.stock_receipts.dependencies import get_stock_receipt_service
-from app.modules.stock_receipts.schemas import StockHeaderUpdate, StockReceiptCreate
+from app.modules.stock_receipts.schemas import (
+    Reason,
+    StockHeaderUpdate,
+    StockReceiptCorrection,
+    StockReceiptCreate,
+)
 from app.modules.stock_receipts.service import StockReceiptService
 
 router = APIRouter(prefix="/stock-receipts", tags=["Stock Receipts"], route_class=BusinessRoute)
@@ -136,4 +142,55 @@ def post_stock_receipt(
     key: Key,
 ):
     result = service.post(int(documentId), read_preconditions(request), key)
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+
+
+Corrector = Annotated[
+    Principal, Depends(require_permissions(all_of=("documents.correct", "stock.receipt.post")))
+]
+Canceller = Annotated[Principal, Depends(require_permissions(all_of=("documents.cancel",)))]
+
+
+@router.post(
+    "/{documentId}/corrections",
+    operation_id="correctStockReceipt",
+    response_model=MutationResult,
+    status_code=201,
+    responses=responses(201, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.correct", "stock.receipt.post"]}},
+)
+def correct_stock_receipt(
+    documentId: Id,
+    body: StockReceiptCorrection,
+    principal: Corrector,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = GoodsCorrectionService(service, "STOCK_RECEIPT").correct(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+
+
+@router.post(
+    "/{documentId}/cancel",
+    operation_id="cancelStockReceipt",
+    response_model=MutationResult,
+    responses=responses(200, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.cancel"]}},
+)
+def cancel_stock_receipt(
+    documentId: Id,
+    body: Reason,
+    principal: Canceller,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = GoodsCorrectionService(service, "STOCK_RECEIPT").cancel_document(
+        int(documentId), body, read_preconditions(request), key
+    )
     return JSONResponse(result.body, status_code=result.status, headers=result.headers)
