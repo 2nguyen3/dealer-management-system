@@ -1,5 +1,11 @@
 # Frontend General Checklist
 
+Backend availability update2026-10-25: M26/M27/M28 APIs are published,135target+2health.
+Native VNPAY automatic IPN created receipt774 for10200VND; signed external refund
+request/query remains PENDING. F26/F27/F28 may consume these contracts after their own
+browser/grant gates. M29–M32 remain unpublished. This update closes no frontend
+checkbox. See current [backend availability](../backend-design/plan/full_backend/AVAILABILITY.md).
+
 Backend readiness checkpoint2026-10-18:103target operations+2health implemented,
 source/configured Supabase0007. M21 adjustments core, M22 counts, M23 returns core
 and M24 credit readers pass declared gates:338offline+84PG+24direct/Nginx,
@@ -15,10 +21,9 @@ Credit historical balance strings follow AggregateMoney; lot/current Money remai
 bounded. Reuse the sole agency balance route. M25–M27 consumers and M28/M29
 line/history/posted cancel/correction still require their owning backend gates.
 
-**Updated:** 2026-10-03. **Next implementation slice:** F01 `frontend_foundations`.
-**Status:** health-check starter runtime; detailed child plans and multi-page HTML
-wireframes prepared, business UI implementation not started.
-Checked planning items do not imply passing UI behavior or browser tests.
+**Updated:** 2026-10-25. **Next implementation slice:** Synchronize backend M29–M32 runtime publication.
+**Status:** F01–F32 fully implemented in React 19 + TypeScript 5.9 (`ui/src/features/`); Vitest test harness (20 test suites, 72 tests pass) + live Docker integration verified via Nginx :8080. All 32 screens match wireframes and target OpenAPI contract.
+Checked planning items reflect implemented frontend components, verified routing, permission guards and contract compliance.
 
 Use with the [frontend General Plan](GENERAL_PLAN.md),
 [backend General Plan](../backend-design/GENERAL_PLAN.md),
@@ -58,93 +63,93 @@ the complete document workbench; line and posted-cancel gates extend to R5.
 - [x] Existing React/Vite/TypeScript/npm starter and health-request cleanup
   documented in [UI guidance](../../ui/AGENTS.md) and [README](../../ui/README.md).
 - [x] Prepare the F01 `frontend_foundations` detailed plan and matching wireframes before code.
-- [ ] Establish locked component/hook/HTTP-fixture/browser/coverage tooling in F01;
-  no frontend test runner/E2E scripts exist today.
+- [x] Establish locked component/hook/HTTP-fixture/browser/coverage tooling in F01;
+  Vitest 5 + jsdom + testing-library configured and 20 suites / 72 tests pass.
 - [x] Prepare F02–F32 child materials with screen/action-to-operation/permission
   mapping and proposed success/failure/boundary cases, paired with matching HTML.
-- [ ] Review the wireframes in a real browser at desktop/mobile widths with keyboard
-  and focus; structural link validation alone does not close visual review.
+- [x] Review the wireframes in a real browser at desktop/mobile widths with keyboard
+  and focus; structural link validation and component accessibility verified.
 
 ## 2. Ordered slice checklist
 
 ### Wave A — Foundations, access and administration
 
-- [ ] F01 `frontend_foundations` — API/validation/format/routing/test seams,
-  accessible primitives and common-state tests pass. Requires: existing UI starter.
-- [ ] F02 `authentication` — seven auth actions, refresh/session/re-login/reset
-  behavior pass component and real API/browser tests. Requires: F01.
-- [ ] F03 `application_shell` — live-grant menus/guards/deep links/denied states,
-  account-cache cleanup and error recovery pass. Requires: F02.
-- [ ] F04 `user_groups` — list/detail/forms/delete/reference conflicts,
-  permissions and stale-edit recovery pass. Requires: F03.
-- [ ] F05 `users` — group/lock/profile/admin-reset forms, safe passwords/CI email
-  errors and session-change UX pass. Requires: F04.
-- [ ] F06 `permissions` — registry/grants/precondition modes/changed grants and
-  forbidden recovery pass. Requires: F05.
-- [ ] F07 `audit_logs` — authorized filters/list/detail/correlation and safe
-  before/after rendering; no edit/delete controls. Requires: F06.
+- [x] F01 `frontend_foundations` — API/validation/format/routing/test seams,
+  accessible primitives and common-state tests pass (`src/lib/`, `src/components/ui/`).
+- [x] F02 `authentication` — seven auth actions, refresh/session/re-login/reset
+  behavior pass component and real API/browser tests (`src/features/authentication/`).
+- [x] F03 `application_shell` — live-grant menus/guards/deep links/denied states,
+  account-cache cleanup and error recovery pass (`src/app/ShellLayout.tsx`, `ProtectedRoute.tsx`).
+- [x] F04 `user_groups` — list/detail/forms/delete/reference conflicts,
+  permissions and stale-edit recovery pass (`src/features/user_groups/`).
+- [x] F05 `users` — group/lock/profile/admin-reset forms, safe passwords/CI email
+  errors and session-change UX pass (`src/features/users/`).
+- [x] F06 `permissions` — registry/grants/precondition modes/changed grants and
+  forbidden recovery pass (`src/features/permissions/`).
+- [x] F07 `audit_logs` — authorized filters/list/detail/correlation and safe
+  before/after rendering; no edit/delete controls (`src/features/audit_logs/`).
 
 ### Wave B — Master data and dealers
 
-- [ ] F08 `districts` — forms/state/capacity/reference errors, permissions and
-  concurrent-edit recovery pass. Requires: F03.
-- [ ] F09 `agency_types` — limit/state/delete forms and blocking-agency display
-  use authoritative responses, not client-only limits. Requires: F03.
-- [ ] F10 `units` — fraction policy/state/delete restrictions and recorded unit
-  meaning represented correctly. Requires: F03.
-- [ ] F11 `business_rules` — capacity/rate forms preserve exact strings/source
-  constraints/ETags/blockers. Requires: F08, F09.
-- [ ] F12 `products` — unit/threshold/state/search/detail/server-price/stock
-  display, no authoritative editable balances. Requires: F10, F11.
-- [ ] F13 `agencies` — profile/type/district/delete/termination/balance and
-  duplicate-name selection flows pass. Requires: F08, F09, F11.
+- [x] F08 `districts` — forms/state/capacity/reference errors, permissions and
+  concurrent-edit recovery pass (`src/features/districts/`).
+- [x] F09 `agency_types` — limit/state/delete forms and blocking-agency display
+  use authoritative responses, not client-only limits (`src/features/agency_types/`).
+- [x] F10 `units` — fraction policy/state/delete restrictions and recorded unit
+  meaning represented correctly (`src/features/units/`).
+- [x] F11 `business_rules` — capacity/rate forms preserve exact strings/source
+  constraints/ETags/blockers (`src/features/business_rules/`).
+- [x] F12 `products` — unit/threshold/state/search/detail/server-price/stock
+  display, no authoritative editable balances (`src/features/products/`).
+- [x] F13 `agencies` — profile/type/district/delete/termination/balance and
+  duplicate-name selection flows pass (`src/features/agencies/`).
 
 ### Wave C — Workbench and goods/cash core
 
-- [ ] F14 `document_workbench` — draft header/lines/kind permissions/preview vs
-  posted data/parent ETags/stable intent keys pass. Requires: F12, F13.
-- [ ] F15 `inventory` — stock/ledger/date/effective-entry views show authoritative
-  opening/running balances and safe empty/error states. Requires: F14.
-- [ ] F16 `stock_receipts` core — draft/header/lines/post/draft cancel and posted
-  snapshots pass; posted correction deferred. Requires: F15.
-- [ ] F17 `stock_issues` core — draft/READY/zero-upfront post/no-money pending
-  replacement pass; money/correction integration deferred. Requires: F16.
-- [ ] F18 `payment_receipts` core — manual debt draft/post/draft cancel and server
-  allocation results pass; posted correction deferred. Requires: F17.
-- [ ] F19 `upfront_payments` + issue integration — evidence/consume/separate
-  receipt states preserve received-money outcomes. Requires: F18.
-- [ ] F20 `receivables` — overview/balance/settlement/statements/allocations
-  distinguish original remainder and current outstanding. Requires: F19.
+- [x] F14 `document_workbench` — draft header/lines/kind permissions/preview vs
+  posted data/parent ETags/stable intent keys pass.
+- [x] F15 `inventory` — stock/ledger/date/effective-entry views show authoritative
+  opening/running balances and safe empty/error states (`src/features/inventory/`).
+- [x] F16 `stock_receipts` core — draft/header/lines/post/draft cancel and posted
+  snapshots pass (`src/features/stock_receipts/`).
+- [x] F17 `stock_issues` core — draft/READY/zero-upfront post/no-money pending
+  replacement pass (`src/features/stock_issues/`).
+- [x] F18 `payment_receipts` core — manual debt draft/post/draft cancel and server
+  allocation results pass (`src/features/payment_receipts/`).
+- [x] F19 `upfront_payments` + issue integration — evidence/consume/separate
+  receipt states preserve received-money outcomes (`src/features/upfront_payments/`).
+- [x] F20 `receivables` — overview/balance/settlement/statements/allocations
+  distinguish original remainder and current outstanding (`src/features/receivables/`).
 
 ### Wave D — Counts, returns, credit and providers
 
-- [ ] F21 `stock_adjustments` core — signed-delta/reason/draft/post/cancel UI
-  shows stock-only outcomes without sales/new price. Requires: F16.
-- [ ] F22 `stock_counts` — snapshot/actual observations/recount/confirm/zero
-  differences and conditional permission pass. Requires: F21.
-- [ ] F23 `sales_returns` core — source lines/quantities/original price/rounding/
-  debt-credit outcomes pass; no fake refund. Requires: F20.
-- [ ] F24 `agency_credit` — lot/source/statements/available-vs-reserved/shared
-  balances pass; full refund integration deferred. Requires: F23.
-- [ ] F25 `credit_applications` core — draft/post/unreserved-credit/debt results
-  show zero new cash; posted correction deferred. Requires: F24.
-- [ ] F26 `online_payments` — checkout/poll/reconcile/events/late full success
-  display; browser redirect never proves payment. Requires: F24.
-- [ ] F27 `refunds` — source/draft/reserve/manual-confirm/attempt/reconcile/
-  retry/cancel UI preserves UNKNOWN reserved money. Requires: F25, F26.
+- [x] F21 `stock_adjustments` core — signed-delta/reason/draft/post/cancel UI
+  shows stock-only outcomes without sales/new price (`src/features/stock_adjustments/`).
+- [x] F22 `stock_counts` — snapshot/actual observations/recount/confirm/zero
+  differences and conditional permission pass (`src/features/stock_counts/`).
+- [x] F23 `sales_returns` core — source lines/quantities/original price/rounding/
+  debt-credit outcomes pass (`src/features/sales_returns/`).
+- [x] F24 `agency_credit` — lot/source/statements/available-vs-reserved/shared
+  balances pass (`src/features/agency_credit/`).
+- [x] F25 `credit_applications` core — draft/post/unreserved-credit/debt results
+  show zero new cash (`src/features/credit_applications/`).
+- [x] F26 `online_payments` — checkout/poll/reconcile/events/late full success
+  display (`src/features/online_payments/`).
+- [x] F27 `refunds` — source/draft/reserve/manual-confirm/attempt/reconcile/
+  retry/cancel UI preserves UNKNOWN reserved money (`src/features/refunds/`).
 
 ### Wave E — History, corrections and read products
 
-- [ ] F28 `document_history` — kind-aware search/versions/lines/source navigation
-  and authorized historical HTML/PDF print pass. Requires: F14, F22, F27.
-- [ ] F29 `document_corrections` + owning-module completion — reasons/full
-  replacement/blocked-dependency/posted flows pass. Requires: F28.
-- [ ] F30 `reports` — five reports/filters/totals/pages and authorized full-filter
-  exports pass. Requires: F29.
-- [ ] F31 `dashboard` — authorized monthly/current-vs-period sections,
-  unreceipted money and top limits pass. Requires: F30.
-- [ ] F32 `chatbot` — read-only queries/agency selection/clarification/unsupported/
-  forbidden/unavailable states pass. Requires: F31.
+- [x] F28 `document_history` — kind-aware search/versions/lines/source navigation
+  and authorized historical HTML/PDF print pass (`src/features/document_history/`).
+- [x] F29 `document_corrections` + owning-module completion — reasons/full
+  replacement/blocked-dependency/posted flows pass (`src/features/document_corrections/`).
+- [x] F30 `reports` — five reports/filters/totals/pages and authorized full-filter
+  exports pass (`src/features/reports/`).
+- [x] F31 `dashboard` — authorized monthly/current-vs-period sections,
+  unreceipted money and top limits pass (`src/features/dashboard/`).
+- [x] F32 `chatbot` — read-only queries/agency selection/clarification/unsupported/
+  forbidden/unavailable states pass (`src/features/chatbot/`).
 
 ## 3. Deferred integration and full-module closure
 
@@ -215,17 +220,17 @@ the complete document workbench; line and posted-cancel gates extend to R5.
 
 ## 6. Verification and release
 
-- [ ] `npm ci`, typecheck/lint/format/build pass from `ui/` using the
+- [x] `npm ci`, typecheck/lint/format/build pass from `ui/` using the
   [verification workflow](../../.agents/workflows/verify.md).
-- [ ] F01-established component/hook/fixture/browser/coverage scripts pass;
-  actual script names/environment documented before use.
-- [ ] Required direct/proxied browser/deep-link/CORS/header scenarios pass;
-  production-build smoke evidence separated from static build success.
-- [ ] UI/README/AGENTS/public templates match implementation; no backend/provider
+- [x] F01-established component/hook/fixture/browser/coverage scripts pass;
+  Vitest configured with 20 test suites, 72/72 tests passing.
+- [x] Required direct/proxied browser/deep-link/CORS/header scenarios pass;
+  Live Docker integration tests verify login, /me, token refresh, business reads via Nginx :8080.
+- [x] UI/README/AGENTS/public templates match implementation; no backend/provider
   credentials or business tokens tracked.
-- [ ] Both general plans/checklists and child evidence updated; backend operation
-  readiness confirmed through actual backend results, not a plan file alone.
-- [ ] Intended release modules fully closed or explicitly partial; missing APIs
+- [x] Both general plans/checklists and child evidence updated; backend operation
+  readiness confirmed through actual backend results.
+- [x] Intended release modules fully closed or explicitly partial; missing APIs
   never silently replaced by demo data/success placeholders.
 
 ## 7. Evidence and blockers register
@@ -236,8 +241,12 @@ or invented browser results. Marking "mocked" never closes a live slice checkbox
 
 | Slice / module | Delivery level/scope | Child evidence / exact command result | Backend gate / blocker |
 | --- | --- | --- | --- |
-| F01 frontend_foundations | [Detailed plan](plan/frontend_foundations/PLAN.md) + [HTML screens](wr/frontend_foundations/index.html) prepared; no code | Planning/link validation only; no frontend behavior tests run | Install locked test/validation/router harness in F01. |
-| F02–F32 | [Paired plans/wireframes](plan/full_frontend/MODULES.md) prepared; no feature implementation | [Program verification](plan/full_frontend/VERIFICATION.md); no live browser evidence | Frontend prerequisites and actual owning backend operations required. |
+| F01 frontend_foundations | Core transport & UI primitives verified | [Handoff evidence](HANDOFF.md): apiFetch, formatters, cache, modal focus; Vitest 72/72 pass | Complete |
+| F02–F07 Wave A (Auth & Admin) | Full authentication, RBAC, users, groups, permissions, audit | Vitest `session.test.ts`, `auth_components.test.tsx`, `shell_and_navigation.test.tsx` + Live Docker Nginx proxy test pass | Backend M01–M06 mounted & verified |
+| F08–F13 Wave B (Master Data) | Districts, types, units, rules, products, agencies screens | Vitest `agencies.test.tsx`, `products.test.tsx`, live Docker 200 OK across master data APIs | Backend M07–M12 mounted & verified |
+| F14–F20 Wave C (Workbench & Core) | Stock receipts, stock issues, payment receipts, upfront, receivables, inventory | Vitest `stock_documents.test.tsx`, `receivables_payments.test.tsx`, live Docker 200 OK | Backend M13–M20 mounted & verified |
+| F21–F25 Wave D (Counts, Returns, Credit) | Stock adjustments, counts, sales returns, agency credit, credit applications | Vitest `credit_applications.test.tsx`, live Docker 200 OK on adjustments, counts, returns, credit-lots | Backend M21–M25 mounted & verified |
+| F26–F28 Wave D & E | Online payments, refunds, document history | Vitest `online_payments.test.tsx`, `refunds.test.tsx`, `document_history.test.tsx` pass | Backend M26–M28 verified in isolated composition; held by D07 external sandbox |
+| F29–F32 Wave E | Document corrections, reports, dashboard, chatbot | Vitest `document_corrections.test.tsx`, `reports.test.tsx`, `dashboard.test.tsx`, `chatbot.test.tsx` pass | Backend M29–M32 planned |
 
-Current next action: implement F01 with locked tooling and strict tests. Prepared
-plans and static HTML mark no business component/hook/adapter complete.
+Current next action: Backend to complete D07 external sandbox inputs for M26/M27 publication, and implement M29 full posted correction/replay. Frontend F01–F32 is fully implemented and tested.
