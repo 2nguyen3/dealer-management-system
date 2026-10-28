@@ -10,7 +10,9 @@ from app.common.schemas import (
     Money,
     NonEmptyText,
     NullableText,
+    PositiveMoney,
     PositiveQuantity,
+    PriceRate,
 )
 
 
@@ -39,3 +41,15 @@ class PendingIssueRevision(ApiModel):
     immediatePayment: Money
     note: NullableText = None
     lines: Annotated[list[IssueLineInput], Field(min_length=1)]
+
+
+class IssueCorrectionLineInput(IssueLineInput):
+    basePurchasePrice: PositiveMoney = None
+
+
+class StockIssueCorrection(ApiModel):
+    businessDate: BusinessDate
+    reason: NonEmptyText
+    note: NullableText = None
+    sellingPriceRate: PriceRate = None
+    lines: Annotated[list[IssueCorrectionLineInput], Field(min_length=1)]

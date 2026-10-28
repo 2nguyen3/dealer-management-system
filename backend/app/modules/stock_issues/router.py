@@ -16,15 +16,21 @@ from app.modules.document_core.schemas import (
     MutationResult,
     StockIssue,
 )
+from app.modules.document_corrections.issues import IssueCorrectionService
 from app.modules.stock_issues.dependencies import get_stock_issue_service
 from app.modules.stock_issues.schemas import (
     PendingIssueRevision,
+    StockIssueCorrection,
     StockIssueCreate,
     StockIssueUpdate,
 )
 from app.modules.stock_issues.service import StockIssueService
+from app.modules.stock_receipts.schemas import Reason
 
 router = APIRouter(prefix="/stock-issues", tags=["Stock Issues"], route_class=BusinessRoute)
+correction_router = APIRouter(
+    prefix="/stock-issues", tags=["Stock Issues"], route_class=BusinessRoute
+)
 READ = {"anyOf": ["stock.issue.prepare", "stock.issue.post", "debt.read", "sales.read"]}
 PREPARE = {"allOf": ["stock.issue.prepare"]}
 POST = {"allOf": ["stock.issue.post"]}
@@ -33,6 +39,63 @@ Preparer = Annotated[Principal, Depends(require_permissions(all_of=("stock.issue
 Poster = Annotated[Principal, Depends(require_permissions(all_of=("stock.issue.post",)))]
 Service = Annotated[StockIssueService, Depends(get_stock_issue_service)]
 Key = Annotated[UUID, Header(alias="Idempotency-Key")]
+
+Corrector = Annotated[
+    Principal, Depends(require_permissions(all_of=("documents.correct", "stock.issue.post")))
+]
+Canceller = Annotated[Principal, Depends(require_permissions(all_of=("documents.cancel",)))]
+
+
+@correction_router.post(
+    "/{documentId}/corrections",
+    operation_id="correctStockIssue",
+    response_model=MutationResult,
+    status_code=201,
+    responses=responses(201, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={"x-permissions": {"allOf": ["documents.correct", "stock.issue.post"]}},
+)
+def correct_stock_issue(
+    documentId: Id,
+    body: StockIssueCorrection,
+    principal: Corrector,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = IssueCorrectionService(service).correct(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+
+
+@correction_router.post(
+    "/{documentId}/cancel",
+    operation_id="cancelStockIssue",
+    response_model=MutationResult,
+    responses=responses(200, 400, 401, 403, 404, 409, 412, 415, 422, 428, 429, 500, etag=True),
+    openapi_extra={
+        "x-permissions": {
+            "allOf": ["documents.cancel"],
+            "conditional": (
+                "cash.receipt.post nếu có bằng chứng trả ngay cần chuyển thành phiếu thu riêng"
+            ),
+        }
+    },
+)
+def cancel_stock_issue(
+    documentId: Id,
+    body: Reason,
+    principal: Canceller,
+    service: Service,
+    request: Request,
+    match: MatchHeader,
+    key: Key,
+):
+    result = IssueCorrectionService(service).cancel(
+        int(documentId), body, read_preconditions(request), key
+    )
+    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
 
 
 @router.get(
