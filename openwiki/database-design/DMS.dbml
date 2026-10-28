@@ -269,7 +269,7 @@ Table dms.document_revision {
   "documentId" bigint [not null]
   "revisionNo" integer [not null, check: `"revisionNo" > 0`]
   state text [not null, default: 'DRAFT', check: `state IN ('DRAFT', 'READY', 'POSTED')`]
-  "businessDate" date [not null]
+  "businessDate" date [not null, note: 'Correction dùng ngày nghiệp vụ đúng và giữ businessOrder gốc. Revision0008 guard_revision cho receipt tái dùng product/unit đã POSTED của chính phiếu dù master hiện INACTIVE; lần post đầu/hàng inactive mới vẫn chặn.']
   "totalAmount" money_vnd [not null, default: 0, check: `"totalAmount" >= 0`]
   "immediatePayment" money_vnd [not null, default: 0, check: `"immediatePayment" >= 0 AND "immediatePayment" <= "totalAmount"`]
   "sellingPriceRate" price_rate

@@ -20,7 +20,14 @@ xác minh chữ ký cổng thanh toán hoặc gọi API hoàn tiền.
 | [DMS_exploration.md](../BA/DMS_exploration.md) | BA đầu vào; các thay đổi cần đồng bộ được liệt kê ở mục 9 |
 | [CONTEXT.md](../../CONTEXT.md) | Thuật ngữ nghiệp vụ đã làm rõ |
 
-Source/configured Supabase head hiện là **0007**:
+Checkpoint source M29 mới là **0008**, còn configured Supabase/runtime vẫn **0007**.
+[0008 historical receipt corrections](../../backend/alembic/sql/0008_historical_receipt_corrections.sql)
+chỉ cho phép correction receipt tái dùng product/unit đã POSTED trong chính chứng từ
+khi master hiện INACTIVE; lần post đầu và hàng inactive mới vẫn bị chặn. Đã kiểm
+chứng trên schema UUID tạm trong Supabase hiện có; chưa migrate schema dev.
+[M29 evidence](../backend-design/plan/document_corrections/VERIFICATION.md).
+
+Checkpoint source/configured trước M29 là **0007**:
 [return lot successors](../../backend/alembic/sql/0007_return_lot_successors.sql)
 cho phép phiên bản POSTED hiện hành của cùng phiếu trả hàng tiếp tục nguồn credit lot
 gốc khi tính lại làm tròn; giữ nguyên sourceRevisionId/originReceiptId/lot và bằng chứng
