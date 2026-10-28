@@ -1,5 +1,12 @@
 # M21 verification
 
+## M29 internal continuation — 2026-10-25
+
+Independent adjustment correction/cancel now passes internal M29 stock history,
+rollback/count blocker and race checks. [Current M29 evidence](../document_corrections/VERIFICATION.md)
+records the exact scope. No correction/cancel route is mounted; deferred whole-module
+publication/consumer gates remain open. Confirmed-count evidence stays immutable.
+
 ## 2026-10-18 — core scope verified
 
 Five full operations and internal draft cancellation are delivered. Posted correction/

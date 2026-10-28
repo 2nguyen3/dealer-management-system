@@ -1,5 +1,11 @@
 # M16 tests and actual-symbol register
 
+2026-10-25 M29 extension: `service.WRITERS` accepts documents.correct/documents.cancel
+for caller-owned replay. The M29 outer orchestrator still checks correction+post allOf
+and reauthorizes after history locks/replay and completed retries. New11manual PG
+cases and10retained M16 PG cases give current `service.py`75statements/32branches exact
+100%; this is not a rerun of all historical M16 scopes. [Evidence](../document_corrections/VERIFICATION.md).
+
 2026-10-17 extension: `replay._timeline`'s final current-balance range guard is
 additionally covered through `plan_replay` by
 `tests/settlement_core/test_review_regressions.py::test_current_balance_storage_boundary_returns_a_business_conflict[debt]`

@@ -1,5 +1,14 @@
 # M18 verification
 
+## M29 internal manual-cash continuation — 2026-10-25
+
+Manual DEBT_COLLECTION CASH/BANK_TRANSFER correction/cancel services pass11owningPG
+cases, including downstream FIFO replay, actual grant waits/cancel-only replay,
+protected returned-cash sources and immutable ONLINE/AUTO/RECEIVED_UNAPPLIED receipts.
+[M29 evidence](../document_corrections/VERIFICATION.md) records scope and the corrected
+full-seed separation fixture. No new route is mounted; full M29/owner publication
+remains open. Live automatic receipt774 is protected and untouched.
+
 ## 2026-10-17 M18 core verification
 
 Five public operations and internal draft cancellation pass the shared

@@ -1,5 +1,12 @@
 # M15 verification
 
+## M29 internal continuation — 2026-10-25
+
+Receipt correction/full cancellation services now have internal state/rollback/race
+evidence under [M29](../document_corrections/VERIFICATION.md), including original-period
+stock/price source and inactive historical goods (source0008). Runtime remains0007;
+no correction/cancel route is published and whole-module deferred gates stay open.
+
 2026-10-05 planning checkpoint: source0006, five full target operations and
 internal draft cancel selected from operation inventory; no implementation pass
 claimed. Dedicated loopback PostgreSQL17 is separate from external Supabase.
