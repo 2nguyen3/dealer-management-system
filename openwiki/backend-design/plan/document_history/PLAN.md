@@ -1,5 +1,11 @@
 # M28 — document history and snapshot printing
 
+Completion2026-10-29: all nine history/print operations remain published and
+[M29 correction/cancel](../document_corrections/VERIFICATION.md) closes its downstream
+representation gate. The native provider acceptance block in the original planning
+below was superseded by M26-M28 publication evidence. Terminal bank refund settlement
+and whole R5/R6 remain separate; no immutable history was rewritten.
+
 Prepared before M28 code. Reuse M13 seven-kind DocumentService, M22 confirmed-count
 protection, M23 cumulative-return lineage, M25 credit and M27 paid-refund invariants.
 M26/M27 provider acceptance remains blocked; M28 implementation may be independently

@@ -8,4 +8,4 @@
 - [x] Actual-symbol register and exact100% scoped coverage pass at internal checkpoint.
 - [x] Retained migration/seed/contract/deployment evidence recorded.
 - [x] M13 internal slice complete and general trackers aligned.
-- [ ] Deferred M28 full dispatch/history/printing operation gate (not closed by M13).
+- [x] M28 full dispatch/history/printing operation gate: [owning publication](../document_history/VERIFICATION.md), not inferred from M13 alone.

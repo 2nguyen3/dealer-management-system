@@ -11,4 +11,5 @@ bank settlement is tracked in M27; no frontend or M29 closure is implied here.
 - [x] All11owningPG nodes, source contracts and exact owning333statements/78branches per-file coverage pass.
 - [x] Separate standards/specification reviews and controlled built-image/direct/Nginx probes pass.
 - [x] Update roadmap/frontendhandoff with nine published operations and current verification evidence.
-- [ ] M29/R5 full postedcorrections/cancellation remains deferred.
+- [x] M29 full posted corrections/cancellation: [publication evidence](../document_corrections/VERIFICATION.md).
+- [ ] Full R5 integrated acceptance/release remains separate from owning operation completion.
