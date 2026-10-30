@@ -7,4 +7,4 @@
 - [x] Real state/rollback/races, canonical HTTP contracts and exact scoped coverage pass.
 - [x] All370retained PG/TLS nodes and22Docker smoke cases recorded;308offline pass.
 - [x] Availability, roadmap and guidance aligned with verified core delivery.
-- [ ] Full module: posted corrections/cancellation through M29 (deferred).
+- [x] Full module posted corrections/cancellation through M29: [publication evidence](../document_corrections/VERIFICATION.md).

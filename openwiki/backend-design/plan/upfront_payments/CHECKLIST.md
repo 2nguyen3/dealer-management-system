@@ -6,4 +6,4 @@
 - [x] Real opposing races and post-wait authorization verified.
 - [x] All actual symbols mapped; canonical contracts and exact scoped coverage pass.
 - [x] Retained370PG/TLS,308offline and22deployment cases recorded; roadmap aligned.
-- [ ] M29 issue cancellation integration remains explicitly deferred.
+- [x] M29 issue cancellation/full-money separation integration: [publication evidence](../document_corrections/VERIFICATION.md).
