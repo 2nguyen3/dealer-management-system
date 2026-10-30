@@ -6,5 +6,5 @@
 - [x] Pass canonical HTTP/permission/retry/precondition/media tests.
 - [x] Exact per-file statement/branch coverage, including changed shared production.
 - [x] Retained regressions, review, deployment and roadmap/handoff evidence.
-- [ ] M29 posted corrections/full cancellation (deferred).
-- [ ] M28 public shared lines/history (deferred).
+- [x] M29 posted corrections/full cancellation: [publication evidence](../document_corrections/VERIFICATION.md).
+- [x] M28 public shared lines/history: [publication evidence](../document_history/VERIFICATION.md).

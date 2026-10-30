@@ -9,4 +9,4 @@
 - [x] Five runtime/source contracts and populated-kind publication pass.
 - [x] Actual-symbol register/exact100% coverage/deployment evidence pass.
 - [x] Core slice/general trackers aligned.
-- [ ] M29 correctStockReceipt and full cancelStockReceipt remain deferred.
+- [x] M29 correctStockReceipt and full cancelStockReceipt published: [M29 evidence](../document_corrections/VERIFICATION.md).

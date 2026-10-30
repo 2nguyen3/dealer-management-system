@@ -1,11 +1,16 @@
 # M15 — Stock receipts core
 
+Completion2026-10-29: core plus full posted correction/cancellation are published.
+The original core scope below is historical; [M29 closure evidence](../document_corrections/VERIFICATION.md)
+supplies replay/protection/rollback/races and runtime publication, not a rerun claim
+for every historical M15 case. Whole R5/R6 remain separate.
+
 Prepared 2026-10-05 before code. Prerequisite M14; second E08 slice.
 
 Public complete operations: listStockReceipts, getStockReceipt,
 createStockReceipt, updateStockReceiptDraft, postStockReceipt.
 Internal branch: draft cancellation. Whole cancelStockReceipt and
-correctStockReceipt remain M29-gated and are not mounted early.
+correctStockReceipt were originally M29-gated; that gate is now closed as linked above.
 
 Phases: receipt validator/DTOs → neutral keyed creation/header edits → ordered
 atomic posting/snapshot/cache projection → internal draft cancellation → contracts,
