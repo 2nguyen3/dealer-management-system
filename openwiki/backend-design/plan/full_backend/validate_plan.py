@@ -19,6 +19,8 @@ OWNING_CHILDREN = (
     "document_core", "inventory", "stock_receipts", "settlement_core",
     "stock_issues", "payment_receipts", "upfront_payments", "receivables",
     "stock_adjustments", "stock_counts", "sales_returns", "agency_credit",
+    "credit_applications", "online_payments", "refunds", "document_history",
+    "document_corrections", "reports", "dashboard",
 )
 
 
@@ -294,7 +296,11 @@ def check_storage_and_price_baseline(source: dict) -> None:
             require(values["revision"] not in versions, "Duplicate migration revision")
             versions[values["revision"]] = values["down_revision"]
     require(
-        versions == {"0001": None, "0002": "0001", "0003": "0002", "0004": "0003", "0005": "0004", "0006": "0005", "0007": "0006"},
+        versions == {
+            "0001": None, "0002": "0001", "0003": "0002", "0004": "0003",
+            "0005": "0004", "0006": "0005", "0007": "0006", "0008": "0007",
+            "0009": "0008",
+        },
         "Update migration baseline",
     )
     schemas = source["components"]["schemas"]
@@ -322,11 +328,13 @@ def check_storage_and_price_baseline(source: dict) -> None:
         properties = schema.get("properties", schema.get("allOf", [{}, {}])[-1].get("properties"))
         require(properties["currentSellingPrice"]["$ref"] == "#/components/schemas/DerivedSellingPrice",
                 "D16 quote projection differs from canonical decision")
-    print("PASS: static storage baseline: 29 domain tables, 8 domain ORM mappings, source head 0007")
+    print("PASS: static storage baseline: 29 domain tables, 8 domain ORM mappings, source head 0009")
     print(f"PASS: D16 witness: valid {purchase} x {rate} = {derived}, outside Money, valid derived quote")
     for schema_name, field in (("InventoryStatement", "openingStock"),
                                ("InventoryStatement", "closingStock"),
-                               ("InventoryEntry", "balanceAfter")):
+                               ("InventoryEntry", "balanceAfter"),
+                               ("InventoryReportRow", "openingStock"),
+                               ("InventoryReportRow", "closingStock")):
         schema = schemas[schema_name]
         properties = schema.get("properties", schema.get("allOf", [{}, {}])[-1].get("properties"))
         require(properties[field]["$ref"] == "#/components/schemas/AggregateQuantity",

@@ -1,5 +1,57 @@
 # Published backend operation checkpoint
 
+## M31 available - 2026-10-29
+
+Runtime153/154business+2health/0009; getDashboard published, queryChatbot alone absent.
+Direct8000/proxy8080/public-ngrok and all owning gates pass; [evidence](../dashboard/VERIFICATION.md).
+GET /api/v1/dashboard requires month=YYYY-MM, real years0001-9999, JSON only/no body,
+private,no-store and standard errors/requestIDs/business rate limit. Admission anyOf
+is agency.read/inventory.read/sales.read/debt.read/stock.issue.post/cash.upfront.verify.
+Prepare-only/receipt-post-only receive403. Admitted callers independently receive
+sections by their grant; pending allows post OR prepare, evidence verify OR receipt-post.
+Thus agency.read+prepare receives agency+queue; prepare alone cannot enter. No group
+or reports.read bypass. Unauthorized keys are absent, not null/zero. Current master/
+queue/balances differ from Vietnam-month period flows; VERIFIED receivedAt evidence
+includes older issue revisions.12ordinary trend buckets truncate safely at year1,
+top10ties use stableIDs, exact amounts stay strings. asOf scopes one authenticated
+repeatable-read response, not later requests. Next M32 AI API per user/HANDOFF;
+wholeR5/R6/terminalbankrefund/finalrelease/browser remain separate/open.
+
+## M29-M30 available - 2026-10-29
+
+Runtime152/154business+2health at source/image/configured0009. All twelve owning
+correction/cancel operations and all five reports are published, not test-only routes.
+Only getDashboard/queryChatbot remain absent. Direct8000/proxy8080/public-ngrok gates
+pass; [exact verification](../reports/VERIFICATION.md) and [M29](../document_corrections/VERIFICATION.md).
+
+| GET path below /api/v1 | Required allOf grants |
+| --- | --- |
+| /reports/sales | reports.read + sales.read |
+| /reports/debt | reports.read + debt.read |
+| /reports/inventory | reports.read + inventory.read |
+| /reports/product-sales | reports.read + sales.read |
+| /reports/cash-and-credit | reports.read + debt.read |
+
+All five require real-calendar fromDate/toDate with a half-open[fromDate,toDate)
+interval. JSON uses canonical filters/cursor/limit/sort. Accept selects JSON,
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet or application/pdf;
+binaries use all business-filtered rows and intentionally ignore page controls.
+Current-credit labels refer to generatedAt, not historical closing credit. A response
+has one coherent snapshot; separately fetched HTTP pages do not freeze data. No extra
+frontend-only grant, format query parameter, request body or export endpoint exists.
+Native VNPAY IPN/Return remain separate transports outside canonical business count.
+M31/M32/whole R5/R6, external terminalbankrefund and frontend/browser gates stay open.
+
+## Full M29 publication - 2026-10-29
+
+Runtime147/154business+2health, source/image/configuredSupabase0009. All twelve owning
+correction/cancel operations available; normal-app36sourcecases+3direct/proxy/public
+cases pass and protected live integrity retained. [Evidence](../document_corrections/VERIFICATION.md).
+Seven unpublished operations remain: five M30 reports, M31 dashboard, M32 chatbot.
+M30 PostgreSQL verification active; code/offline is not live availability. M29 matching
+frontend contracts may integrate but no frontendbrowser/fullreleasegate closes here.
+External terminalbankrefund remainsPENDING. Older checkpoints below are historical.
+
 ## M29 source-only internal checkpoint — 2026-10-25
 
 Normal publication is unchanged:135/154target+2health at0007. Internal receipt/

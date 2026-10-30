@@ -1,5 +1,46 @@
 # General Plan
 
+## Current M31 publication - 2026-10-29
+
+getDashboard is published with unchanged D09:153/154business+2health at0009, chatbot
+alone absent. Final1084offline/291dashboard,14unique owningM31PG across completed
+serial selections and3dashboard+8retained direct/proxy/public deploymentcases pass.
+Dashboard161/24/API68/0 exact100%; independent review resolved its two test gaps.
+Current/state/period/original-revision/money/snapshot/error/rate gates pass; no
+frontendbrowser or whole R6 claim. [Evidence](plan/dashboard/VERIFICATION.md).
+Live411documents/30agencies/24products and receipt774/payment37/oneevent retained;
+Docker/ngrok healthy, frontendunchanged. Next M32: user selected AI API interpretation,
+provider/model/settings unspecified, D10 still requires a canonical resolution.
+Full R5/R6/terminalbankrefund/system/recovery/backup/browser gates remain separate.
+
+## Current M29-M30 publication - 2026-10-29
+
+All twelve owning M29 correction/cancel and all five M30 report operations are
+published:152/154business+2health, source/image/configured Supabase0009. Final1083
+offline cases pass;191belong to reports. All11unique owningM30PG and11unique deployed
+endpoint cases pass across documented resumes. Reports438/98, API66/0, shared
+responses48/18 exact per-file100%; M29 disjoint22file1124/196 evidence stays separate.
+Independent oracles, real in-flight snapshots, read-only errors,101+exports, exact
+values and automated rendered-page checks pass. No human visual-review claim.
+Live integrity411documents/30agencies/24products and protected receipt/payment/event
+retained; existingDocker/ngrokhealthy, frontendunchanged. Next M31, then M32 and
+full release gates. R5/R6 acceptance, terminal bank refund and browser completion
+are not closed here. [M30 evidence](plan/reports/VERIFICATION.md). Older entries
+below are historical; prerequisite dependency graph is unchanged.
+
+## Full M29 publication - 2026-10-29
+
+All twelve owning correction/cancel operations are published on existing dms:
+147business+2health, source/image/configured Supabase0009. Normal-app36sourcecases,
+3direct/proxy/public deploymentcases and protected live integrity pass. Owning
+disjoint22files1124statements196branches exact100%; API64/0separate. The reviewed
+historical-goods reintroduction defect has realPG red/green resolution. M29 closes
+the deferred posted correction/cancellation work in M15/M17/M18/M19/M21/M23/M25;
+M28 history remains published. No dependency edge changes. M30 actual SQL/export
+verification is next and running, not published; M31/M32/fullR5/R6 and terminalbank
+refund settlement remain open. [M29 evidence](plan/document_corrections/VERIFICATION.md)
+supersedes the historical checkpoints below.
+
 ## Current M29 internal progress — 2026-10-25
 
 Owning [six-file plan](plan/document_corrections/PLAN.md) now exists. Receipt and
@@ -394,16 +435,19 @@ does not prove business API, concurrency or external sandbox behavior.
 | M05/M06/M10/M11/M12 | Twenty full operations locally complete, D02/0006 and D16 resolved | Preserve [permissions](plan/permissions/VERIFICATION.md), [audit](plan/audit_logs/VERIFICATION.md), [rules](plan/business_rules/VERIFICATION.md), [products](plan/products/VERIFICATION.md), [agencies](plan/agencies/VERIFICATION.md). |
 | M13 document_core | Internal all-kind readers/draft/revision/line/snapshot/batch foundations locally verified | Preserve [evidence](plan/document_core/VERIFICATION.md); full history/line dispatch remains M28. |
 | M14 inventory | Full statement operation and stock/reversal helpers locally verified; D14 historical aggregate range resolved | Preserve [evidence](plan/inventory/VERIFICATION.md), including all seeded goods kinds and filter-independent atomic balances. |
-| M15 stock_receipts core | Five full operations and internal draft cancel locally verified | Preserve [evidence](plan/stock_receipts/VERIFICATION.md); posted correction/full cancellation remain M29. |
+| M15 stock_receipts | Core and posted correction/full cancellation published | [Core evidence](plan/stock_receipts/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
 | M16 settlement_core | E09/E10 internal FIFO/provenance/reservations and chronological replay locally verified | Preserve [evidence](plan/settlement_core/VERIFICATION.md), including existing return/credit/refund financial effects; owning later HTTP/rounding gates remain open. |
-| M17 stock_issues core | Seven operations including M19 posting/replacement implemented; owning tests/races pass | Preserve [evidence](plan/stock_issues/VERIFICATION.md); posted corrections/cancel remain M29. |
-| M18 payment_receipts core | Five manual-receipt operations and protected special receipts implemented | Preserve [evidence](plan/payment_receipts/VERIFICATION.md); posted corrections/cancel remain M29. |
-| M19 upfront_payments | Four operations, full-money consumption/separation and issue integration implemented | Preserve [evidence](plan/upfront_payments/VERIFICATION.md); retain M29 money-preserving cancellation gate. |
+| M17 stock_issues | Core/M19 posting and full posted correction/cancel published | [Core evidence](plan/stock_issues/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
+| M18 payment_receipts | Core and full manual correction/cancel with protected special receipts | [Core evidence](plan/payment_receipts/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
+| M19 upfront_payments | Four operations and full-money issue integration/cancellation verified | [Core evidence](plan/upfront_payments/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
 | M20 receivables | Six complete read operations implemented; exact snapshots/atomic ledgers/historical aggregates verified | Preserve [evidence](plan/receivables/VERIFICATION.md); M24 reuses the sole balance route. |
 | M21/M22/M23/M24 | Owning plans/actual symbols and scoped state/rollback/race/coverage/deployment gates pass | [Adjustments](plan/stock_adjustments/VERIFICATION.md), [counts](plan/stock_counts/VERIFICATION.md), [returns](plan/sales_returns/VERIFICATION.md), [credit](plan/agency_credit/VERIFICATION.md); dependency edges unchanged. |
-| M25 core | Five core operations verified/mounted; internal draft cancellation, zero new cash, protected-source/race/replay evidence | [Owning evidence](plan/credit_applications/VERIFICATION.md); posted correction/full cancel remains M29. |
+| M25 credit_applications | Core plus full posted correction/cancel published; zero new cash/protected provenance | [Core evidence](plan/credit_applications/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
 | M26/M27/M28 | All27operations published with native VNPAY acceptance and exact owning coverage | [Payments](plan/online_payments/VERIFICATION.md), [refunds](plan/refunds/VERIFICATION.md), [history](plan/document_history/VERIFICATION.md); automatic IPN passes, external bank refund remains PENDING rather than paid. |
-| M29–M32 | Remaining roadmap implementation | Next M29 full posted corrections/cancel; R5/R6 remain open. |
+| M29 corrections | All twelve owning operations verified/published, including reviewed historical-goods fix | [Current evidence](plan/document_corrections/VERIFICATION.md); whole R5/R6 remain separate. |
+| M30 reports | All five JSON/full-filter XLSX/PDF operations verified and published | [Owning evidence](plan/reports/VERIFICATION.md); snapshot/oracle/read-only/101+export/resource gates pass. |
+| M31 dashboard | getDashboard verified/published, unchanged D09 and coherent authorized snapshots | [Owning evidence](plan/dashboard/VERIFICATION.md),161/24exact coverage. Full R6 separate. |
+| M32 chatbot | Only unpublished business operation | AI API selected by user; provider details and D10/owning plan/implementation/gates remain next. |
 
 Current dependencies are unchanged. M04 and M07–M09 table gates above have passed
 their linked child evidence: 207 offline + 217 PostgreSQL/TLS + 16 deployment

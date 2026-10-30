@@ -1,5 +1,27 @@
 # Full backend implementation plan
 
+## M31 published / M32 AI direction - 2026-10-29
+
+getDashboard published153/154business+2health/0009; only chatbot absent. Final1084
+offline incl291dashboard,14unique owningPG,3dashboard+8retained deployed cases pass.
+Dashboard161/24/API68/0 exact100%, D09 unchanged. All240source hashes match image;
+live411documents/30agencies/24products/acceptedreceipt/payment/event retained.
+[Evidence](../dashboard/VERIFICATION.md). Next M32 user-selected AI API; provider
+details/D10/owning plan/implementation remain per HANDOFF. Whole R5/R6/system/recovery/
+backup/browser/terminalbankrefund gates remain separate. Older checkpoints are history.
+
+## M29-M30 published checkpoint - 2026-10-29
+
+All twelve owning corrections/cancels and all five report operations are verified/
+published:152/154business+2health at0009. Final1083offline,11unique M30PG plus normal-app
+HTTP/resource rerun and11unique deployed endpoint cases pass across documented resumes.
+Per-file reports438/98/API66/0/sharedresponses48/18 exact100%; M29disjoint22file1124/196
+separate. Automated rendered-output inspection is not a human visual claim. Live411
+documents/30agencies/24products and original payment/receipt/event retained. Existing
+Docker/ngrokhealthy, frontendunchanged. [Current evidence](../reports/VERIFICATION.md).
+Next M31 then M32 and remaining full R5/R6/terminalbankrefund/finalrelease/browser
+gates; historical source-only or deferred M29/M30 statements below are superseded.
+
 ## M29 source-only internal checkpoint — 2026-10-25
 
 Receipt/independent-adjustment and manual-cash correction/cancel services now have

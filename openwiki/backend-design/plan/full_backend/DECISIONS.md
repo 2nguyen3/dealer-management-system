@@ -190,18 +190,39 @@ substitute “any same-agency receipt.” **Gate:** multi-lot/multi-invoice cons
 reapplication followed by return, refund to the correct original online payment,
 and correction invalidating a reserved/paid source.
 
-## D09 — Dashboard admission disagrees with section permissions
+## D09 — Dashboard admission versus section projection
 
-**Observed:** `getDashboard.x-permissions.anyOf` includes stock.issue.post and
-cash.upfront.verify, but not stock.issue.prepare/cash.receipt.post. The response
-schema permits pendingIssueCount to prepare-only and verifiedUnreceiptedAmount to
-cash.receipt.post-only users. These valid section readers could fail route admission.
+**Observed:** `getDashboard.x-permissions.anyOf` lists exactly agency.read,
+inventory.read, sales.read, debt.read, stock.issue.post and cash.upfront.verify.
+The response schema independently lists stock.issue.prepare as an alternative
+reader of pendingIssueCount and cash.receipt.post as an alternative reader of
+verifiedUnreceiptedAmount. A section-reader grant alone is not route admission.
 
-**Proposed contract resolution:** use the union of all documented section readers
-for admission and retain per-section projection checks. **Status:** requires a
-target-contract decision/update before M31, not silently implemented here. If the
-product intends stricter admission instead, revise the schema descriptions and UI
-mapping explicitly. Test each permission in isolation and the no-permission case.
+**Selected source-alignment decision — 2026-10-28:** preserve the exact existing
+six-grant admission anyOf and all existing section-reader rules. Evaluate admission
+first, then independently project sections for admitted callers. Prepare-only and
+receipt-post-only callers receive 403. A caller with a canonical admission grant
+plus stock.issue.prepare or cash.receipt.post can receive the corresponding section
+in a 200 response, along with only its other authorized sections. Unauthorized keys
+are omitted and their data is not queried. No permission expansion, removal,
+MANAGEMENT bypass or additional reports.read requirement is permitted.
+
+**Status:** interpretive ambiguity resolved for implementation by explicitly
+distinguishing admission from projection. This is the coordinator's conservative
+source-alignment decision under the user's implementation request, not user approval
+of a changed security policy. The earlier union-admission proposal is not selected.
+Implementing the existing canonical semantics does not require approval to change
+security policy, because no such change is made. This documentation update does not
+edit canonical OpenAPI or production code and does not claim implementation or test
+completion. Future source-description/UI clarification must preserve this distinction,
+not silently change the grant sets.
+
+**Completion2026-10-29:** M29/M30 prerequisites and all M31 owning gates now pass;
+getDashboard is published153business+2health/0009. Single/mixed/no-grant, coherent
+snapshot/read-only, exact coverage and direct/proxy/public cases explicitly prove
+prepare-only/receipt-post-only403 versus combined-admitted200. See [dashboard evidence](../dashboard/VERIFICATION.md).
+This implements unchanged canonical semantics, not a changed-security-policy approval.
+Whole R6/frontend/browser acceptance remains separate.
 
 ## D10 — Chatbot candidate pagination has no safe continuation
 

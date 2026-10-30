@@ -1,5 +1,44 @@
 # Backend General Checklist
 
+## Current M31 completion - 2026-10-29
+
+- [x] M31 getDashboard published153/154business+2health at0009, chatbot alone absent.
+- [x] Final1084offline incl291dashboard;14unique owningPG and3dashboard+8retained
+  deployed endpoint cases pass; [owning evidence](plan/dashboard/VERIFICATION.md).
+- [x] Dashboard161/24/API68/0 exact per-file100%, D09/subsets/snapshots/period/current/
+  original revision/failed-post/cross-month/rate/error/no-write witnesses complete.
+- [x] Live411documents/30agencies/24products and acceptedreceipt774/payment37/event
+  retained; Docker/ngrok healthy, frontendunchanged; M32 AI direction in HANDOFF.
+- [ ] M32 provider/D10/implementation and whole R5/R6/system/recovery/backup/browser/
+  externalterminalbankrefund acceptance remain separate/open.
+
+## Current M29-M30 completion - 2026-10-29
+
+- [x] All12M29 and5M30 operations published:152/154business+2health at0009.
+- [x] Final1083offline (191reports),11unique owningM30PG and11unique deployed endpoint
+  cases pass across recorded resumes; [actual commands/evidence](plan/reports/VERIFICATION.md).
+- [x] Reports438/98, aggregator66/0, sharedresponses48/18 exact per-file100%; prior
+  M29 disjoint22file1124/196 coverage remains separately reconciled.
+- [x] Actual query/oracle/read-only/in-flight snapshot and101+all-format export gates;
+  automated rendered-page text/geometry/raster/glyph checks, no human visual claim.
+- [x] Live411documents/30agencies/24products and immutable receipt774/payment37/event
+  preserved; Docker/ngrok healthy and frontend unchanged.
+- [ ] Next M31/M32 and whole R5/R6 acceptance/recovery/performance/browser release
+  gates; terminal external bank refund remainsPENDING, not a paid claim.
+
+## Full M29 publication - 2026-10-29
+
+- [x] All twelve owning correction/cancel operations published on existing dms;
+  runtime147business+2health, source/image/configured Supabase0009.
+- [x] Normal-app36sourcecases, API64/0exact coverage and3direct/proxy/public deployment
+  cases pass; owning22files1124statements196branches disjoint exact100%.
+- [x] Historical goods reintroduction review defect fixed with realPG red/green;
+  live411documents/30agencies/24products and immutable receipt774/payment37 retained.
+- [x] M29 dependent posted correction/cancel gates for M15/M17/M18/M19/M21/M23/M25
+  closed by [owning M29 evidence](plan/document_corrections/VERIFICATION.md).
+- [x] M30 actual PostgreSQL/export/publication gates: [evidence](plan/reports/VERIFICATION.md).
+  M31/M32, full R5/R6 and external terminal bank settlement remain separate/open.
+
 ## Current M29 Publication - 2026-10-28
 
 Six correction/cancel operations for receipts, independent adjustments and manual
@@ -173,26 +212,26 @@ per-function cases/results belong in the owning child checklist and VERIFICATION
 
 - [x] M28 `document_history` — complete kind-dispatched lines/history/search
   and authorized snapshot HTML/PDF printing pass. Requires: M13, M22, M27.
-- [ ] M29 `document_corrections` + owning-module completion — posted correction/
+- [x] M29 `document_corrections` + owning-module completion — posted correction/
   cancel/replay, conditional permissions and downstream guards pass. Requires: M28.
-- [ ] M30 `reports` — all five reports, exact periods/totals and whole-filter
+- [x] M30 `reports` — all five reports, exact periods/totals and whole-filter
   authorized JSON/XLSX/PDF results reconcile after replay. Requires: M29.
-- [ ] M31 `dashboard` — authorized sections/current-vs-period metrics/
+- [x] M31 `dashboard` — authorized sections/current-vs-period metrics/
   unreceipted-money visibility/top limits pass. Requires: M30.
 - [ ] M32 `chatbot` — whitelisted authorized reads/ambiguity/clarification/
   unsupported behavior; no arbitrary SQL or mutations. Requires: M31.
 
 ## 3. Deferred integration and full-module closure
 
-- [ ] Stock receipts close through M15 + M29: posted correction/cancel preserves
+- [x] Stock receipts close through M15 + M29: posted correction/cancel preserves
   downstream stock use and historical purchase-price consistency.
-- [ ] Stock issues close through M17 + M19 + M29: upfront consumption/separation,
+- [x] Stock issues close through M17 + M19 + M29: upfront consumption/separation,
   pending replacement and posted correction/cancel all completed.
-- [ ] Manual receipt/independent adjustment/return/credit-application posted paths
+- [x] Manual receipt/independent adjustment/return/credit-application posted paths
   close through M29; automatic/online/received-unapplied money cannot be edited away.
-- [ ] Confirmed count adjustments and paid refunds remain immutable; refunded,
+- [x] Confirmed count adjustments and paid refunds remain immutable; refunded,
   reserved or consumed credit retains valid source provenance during corrections.
-- [ ] Shared document/history dispatch covers every goods kind and all versions;
+- [x] Shared document/history dispatch covers every goods kind and all versions;
   financial-only documents never gain goods-line CRUD.
 - [ ] New return/online/refund/count consumers trigger affected earlier module
   regression checks and dependent-state guards before integrated closure.
