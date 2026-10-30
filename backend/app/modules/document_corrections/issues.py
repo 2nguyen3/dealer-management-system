@@ -23,16 +23,16 @@ class IssueCorrectionService:
         self.session, self.core = owner.session, owner.core
         self.inventory, self.settlement = owner.inventory, owner.settlement
 
-    def evidence(self, identifier):
+    def evidence(self, identifier, states=("VERIFIED", "CONSUMED")):
         return [
             dict(row)
             for row in self.session.execute(
                 text("""
             SELECT u.* FROM dms.upfront_confirmation u JOIN dms.document_revision r
             ON r.id=u."issueRevisionId" WHERE r."documentId"=:id
-            AND u.state IN ('VERIFIED','CONSUMED') ORDER BY u.id
+            AND u.state=ANY(:states) ORDER BY u.id
             """),
-                {"id": identifier},
+                {"id": identifier, "states": list(states)},
             ).mappings()
         ]
 
@@ -263,11 +263,10 @@ class IssueCorrectionService:
             direction=-1,
         )
         if revision["businessDate"] != body.businessDate:
-            for evidence in self.evidence(document["id"]):
-                if evidence["state"] == "CONSUMED":
-                    self.sync_auto(
-                        evidence["receiptDocumentId"], body.businessDate, body.reason, command_id
-                    )
+            for evidence in self.evidence(document["id"], states=("CONSUMED",)):
+                self.sync_auto(
+                    evidence["receiptDocumentId"], body.businessDate, body.reason, command_id
+                )
 
     def reverse(self, revision_id, key, label, *, inventory=False):
         batch = self.core.repo.append_batch(
