@@ -1,5 +1,52 @@
 # Agentra project instructions
 
+## Source review checkpoint - 2026-10-30
+
+1088offline pass; reports/dashboard/API/responses717stmt140branches exact100%.
+Fixed ignored-directory artifact dependency, preconnection JWT validation and
+large-aggregate sales-rate double rounding; actual-PG boundary/PDF geometry pass.
+Supabase0009/live30tableintegrity411documents/30agencies/24products unchanged.
+Docker Engine unavailable, local8000/8080 unreachable; no rebuild/deploy. Older
+source/image parity and healthy-runtime entries below are dated historical evidence.
+Read full_backend/VERIFICATION for commands; wholePG/deployment/browser not rerun.
+
+## Current M31 publication / M32 AI handoff - 2026-10-29
+
+Runtime153/154business+2health at source/image/configured0009; only chatbot absent.
+M31 published with unchanged D09. Final1084offline incl291dashboard,14unique owning
+PG across serial selections,3direct/proxy/public dashboard and8retained deployment
+cases pass. Dashboard6files161/24 and API68/0 exact100%; M29/M30 scoped evidence
+retained separately. Shared rate-limit omission fixed with actualHTTP429 regression;
+older-revision/failed-post/cross-month evidence witnesses pass. All240appPythonSHA256s
+match image. Live411documents/30agencies/24products and receipt774/payment37/oneevent
+preserved; Docker/ngrok healthy, frontend unchanged. Next M32 uses user-selected AI
+API; provider/key/model unspecified, D10 still required. See HANDOFF and dashboard
+VERIFICATION. Whole R5/R6/terminalbankrefund/finalrelease/browser remain open.
+
+## Current M29-M30 publication - 2026-10-29
+
+Runtime152/154business+2health; source/image/configured Supabase0009. All12M29 and
+all5M30 report operations published. Final1083offline pass (191reports),11unique
+M30PG pass across documented resumes plus normal-appHTTP/resource rerun;11unique
+deploymentcases pass across direct/proxy/public resumes. Reports438/98, API66/0,
+responses48/18 exact per-file100%; M29 disjoint22files1124/196 separately retained.
+Automated PDF text/geometry/raster/glyph inspection passes; no human visual claim.
+Live411documents/30agencies/24products and receipt774/payment37/10200VND/oneevent
+preserved. Docker/ngrok healthy, frontend unchanged. Next M31 then M32; wholeR5/R6,
+terminalbankrefund and finalrelease/browser gates remain open. Read current reports
+VERIFICATION and HANDOFF; all older checkpoints below are historical.
+
+## Full M29 publication checkpoint - 2026-10-29
+
+Runtime147business+2health; source/image/configured Supabase0009. All twelve owning
+correction/cancel operations published, normal-app36sourcecases+3direct/proxy/public
+deploymentcases pass. Owning disjoint22files1124statements196branches exact100%; API
+64/0exact separately. Historical-product reintroduction review defect fixed with
+realPG red/green. Live411documents/30agencies/24products/receipt774/payment37/one-event
+preserved. Docker/ngrok healthy, frontend unchanged. M30 PG gates are active, reports
+still unmounted; M31/M32/fullR5/R6/terminalbankrefund remain open. Read latest owning
+VERIFICATION/HANDOFF; older checkpoints below are historical, not current runtime.
+
 ## Current M29 six-operation publication - 2026-10-28
 
 Runtime141target+2health; source/deployed/configured Supabase0009. Six receipt/
@@ -234,8 +281,9 @@ plans and agent guidance aligned with actual implementation progress.
 - Schema authority: immutable reviewed DDL in `backend/alembic/sql/`; migrations
   `0001` (complete DMS/core RBAC), `0002` (search indexes), `0003` (auth sessions),
   `0004` (durable scoped API commands), `0005` (recorded-unit policy/first-use locks),
-  `0006` (eligible owner deletion/product first-use/agency history-date guards), and
-  `0007` (same-return successor credit-lot provenance).
+  `0006` (eligible owner deletion/product first-use/agency history-date guards),
+  `0007` (same-return successor credit-lot provenance), `0008` (historical receipt
+  goods admission), and `0009` (historical issue goods/agency admission).
   `openwiki/database-design/*.sql` are psql entry points, not duplicate DDL copies.
 - From `backend/`: `uv sync --frozen`, `uv run alembic upgrade head`, then
   `uv run python -m app.db.seed` for the complete demo.
@@ -243,7 +291,8 @@ plans and agent guidance aligned with actual implementation progress.
   The 54 regression checks use a separate schema and roll back all fixtures.
 - The demo covers all 29 domain tables, 30 agencies, 24 products, 410 documents and
   June–September 2026 history. Account credentials and exact counts are in README.
-  The command infrastructure table may legitimately have zero rows; source head is 0007.
+  The command infrastructure table may legitimately have zero rows; source head is0009.
+  Current live includes the authorized extra receipt774 (411documents); never reset it.
 - Seed v1 is atomic and repeatable; it verifies existing demo data on rerun.
   It does not reset a populated database, disable triggers or write balance caches.
 - Add new revisions for schema changes; do not edit deployed SQL snapshots or

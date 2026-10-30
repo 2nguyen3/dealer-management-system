@@ -1,5 +1,51 @@
 # Backend project context
 
+## Source review checkpoint - 2026-10-30
+
+1088offline pass; reports/dashboard/API/responses717stmt140branches exact100%.
+Current source fixes report artifact isolation, preconnection cryptographic JWT
+rejection (live snapshot auth retained), and exact integer-ratio sales percentages.
+Actual-PG boundary and fresh PDF geometry pass; Supabase0009/live30tableintegrity
+411documents/30agencies/24products preserved. Docker Engine/local8000/8080 are
+unavailable, no rebuild/deploy performed. Earlier image/health checkpoints are
+historical, not parity for these fixes. WholePG/races/deployment/browser not rerun.
+
+## Current M31 publication / M32 AI handoff - 2026-10-29
+
+Existingdms153/154business+2health at0009; getDashboard published, chatbot alone absent.
+Final1084offline incl291dashboard,14unique owningPG across serial selections,
+3direct/proxy/public dashboard+8retaineddeployment pass. Six dashboardfiles161stmt/
+24branches and API68/0 exact per-file100%. Real429 omission fixed, review DP07/DP08
+money witnesses added/passed; no changed D09 policy or optional auth. All240appPython
+hashes match image, live411documents/30agencies/24products and originalreceipt774/
+payment37/oneevent retained. Docker/ngrok healthy, frontendunchanged. Next M32 AI API
+per user; credentials/provider/model not supplied, D10 unresolved. Read latest HANDOFF
+and dashboard VERIFICATION. Whole R5/R6/terminalbankrefund/browserrelease stay open.
+
+## Current M29-M30 publication - 2026-10-29
+
+Existing dms publishes152/154business+2health at0009: all12M29 and all5M30 reports.
+Final1083offline pass incl191reports;11unique owningM30PG across completed resumes,
+normal-appHTTP/resource rerun and11unique direct/proxy/public deploymentcases pass.
+Reports438/98, API66/0, responses48/18 exact100%; M29 disjoint22files1124/196 retained
+separately. PDF actual rendered-output checks are automated, not human inspection.
+Live30tableintegrity411documents/30agencies/24products and immutable receipt774/
+payment37/10200VND/oneevent preserved. Docker/ngrok healthy; frontend unchanged.
+Next M31/M32; fullR5/R6, terminalbankrefund and finalrelease/browser remain open.
+Read reports VERIFICATION/HANDOFF. Do not rerun unrelated baselines/newDB/services.
+
+## Full M29 publication checkpoint - 2026-10-29
+
+All twelve M29 owning correction/cancel operations are deployed on existing dms:
+147business+2health, source/image/configured Supabase0009. Normal-app36sourcecases
+and3direct/proxy/public deploymentcases pass. Disjoint owning22files1124statements/
+196branches exact100%; aggregator64/0separately. Goods historical reintroduction fix
+has realPG red/green. Live30tablesintegrity411documents/30agencies/24products and
+receipt774/payment37/one-event preserved. Frontend not rebuilt. M30 PG verification
+active, reports not mounted; M31/M32/fullR5/R6/terminalbankrefund remain open. No new
+DB/service/server/seedreset; current SupabaseUUIDschemas and existingdms only. Earlier
+entries below are history; read current owning VERIFICATION/HANDOFF.
+
 ## Current M29 six-operation publication - 2026-10-28
 
 Existing Docker runtime141target+2health and configured Supabase0009. Six complete
@@ -95,7 +141,7 @@ The repository contains API infrastructure and a deployed database. The backend 
 configuration, database/session setup, health endpoints, migration tooling, and
 health-check tests. The frontend is a starter page that checks API availability.
 The database now has 29 domain tables plus a durable-command infrastructure table,
-PostgreSQL domains/routines/triggers/views, seven reviewed SQL Alembic revisions,
+PostgreSQL domains/routines/triggers/views, nine reviewed SQL Alembic revisions,
 core RBAC/rules and a full transactional demo
 seed. Seven authentication endpoints, live session/version checks, reusable group
 authorization and five identity/access ORM mappings are implemented. Full
@@ -103,7 +149,7 @@ administration/audit/master data through M12, M13 document foundations, M14
 inventory, M15 receipt core and M16 internal settlement are implemented;
 M17–M20 issue/manual-receipt/upfront/receivable APIs are now implemented with owning
 and deployment evidence; all370retained PG/TLS and308offline cases pass.
-M21–M24 pass their declared owning gates; M25–M32 remain future.
+M21–M31 pass their declared owning/publication gates; M32 remains unpublished.
 M02 exact values/errors/cursors/preconditions/retries and M03 groups are implemented
 with recorded PostgreSQL, coverage and deployment evidence. M04/M07/M08/M09 also
 pass full local gates (207 offline, 217 PG/TLS, 16 smoke, exact 100% combined scope).
@@ -468,8 +514,8 @@ M02 shared_api and M03 user_groups are also implemented and locally verified.
 M04/M07–M09, M05/M06/M10–M12, M13/M14, M15 core and M16 internal settlement pass
 local gates. M17–M20 now pass owning/deployment and retained regression gates.
 M21–M24 now have owning plans/implementations and passing declared gates.
-Next M25 needs its owning plan; M25–M32 remain unimplemented.
-M28/M29 close deferred operations.
+Next M32 needs complete owning/AI-provider/D10 gates. M25–M31 are implemented/published;
+M28/M29 have closed deferred document/history/correction operations.
 
 The full execution design is in `../openwiki/backend-design/plan/full_backend/PLAN.md`,
 with all target operation IDs, 32 work packages, concrete schema/contract gaps and

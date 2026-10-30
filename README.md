@@ -26,13 +26,32 @@ Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xu�
 
 ## Development setup
 
-Current backend checkpoint2026-10-25: M26 online payments/VNPAY, M27 refunds and M28
-history/HTML/PDF APIs are mounted:135/154target operations+2health. Actual automatic
-sandbox IPN payment37 created receipt774 for10200VND; live411documents. Signed external
-refund request/query is still PENDING, not paid. [Current evidence](openwiki/backend-design/plan/online_payments/VERIFICATION.md).
-M29 posted corrections/cancel and M30–M32 remain future work. After this authorized
-development transaction, use ordinary `python -m app.db.verify --regression` for live
-integrity; the original410-document seeded checkpoint is historical, not a reset target.
+Backend review2026-10-30:1088offline tests pass; report/dashboard/API/response scope
+is717statements/140branches exact100%. Fixed test-artifact isolation, early invalid-JWT
+rejection and large-value sales-rate rounding; isolated PostgreSQL boundary and PDF
+geometry checks pass. Supabase0009/live integrity retains411documents/30agencies/
+24products. Docker Engine is currently unavailable; today's fixes were not rebuilt
+or deployed. Health/image claims in older dated checkpoints below are historical.
+[Exact verification](openwiki/backend-design/plan/full_backend/VERIFICATION.md).
+
+Current M31 checkpoint2026-10-29: dashboard published153/154business+2health at0009,
+chatbot alone absent. Final1084offline incl291dashboard,14unique owningPG,
+3dashboard+8retained direct/proxy/public cases pass; dashboard161/24/API68/0exact.
+[Evidence](openwiki/backend-design/plan/dashboard/VERIFICATION.md). Live411documents/
+30agencies/24products and acceptedpayment/receipt/event preserved. Docker/ngrokhealthy,
+frontendunchanged. Next M32 uses user's AI API; details/D10 remain in HANDOFF, not coded.
+The earlier checkpoints below are historical, not current runtime counts.
+
+Earlier backend checkpoint2026-10-29: all twelve M29 posted correction/cancel and
+all five M30 report operations are published:152/154business operations+2health,
+source/image/configured Supabase0009. Reports support JSON and full-filter XLSX/PDF.
+Final1083offline,11unique owningM30PG and11unique direct/proxy/public endpoint cases
+pass across documented resumes; [current evidence](openwiki/backend-design/plan/reports/VERIFICATION.md).
+Live411documents/30agencies/24products and original VNPAY payment37/10200VND/receipt774/
+oneevent are preserved. External refund remains PENDING, not paid. Next M31 dashboard,
+then M32 chatbot and final release gates. Docker/ngrok are running, frontend unchanged.
+Use ordinary `python -m app.db.verify` for live integrity; the410-document original
+seed is historical, not a reset target.
 
 | Component | Stack | Documentation |
 |---|---|---|
@@ -69,9 +88,9 @@ Environment files are ignored by Git; commit only the example templates.
 
 ### Database và dữ liệu demo
 
-Schema `dms` đã được nâng cấp tường minh trên Supabase từ `0002` lên `0006`
-ngày2026-10-17, rồi lên`0007` ngày2026-10-18; source/runtime cùng head`0007`. Live verifier đối chiếu
-được dữ liệu demo410chứng từ/30đại lý/24mặt hàng. Thiết kế ở
+Schema `dms` trên Supabase hiện cùng source/runtime ở head`0009`. Live verifier
+đối chiếu411chứng từ/30đại lý/24mặt hàng; gồm410chứng từ seed gốc và phiếu thu VNPAY
+đã được chấp thuận, không reset dữ liệu về số seed cũ. Thiết kế ở
 [openwiki/database-design](openwiki/database-design/README.md);
 DDL có version nằm trong `backend/alembic/sql/`. Migration tạo đầy đủ 29 bảng,
 3 domain số chính xác, sequence, FK/CHECK/index, trigger toàn vẹn/audit,
@@ -83,6 +102,7 @@ Revision `0006` sửa xóa hồ sơ/hàng chưa dùng cùng cache0, khóa first-
 và ngày tiếp nhận/lịch sử đại lý. Migration không tự chạy khi khởi động API.
 Revision `0007` giữ credit lot gốc khi tạo successor để tính lại làm tròn cùng phiếu trả,
 bảo toàn reservation/refund đã trả và nguồn phiếu thu.
+Revisions `0008`/`0009` bổ sung chính sách master lịch sử cho sửa phiếu nhập/xuất.
 
 Backend M01–M14, M15 core và M16 settlement nội bộ đã qua gate cục bộ:
 58/154 operation mục tiêu +2health;247 offline +370 PostgreSQL/TLS,
@@ -98,8 +118,9 @@ implementation/owning plan và pass59case riêng. Packet338offline+84PG+24direct
 scope30file production1162statements/162branches exact100%. Runtime103/154operation+2health,
 source/Supabase0007. Docker Desktop/backend/frontend healthy, API trực tiếp
 và qua Nginx readiness200; live integrity giữ410chứng từ/30đại lý/24mặt hàng.
-M25 credit_applications là module code tiếp theo; M28/M29 và toàn R4–R6 còn mở.
-Sửa/hủy phiếu đã ghi nhận và API dòng/lịch sử đầy đủ còn gate M28/M29.
+Các số liệu M17–M24 ở trên là lịch sử. M25–M30 hiện đã được triển khai; đầy đủ
+API sửa/hủy và dòng/lịch sử đã có evidence riêng. Tiếp theo M31/M32; các gate
+release tổng thể R5/R6 và terminal bank refund vẫn tách riêng, chưa đóng.
 [Trạng thái operation](openwiki/backend-design/plan/full_backend/AVAILABILITY.md)
 và [mục tiêu đang chạy](openwiki/backend-design/plan/full_backend/GOAL.md) là nguồn
 handoff hiện tại. UI nghiệp vụ vẫn cần kế hoạch/implementation/test riêng.
@@ -187,7 +208,7 @@ Backend features now use `backend/app/modules/<feature>/`, shared API helpers in
 The initial limiter requires one worker/replica. Forwarded-header trust is disabled;
 Nginx traffic shares its peer-address bucket. Local verification covers real PostgreSQL
 races, TLS SMTP, 100% scoped statements/branches and direct/Nginx smoke. External
-provider mail remains an operational step; configured Supabase now runs source head `0007`.
+provider mail remains an operational step; configured Supabase now runs source head `0009`.
 
 ### Docker deployment
 

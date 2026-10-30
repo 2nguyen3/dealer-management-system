@@ -1,5 +1,57 @@
 # Agentra backend
 
+## Current Source Review - 2026-10-30
+
+1088offline tests pass; reports/dashboard/API/responses have exact717statements/
+140branches coverage. Review fixes isolate test artifacts, reject invalid JWTs before
+database allocation and preserve exact sales-rate rounding. Actual-PG boundary and
+fresh PDF geometry tests pass. Supabase0009/live30tableintegrity retains411documents/
+30agencies/24products. Docker Engine and local API endpoints are unavailable today;
+no rebuild/deployment was performed. Older dated publication/image/health evidence
+below is historical. [Commands and limits](../openwiki/backend-design/plan/full_backend/VERIFICATION.md).
+
+## Current M31 publication - 2026-10-29
+
+getDashboard published153/154business+2health at source/image/configured0009;
+chatbot alone absent. Full1084offline incl291dashboard,14uniquePG and3dashboard+
+8retained deployed cases pass;161/24module+68/0API exact100%. [Evidence](../openwiki/backend-design/plan/dashboard/VERIFICATION.md).
+All240source hashes match image; live411documents/30agencies/24products and
+receipt774/payment37/event retained. Docker/ngrokhealthy, frontendunchanged. Next M32
+AI API per user, with provider details/D10 still required; wholeR5/R6/release open.
+GET /api/v1/dashboard?month=YYYY-MM preserves canonical six-grant route admission
+then independent section projection inside one freshly authenticated read-only
+snapshot. Prepare-only/receipt-post-only403; admitted mixed callers may receive those
+scalars. Forbidden keys are omitted. Current counters/balances/queue differ from
+Vietnam-month flows; asOf relates one response, not future requests. JSON only,
+private,no-store, standard requestIDs/rate limit and no reports.read inheritance.
+
+## Current M29-M30 publication - 2026-10-29
+
+All twelve owning correction/cancel and all five report operations are published:
+152/154canonical business operations+2health, source/image/configured Supabase0009.
+Final1083offlinepass (191reports),11unique owningM30PG across serial resumes plus
+normal-appHTTP/resource rerun and11unique direct/proxy/public endpoint cases pass.
+Reports438/98, aggregator66/0, sharedresponses48/18 exact per-file100%; M29 disjoint
+22file1124/196 evidence separately retained. PDF rendered-output inspection is
+automated text/geometry/raster/glyph verification, not a human visual-review claim.
+Live411documents/30agencies/24products and payment37/receipt774/10200VND/oneevent
+preserved; existingDocker/ngrokhealthy and frontendnotrebuilt. [Exact evidence](../openwiki/backend-design/plan/reports/VERIFICATION.md).
+Next M31 dashboard then M32 chatbot; whole R5/R6 acceptance, terminal bank refund and
+finalrelease/browser gates remain open. Earlier entries below are historical.
+
+### Published reports
+
+GET `/api/v1/reports/{sales,debt,inventory,product-sales,cash-and-credit}` requires
+fromDate/toDate, interpreted as[fromDate,toDate). All formats require reports.read
+AND the respective sales.read/debt.read/inventory.read grant. JSON uses canonical
+cursor/limit/sort; Accept selects application/json, XLSX MIME or application/pdf.
+Binary exports ignore page controls and include every business-filtered logical row
+in stable ID order. Exact decimals/IDs remain strings; current credit at generatedAt
+is distinct from historical period closing credit. Exports have safe attachment,
+no-store/nosniff/Vary/request-ID/CORS headers and finish before any200response.
+One response uses one statement snapshot; separate JSON page requests do not freeze
+the dataset. Materialization/rendering uses O(full-result) memory with no hidden cap.
+
 ## Native VNPAY and M26–M28 publication — 2026-10-25
 
 M26 online payments, M27 refunds and M28 document history/printing are now mounted:
