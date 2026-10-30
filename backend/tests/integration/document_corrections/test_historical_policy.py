@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ApiError
 from app.modules.document_core.repository import DocumentRepository
+from app.modules.stock_receipts.schemas import StockReceiptCorrection
 from tests.integration.document_corrections.helpers import apply, condition, replacement, snapshot
 from tests.integration.documents.test_receipts import post_receipt, receipt
 from tests.support.database import migrate
@@ -128,3 +130,66 @@ def test_populated_0007_upgrade_and_downgrade_preserve_history(client, engine, a
     assert snapshot(engine) == successor
     migrate(engine.url, "head")
     assert snapshot(engine) == successor
+
+
+def test_removed_receipt_product_reuses_latest_posted_snapshot_after_retirement(
+    client, engine, actor, product
+):
+    other = client.post(
+        "/api/v1/products", json={"name": "Retained product", "unitId": product["unitId"]}
+    ).json()
+    incoming = client.post(
+        "/api/v1/stock-receipts",
+        json={
+            "businessDate": "2026-10-01",
+            "lines": [
+                {"productId": item["id"], "quantity": "2", "unitPrice": "100"}
+                for item in (product, other)
+            ],
+        },
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert incoming.status_code == 201, incoming.text
+    assert post_receipt(client, incoming).status_code == 200
+    identifier, path = int(incoming.json()["id"]), incoming.headers["Location"]
+    original = client.get(path).json()["currentRevision"]["lines"][0]
+    apply(engine, actor, identifier, replacement(other["id"]), condition(client, path))
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE dms.product SET name='Renamed product' WHERE id=:id"),
+            {"id": int(product["id"])},
+        )
+        connection.execute(
+            text("UPDATE dms.unit SET name='Renamed unit' WHERE id=:id"),
+            {"id": int(product["unitId"])},
+        )
+    body = StockReceiptCorrection(
+        businessDate="2026-10-01",
+        reason="Restore recorded goods",
+        lines=[
+            {"productId": item["id"], "quantity": "3", "unitPrice": "300"}
+            for item in (product, other)
+        ],
+    )
+    for retired in (False, True):
+        if retired:
+            apply(engine, actor, identifier, replacement(other["id"]), condition(client, path))
+            with engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE dms.product SET status='INACTIVE' WHERE id=:id"),
+                    {"id": int(product["id"])},
+                )
+                connection.execute(
+                    text("UPDATE dms.unit SET status='INACTIVE' WHERE id=:id"),
+                    {"id": int(product["unitId"])},
+                )
+        before = snapshot(engine)
+        restored = apply(engine, actor, identifier, body, condition(client, path))
+        assert restored.status == 201
+        current = client.get(path).json()["currentRevision"]["lines"][0]
+        for name in ("productId", "unitId", "productName", "unitName"):
+            assert current[name] == original[name]
+        after = snapshot(engine)
+        for table in ("document_revision", "document_line"):
+            assert after[table][: len(before[table])] == before[table]
+        assert {row["currentStock"] for row in after["inventory_balance"]} == {3}

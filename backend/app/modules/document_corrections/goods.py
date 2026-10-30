@@ -95,7 +95,16 @@ class GoodsCorrectionService:
         identifiers = [int(line.productId) for line in body.lines]
         if len(set(identifiers)) != len(identifiers):
             raise ApiError(409, "DUPLICATE_PRODUCT", "Product already has a line")
-        old_lines = {line["productId"]: line for line in self.core.repo.lines(revision["id"])}
+        old_lines = {
+            line["productId"]: line
+            for line in self.session.execute(
+                text("""SELECT DISTINCT ON (l."productId") l.*
+                FROM dms.document_line l JOIN dms.document_revision r ON r.id=l."revisionId"
+                WHERE r."documentId"=:document AND r.state='POSTED'
+                ORDER BY l."productId",r."revisionNo" DESC"""),
+                {"document": document["id"]},
+            ).mappings()
+        }
         values = []
         amounts = []
         for line in body.lines:
