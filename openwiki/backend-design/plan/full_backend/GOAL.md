@@ -1,5 +1,46 @@
 # Active full-backend delivery goal
 
+## M31 complete; next M32 AI API - 2026-10-29
+
+Requested M31 complete/published153/154business+2health/0009; only chatbot absent.
+Final1084offline/291dashboard;14unique owningPG across serial selections,3dashboard+
+8retained direct/proxy/public deploymentcases pass. Dashboard161/24/API68/0 exact100%.
+Independent review's missing historical-money/failed-post/cross-month witnesses pass;
+real429 regression fixed omitted shared limiter without changing D09. All240appPython
+hashes match image; live411documents/30agencies/24products/receipt774/payment37/oneevent
+preserved. Docker/ngrokhealthy, frontendunchanged. [Evidence](../dashboard/VERIFICATION.md).
+Next M32 uses user's AI API; provider details/model unknown, D10 still required.
+HANDOFF specifies exact read-only readers/permissions/provider privacy/errors. No
+chatbot/provider/settings implementation occurred. WholeR5/R6, terminalbankrefund,
+final system/recovery/backup/browser gates remain open; older checkpoints are history.
+
+## M29-M30 complete; next M31 - 2026-10-29
+
+Requested packet complete/published:152/154business+2health, source/image/configured
+Supabase0009. All12M29 and all5M30 report operations pass their owning gates. Final
+1083offline/191reports;11unique owningM30PG across completed resumes plus normal-app
+HTTP/resource rerun;11unique direct/proxy/public deploymentcases. Reports438/98,
+API66/0, sharedresponses48/18 exact100%; disjoint22fileM29 scope1124/196 separate.
+Automated actual PDF text/geometry/raster/glyph checks pass, no human visual claim.
+Live411documents/30agencies/24products and original receipt774/payment37/oneevent
+preserved. ExistingDocker/ngrok healthy, frontend unchanged. [M30 evidence](../reports/VERIFICATION.md).
+
+Next M31 then M32; only their two business operations remain unpublished. Full
+R5/R6 acceptance/races/recovery/runtime-role/backup/performance/browser release and
+external terminalbankrefund remain open. Preserve user dashboardWIP and use current
+SupabaseUUIDschemas only; do not restart old source-only/unmounted M29/M30 work.
+
+## Full M29 published; M30 active - 2026-10-29
+
+All12M29 operations are deployed on existingDocker147business+2health/0009head.
+Owning22files1124stmt196branches exact100% disjoint; API64/0separate;36sourcecases
+and3direct/proxy/public cases pass. Live411documents/30agencies/24products and
+receipt774/payment37/oneevent preserved. Historicalproductreintroduction review
+defect resolved by realPGred/green. [Current evidence](../document_corrections/VERIFICATION.md).
+M30 five reports offline191pass438/98exact, actualPGverificationactive and not mounted.
+Continue M30 publication then M31/M32/fullR5/R6; externalterminalbankrefund remainsopen.
+Ngrok sameconfiguredpublicdomain/upstream8000 healthy, frontendnotrebuilt.
+
 ## Six-operation M29 publication - 2026-10-28
 
 Existing Docker backend now publishes141target+2health at source/deployed/configured

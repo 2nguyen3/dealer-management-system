@@ -1,5 +1,88 @@
 # Full backend planning verification
 
+## Backend Pre-Push Review - 2026-10-30
+
+The user requested checking the current backend and publishing thirty meaningful
+commits on the existing branch. Review found and fixed three issues: report resource
+tests depended on an ignored data directory/prior artifact run; dashboard invalid
+JWTs allocated a database connection before rejection; and sales percentages could
+double-round at large aggregate boundaries. Tests now use shared pytest-temporary
+artifacts, cryptographic JWT preflight before connection allocation with mandatory
+live snapshot reauthentication, and exact integer-ratio HALF_UP projection without
+editing immutable deployed SQL snapshots.
+
+Commands actually run from backend, all passing:
+
+- `uv run --frozen --no-sync ruff check .`
+- `uv run --frozen --no-sync ruff format --check .`: 547 files formatted.
+- `uv run --frozen --no-sync pytest -q --tb=short --cov=app.modules.dashboard --cov=app.modules.reports --cov=app.api.router --cov=app.common.responses --cov-branch --cov-report=term --cov-report=json:../data/backend/backend-final-prepush-20261030-coverage.json --junitxml=../data/backend/backend-final-prepush-20261030.xml`: 1088 passed, 640 deselected, six existing dependency warnings, 205.27s. Exact measured scope is 717 statements/140 branches across reports, dashboard, API router and shared responses; this is not whole-backend coverage.
+- `uv run --frozen --no-sync pytest tests/reports/test_pdf_geometry.py -m integration -q --tb=short --maxfail=1`: one passed, 7.88s, using freshly generated temporary PDF/XLSX artifacts.
+- `SUPABASE_TEST_SCHEMAS=1` with `uv run --frozen --no-sync pytest tests/integration/reports/test_queries.py::test_sales_rate_rounds_once_with_exact_integer_arithmetic -m integration -q --tb=short --maxfail=1`: one passed, 23.97s, eight independently checked percentage boundaries in an owned UUID schema.
+- `SUPABASE_TEST_SCHEMAS=1` with `uv run --frozen --no-sync pytest tests/integration/reports/test_queries.py::test_all_report_queries_reconcile_corrected_sources_ledgers_and_full_totals -m integration -q --tb=short --maxfail=1`: one passed, 243.29s, exercising all five current report queries, independent source/ledger oracles, full totals, filters and company-denominator preservation after the SQL fix.
+- `uv run --frozen --no-sync alembic current`: configured Supabase 0009 head, no migration applied.
+- `uv run --frozen --no-sync python -m app.db.verify`: 30-table live integrity passes, retaining 411 documents/30 agencies/24 products, no seed/reset or live business mutation.
+- `uv run --frozen --no-sync python ../openwiki/backend-design/plan/full_backend/validate_plan.py`: all consistency checks pass, including 154 operations, 32 packages/40 dependency edges, 187 package documents and 3050 OpenAPI references.
+
+Root `docker compose --profile tools config --quiet` and `git diff --check` pass.
+Docker Engine is unavailable (missing Docker Desktop Linux engine pipe); direct
+8000/proxy8080 readiness endpoints are unreachable. No container was rebuilt or
+restarted, and deployment/public-endpoint checks were not rerun. The October29
+image hashes and healthy-service observations below remain historical evidence,
+not current source/image parity or deployment of today's fixes. Full PG/race suites,
+browser/release gates, M32 and terminal bank refund remain outside this rerun.
+
+## M31 publication - 2026-10-29
+
+Runtime153/154business+2health/source-image-configured0009, only chatbot absent.
+Full1084offlinepass177.05s incl291dashboard,14unique owningPG across serial selections,
+3dashboard deploymentcases108.82s and8retained320.90s pass. Dashboard161stmt24branches/
+API68/0 exact per-file100%; M29/M30 scoped evidence remains separate. All240Python
+hashes match image, existingbackend frozenbuild/update healthy, frontendunchanged,
+same ngrokdomain/upstream8000. Live30tableintegrity411documents/30agencies/24products
+and receipt774/payment37/10200VND/oneevent unchanged. No migration/seedreset/newDB/
+provideraction/commit/push. [Actual commands/failures](../dashboard/VERIFICATION.md).
+Review found no production defect; DP07older-revision and DP08failed-post/cross-month
+gaps were added/pass. Actual429 fixed omitted limiter, mandatory snapshot auth/D09
+unchanged. M32 AI API is selected by user, not implemented; HANDOFF retains unknown
+provider/model/settings and D10beforecode. WholeR5/R6/terminalexternalrefund/system/
+recovery/backup/browser remain open.
+
+## M29-M30 completion and publication - 2026-10-29
+
+All12M29 and5M30 report operations now published on existingdms152/154business+2health
+at source/image/configuredSupabase0009. Final1083offlinepass200.43s incl191reports;
+all11unique owningM30PG pass across documented resumes and normal-appHTTP/resource
+rerun1pass175.06s. All11unique direct/proxy/public endpoint cases pass across recorded
+resumes. Reports8files438stmt98branches/API66/0/sharedresponses48/18 exact per-file100%;
+M29disjoint22file1124/196 retains its separately documented fresh/stable sources.
+Actual SQL independent-oracles/replay/date-move/snapshot/read-only and101+full exports
+pass, plus automated rendered-page text/geometry/raster/glyph checks (no human claim).
+Shared405Allow-header defect fixed with HTTP regression and428boundary; no new helper.
+All commands/failures/artifacts/scopes in [M30](../reports/VERIFICATION.md) and
+[M29](../document_corrections/VERIFICATION.md). Earlier unsupported image-review claims
+are explicitly retracted there rather than treated as evidence.
+
+Backend frozenbuild/recreate healthy; frontendunchanged; same public ngrokdomain
+upstream8000healthy. Live30tableintegrity411documents/30agencies/24products and
+immutable receipt774/payment37/10200VND/oneevent retained. No migration/seedreset/
+provideraction/livebusinessmutation/commit/push. Only M31/M32business operations remain
+unpublished; fullR5/R6 system/recovery/runtime-role/backup/performance/browser and
+external terminalbankrefund remain separateopen gates.
+
+## Full M29 publication - 2026-10-29
+
+All twelve owning correction/cancel operations deployed:147business+2health at0009.
+Freshgoods14PG1984.30s, HTTPnegative1PG130.52s, owningoffline14pass4.07s; stable28case
+financialservices/16caseclosure/8caseHTTP are retained overlapping evidence, not added
+as unique freshcases. Owning22file1124stmt196branches exact100% uses disjoint scopes;
+aggregator64/0exact separately. Normal-app36cases17.37s and3direct/proxy/public cases
+14.11s pass. Full commands/artifacts/reviewfix in [M29](../document_corrections/VERIFICATION.md).
+Existingbackend frozenbuild/recreatehealthy; frontendunchanged; ngroksameconfigured
+domain/upstream8000. Readonly30tableliveintegrity411documents/30agencies/24products
+and protectedreceipt774/payment37/10200VND/oneevent pass, alembiccurrent0009head.
+No migration/seed/provider/livebusinessmutation/commit. M30actualPGverificationactive;
+M31/M32/fullR5/R6 and terminalexternalbankrefund remainopen.
+
 ## M29 internal goods/manual cash — 2026-10-25
 
 Actually passed572defaultoffline,27unique owningPG(16goods+11manual) and12retainedPG

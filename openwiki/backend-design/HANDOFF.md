@@ -1,5 +1,105 @@
 # Handoff: hoàn tất backend Agentra DMS
 
+## Current Pre-Push Review - 2026-10-30
+
+Current source includes three review fixes: isolated report test artifacts, early
+dashboard JWT rejection without weakening live snapshot auth, and exact sales-rate
+HALF_UP arithmetic. Final1088offline pass; reports/dashboard/API/responses measured
+717statements/140branches exact100%. New actual-PG eight-boundary percentage node,
+all-report source/ledger oracle rerun and independently generated PDF geometry pass.
+Supabase0009/live30tableintegrity411documents/30agencies/24products pass without reset
+or business mutation. Docker Engine is currently unavailable and local8000/8080
+endpoints are unreachable; no rebuild/redeploy was performed. All earlier image/
+hash/health observations are historical, not parity for today's changed source.
+Full PG/deployment/browser gates were not rerun. See full_backend/VERIFICATION.md
+for actual commands and limitations.
+
+## M31 complete; next M32 with AI API - 2026-10-29 (latest)
+
+M31 is complete/published:153/154business+2health at source/image/configured0009,
+only chatbot absent. Final1084offline (291dashboard),14unique owningM31PG and
+3direct/proxy/public dashboard cases pass;8retained deployment cases pass on the
+same image. Dashboard6files161statements24branches/API68/0 exact per-file100%.
+No concrete production finding remains after independent review and missing DP07/
+DP08 witnesses were added/passed. Exact commands/scopes/failure resolutions in
+[dashboard VERIFICATION](plan/dashboard/VERIFICATION.md). The real429 regression
+fixed omitted shared HTTP limiting; rate check runs after same-snapshot auth/grants
+and before any domain metric. D09 canonical policy was not expanded or rewritten.
+All240app Python hashes match running image; live411documents/30agencies/24products
+and receipt774/payment37/10200VND/oneevent retained. ExistingDocker/ngrok healthy,
+frontend unchanged; no commit/push/newDB/seedreset/provider action.
+
+Latest user instruction: finish M31 dashboard first, and edit this handoff for M32.
+User confirms possessing an AI API and selects AI-assisted chatbot interpretation.
+Do not implement M32 or call any AI provider during the M31 packet. Provider, base
+URL, model, auth format, limits and data-retention policy have not been supplied;
+do not guess them or request/print secrets in chat. Configure future credentials
+server-side through reviewed Settings and ignored environment files, never frontend.
+
+M32 must preserve the read-only AGENCY_DEBT/INVENTORY/SALES whitelist. The AI may
+interpret supported questions into validated structured intent/entity/date inputs,
+not execute SQL, choose arbitrary tools/URLs, alter documents/payments or override
+the requested queryType. Check existing debt.read/inventory.read/sales.read before
+entity or financial lookup and before sending protected context to a provider.
+Minimize provider data: no tokens, credentials, contacts, provider evidence or bulk
+financial datasets. Backend readers calculate exact money/quantity; AI-generated
+numbers never replace authoritative results. Consider deterministic answer templates
+after validated tool results. Prompt injection, malformed/extra model output,
+timeouts/429/5xx and unavailable provider must fail safely without policy bypass,
+secret leakage or fabricated successful answers. No mandatory conversation store.
+
+D10 remains required before M32: signed scope-bound candidate-only continuation
+under the same intent grant, minimal code/name/district, no broadened agency-profile
+permission. Test26+matches, cursor tampering/context changes and final one/empty
+pages; one candidate on a continuation page does not resolve original ambiguity.
+AI integration does not itself resolve D10 or authorize wider data access.
+
+Next worker starts M32 from this handoff: expand its owning six-file plan first,
+resolve D10 in the single canonical contract, then implement bounded AI intent
+interpretation and authorized exact readers. Do not reopen completed M31 or older
+M29/M30 baselines without an affected dependency. Whole R5/R6, external terminal bank
+refund settlement and final system/recovery/backup/browser gates remain open.
+All runtime numbers in checkpoints below are historical.
+
+## M29-M30 publication checkpoint - 2026-10-29
+
+User-requested M29/M30 work is complete. Existing dms now publishes152/154business+
+2health at source/image/configured Supabase0009. All12owning corrections/cancels and
+all5reports(JSON/XLSX/PDF) are available; dashboard/chatbot alone remain unpublished.
+Final1083offline (191reports),11unique owningM30PG across serial resumes plus normal-app
+HTTP/resource rerun, and11unique direct/proxy/public endpoint cases pass. Exact per-file
+coverage reports438/98/API66/0/sharedresponses48/18; M29disjoint22files1124/196 retained
+separately. Automated actual PDF text/geometry/raster/glyph checks pass, not human
+visual inspection. Original unsupported PNG image-review claims are retracted.
+
+Source/runtime publication, fixture failures and their superseding passes, exact
+commands/artifacts: [reports VERIFICATION](plan/reports/VERIFICATION.md) and
+[M29 VERIFICATION](plan/document_corrections/VERIFICATION.md). All earlier dependent
+M29 operation checklists have closure links. Plan validator sourcehead baseline is0009.
+Existing Docker backend/frontend healthy; only backend rebuilt. Ngrok persistent
+same configured publicdomain upstream8000, readiness200. Live30tablesintegrity and
+411documents/30agencies/24products/receipt774/payment37/10200VND/oneevent retained.
+No livebusinessmutation/seedreset/newDB/provideraction/commit/push in this delivery.
+
+Next: M31 dashboard then M32 chatbot, followed by full R5/R6 acceptance/race/recovery/
+backup/runtime-role/performance/browser release gates. Preserve dashboard userWIP;
+only an empty integration-test package marker was added to prevent collection collision.
+M31 should reuse ReportQueries.statement/exact projection inside one outer snapshot
+with its own per-section authorization, not inherit reports.read or invoke public
+report routes. External refund terminal bank settlement remainsPENDING and out of
+scope. Do not rerun unrelated completed baselines or create extra DB/services/servers.
+
+## Full M29 publication checkpoint - 2026-10-29
+
+All12M29 correction/cancel operations deployed:147business+2health,0009head. Owning
+disjoint22files1124stmt196branches exact100%; API64/0separate;36sourcecases+3direct/
+proxy/public cases pass. Latest owning VERIFICATION records actual commands/artifacts.
+Live30tablesintegrity411documents/30agencies/24products and immutable receipt774/
+payment37/10200VND/oneevent preserved. ExistingDockerhealthy; frontend unchanged;
+ngrok restored persistent same configured domain/upstream8000. No seedreset or live
+businessmutation. M30 actualPGverification active, reports not published yet; continue
+M30 then M31/M32 and fullreleasegates. Older entries below are historical.
+
 Ngày bàn giao: 2026-10-25. Workspace: `D:\WorkSpace\projects\DMS`.
 Mục tiêu phiên tiếp theo: triển khai backend còn lại theo thứ tự **M29 → M30 → M31 → M32**, rồi hoàn tất các gate release còn mở.
 

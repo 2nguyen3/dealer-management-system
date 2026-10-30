@@ -3,6 +3,27 @@
 Use the [General Checklist](../../GENERAL_CHECKLIST.md) for M01–M32 implementation
 status. This checklist tracks execution-design and whole-program acceptance.
 
+## M31 owning completion - 2026-10-29
+
+- [x] getDashboard published153/154business+2health/0009 with unchanged D09.
+- [x] Full1084offline/291dashboard,14uniquePG,3dashboard+8retained deployed cases;
+  [evidence](../dashboard/VERIFICATION.md),161/24module+68/0API exact100%.
+- [x] M32 handoff records user-selected AI API and required D10/provider/privacy/
+  error boundaries, not a provider/key/config/implementation or publication claim.
+- [ ] Whole R5/R6/system/recovery/backup/browser/terminalbankrefund remains separate.
+
+
+## M29-M30 owning completion - 2026-10-29
+
+- [x] M29 all twelve owning posted correction/cancel operations and dependent owning
+  inventories complete/published: [evidence](../document_corrections/VERIFICATION.md).
+- [x] M30 all five JSON/full-filter XLSX/PDF reports complete/published with independent
+  ledger/replay/snapshot/read-only/resource/rendered-output evidence: [evidence](../reports/VERIFICATION.md).
+- [x] Runtime152/154business+2health at0009 matches current canonical publication;
+  final1083offline,11unique owningM30PG and11unique deployed endpoint cases pass.
+- [ ] Whole R5/R6 release acceptance and prerequisites remain separate; terminal bank
+  refund, M31/M32, final system/races/recovery/backup/browser gates are not closed here.
+
 ## Planning package
 
 - [x] Inspect working-tree backend, UI, deployment and relevant OpenWiki authorities.
