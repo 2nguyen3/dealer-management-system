@@ -1,5 +1,18 @@
 # M02 verification log
 
+## HTTP framework headers preserved - 2026-10-29
+
+M29/M30 publication exposed the business HTTPException projection dropping405Allow.
+`http_error_handler` now passes framework headers to ApiError while retaining the
+generic safe body. New `test_method_not_allowed_preserves_framework_allow_header`
+and `test_required_precondition_header_validation_is_428` cover real HTTP/error/schema/
+request-ID and mandatory precondition failure/success. Existing400/privacy/auth tests
+remain passing. No constructor/helper was added; SA03 actual-symbol register updated.
+Final full offline1083pass200.43s; responses.py48statements18branches exact100% with
+zero missing/excluded/partial branches. Source API66/0 and reports438/98 exact separately.
+Deployed old-wrong-method expectation updated404to405; all11unique endpoint cases
+pass across direct/proxy/public resumes. [Full evidence](../reports/VERIFICATION.md).
+
 ## Module-layout preservation — 2026-10-04
 
 Shared primitives and HTTP transport now live in `app.common`; exception types

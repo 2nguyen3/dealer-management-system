@@ -91,7 +91,10 @@ async def auth_error_handler(request: Request, error: AuthError) -> JSONResponse
 async def http_error_handler(request: Request, error: HTTPException) -> JSONResponse:
     if business_path(request):
         return api_error_response(
-            request, ApiError(error.status_code, "BAD_REQUEST", "Invalid HTTP request")
+            request,
+            ApiError(
+                error.status_code, "BAD_REQUEST", "Invalid HTTP request", headers=error.headers
+            ),
         )
     if not request.url.path.startswith("/api/v1/auth/"):
         from fastapi.exception_handlers import http_exception_handler

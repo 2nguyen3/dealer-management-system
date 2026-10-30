@@ -47,6 +47,10 @@ def client(settings):
     async def raw(request: Request):
         return {"length": len(await request.body())}
 
+    @router.post("/required-header")
+    def required_header(match: Annotated[str, Header(alias="If-Match")]):
+        return {"etag": match}
+
     @router.get("/catalog/{identifier}")
     def catalog_parameter(identifier: CatalogParameter):
         return {"id": identifier}
@@ -111,6 +115,21 @@ def test_business_errors_are_safe(client, content, headers, status):
     assert_schema(response.json(), "Error")
     if status == 422:
         assert response.json()["fieldErrors"][0]["field"] in ("/amount", "/password")
+
+
+def test_method_not_allowed_preserves_framework_allow_header(client):
+    response = client.get("/api/v1/probe")
+    assert response.status_code == 405 and "POST" in response.headers["Allow"]
+    assert response.json()["requestId"] == response.headers["X-Request-Id"]
+    assert_schema(response.json(), "Error")
+
+
+def test_required_precondition_header_validation_is_428(client):
+    response = client.post("/api/v1/required-header")
+    assert response.status_code == 428 and response.json()["code"] == "PRECONDITION_REQUIRED"
+    assert_schema(response.json(), "Error")
+    success = client.post("/api/v1/required-header", headers={"If-Match": '"current"'})
+    assert success.status_code == 200 and success.json() == {"etag": '"current"'}
 
 
 def test_bodyless_raw_and_preconditions(client):
