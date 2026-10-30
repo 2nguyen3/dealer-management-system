@@ -29,7 +29,7 @@ def test_published_payment_refund_history_and_vietnamese_pdf(variable):
         assert login.status_code == 200
         client.headers["Authorization"] = "Bearer " + login.json()["accessToken"]
         schema = client.get("/api/openapi.json").json()
-        assert sum(len(methods) for methods in schema["paths"].values()) == 143
+        assert sum(len(methods) for methods in schema["paths"].values()) == 155
         payment = client.get(f"/api/v1/online-payments/{payment_id}")
         assert payment.status_code == 200
         assert_schema(payment.json(), "OnlinePayment")
@@ -63,4 +63,5 @@ def test_published_payment_refund_history_and_vietnamese_pdf(variable):
         assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
         extracted = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf.content)).pages)
         assert "Phiếu thu tiền" in extracted and "ĐÃ GHI SỔ" in extracted
-        assert client.get("/api/v1/stock-receipts/1/corrections").status_code == 404
+        wrong_method = client.get("/api/v1/stock-receipts/1/corrections")
+        assert wrong_method.status_code == 405 and "POST" in wrong_method.headers["Allow"]

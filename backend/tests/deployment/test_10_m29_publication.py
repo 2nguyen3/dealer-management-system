@@ -6,11 +6,13 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from tests.support.contract import SOURCE
+
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
 
 @pytest.mark.parametrize("variable", ["M29_DIRECT_URL", "M29_PROXY_URL", "M29_PUBLIC_URL"])
-def test_six_ready_operations_are_published_without_incomplete_handlers(variable):
+def test_all_correction_operations_are_published(variable):
     base = os.environ.get(variable)
     if not base:
         pytest.fail("Explicit existing development URL required")
@@ -22,14 +24,43 @@ def test_six_ready_operations_are_published_without_incomplete_handlers(variable
         specification = client.get("/api/openapi.json")
         assert specification.status_code == 200
         paths = specification.json()["paths"]
-        operations = {
+        operations = [
             operation["operationId"]
             for methods in paths.values()
             for method, operation in methods.items()
             if method in {"get", "post", "patch", "put", "delete"}
+        ]
+        assert len(operations) == len(set(operations))
+        canonical = {
+            operation["operationId"]
+            for methods in SOURCE["paths"].values()
+            for operation in methods.values()
+            if isinstance(operation, dict) and "operationId" in operation
         }
-        assert len(operations) == 143
-        for owner in ("stock-receipts", "stock-adjustments", "payment-receipts"):
+        published = {
+            operation["operationId"]
+            for path, methods in paths.items()
+            if not path.startswith("/api/v1/health")
+            for method, operation in methods.items()
+            if method in {"get", "post", "patch", "put", "delete"}
+        }
+        unpublished_read_products = {
+            operation["operationId"]
+            for path, methods in SOURCE["paths"].items()
+            if path.startswith(("/reports/", "/dashboard", "/chatbot/"))
+            for operation in methods.values()
+            if isinstance(operation, dict) and "operationId" in operation
+        }
+        assert published <= canonical
+        assert canonical - published <= unpublished_read_products
+        for owner in (
+            "stock-receipts",
+            "stock-adjustments",
+            "payment-receipts",
+            "stock-issues",
+            "sales-returns",
+            "credit-applications",
+        ):
             for action in ("corrections", "cancel"):
                 path = f"/api/v1/{owner}/{{documentId}}/{action}"
                 assert "post" in paths[path]
@@ -40,9 +71,8 @@ def test_six_ready_operations_are_published_without_incomplete_handlers(variable
                 )
                 assert denied.status_code == 401, denied.text
                 assert denied.headers.get("X-Request-Id")
-        for owner in ("stock-issues", "sales-returns", "credit-applications"):
-            for action in ("corrections", "cancel"):
-                assert f"/api/v1/{owner}/{{documentId}}/{action}" not in paths
+        assert paths["/api/v1/dashboard"]["get"]["operationId"] == "getDashboard"
+        assert "/api/v1/chatbot/queries" not in paths
         options = client.options(
             "/api/v1/payment-receipts/999999999/cancel",
             headers={

@@ -65,7 +65,7 @@ def test_owning_operations_match_canonical_contract(runtime, path, method, expec
     for definition in SOURCE["paths"][path].get("parameters", []) + expected.get("parameters", []):
         parameter = resolve(definition)
         generated = parameters.pop(parameter["name"])
-        assert generated["required"] == parameter.get("required", False)
+        assert generated.get("required", False) == parameter.get("required", False)
         schema = generated["schema"]
         if "anyOf" in schema:
             schema = next(item for item in schema["anyOf"] if item.get("type") != "null")
@@ -96,15 +96,39 @@ def test_owning_operations_match_canonical_contract(runtime, path, method, expec
             )
 
 
-def test_ready_m29_owning_routes_are_present_and_incomplete_routes_are_unmounted(runtime):
-    for prefix in ("stock-receipts", "stock-adjustments", "payment-receipts"):
+def test_all_m29_owning_routes_are_published(runtime):
+    for prefix in (
+        "stock-receipts",
+        "stock-adjustments",
+        "payment-receipts",
+        "stock-issues",
+        "sales-returns",
+        "credit-applications",
+    ):
         for action in ("cancel", "corrections"):
             path = f"/api/v1/{prefix}/{{documentId}}/{action}"
             assert path in runtime["paths"]
             assert runtime["paths"][path]["post"]["x-permissions"]["allOf"][0] == (
                 "documents.cancel" if action == "cancel" else "documents.correct"
             )
-    for prefix in ("stock-issues", "sales-returns", "credit-applications"):
-        for action in ("cancel", "corrections"):
-            assert f"/api/v1/{prefix}/{{documentId}}/{action}" not in runtime["paths"]
     assert len(OWNED) == 22
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        (path, methods["get"])
+        for path, methods in SOURCE["paths"].items()
+        if path.startswith("/reports/")
+    ],
+)
+def test_published_report_contract_matches_all_source_schemas_and_media(runtime, path, expected):
+    test_owning_operations_match_canonical_contract(runtime, path, "get", expected)
+    actual = runtime["paths"]["/api/v1" + path]["get"]
+    source_content = resolve(expected["responses"]["200"])["content"]
+    actual_content = actual["responses"]["200"]["content"]
+    assert set(actual_content) == set(source_content)
+    for media, definition in source_content.items():
+        assert_schema_constraints(
+            definition["schema"], actual_content[media]["schema"], SOURCE, runtime
+        )

@@ -18,7 +18,9 @@ def test_source_packet_preserves_provider_operations_with_owning_corrections():
         for operation in methods.values()
         if isinstance(operation, dict) and "operationId" in operation
     }
-    assert len(business) == 141 and business <= canonical
+    assert len(business) == 153
+    assert canonical - business == {"queryChatbot"}
+    assert business <= canonical
     assert {
         "createOnlinePayment",
         "receiveVerifiedPaymentWebhook",
@@ -35,14 +37,17 @@ def test_source_packet_preserves_provider_operations_with_owning_corrections():
             "StockReceipt",
             "PaymentReceipt",
             "StockAdjustment",
+            "StockIssue",
+            "SalesReturn",
+            "CreditApplication",
         )
     } <= business
-    assert (
-        not {
-            prefix + suffix
-            for prefix in ("correct", "cancel")
-            for suffix in ("StockIssue", "SalesReturn", "CreditApplication")
-        }
-        & business
-    )
-    assert "/api/v1/reports/sales" not in document["paths"]
+    assert {
+        "getSalesReport",
+        "getDebtReport",
+        "getInventoryReport",
+        "getProductSalesReport",
+        "getCashAndCreditReport",
+    } <= business
+    assert document["paths"]["/api/v1/dashboard"]["get"]["operationId"] == "getDashboard"
+    assert "/api/v1/chatbot/queries" not in document["paths"]

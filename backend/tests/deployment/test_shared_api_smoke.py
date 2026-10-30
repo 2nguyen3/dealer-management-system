@@ -28,5 +28,5 @@ def test_shared_browser_headers_and_safe_errors(variable):
         runtime = client.get("/api/openapi.json").json()
         assert (
             len([op for path, methods in runtime["paths"].items() for op in methods.values()])
-            == 143
+            == 155
         )
