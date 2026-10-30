@@ -2,7 +2,13 @@
 
 Prepared 2026-10-25 before implementation. Prerequisite: M28 published checkpoint.
 Authority: [GENERAL_PLAN](../../GENERAL_PLAN.md), [E19](../full_backend/EXECUTION.md#5-where-to-spend-detailed-design-effort),
-[canonical contract](../../API/openapi.json). Status: active; no M29 operation published.
+[canonical contract](../../API/openapi.json). Status2026-10-29: all twelve owning
+operations published at0009; final M29/M30 runtime152business+2health. Service/financial/HTTP gates,
+reviewed goods red/green regression,36normal-app source cases and3direct/proxy/public
+deployment cases pass. Affected22files1124statements196branches exact100% per file;
+M29-only aggregator64/0exact; final aggregator66/0exact separately in M30 evidence.
+M29 is complete; full release gates remain separate.
+Commands and protected live integrity are in [VERIFICATION](VERIFICATION.md).
 
 ## Scope and ownership
 

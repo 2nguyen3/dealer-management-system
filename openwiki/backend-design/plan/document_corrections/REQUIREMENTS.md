@@ -21,3 +21,17 @@ Source precedence: selected database business decisions and canonical API, revie
 SQL constraints, owning verified services. A discovered conflict is evidence to
 resolve, never permission to suppress a failing test or bypass a trigger. Deployed
 0001–0007 remain immutable; allocate a new revision only after a concrete witness.
+
+## Verified Requirement Mapping - 2026-10-29
+
+C01/C02/C04/C11/C12 use goods lifecycle/guards/races plus the reviewed historical
+reintroduction regression. C03 uses retained eight-case realPG HTTP allOf/cancel-only/
+conditional-cash/retry tests, live separate-connection revocation races and the new
+all-twelve-owner unauthenticated/wrong-kind/media/JSON negative case. C05-C10 use
+the retained stable28-case issue/return/credit selection,16-case financial closure,
+manual source protection and retained M16 replay/reservations. These selections
+overlap; they are not summed as distinct cases. C13 uses actual0007/0008 witnesses
+and0008/0009 migration/admission evidence. C14 uses independent goods/manual and
+three financial period oracles, not coverage or a report implementation claim.
+Exact artifact/command/scope remains in VERIFICATION. All twelve operation source and
+direct/proxy/public publication gates pass; full R5/R6 release completion is separate.

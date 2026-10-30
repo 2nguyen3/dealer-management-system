@@ -1,5 +1,9 @@
 # M29 design
 
+Implementation/publication2026-10-29: all twelve owning operations use normal
+aggregator composition and are deployed on existing dms at0009. Full M29 evidence is
+in [VERIFICATION](VERIFICATION.md); no new runtime or generic correction API was added.
+
 ## Keep existing boundaries
 
 Use M13 DocumentService/DocumentRepository, InventoryRepository.reverse_revision and
@@ -54,14 +58,21 @@ versus actual. Select a narrowly scoped historical-successor allowance only if t
 selected requirements demand it. New goods/first postings retain active admission.
 Never insert directly as POSTED, disable constraints or alter immutable snapshots.
 
-### Implemented receipt policy (source0008, not deployed)
+### Implemented receipt policy (deployed0008, current head0009)
 
 The 0007 witness failed with23514 on a successor retaining an inactive original
 product. Reviewed additive0008 now permits only receipt goods already present with
 the same product/unit in a POSTED revision of that document. The service preserves
 their recorded product/unit names. First posting and newly introduced inactive goods
 remain rejected by both service and SQL. Adjustment admission is unchanged. Stock
-issue/terminated-agency D15 policy is still a later slice;0008 does not relax it.
+issue/terminated-agency policy is separately implemented by0009;0008 does not relax it.
+
+Historical goods lookup uses the latest POSTED snapshot for each product across the
+same document, not just its current revision. Removing a product in an intermediate
+correction does not erase its recorded names/unit or its historical eligibility.
+Unrelated documents and never-posted lines do not confer eligibility. The2026-10-29
+independent review found the prior current-revision-only lookup; the realPG red/green
+regression and affected current-file gate are recorded in VERIFICATION.
 
 ### Next internal manual cash slice
 
@@ -80,7 +91,7 @@ until owning full-operation tests and deployment gates pass.
 
 ## Issue correction/cancel implementation continuation
 
-`IssueCorrectionService` will lock discovered old/replacement products and stock,
+`IssueCorrectionService` locks discovered old/replacement products and stock,
 then agency/history, current issue and linked upfront evidence. Recheck product
 discovery and allOf grants after waits. Preserve original agency/price/rate/limit
 snapshots unless the canonical correction payload explicitly corrects price/rate;
@@ -100,6 +111,9 @@ issue cancellation. All source effects, audit and command results remain atomic.
 D15 issue retirement/termination is reproduced at0008 before a new reviewed revision.
 Historical same-document/product/unit eligibility must not admit first postings or
 new inactive products; no deployed SQL snapshot is edited.
+The retained0009 fresh/populated downgrade/re-upgrade and three admission cases pass
+for product/unit/agency retirement. Same-document historical agency/product/unit
+snapshots remain eligible; first/new inactive admission remains denied.
 
 ## Return and credit correction continuation
 
