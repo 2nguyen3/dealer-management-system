@@ -1,9 +1,6 @@
 import pytest
 
 from app.main import create_app
-from app.modules.credit_applications.router import correction_router as credit_corrections
-from app.modules.sales_returns.router import correction_router as return_corrections
-from app.modules.stock_issues.router import correction_router as issue_corrections
 from tests.online_payments.test_vnpay import config
 from tests.support.contract import SOURCE
 from tests.workflows.test_contract import (
@@ -26,10 +23,7 @@ OWNED = {
 
 @pytest.fixture(scope="module")
 def runtime():
-    app = create_app(config())
-    for router in (issue_corrections, return_corrections, credit_corrections):
-        app.include_router(router, prefix="/api/v1")
-    return app.openapi()
+    return create_app(config()).openapi()
 
 
 @pytest.mark.parametrize(
@@ -54,4 +48,25 @@ def test_source_operation_inventory_has_no_extra_generic_correction_api(runtime)
     }
     assert OWNED <= actual and len(OWNED) == 12
     assert "/api/v1/documents/{documentId}/corrections" not in runtime["paths"]
-    assert len(actual) == 149
+    canonical = {
+        operation["operationId"]
+        for methods in SOURCE["paths"].values()
+        for operation in methods.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    }
+    business = {
+        operation["operationId"]
+        for path, methods in runtime["paths"].items()
+        if not path.startswith("/api/v1/health")
+        for operation in methods.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    }
+    assert business <= canonical
+    unpublished_read_products = {
+        operation["operationId"]
+        for path, methods in SOURCE["paths"].items()
+        if path.startswith(("/reports/", "/dashboard", "/chatbot/"))
+        for operation in methods.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    }
+    assert canonical - business <= unpublished_read_products

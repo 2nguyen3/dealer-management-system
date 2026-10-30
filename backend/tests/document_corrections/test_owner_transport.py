@@ -34,6 +34,30 @@ from fastapi import Response
             "ManualReceiptCorrectionService",
             "cancel",
         ),
+        (
+            "stock_issues",
+            "stock_issue",
+            "stock_issues",
+            "update_stock_issue",
+            "IssueCorrectionService",
+            "cancel",
+        ),
+        (
+            "sales_returns",
+            "sales_return",
+            "sales_returns",
+            "update_sales_return",
+            "ReturnCorrectionService",
+            "cancel",
+        ),
+        (
+            "credit_applications",
+            "credit_application",
+            "credit_applications",
+            "update_credit_application",
+            "CreditCorrectionService",
+            "cancel",
+        ),
     ],
 )
 def test_owner_handlers_delegate_and_preserve_transport(
@@ -71,6 +95,17 @@ def test_owner_handlers_delegate_and_preserve_transport(
         )
         assert posted.status_code == 201
         service.post.assert_called_once_with(7, condition, key)
+        if module == "stock_issues":
+            service.submit.return_value = result
+            submitted = router.submit_stock_issue("7", principal, service, request, '"match"', key)
+            assert submitted.status_code == 201
+            service.submit.assert_called_once_with(7, condition, key)
+            service.replace_pending.return_value = result
+            revised = router.replace_pending_stock_issue(
+                "7", body, principal, service, request, '"match"', key
+            )
+            assert revised.status_code == 201
+            service.replace_pending.assert_called_once_with(7, body, condition, key)
         with patch.object(router, correction_class) as correction:
             correction.return_value.correct.return_value = result
             getattr(correction.return_value, action).return_value = result
@@ -84,3 +119,32 @@ def test_owner_handlers_delegate_and_preserve_transport(
                 getattr(correction.return_value, method).assert_called_once_with(
                     7, body, condition, key
                 )
+
+
+@pytest.mark.parametrize(
+    "module,singular,correction_class",
+    [
+        ("stock_issues", "stock_issue", "IssueCorrectionService"),
+        ("sales_returns", "sales_return", "ReturnCorrectionService"),
+        ("credit_applications", "credit_application", "CreditCorrectionService"),
+    ],
+)
+def test_financial_correction_handlers_preserve_command_transport(
+    module, singular, correction_class
+):
+    router = import_module(f"app.modules.{module}.router")
+    service, principal, body, request, condition = (Mock() for _ in range(5))
+    key = uuid4()
+    with (
+        patch.object(router, "read_preconditions", return_value=condition),
+        patch.object(router, correction_class) as factory,
+    ):
+        for action, status in (("correct", 201), ("cancel", 200)):
+            result = SimpleNamespace(body={"id": "7"}, status=status, headers={"ETag": '"current"'})
+            getattr(factory.return_value, action).return_value = result
+            response = getattr(router, f"{action}_{singular}")(
+                "7", body, principal, service, request, '"match"', key
+            )
+            assert response.status_code == status and response.body == b'{"id":"7"}'
+            assert response.headers["ETag"] == '"current"'
+            getattr(factory.return_value, action).assert_called_once_with(7, body, condition, key)
