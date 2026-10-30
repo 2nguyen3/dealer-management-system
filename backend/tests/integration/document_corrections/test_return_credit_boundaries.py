@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -43,6 +44,18 @@ def test_return_validation_failures_preserve_every_persisted_effect(engine, acto
         ]
         identifier = post_return(owner, invoices[0], lines[0], "1", "2026-01-03")
         token = match(owner, identifier)
+        correction = ReturnCorrectionService(owner)
+        with pytest.raises(ApiError, match="RETURN_SOURCE_CONFLICT"):
+            correction.prepare(
+                owner.core.repo.document(identifier),
+                owner.repo.origin(invoices[0]),
+                SalesReturnCorrection(
+                    businessDate="2026-01-03",
+                    reason="Missing discovered source product",
+                    lines=[{"originLineId": str(lines[0]), "quantity": "1"}],
+                ),
+                {},
+            )
     before = snapshot(engine)
     for payload, code in (
         ([{"originLineId": str(lines[0]), "quantity": "1"}] * 2, "DUPLICATE_PRODUCT"),
@@ -114,7 +127,18 @@ def test_draft_return_can_cancel_after_origin_cancel_without_revision_or_ledgers
         assert snapshot(engine) == before
         token, key = match(owner, identifier), uuid4()
         reason = Reason(reason="Discard draft with cancelled origin")
-        result = correction.cancel(identifier, reason, token, key)
+        original = owner.repo.agency_products
+        calls = 0
+
+        def rediscover(agency):
+            nonlocal calls
+            calls += 1
+            found = original(agency)
+            return found + (999999,) if calls == 2 else found
+
+        with patch.object(owner.repo, "agency_products", side_effect=rediscover):
+            result = correction.cancel(identifier, reason, token, key)
+        assert calls == 4
         assert result.body["status"] == "CANCELLED" and result.body["inventoryChanges"] == []
         assert correction.cancel(identifier, reason, token, key) == result
     after = snapshot(engine)
@@ -281,7 +305,8 @@ def test_credit_replacement_cannot_spend_protected_return_credit(engine, actor, 
     before = snapshot(engine)
     for day, amount, code in (
         ("2026-01-05", "100", "INSUFFICIENT_CREDIT"),
-        ("2026-01-02", "50", "PAYMENT_EXCEEDS_DEBT"),
+        # Credit does not exist until the Jan04 return, even though Jan02 has debt.
+        ("2026-01-02", "50", "INSUFFICIENT_CREDIT"),
         ("2025-12-31", "50", "AGENCY_CONFLICT"),
     ):
         with Session(engine) as session, pytest.raises(ApiError) as failure:
