@@ -1,9 +1,14 @@
 # M23 — sales returns core
 
+Completion2026-10-29: [M28 lines/history](../document_history/VERIFICATION.md) and
+[M29 posted correction/cancel](../document_corrections/VERIFICATION.md) are published.
+Immutable return-credit lots and reserved/paid refund provenance remain protected.
+Original core scope below is historical; whole R5/R6 remains separate.
+
 Prepared 2026-10-17 before code. Direct prerequisite M20; execute after M21/M22 packet.
 Own listSalesReturns/getSalesReturn/createSalesReturn/updateSalesReturnDraft/postSalesReturn
-and internal draft cancellation. Full posted correction/cancel remain M29; public
-line/history operations remain M28. Five operations publish only after complete gates.
+and internal draft cancellation. Full posted correction/cancel belong to completed M29;
+public line/history operations to completed M28. Publish only after complete gates.
 
 Vertical slices: source-bound draft/prices → cumulative rounding → stock+financial
 posting → immutable dependent-return replacement → protected provenance → full tests.

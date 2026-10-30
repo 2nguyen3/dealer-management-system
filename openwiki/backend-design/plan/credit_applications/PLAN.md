@@ -1,5 +1,10 @@
 # M25 — credit applications core
 
+Completion2026-10-29: [M29 full posted correction/cancel](../document_corrections/VERIFICATION.md)
+is published, preserving same-agency provenance/reservations, exact amount and zero
+new cash. Original core scope below is historical; the owning operation inventory
+is complete while whole R5/R6 remains separate.
+
 Prepared 2026-10-22 before implementation. Prerequisite: M24's verified available-credit
 reader and M16's seven-kind chronological settlement replay. Canonical contract:
 `../../API/openapi.json`; owning work package:

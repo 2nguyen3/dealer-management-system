@@ -6,5 +6,5 @@
 - [x] Real chronology/provenance/rollback and independent races pass.
 - [x] Canonical HTTP transport/permissions and exact owning/shared coverage pass.
 - [x] Relevant M16–M20 regressions, review, deployment and handoff pass.
-- [ ] Posted correction/full cancellation (M29 deferred).
-- [ ] Public line/history operations (M28 deferred).
+- [x] Posted correction/full cancellation: [M29 publication evidence](../document_corrections/VERIFICATION.md).
+- [x] Public line/history operations: [M28 publication evidence](../document_history/VERIFICATION.md).

@@ -7,4 +7,4 @@
 - [x] Retained prerequisite regression passes:370PG/TLS nodes;308offline overall.
 - [x] M19 consumer and deployment smoke recorded.
 - [x] Roadmap/availability/evidence aligned with verified core delivery.
-- [ ] Full module: M29 posted correction/cancellation (deferred).
+- [x] Full module M29 posted correction/cancellation: [publication evidence](../document_corrections/VERIFICATION.md).

@@ -7,4 +7,4 @@
 - [x] Exact per-file statement/branch coverage and retained M16/M24 regressions pass.
 - [x] Standards/specification review and direct/proxy deployment evidence pass.
 - [x] Update roadmap, availability and frontend handoff with verified core scope.
-- [ ] M29: posted correction and complete public cancellation (deferred).
+- [x] M29 posted correction and complete public cancellation: [publication evidence](../document_corrections/VERIFICATION.md).
