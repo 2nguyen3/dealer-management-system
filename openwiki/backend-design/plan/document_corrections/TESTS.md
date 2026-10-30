@@ -22,7 +22,7 @@ Current implemented goods symbols (module prefix `app.modules.document_correctio
 | --- | --- |
 | `GoodsCorrectionService.__init__` | Both goods kinds in PG lifecycle; unsupported cash kind in offline schemas. |
 | `.command` and its `authorize`, `work`, `project` closures | Both correction/cancel, kind/state/precondition/key guards, live allOf/cancel-only completed replay, observed grant revocation and changed-product rediscovery races. |
-| `.replace` | Receipt/adjustment successor, changed/removed goods/date/price; duplicates, integer fraction, rounded zero, total overflow; inactive historic snapshots vs inactive new goods. |
+| `.replace` | Receipt/adjustment successor, changed/removed goods/date/price; duplicates, integer fraction, rounded zero, total overflow; inactive historic snapshots vs inactive new goods. Independent-review realPG regression covers removal/reintroduction after rename and retirement, retaining same-document POSTED snapshot names/unit and all prior rows. |
 | `.reverse` | Exact original date/order reversal; repeated successors and injected post-reverse rollback. |
 | `.cancel` | DRAFT/POSTED for both kinds; canceled state/count link/history blockers; retained lines/revisions. |
 | `.check_stock` | Positive current with negative past/removed goods rejected; zero stock allowed; stored overflow rejected. |
@@ -34,12 +34,12 @@ Current implemented goods symbols (module prefix `app.modules.document_correctio
 | `manual_receipts.ManualReceiptCorrectionService.reverse`, `.correct`, `.cancel` | Original financial reversals; injected failure after reverse/replay/projection restores source/revisions/ledgers/audit/command; observed competing post/one-key/grant-wait races. |
 | `payment_receipts.schemas.PaymentReceiptCorrection` | Canonical manual methods/exact amount; reject ONLINE, identity/type override, missing amount, blank reason and numeric/precision/zero input. |
 | Changed `settlement_core.service.WRITERS`; existing `.lock`, `.replay` behavior | documents.correct/post allOf; documents.cancel alone with actual live grants and replay, revoked grant after balance wait; actual return plus ACTIVE/CONSUMED refund sources;10retained M16 cases. |
-| `issues.IssueCorrectionService.__init__`, `.evidence`, `.run` and authorization/work/projection closures | Zero-upfront correction/cancel; VERIFIED/CONSUMED cancellation and completed retry, conditional grant enforcement through final check; six-owner real HTTP lifecycle. Real competing issue/cash winners and one-key successor race. Dependency-rediscovery/full race matrix remains open. |
+| `issues.IssueCorrectionService.__init__`, `.evidence`, `.run` and authorization/work/projection closures | Zero-upfront correction/cancel; VERIFIED/CONSUMED cancellation and completed retry, conditional grant enforcement through final check; six-owner real HTTP lifecycle. Real competing issue/cash winners, one-key successor/changed-product rediscovery, cancel-vs-return and correction-vs-count both lock orders. Stable service selection28pass and financial closure16pass are retained, overlapping selections. |
 | `issues.IssueCorrectionService.lines`, `.replace` | Preserved recorded prices/rate, current source for new goods and explicit overrides; duplicate/fraction/unusable price/received-money floor; effective return date/source guards. Removed then retired product reintroduced using latest same-document POSTED snapshot. |
-| `issues.IssueCorrectionService.reverse`, `.sync_auto`, `.separate_money`, `.check_stock`, `.correct`, `.cancel` | Original financial/inventory legs; auto-receipt dated successor; neutral DRAFT cancel; full40VND separation once. Injected replay failure and actual separate-connection grant revocation after separation both roll back all persisted effects. Historical stock rejection; stock-overflow boundary and full affected coverage remain open. |
-| `returns.ReturnCorrectionService.__init__`, `.run`, `.prepare`, `.reverse`, `.replay_rounding`, `.check_stock`, `.correct`, `.cancel` | Fractional zero-value correction, later cumulative rounding successor and immutable original lines, cancel; over-cap and pre-sale date rejected. Six-owner HTTP grants/preconditions/replay; remaining failure/boundary/protection gates still open. |
-| `credit.CreditCorrectionService.__init__`, `.run`, `.correct`, `.cancel` | FIFO correction and DRAFT/POSTED cancel, no new cash/inventory, replay rollback, state error, same-key replay; six-owner HTTP allOf/cancel-only/preconditions/payload conflict. Wider protected-source/race matrix remains open. |
-| Changed `settlement_core.repository.SettlementRepository.lots`, `.available` | Three red-to-green realPG return-date moves (earlier/later/equal-day tie), current-revision FIFO/availability and byte-equivalent original lot provenance; retained reservation/paid refund and return/credit nodes. Exact whole-file coverage remains open. |
+| `issues.IssueCorrectionService.reverse`, `.sync_auto`, `.separate_money`, `.check_stock`, `.correct`, `.cancel` | Original financial/inventory legs; auto-receipt dated successor; neutral DRAFT cancel; full40VND separation once. Injected replay/auto-successor/separation failures and separate-connection grant revocation restore all effects. Historical stock and current-overflow rejection; separated historic confirmation is not synchronized. Exact163statements/52branches in stable final service coverage. |
+| `returns.ReturnCorrectionService.__init__`, `.run`, `.prepare`, `.reverse`, `.replay_rounding`, `.check_stock`, `.correct`, `.cancel` | Fractional zero-value correction, later rounding successor, immutable original lines; duplicate/wrong-origin/missing-product/fraction/over-cap/pre-sale/state errors; draft cancel after origin cancel; dependency retry; stock-history/overflow and ACTIVE/paid protection. Injected revision/reverse/rounding/replay/projection failures restore full snapshots. Return-reduce/credit-post both winners. Exact109statements/36branches. |
+| `credit.CreditCorrectionService.__init__`, `.run`, `.correct`, `.cancel` | FIFO correction and DRAFT/POSTED cancel, no new cash/inventory, replay rollback/state/retry; six-owner HTTP grants/preconditions/conflict; reserved/paid original-source protection; increase-vs-refund reservation both winners. Exact49statements/12branches. |
+| Changed `settlement_core.repository.SettlementRepository.lots`, `.available` | Three red-to-green return-date moves (earlier/later/equal-day tie), current-revision FIFO/availability and immutable original lot provenance; retained reservation/paid refund and return/credit nodes plus11retained posting/guards. Exact73statements/20branches. |
 | Twelve owning correction/cancel handlers and schemas | Source canonical contract18offline tests; six realPG TestClient owner lifecycles, individual missing correction grants403, cancel-only with no read/post grants, missing428/422and stale412preconditions, completed retry and changed-payload409without effects, invalid media/JSON/extra fields/blank reason. VERIFIED/CONSUMED conditional cash fresh/replay tests. In-process HTTP is not deployed Docker evidence. |
 
 Node IDs are the test functions under `tests/integration/document_corrections/`;
@@ -47,7 +47,12 @@ the XML selections in VERIFICATION preserve exact parameter IDs and all phases.
 Existing M13/M14/M16 consumers retain owning registers; source/internal or in-process
 HTTP evidence is not a published Docker operation. Manual-cash internal gates retain
 their scope; added issue/upfront/return/credit evidence is recorded in VERIFICATION.
-Full affected coverage, integrated/race/original-period and publication gates remain open.
+Stable issue/return/credit coverage and integrated/race/original-period behavior gates
+pass. Fresh goods14PG plus current offline constructor evidence give102/30exact100%.
+Full disjoint affected scope is22files1124statements196branches exact100% per file;
+normal-app source contract36pass and direct/proxy/public publication3pass are recorded
+separately in VERIFICATION, with exact64/0aggregator coverage.
+Retained evidence is not a fresh whole-suite run.
 
 ## Commands and scope
 

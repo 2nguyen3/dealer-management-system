@@ -1,6 +1,229 @@
 # M29 verification
 
-## Six-operation publication - 2026-10-28 (current)
+## Final Runtime After M30 - 2026-10-29
+
+All twelve M29 operations remain published after M30 release. Final runtime has
+152/154business+2health at0009; only dashboard/chatbot are unpublished. Final full
+offline1083pass includes the normal-app M29 contracts/transports, and all three final
+direct/proxy/public M29 deployment nodes pass on the final image. M29 disjoint owning
+22file1124/196 scope below remains valid; current aggregator66/0 and responses48/18
+are separately exact100% in [M30 release evidence](../reports/VERIFICATION.md).
+Live411documents/30agencies/24products/receipt774/payment37/oneevent remain unchanged.
+The147business/64aggregator figures below describe the earlier M29-only publication,
+not current runtime. Whole R5/R6/external terminal bank settlement remain separate.
+
+## All Twelve Operations Published - 2026-10-29
+
+All twelve M29 correction/cancellation operations are now mounted on the existing
+Docker backend. Runtime independently reports **147 business operations + 2 health**;
+the only missing canonical operations are five M30 reports, dashboard and chatbot.
+Source, image and configured Supabase remain revision **0009**. No migration, seed,
+provider action or live business mutation was performed for this publication.
+
+Normal-app source verification now passes **36 cases, 5 deselected, 17.37 seconds**:
+
+```powershell
+uv run --frozen --no-sync pytest tests/document_corrections/test_contract.py tests/workflows/test_contract.py -q --tb=short -k 'not published_report_contract' --junitxml=../data/backend/m29-published-source-contract-20261029.xml --cov=app.api.router --cov-branch --cov-report=term-missing --cov-report=json:../data/backend/m29-published-api-coverage-20261029.json
+```
+
+The five deselected nodes belong to M30, not M29. M29 inventory assertions permit
+only future read products to remain unpublished; all twelve M29 IDs are required.
+The final M29/M30 publication test separately requires only dashboard/chatbot absent.
+Aggregator coverage is exact64statements/0branches, separate from the disjoint
+22-file1124statement/196branch owning scope below; no obsolete line data was combined.
+
+`docker compose build backend` passed with frozen dependencies, including locked
+XlsxWriter3.3.0. `docker compose up -d --no-deps --wait --wait-timeout 120 backend`
+updated the existing backend service. Frontend was neither rebuilt nor recreated.
+Both existing services are healthy. The ngrok agent was explicitly restored at the
+existing configured domain/upstream8000, without modifying callback settings.
+
+```powershell
+$env:M29_DIRECT_URL='http://localhost:8000'
+$env:M29_PROXY_URL='http://localhost:8080'
+$env:M29_PUBLIC_URL=(Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels').tunnels[0].public_url
+uv run --frozen --no-sync pytest tests/deployment/test_10_m29_publication.py -m 'integration and deployment' -q --tb=short --junitxml=../data/backend/m29-final-deployment-20261029.xml
+```
+
+Actual deployment result: **3 passed, 14.11 seconds**. Direct/proxy/public each verify
+readiness, canonical/unique manifest, all twelve owner/action routes, unauthenticated
+401/request IDs, missing-precondition428 and CORS. Synthetic nonexistent document IDs
+only; deployment checks do not modify live business documents.
+
+Existing-container `python -m app.db.verify` passes all30tables and document/ledger/
+cache/audit/report integrity:411documents,30agencies,24products. A separate read-only
+SQLAlchemy assertion confirms receipt774 POSTED/PAYMENT_RECEIPT/DEBT_COLLECTION,
+current revision POSTED/10200VND/ONLINE, payment37 SUCCESS/VNPAY/receipt774/10200VND,
+and exactly one payment event. `alembic current` returns0009(head).
+
+Independent review rechecked the goods fix and resolved its only concrete finding;
+no additional high-confidence correction defect was found. M29 owning/publication
+gates are complete; M30 actual SQL/export verification is running separately. This
+does not close whole R5/R6, external terminal bank settlement or frontend gates.
+
+## Normal Aggregator Source Gate - 2026-10-29
+
+Parent mounted the three remaining owning correction routers in `app/api/router.py`.
+All twelve M29 operation IDs now use normal application composition, without test-only
+router injection. This is a source checkpoint, not a deployed-runtime claim.
+
+From `backend/`:
+
+```powershell
+uv run --frozen --no-sync pytest tests/document_corrections/test_contract.py tests/workflows/test_contract.py -q --tb=short -k 'not source_operation_inventory and not published_report_contract' --junitxml=../data/backend/m29-normal-app-contract-20261029.xml
+```
+
+Actual result: **35 passed, 6 deselected, 5.61 seconds**, two existing dependency
+deprecation warnings. The six deselected nodes depend on final M30 publication and
+remain required/unclosed here. All twelve correction source schemas, statuses,
+permissions, headers and command/precondition parameters pass the selected gate.
+The source inventory has147business+2health; existing deployed runtime remains
+141business+2health until explicit parent deployment. No live business ID was mutated.
+
+## Final Gate Reconciliation - 2026-10-29
+
+Current scope is the remaining six issue/return/credit operations plus an independently
+reviewed receipt-history defect. The parent owns aggregator/publication/deployment;
+this worker has made no runtime change or live business mutation. Opening deployed
+state remains141target+2health/schema0009 until the parent's publication evidence.
+
+New commands actually run from `backend/`, prefix `uv run --frozen --no-sync`:
+
+| Selection | Actual result | Artifact under data/backend |
+| --- | --- | --- |
+| `pytest tests/integration/document_corrections/test_http_negatives.py -m integration -vv --tb=short --maxfail=1` |1passed130.52s, no skips/xfails| `m29-http-negatives-20261029.xml` |
+| `pytest tests/integration/document_corrections/test_historical_policy.py::test_removed_receipt_product_reuses_latest_posted_snapshot_after_retirement -m integration -vv --tb=short --maxfail=1` before fix |1failed113.36s, expected regression red| `m29-historical-reintroduction-red-20261029.xml` |
+| Goods14-case current-source selection below after fix |14passed1984.30s, no skips/xfails| `m29-goods-review-green-20261029.xml` |
+| `pytest tests/document_corrections/test_schemas.py tests/document_corrections/test_owner_transport.py -q --tb=short` |14passed4.07s| `m29-current-offline-20261029.xml` |
+
+The HTTP-negative node tests all twelve owner/action pairs: unauthenticated401,
+authenticated wrong-kind404, unsupported-media415 and malformed-JSON400. Full
+business/audit/command snapshots are unchanged. Retained realPG eight-case HTTP
+lifecycle/allOf/cancel-only/conditional-cash/precondition/key tests are still the
+positive and live-grant evidence; this negative node does not replace them.
+
+Independent read-only reviewer identified `goods.replace` using only current revision
+lines, unlike SQL0008 and the issue coordinator. RealPG red reproduces loss of the
+original product name after removal/reintroduction across a rename. The minimal fix
+selects each product's latest same-document POSTED snapshot; the regression also
+exercises subsequent product+unit retirement, unchanged prior revisions/lines and
+stock reconciliation. No admission guard, SQL snapshot or migration was changed.
+Fresh14-case goods lifecycle/guards/races/historical regression passes. Only the
+unsupported-kind constructor ValueError is absent from PG execution; the current
+offline constructor test covers it. Combining these two same-source data files gives
+exact102statements/30branches, zero missing/partial/excluded lines, under
+`.coverage-m29-goods-current-20261029` and `m29-goods-current-20261029-coverage.json`.
+Old goods line-offset data is not used as current-file coverage proof.
+
+Exact PG green command after fixture inspection, from backend in PowerShell:
+
+```powershell
+$env:SUPABASE_TEST_SCHEMAS='1'; $env:COVERAGE_FILE='../data/backend/.coverage-m29-goods-review-green-20261029'; uv run --frozen --no-sync pytest tests/integration/document_corrections/test_goods.py tests/integration/document_corrections/test_goods_guards.py tests/integration/document_corrections/test_goods_races.py tests/integration/document_corrections/test_historical_policy.py::test_historical_receipt_correction_reuses_inactive_snapshots_but_not_new_inactive_goods tests/integration/document_corrections/test_historical_policy.py::test_removed_receipt_product_reuses_latest_posted_snapshot_after_retirement -m integration -vv --tb=short --maxfail=1 --junitxml=../data/backend/m29-goods-review-green-20261029.xml --cov=app.modules.document_corrections.goods --cov-branch --cov-report=term-missing --cov-report=json:../data/backend/m29-goods-review-green-20261029-coverage.json
+```
+
+Run through tracked `background_process monitor` with600000ms output budget, then a
+blocking `Wait-Process` for that same process until completion. No polling loop, new
+server/database/container or partial-result pass claim. Finished XML confirms all14.
+
+Retained artifacts inspected and exact scopes rechecked, not rerun as whole suites:
+
+- `m29-final-services.xml`:28passed2888.182s, zero failed/error/skipped. Its stable
+  `.coverage-m29-final-services` independently reports credit49/12, issues163/52 and
+  returns109/36, total321statements/100branches exact100% each. This supersedes the
+  stale running/97%-coverage note below for these three files only.
+- `m29-financial-closure.xml`:16passed1752.59s as detailed below. This overlaps stable
+  service nodes and is not added to28as a unique-case count. Its original-period,
+  mutation-stage rollback and observed both-winner races retain their evidence.
+- `.coverage-m29-release`, excluding now-modified goods.py, retains11unchanged files
+  and448statements/66branches exact100%. Explicit include export:
+  `m29-retained-unchanged-20261029-coverage.json` (manual service; goods/manual owner
+  routers+schemas; settlement service/repository; manifest;0008 migration).
+- `.coverage-m29-all-owner-transport`: three remaining entire routers177/0exact100%.
+  `.coverage-m29-current-offline-20261029`: three remaining owner schemas63/0exact100%.
+- `.coverage-m29-migration9`:0009migration13/0exact100%; behavioral migration evidence
+  remains `m29-issue-migration-final.xml` five realPG cases, not inferred from coverage.
+
+These are disjoint production-file scopes. Do not union old goods or old issue
+line-offset data into current file proof or inflate case counts with repeated nodes.
+The supplementary combined retained file is not a new execution or a whole-backend
+coverage gate. No required test is closed using a skip, xfail, interrupted job or
+partial coverage. Fixture inspection confirms SUPABASE_TEST_SCHEMAS=1 chooses only
+UUID schemas in current Supabase, and TestClient opens no listening HTTP port.
+
+The full affected production gate is the disjoint union of22files,1124statements and
+196branches, exact100% per file: current goods102/30, stable financial services321/100,
+unchanged retained11files448/66, remaining routers177/0, current remaining schemas63/0,
+and migration0009 13/0. Each component was checked with `coverage report` or `coverage
+json --fail-under=100` against its explicit include scope; no exclusions were added.
+Coverage is not a fresh whole-backend test run or proof of deployment.
+
+`ruff check app/modules/document_corrections tests/document_corrections
+tests/integration/document_corrections` passes. `ruff format --check` over those same
+paths reports36files formatted. `git diff --check` passes (Git emits LF/CRLF warnings).
+Independent review's one concrete M29 finding has real red/green resolution; its
+read-only review reported no other high-confidence correction defect. No external
+bank/provider result or full R5/R6 release claim is inferred.
+
+PG slot was explicitly released to the parent after all M29 PG completed; no further
+M29 PG is planned. Normal-app fixtures and source contract now remove the explicit
+test-only router composition, ready for parent-owned aggregator mounting. The final
+`tests/document_corrections/test_contract.py` selection must run after mounting all
+M29+M30 operations; its exact canonical missing set is dashboard/chatbot. That final
+source-contract/deployment gate is not claimed passed here while source is unmounted.
+Recommended parent checks: full owning/source contract offline selection, existing
+direct8000/proxy8080/public-domain manifest/all-twelve authentication/preconditions,
+schema0009/readiness and read-only live integrity/receipt774/payment37/one-event
+preservation. Do not exercise correction/cancel on live business IDs.
+
+## Remaining-six retained closure - 2026-10-28
+
+After the six-operation publication, user explicitly requested full M29/M30/M31.
+No new commits/publication yet in this phase. Runtime remains141target+2health0009.
+
+Completed scoped evidence (same Supabase UUID-schema harness, serialized PG runs):
+
+- `m29-financial-final.xml`:8passed/1failed before maxfail. All return boundary,
+  reserved/paid protection cases passed. Credit test expected PAYMENT_EXCEEDS_DEBT
+  before any credit existed; replay correctly returns INSUFFICIENT_CREDIT. Source
+  chronological credit consumption was inspected and only the erroneous assertion
+  changed, retaining full persisted-state rollback comparisons.
+- `m29-financial-closure.xml`: **16passed,1752.59s**, no skips/xfails. Corrected credit
+  protection reserved/paid2, return post-mutation rollback1, upfront linked-money
+  rollback2, separated historical confirmation1, seven observed opposing-race cases,
+  three independent Jan-to-Feb period/cancel oracles. Explicit source rows, all
+  signed ledger reversals and caches reconcile; original revisions/lines/lots retained.
+- Race cases cover both winners issue-cancel/return-post, return-reduce/credit-post,
+  credit-increase/refund-reserve, and correction/count-confirm in both orders. Losing
+  commands leave no partial successor/audit/command effects; stale ETag and fresh
+  semantic rejection are tested separately. Existing ordered_race uses independent
+  sessions and observed PostgreSQL blocking, not mocked concurrency.
+- Offline transport9pass3.75s, `m29-all-owner-transport-coverage.json`:
+  stock-issue/sales-return/credit-application entire routers177statements exact100%.
+  This verifies delegation/ID/precondition/key/status/header propagation only;
+  retained realPG HTTP grant/retry evidence is still required and retained.
+- Static independent correction lock/source/evidence review found no concrete defect;
+  no test/runtime result is inferred from review.
+
+Historical combined coverage before the final date-sync refinement was97% of correction services:
+  credit/goods/manual exact100%, issue one partial branch, returns8missing lines.
+Return failed/maxfail coverage was not flushed, so its passing nodes are behavioral
+evidence but cannot silently be counted in an aggregate. A final stable service
+selection subsequently completed:28passed and321/100exact in the inspected
+`m29-final-services.xml`/coverage artifact, reconciled above.
+
+Date-sync refinement: only CONSUMED evidence should sync its automatic receipt.
+The supported verify/replace/post lifecycle and seed cannot produce VERIFIED on a
+POSTED corrected issue, although raw SQL can manufacture schema-admissible history.
+`IssueCorrectionService.evidence(states=...)` now defaults VERIFIED/CONSUMED for
+cancellation and selects CONSUMED only for date sync, preserving old behavior even
+for anomalous SQL history without an unreachable inner state branch. No artificial
+VERIFIED fixture, exclusion pragma or weakened money guard was introduced.
+
+Further source/runtime publication, complete affected coverage and remaining required
+HTTP negatives stay open until recorded as passed. M30/M31 own six-file plans now
+exist but no report/dashboard implementation is implied by this checkpoint.
+
+## Six-operation publication - 2026-10-28 (historical)
 
 Published six complete owning operations: correct/cancel StockReceipt,
 StockAdjustment and manual PaymentReceipt. Issue/return/credit correction routers
