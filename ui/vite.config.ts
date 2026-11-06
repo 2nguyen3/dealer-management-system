@@ -1,8 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   server: {
     port: 5173,
     strictPort: true,
@@ -10,23 +15,5 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:8000',
     },
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (
-              id.includes('react') ||
-              id.includes('react-dom') ||
-              id.includes('react-router')
-            ) {
-              return 'vendor'
-            }
-            return 'libs'
-          }
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000,
-  },
+  build: { chunkSizeWarningLimit: 1000 },
 })
