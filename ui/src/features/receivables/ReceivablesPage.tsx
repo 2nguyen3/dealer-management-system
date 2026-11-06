@@ -1,313 +1,166 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Alert } from '../../components/ui/Alert'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { SearchIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
-import { Spinner } from '../../components/ui/Spinner'
+import { Pagination } from '../../components/ui/Pagination'
 import { Table } from '../../components/ui/Table'
-import { apiFetch } from '../../lib/api'
-import { cachedApiFetch, getCachedData } from '../../lib/cache'
 import { formatDate, formatVND } from '../../lib/formatters'
-import type { AgencyBalance, InvoiceBalance } from '../../lib/types'
+import {
+  businessDate,
+  decimal,
+  id,
+  record,
+  text,
+  type Row,
+} from '../payment_receipts/contracts'
+import { useSourcePage } from '../payment_receipts/useSourcePage'
+import { Balance } from './Balance'
+import { SourceStatement } from './SourceStatement'
 
-interface ReceivableSummaryItem {
-  agencyId: string
-  agencyCode: string
-  agencyName: string
-  districtName?: string
-  currentDebt: string
-  maxDebt: string
-  availableCredit?: string
-  status: 'ACTIVE' | 'TERMINATED'
+function overview(value: unknown): Row {
+  const data = record(value)
+  id(data.agencyId)
+  text(data.agencyCode)
+  text(data.agencyName)
+  decimal(data.currentDebt)
+  decimal(data.remainingCreditLimit)
+  return data
 }
-
-export function ReceivablesPage() {
-  const [items, setItems] = useState<ReceivableSummaryItem[]>(() => {
-    const cached = getCachedData<
-      ReceivableSummaryItem[] | { items: ReceivableSummaryItem[] }
-    >('/receivables')
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [isLoading, setIsLoading] = useState(() => items.length === 0)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-
-  // Agency Detail Balance Modal
-  const [selectedAgency, setSelectedAgency] =
-    useState<ReceivableSummaryItem | null>(null)
-  const [agencyBalance, setAgencyBalance] = useState<AgencyBalance | null>(null)
-  const [agencyInvoices, setAgencyInvoices] = useState<InvoiceBalance[]>([])
-  const [isDetailLoading, setIsDetailLoading] = useState(false)
-
-  useEffect(() => {
-    let isMounted = true
-    cachedApiFetch<
-      ReceivableSummaryItem[] | { items: ReceivableSummaryItem[] }
-    >('/receivables')
-      .then((res) => {
-        if (!isMounted) return
-        const data = Array.isArray(res.data) ? res.data : res.data.items || []
-        setItems(data)
-      })
-      .catch((err: unknown) => {
-        if (!isMounted) return
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải dữ liệu công nợ đại lý.')
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  const openAgencyDetail = async (item: ReceivableSummaryItem) => {
-    setSelectedAgency(item)
-    setIsDetailLoading(true)
-    try {
-      const [balRes, invRes] = await Promise.all([
-        apiFetch<AgencyBalance>(`/agencies/${item.agencyId}/balance`),
-        apiFetch<InvoiceBalance[] | { items: InvoiceBalance[] }>(
-          `/agencies/${item.agencyId}/invoices`,
-        ),
-      ])
-      setAgencyBalance(balRes.data)
-      setAgencyInvoices(
-        Array.isArray(invRes.data) ? invRes.data : invRes.data.items || [],
-      )
-    } catch {
-      // Keep basic info
-    } finally {
-      setIsDetailLoading(false)
-    }
-  }
-
-  const filteredItems = items.filter(
-    (item) =>
-      item.agencyName.toLowerCase().includes(search.toLowerCase()) ||
-      item.agencyCode.toLowerCase().includes(search.toLowerCase()),
+function invoice(value: unknown): Row {
+  const data = record(value)
+  id(data.issueDocumentId)
+  text(data.code)
+  businessDate(data.businessDate)
+  decimal(data.totalAmount)
+  decimal(data.outstandingAmount)
+  return data
+}
+function Invoices({ agencyId }: { agencyId: string }) {
+  const list = useSourcePage(
+    `/agencies/${agencyId}/invoice-balances`,
+    { sort: 'businessDate' },
+    invoice,
   )
-
+  return (
+    <section>
+      <h3>Số dư hóa đơn</h3>
+      {list.error && <Alert type="error">{list.error}</Alert>}
+      <Table caption="Số dư hóa đơn">
+        <thead>
+          <tr>
+            <th>Phiếu xuất</th>
+            <th>Ngày</th>
+            <th>Tổng tiền</th>
+            <th>Còn nợ</th>
+            <th>Thanh toán</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.items.map((item) => (
+            <tr key={String(item.issueDocumentId)}>
+              <td>{String(item.code)}</td>
+              <td>{formatDate(String(item.businessDate))}</td>
+              <td>{formatVND(String(item.totalAmount))}</td>
+              <td>{formatVND(String(item.outstandingAmount))}</td>
+              <td>{String(item.settlementStatus)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <Pagination
+        hasNext={list.hasMore}
+        hasPrevious={list.hasPrevious}
+        onNext={list.next}
+        onPrevious={list.previous}
+        isLoading={list.loading}
+      />
+    </section>
+  )
+}
+export function ReceivablesPage() {
+  const [q, setQ] = useState('')
+  const [selected, setSelected] = useState('')
+  const [statement, setStatement] = useState(false)
+  const list = useSourcePage('/receivables', { q }, overview)
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Công nợ đại lý</h1>
-          <p className="page-desc">
-            Theo dõi dư nợ thực tế, giới hạn nợ tối đa và danh sách hóa đơn xuất
-            chưa thanh toán
-          </p>
-        </div>
-      </div>
-
-      {error && <Alert type="error">{error}</Alert>}
-
-      <div className="filter-bar">
-        <div className="filter-search">
-          <Input
-            placeholder="Tìm theo mã hoặc tên đại lý..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            endAdornment={<SearchIcon size={18} />}
-          />
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="page-loading">
-          <Spinner label="Đang tải dữ liệu công nợ..." />
-        </div>
-      ) : filteredItems.length === 0 ? (
-        <div className="card empty-card">
-          <p>Không có dữ liệu công nợ đại lý phù hợp.</p>
-        </div>
-      ) : (
+      <h1 className="page-title">Công nợ đại lý</h1>
+      <Input
+        label="Tìm theo mã hoặc tên đại lý"
+        value={q}
+        onChange={(event) => setQ(event.target.value)}
+      />
+      {list.error && <Alert type="error">{list.error}</Alert>}
+      {list.metadata?.totals !== undefined && (
         <div className="card">
-          <Table caption="Danh sách công nợ đại lý">
-            <thead>
-              <tr>
-                <th scope="col">Mã đại lý</th>
-                <th scope="col">Tên đại lý</th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Dư nợ hiện tại
-                </th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Giới hạn nợ tối đa
-                </th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Hạn mức còn lại
-                </th>
-                <th scope="col">Trạng thái</th>
-                <th scope="col" style={{ textAlign: 'center' }}>
-                  Chi tiết nợ
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => (
-                <tr key={item.agencyId}>
-                  <td className="font-mono font-bold">{item.agencyCode}</td>
-                  <td>
-                    <strong>{item.agencyName}</strong>
-                    {item.districtName && (
-                      <div className="cell-subtext">{item.districtName}</div>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      color:
-                        Number(item.currentDebt) > 0 ? '#ba3b2f' : 'inherit',
-                    }}
-                  >
-                    {formatVND(item.currentDebt)}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {formatVND(item.maxDebt)}
-                  </td>
-                  <td style={{ textAlign: 'right', color: '#187b55' }}>
-                    {formatVND(
-                      String(
-                        Math.max(
-                          0,
-                          Number(item.maxDebt) - Number(item.currentDebt),
-                        ),
-                      ),
-                    )}
-                  </td>
-                  <td>
-                    {item.status === 'ACTIVE' ? (
-                      <Badge variant="success">Hoạt động</Badge>
-                    ) : (
-                      <Badge variant="danger">Ngừng hợp tác</Badge>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openAgencyDetail(item)}
-                    >
-                      Xem hóa đơn
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <h2>Tổng theo bộ lọc (máy chủ)</h2>
+          {Object.entries(record(list.metadata.totals)).map(([key, value]) => (
+            <p key={key}>
+              {key}: {formatVND(decimal(value))}
+            </p>
+          ))}
         </div>
       )}
-
-      {/* Agency Debt Breakdown Modal */}
+      <Table caption="Công nợ đại lý">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th>Đại lý</th>
+            <th>Dư nợ</th>
+            <th>Hạn mức còn lại</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.items.map((item) => (
+            <tr key={String(item.agencyId)}>
+              <td>{String(item.agencyCode)}</td>
+              <td>{String(item.agencyName)}</td>
+              <td>{formatVND(String(item.currentDebt))}</td>
+              <td>{formatVND(String(item.remainingCreditLimit))}</td>
+              <td>
+                <Button
+                  onClick={() => {
+                    setSelected(String(item.agencyId))
+                    setStatement(false)
+                  }}
+                >
+                  Xem hóa đơn
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <Pagination
+        hasNext={list.hasMore}
+        hasPrevious={list.hasPrevious}
+        onNext={list.next}
+        onPrevious={list.previous}
+        isLoading={list.loading}
+      />
       <Modal
-        isOpen={!!selectedAgency}
-        onClose={() => {
-          setSelectedAgency(null)
-          setAgencyBalance(null)
-          setAgencyInvoices([])
-        }}
-        title={`Chi tiết công nợ: ${selectedAgency?.agencyName} (${selectedAgency?.agencyCode})`}
+        isOpen={!!selected}
+        onClose={() => setSelected('')}
+        title={`Chi tiết công nợ #${selected}`}
         maxWidth="lg"
       >
-        {isDetailLoading ? (
-          <div className="page-loading">
-            <Spinner label="Đang tải chi tiết hóa đơn nợ..." />
-          </div>
-        ) : (
-          <div className="receivable-detail">
-            {agencyBalance && (
-              <div className="debt-summary-banner">
-                <div className="debt-stat">
-                  <span className="stat-label">Tổng nợ hiện tại</span>
-                  <span className="stat-value text-danger">
-                    {formatVND(agencyBalance.currentDebt)}
-                  </span>
-                </div>
-                <div className="debt-stat">
-                  <span className="stat-label">Hạn mức nợ cho phép</span>
-                  <span className="stat-value">
-                    {formatVND(agencyBalance.maxDebt)}
-                  </span>
-                </div>
-                <div className="debt-stat">
-                  <span className="stat-label">Dư có khả dụng</span>
-                  <span className="stat-value text-success">
-                    {formatVND(agencyBalance.availableCredit)}
-                  </span>
-                </div>
-              </div>
+        {selected && (
+          <>
+            <Balance key={`balance-${selected}`} agencyId={selected} />
+            <Invoices key={selected} agencyId={selected} />
+            <Button onClick={() => setStatement(true)}>Mở sổ công nợ</Button>
+            {statement && (
+              <SourceStatement
+                key={`statement-${selected}`}
+                path={`/agencies/${selected}/receivable-entries`}
+                title="Sổ công nợ"
+                opening="openingDebt"
+                closing="closingDebt"
+              />
             )}
-
-            <h3 className="section-title">
-              Danh sách hóa đơn chưa thanh toán đủ
-            </h3>
-            {agencyInvoices.length === 0 ? (
-              <p className="text-muted">
-                Đại lý hiện không có hóa đơn nào còn nợ.
-              </p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table--compact">
-                  <thead>
-                    <tr>
-                      <th scope="col">Số hóa đơn</th>
-                      <th scope="col">Ngày xuất</th>
-                      <th scope="col" style={{ textAlign: 'right' }}>
-                        Tổng hóa đơn
-                      </th>
-                      <th scope="col" style={{ textAlign: 'right' }}>
-                        Đã thanh toán
-                      </th>
-                      <th scope="col" style={{ textAlign: 'right' }}>
-                        Còn nợ lại
-                      </th>
-                      <th scope="col">Tình trạng</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {agencyInvoices.map((inv) => (
-                      <tr key={inv.invoiceId}>
-                        <td className="font-mono font-bold">
-                          {inv.invoiceCode}
-                        </td>
-                        <td>{formatDate(inv.documentDate)}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {formatVND(inv.totalAmount)}
-                        </td>
-                        <td style={{ textAlign: 'right', color: '#187b55' }}>
-                          {formatVND(inv.paidAmount)}
-                        </td>
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            color: '#ba3b2f',
-                          }}
-                        >
-                          {formatVND(inv.remainingAmount)}
-                        </td>
-                        <td>
-                          {inv.status === 'PAID' ? (
-                            <Badge variant="success">Đã trả hết</Badge>
-                          ) : inv.status === 'PARTIALLY_PAID' ? (
-                            <Badge variant="warning">Trả một phần</Badge>
-                          ) : (
-                            <Badge variant="danger">Chưa thanh toán</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          </>
         )}
       </Modal>
     </div>

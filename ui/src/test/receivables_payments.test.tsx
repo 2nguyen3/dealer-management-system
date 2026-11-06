@@ -9,7 +9,7 @@ import { PaymentReceiptsPage } from '../features/payment_receipts/PaymentReceipt
 import { ReceivablesPage } from '../features/receivables/ReceivablesPage'
 import * as apiModule from '../lib/api'
 import * as cacheModule from '../lib/cache'
-import type { Agency, PaymentReceipt, UserResponse } from '../lib/types'
+import type { Agency, UserResponse } from '../lib/types'
 
 describe('Receivables & Payment Receipts Component Tests', () => {
   const mockUser: UserResponse = {
@@ -74,12 +74,13 @@ describe('Receivables & Payment Receipts Component Tests', () => {
       districtName: 'Quận 1',
       currentDebt: '15000000',
       maxDebt: '50000000',
+      remainingCreditLimit: '35000000',
       availableCredit: '2000000',
       status: 'ACTIVE' as const,
     },
   ]
 
-  const samplePaymentReceipts: PaymentReceipt[] = [
+  const samplePaymentReceipts = [
     {
       id: '501',
       code: 'PT-501',
@@ -87,6 +88,7 @@ describe('Receivables & Payment Receipts Component Tests', () => {
       agencyName: 'Đại lý Minh Phát',
       status: 'POSTED',
       amount: '5000000',
+      totalAmount: '5000000',
       paymentMethod: 'BANK_TRANSFER',
       businessDate: '2026-10-05',
       note: 'Thu nợ tiền mặt đợt 1',
@@ -100,25 +102,74 @@ describe('Receivables & Payment Receipts Component Tests', () => {
     vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
       async (path: string) => {
         if (path.startsWith('/agencies')) {
-          return { data: sampleAgencies, status: 200, etag: 'etag-a' }
+          return {
+            data: {
+              items: sampleAgencies,
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: 'etag-a',
+          }
         }
         if (path.startsWith('/receivables')) {
-          return { data: sampleReceivables, status: 200, etag: 'etag-rec' }
+          return {
+            data: {
+              items: sampleReceivables,
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: 'etag-rec',
+          }
         }
         if (path.startsWith('/payment-receipts')) {
-          return { data: samplePaymentReceipts, status: 200, etag: 'etag-pr' }
+          return {
+            data: {
+              items: samplePaymentReceipts,
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: 'etag-pr',
+          }
         }
-        return { data: [], status: 200, etag: null }
+        return {
+          data: {
+            items: [],
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: null,
+        }
       },
     )
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
       if (path.startsWith('/receivables')) {
-        return { data: sampleReceivables, status: 200, etag: 'etag-rec' }
+        return {
+          data: {
+            items: sampleReceivables,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: 'etag-rec',
+        }
       }
       if (path.startsWith('/payment-receipts')) {
-        return { data: samplePaymentReceipts, status: 200, etag: 'etag-pr' }
+        return {
+          data: {
+            items: samplePaymentReceipts,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: 'etag-pr',
+        }
       }
-      return { data: {}, status: 200, etag: null }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, nextCursor: null, hasMore: false },
+        },
+        status: 200,
+        etag: null,
+      }
     })
   })
 
