@@ -1,173 +1,268 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  AuthContext,
-  type AuthContextValue,
-} from '../features/authentication/useAuth'
 import { ReportsPage } from '../features/reports/ReportsPage'
-import * as apiModule from '../lib/api'
-import * as cacheModule from '../lib/cache'
-import type { UserResponse } from '../lib/types'
+import { reports, type ReportKind } from '../features/reports/contracts'
+import * as api from '../lib/api'
+import * as exports from '../features/reports/export'
+import { huge, reportFixture } from './reportFixtures'
 
-describe('ReportsPage Component', () => {
-  const mockUser: UserResponse = {
-    id: '1',
-    fullName: 'Quản lý kinh doanh',
-    email: 'quanly@agentra.vn',
-    groupId: 1,
-    groupCode: 'MANAGER',
-    groupName: 'Quản lý',
-    status: 'ACTIVE',
-    createdAt: '2026-06-01T00:00:00Z',
-    updatedAt: '2026-06-01T00:00:00Z',
+const auth = vi.hoisted(() => ({
+  user: { id: '1' },
+  allowedFunctions: [
+    'reports.read',
+    'sales.read',
+    'debt.read',
+    'inventory.read',
+  ],
+}))
+vi.mock('../features/authentication/useAuth', () => ({ useAuth: () => auth }))
+
+function apply() {
+  fireEvent.click(screen.getByRole('button', { name: 'Xem báo cáo' }))
+}
+function response(path: string) {
+  const url = new URL(path, 'http://test')
+  const kind = url.pathname.split('/').pop() as ReportKind
+  return {
+    data: reportFixture(
+      kind,
+      url.searchParams.get('fromDate')!,
+      url.searchParams.get('toDate')!,
+    ),
+    status: 200,
+    etag: null,
   }
+}
 
-  const mockAuthContext: AuthContextValue = {
-    user: mockUser,
-    allowedFunctions: [
+describe('authoritative reports', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    auth.user = { id: '1' }
+    auth.allowedFunctions = [
       'reports.read',
       'sales.read',
       'debt.read',
       'inventory.read',
-    ],
-    isAuthenticated: true,
-    isLoading: false,
-    hasPermission: () => true,
-    login: vi.fn(),
-    logout: vi.fn(),
-    refreshProfile: vi.fn(),
-  }
-
-  const sampleAgencies = [
-    {
-      id: '101',
-      code: 'DL-101',
-      name: 'Đại lý Minh Phát',
-      agencyTypeName: 'Loại 1',
-      currentDebt: '2000000',
-    },
-    {
-      id: '102',
-      code: 'DL-102',
-      name: 'Đại lý Toàn Thắng',
-      agencyTypeName: 'Loại 2',
-      currentDebt: '500000',
-    },
-  ]
-
-  const sampleProducts = [
-    {
-      id: 'p1',
-      code: 'MH-01',
-      name: 'Nước ngọt lon',
-      unitName: 'Lon',
-      currentStock: '150',
-    },
-    {
-      id: 'p2',
-      code: 'MH-02',
-      name: 'Bánh quy bơ',
-      unitName: 'Hộp',
-      currentStock: '45',
-    },
-  ]
-
-  const sampleIssues = [
-    {
-      id: 'iss-1',
-      code: 'PX-101',
-      agencyId: '101',
-      status: 'POSTED',
-      totalAmount: '1200000',
-      createdAt: '2026-10-05T00:00:00Z',
-    },
-  ]
-
-  beforeEach(() => {
-    vi.restoreAllMocks()
-    vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
-      async (path: string) => {
-        if (path.startsWith('/agencies')) {
-          return {
-            data: sampleAgencies,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/products')) {
-          return {
-            data: sampleProducts,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/stock-issues')) {
-          return {
-            data: sampleIssues,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        return {
-          data: [],
-          status: 200,
-          headers: new Headers(),
-        } as unknown as apiModule.ApiResponse<unknown>
-      },
+    ]
+    vi.spyOn(api, 'apiFetch').mockImplementation(
+      async (path) => response(path) as never,
     )
-    vi.spyOn(apiModule, 'apiFetch').mockResolvedValue({
-      data: null,
-      status: 404,
-      etag: null,
-    })
   })
 
-  it('renders sales report BM6.1 tab by default', async () => {
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={mockAuthContext}>
-          <ReportsPage />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    )
+  it.each(Object.keys(reports) as ReportKind[])(
+    'reads only selected %s on explicit apply with authoritative totals',
+    async (kind) => {
+      render(<ReportsPage />)
+      expect(api.apiFetch).not.toHaveBeenCalled()
+      fireEvent.change(screen.getByLabelText('Loại báo cáo'), {
+        target: { value: kind },
+      })
+      if (reports[kind].filters.includes('agencyId'))
+        fireEvent.change(screen.getByLabelText('ID đại lý'), {
+          target: { value: '9223372036854775807' },
+        })
+      expect(api.apiFetch).not.toHaveBeenCalled()
+      apply()
+      await screen.findByRole('region', { name: reports[kind].label })
+      expect(api.apiFetch).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toContain(
+        `/reports/${kind}?`,
+      )
+      expect(vi.mocked(api.apiFetch).mock.calls[0]![1]?.headers).toEqual({
+        Accept: 'application/json',
+      })
+      expect(screen.getAllByText('9223372036854775807').length).toBe(1)
+      if (kind === 'sales') {
+        expect(screen.getByText('999')).toBeDefined()
+        expect(screen.getByText('0.0001')).toBeDefined()
+        expect(screen.getByText(huge + '00')).toBeDefined()
+      }
+      if (kind === 'inventory')
+        expect(
+          screen.queryByRole('region', { name: 'Tổng toàn bộ kết quả đã lọc' }),
+        ).toBeNull()
+    },
+  )
 
-    expect(screen.getByText('Báo cáo kinh doanh')).toBeDefined()
-
-    await waitFor(() => {
-      expect(screen.getByText('BÁO CÁO DOANH SỐ ĐẠI LÝ (BM6.1)')).toBeDefined()
-      expect(screen.getByText('Đại lý Minh Phát')).toBeDefined()
-      expect(screen.getByText('DL-101')).toBeDefined()
-      expect(screen.getAllByText('1.200.000 ₫').length).toBeGreaterThan(0)
-    })
+  it.each(
+    [
+      ['sales.read'],
+      ['reports.read'],
+      [],
+      ['product.manage', 'reports.read'],
+    ].map((grants) => ({ grants })),
+  )('does not request with missing allOf grants $grants', ({ grants }) => {
+    auth.allowedFunctions = grants
+    render(<ReportsPage />)
+    expect(screen.getByText(/Bạn không có quyền xem báo cáo/)).toBeDefined()
+    expect(api.apiFetch).not.toHaveBeenCalled()
   })
 
-  it('switches between tabs: Debt BM6.2 and Inventory', async () => {
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={mockAuthContext}>
-          <ReportsPage />
-        </AuthContext.Provider>
-      </MemoryRouter>,
+  it('uses inventory defaults for an inventory-only reader', async () => {
+    auth.allowedFunctions = ['reports.read', 'inventory.read']
+    render(<ReportsPage />)
+    apply()
+    await screen.findByRole('region', { name: 'Xuất nhập tồn' })
+    expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toContain(
+      'sort=productId',
     )
+  })
 
-    // Switch to Debt tab
-    const debtTabBtn = screen.getByText('Công nợ (BM6.2)')
-    fireEvent.click(debtTabBtn)
-
-    await waitFor(() => {
-      expect(screen.getByText('BÁO CÁO CÔNG NỢ ĐẠI LÝ (BM6.2)')).toBeDefined()
-      expect(screen.getByText('2.000.000 ₫')).toBeDefined()
+  it('preserves empty as empty and exposes invalid-response/network errors with retry', async () => {
+    vi.mocked(api.apiFetch).mockResolvedValueOnce({
+      ...response('/reports/sales?fromDate=2026-10-01&toDate=2026-11-01'),
+      data: [],
     })
-
-    // Switch to Inventory tab
-    const invTabBtn = screen.getByText('Xuất nhập tồn')
-    fireEvent.click(invTabBtn)
-
-    await waitFor(() => {
-      expect(screen.getByText('BÁO CÁO XUẤT NHẬP TỒN HÀNG HÓA')).toBeDefined()
-      expect(screen.getByText('Nước ngọt lon')).toBeDefined()
-      expect(screen.getByText('Bánh quy bơ')).toBeDefined()
+    render(<ReportsPage />)
+    apply()
+    await screen.findByText(/Dữ liệu máy chủ không đúng hợp đồng/)
+    vi.mocked(api.apiFetch).mockRejectedValueOnce(
+      new Error('HTTP 429: thử lại sau'),
+    )
+    fireEvent.click(screen.getByText('Thử lại'))
+    await screen.findByText(/HTTP 429/)
+    vi.mocked(api.apiFetch).mockImplementationOnce(async (path) => {
+      const result = response(path)
+      result.data.items = []
+      return result as never
     })
+    fireEvent.click(screen.getByText('Thử lại'))
+    await screen.findByText('Không có dữ liệu trong kỳ và bộ lọc đã chọn.')
+    expect(screen.queryByText('Đại lý nguồn')).toBeNull()
+  })
+
+  it('validates exact ID filters before issuing any request', async () => {
+    render(<ReportsPage />)
+    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+      target: { value: '9223372036854775808' },
+    })
+    apply()
+    await screen.findByText('ID đại lý không hợp lệ.')
+    expect(api.apiFetch).not.toHaveBeenCalled()
+  })
+
+  it('uses opaque cursors, resets on apply, and does not refetch while editing filters', async () => {
+    vi.mocked(api.apiFetch).mockImplementation(async (path) => {
+      const result = response(path)
+      if (!path.includes('cursor='))
+        result.data.pagination = {
+          limit: 25,
+          hasMore: true,
+          nextCursor: 'opaque+cursor/=',
+        }
+      return result as never
+    })
+    render(<ReportsPage />)
+    apply()
+    await screen.findByText('Đại lý nguồn')
+    fireEvent.click(screen.getByText('Trang tiếp'))
+    await waitFor(() => expect(api.apiFetch).toHaveBeenCalledTimes(2))
+    await screen.findByText('Đại lý nguồn')
+    expect(vi.mocked(api.apiFetch).mock.calls[1]![0]).toContain(
+      'cursor=opaque%2Bcursor%2F%3D',
+    )
+    fireEvent.click(screen.getByText('Trang trước'))
+    await screen.findByText('Đại lý nguồn')
+    expect(vi.mocked(api.apiFetch).mock.calls[2]![0]).not.toContain('cursor=')
+    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+      target: { value: '2' },
+    })
+    expect(api.apiFetch).toHaveBeenCalledTimes(3)
+    expect(
+      screen.getByText('Xuất PDF toàn bộ').closest('button')!.disabled,
+    ).toBe(true)
+    apply()
+    await screen.findByText('Đại lý nguồn')
+    expect(vi.mocked(api.apiFetch).mock.calls[3]![0]).toContain('agencyId=2')
+    expect(vi.mocked(api.apiFetch).mock.calls[3]![0]).not.toContain('cursor=')
+  })
+
+  it('aborts stale reads on apply/unmount and never paints a late response', async () => {
+    let resolve!: (value: api.ApiResponse<unknown>) => void
+    vi.mocked(api.apiFetch).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }) as never,
+    )
+    const view = render(<ReportsPage />)
+    apply()
+    const first = vi.mocked(api.apiFetch).mock.calls[0]!
+    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+      target: { value: '2' },
+    })
+    apply()
+    await screen.findByText('Đại lý nguồn')
+    expect(first[1]!.signal!.aborted).toBe(true)
+    await act(async () => {
+      resolve({ data: [], status: 200, etag: null })
+    })
+    expect(screen.queryByText(/Dữ liệu máy chủ không đúng hợp đồng/)).toBeNull()
+    view.unmount()
+    expect(vi.mocked(api.apiFetch).mock.calls[1]![1]!.signal!.aborted).toBe(
+      true,
+    )
+  })
+
+  it('clears sensitive results immediately and aborts on identity/grant changes', async () => {
+    const view = render(<ReportsPage />)
+    apply()
+    await screen.findByText('Đại lý nguồn')
+    auth.allowedFunctions = ['reports.read', 'inventory.read']
+    view.rerender(<ReportsPage />)
+    expect(screen.queryByText('Đại lý nguồn')).toBeNull()
+    expect(vi.mocked(api.apiFetch).mock.calls[0]![1]!.signal!.aborted).toBe(
+      true,
+    )
+    expect(api.apiFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['pdf', 'xlsx'] as const)(
+    'exports %s once with applied filters, handles errors, and prevents duplicate export',
+    async (format) => {
+      let finish!: () => void
+      const download = vi
+        .spyOn(exports, 'downloadReport')
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((done) => {
+              finish = done
+            }),
+        )
+      render(<ReportsPage />)
+      fireEvent.change(screen.getByLabelText('ID đại lý'), {
+        target: { value: '7' },
+      })
+      apply()
+      await screen.findByText('Đại lý nguồn')
+      const button = screen.getByText(`Xuất ${format.toUpperCase()} toàn bộ`)
+      fireEvent.click(button)
+      fireEvent.click(button)
+      expect(download).toHaveBeenCalledTimes(1)
+      expect(download.mock.calls[0]![0].filters).toEqual({ agencyId: '7' })
+      expect(api.apiFetch).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        finish()
+      })
+      await screen.findByText('Đã tải tệp báo cáo toàn bộ kết quả đã lọc.')
+      download.mockRejectedValueOnce(new Error('HTTP 406'))
+      fireEvent.click(button)
+      await screen.findByText('HTTP 406')
+    },
+  )
+
+  it('aborts an in-flight export on permission loss', async () => {
+    const download = vi
+      .spyOn(exports, 'downloadReport')
+      .mockReturnValue(new Promise(() => {}))
+    const view = render(<ReportsPage />)
+    apply()
+    await screen.findByText('Đại lý nguồn')
+    fireEvent.click(screen.getByText('Xuất PDF toàn bộ'))
+    const signal = download.mock.calls[0]![2]
+    auth.allowedFunctions = []
+    view.rerender(<ReportsPage />)
+    expect(signal.aborted).toBe(true)
+    expect(screen.queryByText('Đại lý nguồn')).toBeNull()
   })
 })
