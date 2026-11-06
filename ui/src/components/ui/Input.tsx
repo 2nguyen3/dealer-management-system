@@ -1,4 +1,6 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react'
+import { Input as ShadcnInput } from '../shadcn/input'
+import { Label } from '../shadcn/label'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
@@ -31,15 +33,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div className={`form-field ${error ? 'form-field--error' : ''}`.trim()}>
       {label && (
-        <label htmlFor={inputId} className="form-label">
+        <Label htmlFor={inputId} className="form-label">
           {label} {required && <span className="form-required">*</span>}
-        </label>
+        </Label>
       )}
       <div className="input-wrapper">
-        <input
+        <ShadcnInput
           ref={ref}
           id={inputId}
-          className={`input ${className}`.trim()}
+          className={className}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId || helperId || undefined}
           required={required}

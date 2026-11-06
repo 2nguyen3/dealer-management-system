@@ -1,11 +1,16 @@
 import { forwardRef, type SelectHTMLAttributes } from 'react'
+import { Label } from '../shadcn/label'
+import { NativeSelect, NativeSelectOption } from '../shadcn/native-select'
 
 export interface SelectOption {
   value: string | number
   label: string
 }
 
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  'size'
+> {
   label?: string
   options: SelectOption[]
   error?: string
@@ -39,30 +44,30 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className={`form-field ${error ? 'form-field--error' : ''}`.trim()}>
         {label && (
-          <label htmlFor={selectId} className="form-label">
+          <Label htmlFor={selectId} className="form-label">
             {label} {required && <span className="form-required">*</span>}
-          </label>
+          </Label>
         )}
-        <select
+        <NativeSelect
           ref={ref}
           id={selectId}
-          className={`select ${className}`.trim()}
+          className={className}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId || helperId || undefined}
           required={required}
           {...props}
         >
           {placeholder && (
-            <option value="" disabled>
+            <NativeSelectOption value="" disabled>
               {placeholder}
-            </option>
+            </NativeSelectOption>
           )}
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <NativeSelectOption key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
         {error && (
           <p id={errorId} className="form-error" role="alert">
             {error}

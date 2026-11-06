@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Alert as ShadcnAlert } from '../shadcn/alert'
 import { AlertCircleIcon, CheckCircleIcon } from './Icons'
 
 export interface AlertProps {
@@ -15,7 +16,8 @@ export function Alert({
   className = '',
 }: AlertProps) {
   return (
-    <div
+    <ShadcnAlert
+      variant={type === 'error' ? 'destructive' : 'default'}
       className={`alert alert--${type} ${className}`.trim()}
       role={type === 'error' ? 'alert' : 'status'}
     >
@@ -30,6 +32,6 @@ export function Alert({
         {title && <h3 className="alert-title">{title}</h3>}
         <div className="alert-message">{children}</div>
       </div>
-    </div>
+    </ShadcnAlert>
   )
 }
