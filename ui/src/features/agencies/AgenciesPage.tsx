@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -15,7 +22,7 @@ import { Select } from '../../components/ui/Select'
 import { Spinner } from '../../components/ui/Spinner'
 import { Table } from '../../components/ui/Table'
 import { apiFetch } from '../../lib/api'
-import { cachedApiFetch, getCachedData, invalidateCache } from '../../lib/cache'
+import { cachedApiFetch, invalidateCache } from '../../lib/cache'
 import { formatDate, formatVND } from '../../lib/formatters'
 import type { Agency, AgencyType, District } from '../../lib/types'
 import { useAuth } from '../authentication/useAuth'
@@ -24,38 +31,21 @@ export function AgenciesPage() {
   const { hasPermission } = useAuth()
   const canManage = hasPermission('agency.manage')
 
-  const [districts, setDistricts] = useState<District[]>(() => {
-    const cached = getCachedData<District[] | { items: District[] }>(
-      '/districts',
-    )
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [agencyTypes, setAgencyTypes] = useState<AgencyType[]>(() => {
-    const cached = getCachedData<AgencyType[] | { items: AgencyType[] }>(
-      '/agency-types',
-    )
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [agencies, setAgencies] = useState<Agency[]>(() => {
-    const cached =
-      getCachedData<Agency[] | { items: Agency[] }>('/agencies?limit=20') ||
-      getCachedData<Agency[] | { items: Agency[] }>('/agencies')
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [isLoading, setIsLoading] = useState(() => agencies.length === 0)
+  const [districts, setDistricts] = useState<District[]>([])
+  const [agencyTypes, setAgencyTypes] = useState<AgencyType[]>([])
+  const [agencies, setAgencies] = useState<Agency[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [successNotice, setSuccessNotice] = useState<string | null>(null)
 
-  // Filters (in-memory for instant response)
+  // Filters
   const [search, setSearch] = useState('')
   const [filterDistrict, setFilterDistrict] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState<
     'ACTIVE' | 'TERMINATED' | ''
   >('')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(25)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(
@@ -81,93 +71,99 @@ export function AgenciesPage() {
   const [formAddress, setFormAddress] = useState('')
   const [formDistrictId, setFormDistrictId] = useState('')
   const [formTypeId, setFormTypeId] = useState('')
+  const [formAcceptedDate, setFormAcceptedDate] = useState('')
   const [terminateReason, setTerminateReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const loadAgencies = (bypassCache = false) => {
-    if (bypassCache) {
-      invalidateCache('/agencies')
-      setIsLoading(true)
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
     }
+  }, [])
+
+  const loadAgencies = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
 
     const params = new URLSearchParams()
     if (currentCursor) params.append('cursor', currentCursor)
     params.append('limit', String(pageSize))
+    if (search.trim()) params.append('q', search.trim())
+    if (filterDistrict) params.append('districtId', filterDistrict)
+    if (filterType) params.append('typeId', filterType)
+    if (filterStatus) params.append('status', filterStatus)
 
-    const path = `/agencies?${params.toString()}`
-    const fetcher = bypassCache
-      ? apiFetch<Agency[] | { items: Agency[]; nextCursor?: string }>(path)
-      : cachedApiFetch<Agency[] | { items: Agency[]; nextCursor?: string }>(
-          path,
-        )
+    try {
+      const res = await apiFetch<
+        Agency[] | { items: Agency[]; pagination?: { nextCursor?: string } }
+      >(`/agencies?${params.toString()}`)
+      if (!isMountedRef.current) return
 
-    fetcher
-      .then((res) => {
-        if (Array.isArray(res.data)) {
-          setAgencies(res.data)
-          setNextCursor(null)
-        } else {
-          setAgencies(res.data.items || [])
-          setNextCursor(res.data.nextCursor || null)
+      if (Array.isArray(res.data)) {
+        setAgencies(res.data)
+        setNextCursor(null)
+      } else {
+        const paginated = res.data as {
+          items?: Agency[]
+          pagination?: { nextCursor?: string | null }
+          nextCursor?: string | null
         }
-      })
-      .catch((err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải danh sách đại lý.')
-      })
-      .finally(() => {
+        setAgencies(paginated.items || [])
+        setNextCursor(
+          paginated.pagination?.nextCursor ?? paginated.nextCursor ?? null,
+        )
+      }
+    } catch (err: unknown) {
+      if (!isMountedRef.current) return
+      const e = err as { message?: string }
+      setError(e.message || 'Không thể tải danh sách đại lý.')
+    } finally {
+      if (isMountedRef.current) {
         setIsLoading(false)
-      })
-  }
+      }
+    }
+  }, [
+    currentCursor,
+    pageSize,
+    search,
+    filterDistrict,
+    filterType,
+    filterStatus,
+  ])
 
   useEffect(() => {
-    let isMounted = true
-
-    const params = new URLSearchParams()
-    if (currentCursor) params.append('cursor', currentCursor)
-    params.append('limit', String(pageSize))
-    const path = `/agencies?${params.toString()}`
-
+    let active = true
     Promise.all([
       cachedApiFetch<District[] | { items: District[] }>('/districts'),
       cachedApiFetch<AgencyType[] | { items: AgencyType[] }>('/agency-types'),
-      cachedApiFetch<Agency[] | { items: Agency[]; nextCursor?: string }>(path),
     ])
-      .then(([dRes, tRes, aRes]) => {
-        if (!isMounted) return
+      .then(([dRes, tRes]) => {
+        if (!active) return
         const dItems = Array.isArray(dRes.data)
           ? dRes.data
-          : dRes.data.items || []
+          : (dRes.data as { items?: District[] }).items || []
         const tItems = Array.isArray(tRes.data)
           ? tRes.data
-          : tRes.data.items || []
+          : (tRes.data as { items?: AgencyType[] }).items || []
         setDistricts(dItems)
         setAgencyTypes(tItems)
-
-        if (Array.isArray(aRes.data)) {
-          setAgencies(aRes.data)
-          setNextCursor(null)
-        } else {
-          setAgencies(aRes.data.items || [])
-          setNextCursor(aRes.data.nextCursor || null)
-        }
       })
-      .catch((err: unknown) => {
-        if (!isMounted) return
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải danh sách đại lý.')
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false)
-      })
-
+      .catch(() => {})
     return () => {
-      isMounted = false
+      active = false
     }
-  }, [currentCursor, pageSize])
+  }, [])
 
-  // Fast in-memory filtering (0ms latency on typing / changing dropdown)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadAgencies()
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [loadAgencies])
+
   const filteredAgencies = useMemo(() => {
     return agencies.filter((agency) => {
       if (search.trim()) {
@@ -175,13 +171,16 @@ export function AgenciesPage() {
         const match =
           agency.name.toLowerCase().includes(q) ||
           agency.code.toLowerCase().includes(q) ||
-          agency.phone.includes(q)
+          (agency.phone && agency.phone.includes(q))
         if (!match) return false
       }
       if (filterDistrict && String(agency.districtId) !== filterDistrict) {
         return false
       }
-      if (filterType && String(agency.agencyTypeId) !== filterType) {
+      if (
+        filterType &&
+        String(agency.typeId ?? agency.agencyTypeId) !== filterType
+      ) {
         return false
       }
       if (filterStatus && agency.status !== filterStatus) {
@@ -190,10 +189,6 @@ export function AgenciesPage() {
       return true
     })
   }, [agencies, search, filterDistrict, filterType, filterStatus])
-
-  const handleSearchSubmit = (e: FormEvent) => {
-    e.preventDefault()
-  }
 
   const handleNextPage = () => {
     if (!nextCursor) return
@@ -216,6 +211,7 @@ export function AgenciesPage() {
     setFormAddress('')
     setFormDistrictId(districts[0] ? String(districts[0].id) : '')
     setFormTypeId(agencyTypes[0] ? String(agencyTypes[0].id) : '')
+    setFormAcceptedDate(new Date().toISOString().slice(0, 10))
     setFormError(null)
     setIsCreateOpen(true)
   }
@@ -230,10 +226,6 @@ export function AgenciesPage() {
     }
     if (!formPhone.trim()) {
       setFormError('Vui lòng nhập số điện thoại.')
-      return
-    }
-    if (!formAddress.trim()) {
-      setFormError('Vui lòng nhập địa chỉ.')
       return
     }
     if (!formDistrictId) {
@@ -251,16 +243,19 @@ export function AgenciesPage() {
         method: 'POST',
         body: {
           name: formName.trim(),
-          phone: formPhone.trim(),
-          email: formEmail.trim() || undefined,
-          address: formAddress.trim(),
+          typeId: Number(formTypeId),
           districtId: Number(formDistrictId),
-          agencyTypeId: Number(formTypeId),
+          phone: formPhone.trim() || null,
+          address: formAddress.trim() || null,
+          email: formEmail.trim() || null,
+          acceptedDate:
+            formAcceptedDate || new Date().toISOString().slice(0, 10),
         },
       })
       setIsCreateOpen(false)
+      setSuccessNotice('Đã tiếp nhận đại lý mới thành công.')
       invalidateCache('/agencies')
-      loadAgencies(true)
+      void loadAgencies()
     } catch (err: unknown) {
       const e = err as { message?: string }
       setFormError(e.message || 'Không thể tạo hồ sơ đại lý.')
@@ -269,16 +264,30 @@ export function AgenciesPage() {
     }
   }
 
-  // Opens instantly with in-memory agency data
-  const openEditModal = (agency: Agency) => {
+  const openEditModal = async (agencyItem: Agency) => {
     setFormError(null)
-    setFormName(agency.name)
-    setFormPhone(agency.phone)
-    setFormEmail(agency.email || '')
-    setFormAddress(agency.address)
-    setFormDistrictId(String(agency.districtId))
-    setFormTypeId(String(agency.typeId || agency.agencyTypeId || ''))
-    setEditAgency({ agency, etag: null })
+    setFormName(agencyItem.name)
+    setFormPhone(agencyItem.phone || '')
+    setFormEmail(agencyItem.email || '')
+    setFormAddress(agencyItem.address || '')
+    setFormDistrictId(String(agencyItem.districtId))
+    setFormTypeId(String(agencyItem.typeId ?? agencyItem.agencyTypeId ?? ''))
+    setEditAgency({ agency: agencyItem, etag: null })
+
+    // Fetch fresh agency details to obtain authoritative ETag
+    try {
+      const res = await apiFetch<Agency>(`/agencies/${agencyItem.id}`)
+      if (!isMountedRef.current) return
+      setEditAgency({ agency: res.data, etag: res.etag })
+      setFormName(res.data.name)
+      setFormPhone(res.data.phone || '')
+      setFormEmail(res.data.email || '')
+      setFormAddress(res.data.address || '')
+      setFormDistrictId(String(res.data.districtId))
+      setFormTypeId(String(res.data.typeId ?? res.data.agencyTypeId ?? ''))
+    } catch {
+      // If fetching fails, keep the in-memory values and wait for submission
+    }
   }
 
   const handleEditSubmit = async (e: FormEvent) => {
@@ -286,36 +295,85 @@ export function AgenciesPage() {
     if (!editAgency) return
     setFormError(null)
 
+    if (!formName.trim()) {
+      setFormError('Vui lòng nhập tên đại lý.')
+      return
+    }
+    if (!formPhone.trim()) {
+      setFormError('Vui lòng nhập số điện thoại.')
+      return
+    }
+    if (!formDistrictId) {
+      setFormError('Vui lòng chọn quận.')
+      return
+    }
+    if (!formTypeId) {
+      setFormError('Vui lòng chọn loại đại lý.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
+      let currentEtag = editAgency.etag
+      if (!currentEtag) {
+        const fresh = await apiFetch<Agency>(
+          `/agencies/${editAgency.agency.id}`,
+        )
+        currentEtag = fresh.etag
+      }
+      if (!currentEtag) {
+        setFormError('Máy chủ chưa cấp ETag. Vui lòng tải lại.')
+        return
+      }
+
+      // Must use PATCH, must pass ETag in If-Match header, and field name must be typeId
       await apiFetch(`/agencies/${editAgency.agency.id}`, {
-        method: 'PUT',
-        ifMatch: editAgency.etag || undefined,
+        method: 'PATCH',
+        ifMatch: currentEtag,
         body: {
           name: formName.trim(),
-          phone: formPhone.trim(),
-          email: formEmail.trim() || undefined,
-          address: formAddress.trim(),
+          typeId: Number(formTypeId),
           districtId: Number(formDistrictId),
-          agencyTypeId: Number(formTypeId),
+          phone: formPhone.trim() || null,
+          address: formAddress.trim() || null,
+          email: formEmail.trim() || null,
         },
       })
       setEditAgency(null)
+      setSuccessNotice('Đã cập nhật hồ sơ đại lý thành công.')
       invalidateCache('/agencies')
-      loadAgencies(true)
+      void loadAgencies()
     } catch (err: unknown) {
-      const e = err as { message?: string }
-      setFormError(e.message || 'Không thể cập nhật thông tin đại lý.')
+      const e = err as { status?: number; message?: string }
+      if (e.status === 412) {
+        setFormError(
+          'Dữ liệu đại lý đã bị thay đổi bởi người dùng khác. Vui lòng đóng và mở lại để tải dữ liệu mới.',
+        )
+      } else if (e.status === 409) {
+        setFormError(
+          e.message ||
+            'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc quận đã hết chỗ.',
+        )
+      } else {
+        setFormError(e.message || 'Không thể cập nhật thông tin đại lý.')
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Opens instantly with in-memory agency data
-  const openTerminateModal = (agency: Agency) => {
+  const openTerminateModal = async (agencyItem: Agency) => {
     setFormError(null)
     setTerminateReason('')
-    setTerminateAgency({ agency, etag: null })
+    setTerminateAgency({ agency: agencyItem, etag: null })
+
+    try {
+      const res = await apiFetch<Agency>(`/agencies/${agencyItem.id}`)
+      if (!isMountedRef.current) return
+      setTerminateAgency({ agency: res.data, etag: res.etag })
+    } catch {
+      // Keep in-memory
+    }
   }
 
   const handleTerminateSubmit = async (e: FormEvent) => {
@@ -330,19 +388,39 @@ export function AgenciesPage() {
 
     setIsSubmitting(true)
     try {
+      let currentEtag = terminateAgency.etag
+      if (!currentEtag) {
+        const fresh = await apiFetch<Agency>(
+          `/agencies/${terminateAgency.agency.id}`,
+        )
+        currentEtag = fresh.etag
+      }
+      if (!currentEtag) {
+        setFormError('Máy chủ chưa cấp ETag. Vui lòng tải lại.')
+        return
+      }
+
       await apiFetch(`/agencies/${terminateAgency.agency.id}/terminate`, {
         method: 'POST',
-        ifMatch: terminateAgency.etag || undefined,
+        ifMatch: currentEtag,
+        idempotencyKey: crypto.randomUUID(),
         body: {
           reason: terminateReason.trim(),
         },
       })
       setTerminateAgency(null)
+      setSuccessNotice('Đã ngừng hợp tác với đại lý thành công.')
       invalidateCache('/agencies')
-      loadAgencies(true)
+      void loadAgencies()
     } catch (err: unknown) {
-      const e = err as { message?: string }
-      setFormError(e.message || 'Không thể ngừng hợp tác với đại lý này.')
+      const e = err as { status?: number; message?: string }
+      if (e.status === 412) {
+        setFormError(
+          'Hồ sơ đại lý đã bị thay đổi bởi người dùng khác. Vui lòng tải lại.',
+        )
+      } else {
+        setFormError(e.message || 'Không thể ngừng hợp tác với đại lý này.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -369,10 +447,12 @@ export function AgenciesPage() {
         )}
       </div>
 
+      {successNotice && <Alert type="success">{successNotice}</Alert>}
+
       {error && <Alert type="error">{error}</Alert>}
 
       {/* Filter bar */}
-      <form onSubmit={handleSearchSubmit} className="filter-bar">
+      <div className="filter-bar">
         <div className="filter-search">
           <Input
             placeholder="Tìm theo tên hoặc số điện thoại..."
@@ -419,13 +499,17 @@ export function AgenciesPage() {
           />
         </div>
 
-        <Button type="submit" variant="secondary">
-          Lọc
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void loadAgencies()}
+        >
+          Tải lại
         </Button>
-      </form>
+      </div>
 
       {/* Data Table */}
-      {isLoading ? (
+      {isLoading && agencies.length === 0 ? (
         <div className="page-loading">
           <Spinner label="Đang tải danh sách đại lý..." />
         </div>
@@ -471,12 +555,12 @@ export function AgenciesPage() {
                       <div className="cell-subtext">{agency.address}</div>
                     )}
                   </td>
-                  <td>{agency.phone}</td>
+                  <td>{agency.phone || '—'}</td>
                   <td>{agency.districtName || `Quận ${agency.districtId}`}</td>
                   <td>
                     {agency.typeName ||
                       agency.agencyTypeName ||
-                      `Loại ${agency.typeId || agency.agencyTypeId}`}
+                      `Loại ${agency.typeId ?? agency.agencyTypeId}`}
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>
                     {formatVND(agency.currentDebt)}
@@ -499,7 +583,8 @@ export function AgenciesPage() {
                             type="button"
                             className="icon-action-btn"
                             title="Sửa hồ sơ"
-                            onClick={() => openEditModal(agency)}
+                            aria-label={`Sửa hồ sơ ${agency.code} - ${agency.name}`}
+                            onClick={() => void openEditModal(agency)}
                           >
                             <EditIcon size={16} />
                           </button>
@@ -507,7 +592,8 @@ export function AgenciesPage() {
                             type="button"
                             className="icon-action-btn icon-action-btn--danger"
                             title="Ngừng hợp tác"
-                            onClick={() => openTerminateModal(agency)}
+                            aria-label={`Ngừng hợp tác ${agency.code} - ${agency.name}`}
+                            onClick={() => void openTerminateModal(agency)}
                           >
                             <TrashIcon size={16} />
                           </button>
@@ -563,7 +649,7 @@ export function AgenciesPage() {
               required
             />
             <Input
-              label="Email (tùy chọn)"
+              label="Email"
               type="email"
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
@@ -575,7 +661,6 @@ export function AgenciesPage() {
             value={formAddress}
             onChange={(e) => setFormAddress(e.target.value)}
             placeholder="Số nhà, tên đường..."
-            required
           />
           <div className="grid-2">
             <Select
@@ -599,6 +684,13 @@ export function AgenciesPage() {
               required
             />
           </div>
+          <Input
+            label="Ngày tiếp nhận"
+            type="date"
+            value={formAcceptedDate}
+            onChange={(e) => setFormAcceptedDate(e.target.value)}
+            required
+          />
           <div className="modal-actions">
             <Button
               type="button"
@@ -619,7 +711,7 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!editAgency}
         onClose={() => setEditAgency(null)}
-        title={`Chỉnh sửa hồ sơ: ${editAgency?.agency.code}`}
+        title={`Chỉnh sửa hồ sơ: ${editAgency?.agency.code || ''}`}
         maxWidth="md"
       >
         <form onSubmit={handleEditSubmit} className="modal-form" noValidate>
@@ -649,7 +741,6 @@ export function AgenciesPage() {
             label="Địa chỉ"
             value={formAddress}
             onChange={(e) => setFormAddress(e.target.value)}
-            required
           />
           <div className="grid-2">
             <Select
@@ -693,7 +784,7 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!terminateAgency}
         onClose={() => setTerminateAgency(null)}
-        title={`Ngừng hợp tác đại lý: ${terminateAgency?.agency.name}`}
+        title={`Ngừng hợp tác đại lý: ${terminateAgency?.agency.name || ''}`}
         maxWidth="sm"
       >
         <form
@@ -734,7 +825,7 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!detailAgency}
         onClose={() => setDetailAgency(null)}
-        title={`Chi tiết đại lý: ${detailAgency?.name}`}
+        title={`Chi tiết đại lý: ${detailAgency?.name || ''}`}
         maxWidth="md"
       >
         {detailAgency && (
@@ -753,7 +844,7 @@ export function AgenciesPage() {
             </div>
             <div className="detail-item">
               <span className="detail-label">Điện thoại:</span>
-              <span className="detail-value">{detailAgency.phone}</span>
+              <span className="detail-value">{detailAgency.phone || '—'}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Email:</span>
@@ -761,7 +852,9 @@ export function AgenciesPage() {
             </div>
             <div className="detail-item">
               <span className="detail-label">Địa chỉ:</span>
-              <span className="detail-value">{detailAgency.address}</span>
+              <span className="detail-value">
+                {detailAgency.address || '—'}
+              </span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Quận:</span>
@@ -774,7 +867,7 @@ export function AgenciesPage() {
               <span className="detail-value">
                 {detailAgency.typeName ||
                   detailAgency.agencyTypeName ||
-                  `Loại ${detailAgency.typeId || detailAgency.agencyTypeId}`}
+                  `Loại ${detailAgency.typeId ?? detailAgency.agencyTypeId}`}
               </span>
             </div>
             <div className="detail-item">
@@ -789,6 +882,12 @@ export function AgenciesPage() {
               <span className="detail-label">Dư nợ hiện tại:</span>
               <span className="detail-value font-bold text-danger">
                 {formatVND(detailAgency.currentDebt)}
+              </span>
+            </div>
+            <div className="detail-item">
+              <span className="detail-label">Dư có hiện tại:</span>
+              <span className="detail-value font-bold text-success">
+                {formatVND(detailAgency.currentCredit)}
               </span>
             </div>
             <div className="detail-item">
