@@ -7,8 +7,7 @@ import {
 } from '../features/authentication/useAuth'
 import { CreditApplicationsPage } from '../features/credit_applications/CreditApplicationsPage'
 import * as apiModule from '../lib/api'
-import * as cacheModule from '../lib/cache'
-import type { CreditApplication, UserResponse } from '../lib/types'
+import type { UserResponse } from '../lib/types'
 
 describe('CreditApplicationsPage Component', () => {
   const mockUser: UserResponse = {
@@ -37,7 +36,7 @@ describe('CreditApplicationsPage Component', () => {
     refreshProfile: vi.fn(),
   }
 
-  const sampleApps: CreditApplication[] = [
+  const sampleApps = [
     {
       id: '601',
       code: 'BT-601',
@@ -70,49 +69,26 @@ describe('CreditApplicationsPage Component', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
-      async (path: string) => {
-        if (path.startsWith('/agencies')) {
-          return {
-            data: [
-              { id: '101', code: 'DL-101', name: 'Đại lý Minh Phát' },
-              { id: '102', code: 'DL-102', name: 'Đại lý Toàn Thắng' },
-            ],
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/credit-applications')) {
-          return {
-            data: sampleApps,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/receivables/balances')) {
-          return {
-            data: [
-              {
-                agencyId: '101',
-                agencyCode: 'DL-101',
-                agencyName: 'Đại lý Minh Phát',
-                currentDebt: '500000',
-                maxDebt: '5000000',
-                availableCredit: '300000',
-                reservedCredit: '0',
-              },
-            ],
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/credit-applications')) {
         return {
-          data: [],
+          data: {
+            items: sampleApps,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
           status: 200,
-          headers: new Headers(),
+          etag: '"sample-etag"',
         } as unknown as apiModule.ApiResponse<unknown>
-      },
-    )
+      }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, nextCursor: null, hasMore: false },
+        },
+        status: 200,
+        etag: null,
+      } as unknown as apiModule.ApiResponse<unknown>
+    })
   })
 
   it('renders credit applications table with data', async () => {
@@ -130,12 +106,14 @@ describe('CreditApplicationsPage Component', () => {
       expect(screen.getByText('BT-601')).toBeDefined()
       expect(screen.getByText('BT-602')).toBeDefined()
       expect(screen.getByText('Đại lý Minh Phát')).toBeDefined()
-      expect(screen.getAllByText('Đã ghi sổ').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('Bản nháp').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('POSTED').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('DRAFT').length).toBeGreaterThan(0)
     })
   })
 
-  it('filters applications by search query', async () => {
+  it('filters applications by search query and reloads', async () => {
+    const fetchSpy = vi.spyOn(apiModule, 'apiFetch')
+
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -148,13 +126,20 @@ describe('CreditApplicationsPage Component', () => {
       expect(screen.getByText('BT-601')).toBeDefined()
     })
 
-    const searchInput = screen.getByPlaceholderText(
-      'Tìm theo mã phiếu, tên đại lý...',
-    )
+    const searchInput = screen.getByLabelText(/Tìm chứng từ/i, {
+      selector: 'input',
+    })
     fireEvent.change(searchInput, { target: { value: 'BT-602' } })
 
-    expect(screen.queryByText('BT-601')).toBeNull()
-    expect(screen.getByText('BT-602')).toBeDefined()
+    const reloadBtn = screen.getByRole('button', { name: 'Tải lại' })
+    fireEvent.click(reloadBtn)
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('q=BT-602'),
+        expect.any(Object),
+      )
+    })
   })
 
   it('opens and closes the create modal', async () => {
@@ -170,17 +155,21 @@ describe('CreditApplicationsPage Component', () => {
       expect(screen.getByText('BT-601')).toBeDefined()
     })
 
-    const createBtn = screen.getByText('Lập phiếu bù trừ')
+    const createBtn = screen.getByRole('button', { name: 'Lập phiếu bù trừ' })
     fireEvent.click(createBtn)
 
-    expect(screen.getByText(/Đại lý áp dụng/)).toBeDefined()
-    expect(screen.getByText(/Số tiền cấn trừ/)).toBeDefined()
+    expect(
+      screen.getByLabelText(/ID đại lý/i, { selector: 'input' }),
+    ).toBeDefined()
+    expect(
+      screen.getByLabelText(/Số tiền \(VND nguyên\)/i, { selector: 'input' }),
+    ).toBeDefined()
 
-    const cancelBtn = screen.getByText('Hủy bỏ')
-    fireEvent.click(cancelBtn)
+    const closeBtn = screen.getByRole('button', { name: 'Đóng' })
+    fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByText(/Số tiền cấn trừ/)).toBeNull()
+      expect(screen.queryByLabelText(/Số tiền \(VND nguyên\)/i)).toBeNull()
     })
   })
 })
