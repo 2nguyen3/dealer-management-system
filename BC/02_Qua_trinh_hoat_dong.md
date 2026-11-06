@@ -1,5 +1,13 @@
 # Quá trình hoạt động của hệ thống
 
+![Lưu đồ quá trình hoạt động của Agentra](So_do/Qua_trinh_hoat_dong.png)
+
+*Lưu đồ tổng quát, trắng đen, bố cục khổ A3 dọc. Hình được dựng bằng mã từ prompt để giữ chính xác nhãn tiếng Việt.*
+
+[PNG độ phân giải cao](So_do/Qua_trinh_hoat_dong.png) | [SVG vector](So_do/Qua_trinh_hoat_dong.svg) | [Nguồn draw.io](So_do/Qua_trinh_hoat_dong.drawio) | [Prompt](Prompts/Qua_trinh_hoat_dong.txt)
+
+Tái tạo hình bằng `node BC/So_do/export-workflow.mjs` từ gốc repository, sử dụng Playwright trong `ui/node_modules` và Microsoft Edge đã cài. Lần xuất hình này không chạy test/build/verify, không kiểm tra trực quan bằng ảnh. Sơ đồ rút gọn luồng; lỗi trong bước kiểm tra hoặc ghi dữ liệu của transaction đi đến nhánh thất bại, không phải luôn thực hiện mọi bước bất kể lỗi.
+
 ## 1. Nguyên lý chung
 
 Agentra hoạt động theo cơ chế yêu cầu và phản hồi giữa trình duyệt với máy chủ. Người dùng thực hiện thao tác trên giao diện; frontend gửi yêu cầu tới API; backend kiểm tra quyền và điều kiện nghiệp vụ, truy cập dữ liệu khi cần, sau đó trả kết quả để giao diện cập nhật. Với thao tác thay đổi dữ liệu, backend chỉ thông báo thành công sau khi giao dịch cần thiết đã được xác nhận.
