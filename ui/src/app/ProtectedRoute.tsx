@@ -4,6 +4,7 @@ import { Spinner } from '../components/ui/Spinner'
 import { useAuth } from '../features/authentication/useAuth'
 import type { FunctionCode } from '../lib/types'
 import { AccessDeniedPage } from './AccessDeniedPage'
+import { allowsNavigation, routePermissions } from './navigation'
 
 export interface ProtectedRouteProps {
   children: ReactNode
@@ -34,7 +35,12 @@ export function ProtectedRoute({
     )
   }
 
-  if (requiredPermission && !hasPermission(requiredPermission)) {
+  const policy = routePermissions[location.pathname]
+  if (
+    policy
+      ? !allowsNavigation(hasPermission, policy)
+      : requiredPermission && !hasPermission(requiredPermission)
+  ) {
     return <AccessDeniedPage />
   }
 
