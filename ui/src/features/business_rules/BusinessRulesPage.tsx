@@ -1,209 +1,123 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Spinner } from '../../components/ui/Spinner'
-import { apiFetch, type ApiResponse } from '../../lib/api'
-import { cachedApiFetch, invalidateCache } from '../../lib/cache'
-import type { BusinessRules } from '../../lib/types'
+import { apiFetch } from '../../lib/api'
+import { invalidateCache } from '../../lib/cache'
 import { useAuth } from '../authentication/useAuth'
+import {
+  catalog,
+  decimal,
+  Intent,
+  message,
+  record,
+} from '../payment_receipts/contracts'
 
 export function BusinessRulesPage() {
   const { hasPermission } = useAuth()
-  const canManage = hasPermission('rules.manage')
-
-  const [rules, setRules] = useState<BusinessRules | null>(null)
+  const [capacity, setCapacity] = useState('')
+  const [rate, setRate] = useState('')
   const [etag, setEtag] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Form states
-  const [maxAgencies, setMaxAgencies] = useState('4')
-  const [maxTypes, setMaxTypes] = useState('2')
-  const [maxUnits, setMaxUnits] = useState('6')
-  const [multiplier, setMultiplier] = useState('1.02')
-  const [allowDebtExceed, setAllowDebtExceed] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [version, setVersion] = useState(0)
+  const intent = useRef(new Intent())
   useEffect(() => {
-    cachedApiFetch<BusinessRules>('/business-rules')
-      .then((res: ApiResponse<BusinessRules>) => {
-        setRules(res.data)
-        setEtag(res.etag)
-        setMaxAgencies(String(res.data.maxAgenciesPerDistrict))
-        setMaxTypes(String(res.data.maxAgencyTypesCount))
-        setMaxUnits(String(res.data.maxUnitsCount))
-        setMultiplier(res.data.priceMultiplier || '1.02')
-        setAllowDebtExceed(res.data.allowDebtExceedLimit)
+    let current = true
+    const controller = new AbortController()
+    apiFetch<unknown>('/business-rules', { signal: controller.signal })
+      .then((response) => {
+        const data = record(response.data)
+        catalog(data.maxAgenciesPerDistrict)
+        decimal(data.sellingPriceRate)
+        if (current) {
+          setCapacity(String(data.maxAgenciesPerDistrict))
+          setRate(String(data.sellingPriceRate))
+          setEtag(response.etag)
+        }
       })
-      .catch((err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải quy định hệ thống.')
+      .catch((failure: unknown) => {
+        if (current) setError(message(failure))
       })
-      .finally(() => {
-        setIsLoading(false)
-      })
-  }, [])
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccessMessage(null)
-
-    setIsSubmitting(true)
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [version])
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy || !etag || !hasPermission('rules.manage')) return
+    setError('')
+    setNotice('')
     try {
-      const res: ApiResponse<BusinessRules> = await apiFetch(
-        '/business-rules',
-        {
-          method: 'PUT',
-          ifMatch: etag || undefined,
-          body: {
-            maxAgenciesPerDistrict: Number(maxAgencies),
-            maxAgencyTypesCount: Number(maxTypes),
-            maxUnitsCount: Number(maxUnits),
-            priceMultiplier: multiplier.trim(),
-            allowDebtExceedLimit: allowDebtExceed,
-          },
-        },
+      if (
+        !/^(0|[1-9][0-9]{0,2})(\.[0-9]{1,6})?$/.test(rate) ||
+        !/[1-9]/.test(rate)
       )
-      invalidateCache('/business-rules')
-      setRules(res.data)
-      setEtag(res.etag)
-      setSuccessMessage('Đã cập nhật quy định hệ thống thành công.')
-    } catch (err: unknown) {
-      const e = err as { message?: string }
-      setError(e.message || 'Không thể cập nhật quy định hệ thống.')
+        throw new Error(
+          'Hệ số phải dương, tối đa 3 chữ số nguyên và 6 chữ số lẻ.',
+        )
+      const body = {
+        maxAgenciesPerDistrict: catalog(capacity),
+        sellingPriceRate: rate,
+      }
+      setBusy(true)
+      const response = await intent.current.send<unknown>(
+        '/business-rules',
+        { method: 'PATCH', ifMatch: etag, body },
+        false,
+      )
+      const data = record(response.data)
+      catalog(data.maxAgenciesPerDistrict)
+      decimal(data.sellingPriceRate)
+      setEtag(response.etag)
+      setCapacity(String(data.maxAgenciesPerDistrict))
+      setRate(String(data.sellingPriceRate))
+      for (const prefix of ['/business-rules', '/districts', '/products'])
+        invalidateCache(prefix)
+      setNotice(
+        'Đã cập nhật quy định. Không thay đổi giá trong các snapshot chứng từ lịch sử.',
+      )
+    } catch (failure) {
+      setError(message(failure))
     } finally {
-      setIsSubmitting(false)
+      setBusy(false)
     }
   }
-
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Thay đổi quy định</h1>
-          <p className="page-desc">
-            Cấu hình các tham số và giới hạn nghiệp vụ hoạt động của toàn hệ
-            thống
-          </p>
-        </div>
-      </div>
-
+      <h1 className="page-title">Thay đổi quy định</h1>
       {error && <Alert type="error">{error}</Alert>}
-      {successMessage && <Alert type="success">{successMessage}</Alert>}
-
-      {isLoading ? (
-        <div className="page-loading">
-          <Spinner label="Đang tải quy định hệ thống..." />
-        </div>
-      ) : (
-        <div className="card settings-card">
-          <form onSubmit={handleSubmit} className="settings-form" noValidate>
-            <div className="form-group-section">
-              <h2 className="section-title">Quy định về Đại lý & Quận (QĐ1)</h2>
-              <div className="grid-2">
-                <Input
-                  label="Số đại lý tối đa trong mỗi quận"
-                  type="number"
-                  min="1"
-                  value={maxAgencies}
-                  onChange={(e) => setMaxAgencies(e.target.value)}
-                  disabled={!canManage}
-                  helperText="Số lượng đại lý đang hoạt động tối đa được phép tiếp nhận trong 1 quận"
-                  required
-                />
-                <Input
-                  label="Số loại đại lý tối đa"
-                  type="number"
-                  min="1"
-                  value={maxTypes}
-                  onChange={(e) => setMaxTypes(e.target.value)}
-                  disabled={!canManage}
-                  helperText="Giới hạn số loại đại lý được phép thiết lập trong hệ thống"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group-section">
-              <h2 className="section-title">
-                Quy định về Hàng hóa & Đơn vị tính (QĐ2)
-              </h2>
-              <div className="grid-2">
-                <Input
-                  label="Số đơn vị tính tối đa"
-                  type="number"
-                  min="1"
-                  value={maxUnits}
-                  onChange={(e) => setMaxUnits(e.target.value)}
-                  disabled={!canManage}
-                  helperText="Giới hạn số đơn vị tính được phép tạo"
-                  required
-                />
-                <Input
-                  label="Tỷ lệ tính đơn giá xuất hàng"
-                  type="text"
-                  value={multiplier}
-                  onChange={(e) => setMultiplier(e.target.value)}
-                  disabled={!canManage}
-                  helperText="Hệ số nhân với đơn giá nhập (ví dụ: 1.02 tương ứng tăng 2%)"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group-section">
-              <h2 className="section-title">
-                Quy định về Xuất hàng & Công nợ (QĐ4 & QĐ5)
-              </h2>
-              <div className="checkbox-field">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={allowDebtExceed}
-                    onChange={(e) => setAllowDebtExceed(e.target.checked)}
-                    disabled={!canManage}
-                  />
-                  <span>
-                    Cho phép số tiền nợ của đại lý vượt quá giới hạn nợ tối đa
-                    của loại đại lý đó khi xuất hàng
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {canManage && (
-              <div className="form-actions-bar">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (rules) {
-                      setMaxAgencies(String(rules.maxAgenciesPerDistrict))
-                      setMaxTypes(String(rules.maxAgencyTypesCount))
-                      setMaxUnits(String(rules.maxUnitsCount))
-                      setMultiplier(rules.priceMultiplier)
-                      setAllowDebtExceed(rules.allowDebtExceedLimit)
-                    }
-                  }}
-                  disabled={isSubmitting}
-                >
-                  Khôi phục ban đầu
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  isLoading={isSubmitting}
-                >
-                  Lưu thay đổi quy định
-                </Button>
-              </div>
-            )}
-          </form>
-        </div>
-      )}
+      {notice && <Alert type="success">{notice}</Alert>}
+      <form onSubmit={submit} className="card">
+        <Input
+          label="Số đại lý tối đa trong mỗi quận"
+          value={capacity}
+          onChange={(event) => setCapacity(event.target.value)}
+          disabled={!hasPermission('rules.manage') || busy}
+        />
+        <Input
+          label="Hệ số giá bán (sellingPriceRate)"
+          value={rate}
+          onChange={(event) => setRate(event.target.value)}
+          disabled={!hasPermission('rules.manage') || busy}
+        />
+        {hasPermission('rules.manage') && (
+          <Button type="submit" disabled={!etag || busy}>
+            Lưu thay đổi quy định
+          </Button>
+        )}
+        <Button
+          onClick={() => {
+            setError('')
+            setEtag(null)
+            setVersion((value) => value + 1)
+          }}
+        >
+          Tải lại quy định
+        </Button>
+      </form>
     </div>
   )
 }
