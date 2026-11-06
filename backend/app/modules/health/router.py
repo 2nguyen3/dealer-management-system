@@ -27,7 +27,7 @@ def readiness(session: Annotated[Session, Depends(get_session)]) -> HealthRespon
     """Readiness: the configured Postgres database is reachable."""
     try:
         session.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        logger.warning("Database readiness check failed")
+    except SQLAlchemyError as exc:
+        logger.warning("Database readiness check failed: %s", exc)
         raise HTTPException(status_code=503, detail="Database unavailable") from None
     return HealthResponse()
