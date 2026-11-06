@@ -11,6 +11,7 @@ from app.common.responses import (
     business_path,
 )
 from app.core.exceptions import ApiError, AuthError
+from app.core.logging import app_logger as logger
 from app.modules.auth.permissions import FUNCTION_CODES
 
 
@@ -46,7 +47,13 @@ async def request_context(
         response = api_error_response(request, error)
     except AuthError as error:
         response = auth_error_response(request, error)
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Unhandled server exception on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+        )
         if business_path(request):
             response = api_error_response(
                 request, ApiError(500, "INTERNAL_ERROR", "Internal server error")
