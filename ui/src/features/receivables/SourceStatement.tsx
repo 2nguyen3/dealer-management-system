@@ -49,9 +49,9 @@ export function SourceStatement({
     entry,
   )
   return (
-    <section className="card">
-      <h2>{title}</h2>
-      <div className="filter-bar">
+    <section className="card statement-card">
+      <h2 className="statement-title">{title}</h2>
+      <div className="filter-bar filter-bar--row">
         <Input
           label="Từ ngày"
           type="date"
@@ -77,13 +77,22 @@ export function SourceStatement({
       </div>
       {list.error && <Alert type="error">{list.error}</Alert>}
       {list.metadata && (
-        <p>
-          Đầu kỳ: {decimal(list.metadata[opening])}. Cuối kỳ:{' '}
-          {decimal(list.metadata[closing])}.{' '}
-          {list.metadata.unitId !== undefined &&
-            `Đơn vị #${String(list.metadata.unitId)}.`}{' '}
-          Số dư máy chủ cho bộ lọc, không cộng từ trang hiện tại.
-        </p>
+        <dl className="statement-summary">
+          <div>
+            <dt>Đầu kỳ</dt>
+            <dd>{decimal(list.metadata[opening])}</dd>
+          </div>
+          <div>
+            <dt>Cuối kỳ</dt>
+            <dd>{decimal(list.metadata[closing])}</dd>
+          </div>
+          {list.metadata.unitId !== undefined && (
+            <div>
+              <dt>Đơn vị</dt>
+              <dd>#{String(list.metadata.unitId)}</dd>
+            </div>
+          )}
+        </dl>
       )}
       <Table caption={title}>
         <thead>
@@ -111,7 +120,7 @@ export function SourceStatement({
         </tbody>
       </Table>
       {!list.loading && !list.error && !list.items.length && (
-        <p>Không có biến động trong bộ lọc.</p>
+        <p className="statement-empty">Không có biến động trong bộ lọc.</p>
       )}
       <Pagination
         hasNext={list.hasMore}

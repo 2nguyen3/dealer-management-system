@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { PlusIcon, TrashIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Spinner } from '../../components/ui/Spinner'
@@ -45,73 +46,89 @@ export function GoodsLineEditor({
   onChange: (lines: LineInput[]) => void
   disabled?: boolean
 }) {
+  const isReturn = kind === 'SALES_RETURN'
+  const idLabel = isReturn ? 'ID dòng bán gốc' : 'ID mặt hàng'
+  const quantityLabel = `Số lượng${kind === 'STOCK_ADJUSTMENT' ? ' (+/-)' : ''}`
+  function update(index: number, patch: Partial<LineInput>) {
+    onChange(
+      lines.map((item, position) =>
+        position === index ? { ...item, ...patch } : item,
+      ),
+    )
+  }
   return (
-    <fieldset disabled={disabled}>
-      <legend>Dòng hàng thay thế đầy đủ</legend>
+    <fieldset className="line-editor" disabled={disabled}>
+      <legend className="line-editor-title">
+        Danh sách dòng hàng
+        <span className="line-editor-count">{lines.length}</span>
+      </legend>
       {lines.map((line, index) => (
-        <div className="grid-2" key={index}>
-          <Input
-            label={`${kind === 'SALES_RETURN' ? 'ID dòng bán gốc' : 'ID mặt hàng'} ${index + 1}`}
-            value={kind === 'SALES_RETURN' ? line.originLineId : line.productId}
-            onChange={(event) =>
-              onChange(
-                lines.map((item, position) =>
-                  position === index
-                    ? {
-                        ...item,
-                        [kind === 'SALES_RETURN'
-                          ? 'originLineId'
-                          : 'productId']: event.target.value,
-                      }
-                    : item,
-                ),
-              )
-            }
-          />
-          <Input
-            label={`Số lượng ${index + 1}${kind === 'STOCK_ADJUSTMENT' ? ' (+/-)' : ''}`}
-            inputMode="decimal"
-            value={line.quantity}
-            onChange={(event) =>
-              onChange(
-                lines.map((item, position) =>
-                  position === index
-                    ? { ...item, quantity: event.target.value }
-                    : item,
-                ),
-              )
-            }
-          />
-          {kind === 'STOCK_RECEIPT' && (
+        <div className="line-card" key={index}>
+          <div className="line-card-head">
+            <span className="line-card-no">Dòng {index + 1}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="line-card-remove"
+              aria-label={`Xóa dòng ${index + 1}`}
+              disabled={lines.length === 1}
+              icon={<TrashIcon size={16} />}
+              onClick={() =>
+                onChange(lines.filter((_, position) => position !== index))
+              }
+            >
+              Xóa
+            </Button>
+          </div>
+          <div className="line-card-fields">
             <Input
-              label={`Đơn giá nhập ${index + 1} (VNĐ)`}
-              inputMode="numeric"
-              value={line.unitPrice}
+              id={`line-${index}-id`}
+              label={idLabel}
+              aria-label={`${idLabel} ${index + 1}`}
+              required
+              value={isReturn ? line.originLineId : line.productId}
               onChange={(event) =>
-                onChange(
-                  lines.map((item, position) =>
-                    position === index
-                      ? { ...item, unitPrice: event.target.value }
-                      : item,
-                  ),
+                update(
+                  index,
+                  isReturn
+                    ? { originLineId: event.target.value }
+                    : { productId: event.target.value },
                 )
               }
             />
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              onChange(lines.filter((_, position) => position !== index))
-            }
-          >
-            Xóa dòng {index + 1}
-          </Button>
+            <Input
+              id={`line-${index}-quantity`}
+              label={quantityLabel}
+              aria-label={`${quantityLabel.replace(' (+/-)', '')} ${index + 1}${kind === 'STOCK_ADJUSTMENT' ? ' (+/-)' : ''}`}
+              required
+              inputMode="decimal"
+              value={line.quantity}
+              onChange={(event) =>
+                update(index, { quantity: event.target.value })
+              }
+            />
+            {kind === 'STOCK_RECEIPT' && (
+              <Input
+                id={`line-${index}-price`}
+                label="Đơn giá nhập (VNĐ)"
+                aria-label={`Đơn giá nhập ${index + 1} (VNĐ)`}
+                required
+                inputMode="numeric"
+                value={line.unitPrice}
+                onChange={(event) =>
+                  update(index, { unitPrice: event.target.value })
+                }
+              />
+            )}
+          </div>
         </div>
       ))}
       <Button
         type="button"
         variant="outline"
+        className="line-editor-add"
+        icon={<PlusIcon size={16} />}
         onClick={() => onChange([...lines, emptyLine()])}
       >
         Thêm dòng
@@ -534,6 +551,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
         maxWidth="lg"
       >
         <form
+          noValidate
           onSubmit={(event) => {
             event.preventDefault()
             void save()
@@ -543,6 +561,8 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
           <fieldset disabled={mutation.busy}>
             <Input
               label="Ngày nghiệp vụ"
+              aria-label="Ngày nghiệp vụ"
+              required
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
@@ -550,6 +570,8 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
             {create && kind === 'STOCK_ISSUE' && (
               <Input
                 label="ID đại lý"
+                aria-label="ID đại lý"
+                required
                 value={agencyId}
                 onChange={(event) => setAgencyId(event.target.value)}
               />
@@ -558,6 +580,8 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
               <>
                 <Input
                   label="ID phiếu xuất gốc"
+                  aria-label="ID phiếu xuất gốc"
+                  required
                   value={originId}
                   onChange={(event) => {
                     sourceController.current?.abort()
@@ -606,6 +630,8 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
             {kind === 'STOCK_ISSUE' && (
               <Input
                 label="Trả ngay dự kiến (VNĐ)"
+                aria-label="Trả ngay dự kiến (VNĐ)"
+                required
                 inputMode="numeric"
                 value={immediatePayment}
                 onChange={(event) => setImmediatePayment(event.target.value)}
@@ -614,6 +640,8 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
             {(kind === 'STOCK_ADJUSTMENT' || replacePending) && (
               <Input
                 label="Lý do"
+                aria-label="Lý do"
+                required={!editHeader}
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
               />
@@ -632,10 +660,6 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
               disabled={mutation.busy}
             />
           )}
-          <p>
-            Nhập nguyên chuỗi số, không làm tròn. Tổng tiền, giá bán và tác động
-            kho/công nợ được máy chủ tính.
-          </p>
           <div className="modal-actions">
             <Button type="submit" isLoading={mutation.busy}>
               Lưu chứng từ

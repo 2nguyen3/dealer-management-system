@@ -236,7 +236,7 @@ export const reports: Record<
 }
 
 export const labels: Record<string, string> = {
-  agencyId: 'ID đại lý',
+  agencyId: 'ID',
   agencyCode: 'Mã đại lý',
   agencyName: 'Tên đại lý',
   productId: 'ID mặt hàng',

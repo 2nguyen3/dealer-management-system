@@ -25,7 +25,7 @@ export function InventoryPage() {
         Tra cứu từng mặt hàng, không cộng số lượng khác đơn vị. Chỉ gọi thẻ kho
         sau khi chọn mặt hàng.
       </p>
-      <form onSubmit={submit} className="filter-bar">
+      <form onSubmit={submit} className="filter-bar filter-bar--row">
         <Input
           label="ID mặt hàng"
           value={input}

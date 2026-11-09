@@ -19,10 +19,10 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import (
     LongTable,
-    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
+    Table,
     TableStyle,
 )
 
@@ -190,71 +190,179 @@ def render_xlsx(dataset):
         return output.getvalue()
 
 
+INK = colors.HexColor("#1f2937")
+MUTED = colors.HexColor("#6b7280")
+ACCENT = colors.HexColor("#1e3a5f")
+STRIPE = colors.HexColor("#f3f5f8")
+RULE = colors.HexColor("#d5dae2")
+NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+INDEX_WIDTH = 34
+PAGE_MARGIN = 36
+CHAR_WIDTH = 4.6
+
+
 def report_page_footer(canvas, document):
     canvas.saveState()
     canvas.setFont(FONT, 8)
+    canvas.setFillColor(MUTED)
+    canvas.drawString(document.leftMargin, 20, "Agentra")
     canvas.drawRightString(document.pagesize[0] - document.rightMargin, 20, f"Page {document.page}")
     canvas.restoreState()
 
 
+def _ideal_width(label, values):
+    """Preferred column width: widest header word or typical value, long values wrap."""
+    word = max((len(part) for part in label.split()), default=1)
+    longest = max((len(_text(value)) for value in values), default=0)
+    return min(max(word, min(longest, 22)), 30) * CHAR_WIDTH + 12
+
+
+def _column_groups(columns, identity, rows, available):
+    """Pack columns into as few full-width tables as possible; each repeats the identity."""
+    identity_column = next(column for column in columns if column[0] == identity)
+    widths = {key: _ideal_width(label, [row[key] for row in rows]) for key, label in columns}
+    groups = [[identity_column]]
+    used = widths[identity]
+    for column in (column for column in columns if column[0] != identity):
+        if len(groups[-1]) > 1 and used + widths[column[0]] > available:
+            groups.append([identity_column])
+            used = widths[identity]
+        groups[-1].append(column)
+        used += widths[column[0]]
+    return groups, widths
+
+
 def render_pdf(dataset):
     register_font()
-    style = ParagraphStyle("Report", fontName=FONT, fontSize=8, leading=12, splitLongWords=True)
-    heading = ParagraphStyle("ReportHeading", parent=style, fontSize=15, leading=20, spaceAfter=10)
+    style = ParagraphStyle("Report", fontName=FONT, fontSize=8, leading=11, textColor=INK)
+    number = ParagraphStyle("ReportNumber", parent=style, alignment=2)
+    head = ParagraphStyle("ReportHead", parent=style, textColor=colors.white)
+    head_number = ParagraphStyle("ReportHeadNumber", parent=head, alignment=2)
+    muted = ParagraphStyle("ReportMuted", parent=style, fontSize=7, leading=10, textColor=MUTED)
+    heading = ParagraphStyle(
+        "ReportHeading", parent=style, fontSize=18, leading=24, textColor=ACCENT, spaceAfter=4
+    )
+    section = ParagraphStyle(
+        "ReportSection",
+        parent=style,
+        fontSize=9,
+        leading=13,
+        textColor=ACCENT,
+        spaceBefore=6,
+        spaceAfter=4,
+    )
 
-    def paragraph(value):
-        return Paragraph(escape(_text(value)).replace("\n", "<br/>"), style)
+    def paragraph(value, paragraph_style=style):
+        return Paragraph(escape(_text(value)).replace("\n", "<br/>"), paragraph_style)
+
+    columns = dataset["columns"]
+    rows = dataset["rows"]
+    identity = IDENTITIES[dataset["kind"]]
+    metadata = _metadata(dataset)[1:]
+    pairs = metadata[:-3]
+    notes = metadata[-3:]
+    width = landscape(A4)[0] - 2 * PAGE_MARGIN
 
     story = [Paragraph(escape(dataset["title"]), heading)]
-    story.extend(paragraph(f"{key}: {_text(value)}") for key, value in _metadata(dataset)[1:])
-    story.append(Spacer(1, 12))
-    columns = dataset["columns"]
-    # Repeat identity in every wide-table group; physical continuations repeat it too.
-    identity = IDENTITIES[dataset["kind"]]
-    identity_column = next(column for column in columns if column[0] == identity)
-    details = [column for column in columns if column[0] != identity]
-    groups = [[identity_column] + details[start : start + 3] for start in range(0, len(details), 3)]
-    if not groups:
-        groups = [[identity_column]]
-    width = landscape(A4)[0] - 72
+    pair_cells = [paragraph(f"{key}: {_text(value)}", muted) for key, value in pairs]
+    if len(pair_cells) % 2:
+        pair_cells.append(paragraph(""))
+    info = Table(
+        [pair_cells[index : index + 2] for index in range(0, len(pair_cells), 2)],
+        colWidths=[width / 2] * 2,
+        hAlign="LEFT",
+    )
+    info.setStyle(
+        TableStyle(
+            [
+                ("LINEABOVE", (0, 0), (-1, 0), 1.2, ACCENT),
+                ("LINEBELOW", (0, -1), (-1, -1), 0.4, RULE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    story.extend([info, Spacer(1, 12)])
+
+    groups, ideal = _column_groups(columns, identity, rows, width - INDEX_WIDTH)
+    numeric = {
+        key
+        for key, _ in columns
+        if key != identity
+        and rows
+        and all(NUMBER.fullmatch(_text(row[key])) and len(_text(row[key])) <= 20 for row in rows)
+    }
     for group_number, group in enumerate(groups, 1):
-        if group_number > 1:
-            story.append(PageBreak())
-        story.append(paragraph(f"{dataset['kind']} / Columns {group_number} / Full-filter rows"))
-        data = [[paragraph(label) for label in ["Record", "Part"] + [label for _, label in group]]]
-        for record, row in enumerate(dataset["rows"], 1):
+        if len(groups) > 1:
+            story.append(paragraph(f"Columns {group_number} of {len(groups)}", section))
+        header = [paragraph("#", head)] + [
+            paragraph(label, head_number if key in numeric else head) for key, label in group
+        ]
+        data = [header]
+        for record, row in enumerate(rows, 1):
             # Bound physical rows so page breaks never orphan text from its identity.
             chunks = [_chunks(row[key], 120, line_limit=8) for key, _ in group]
             for part, values in enumerate(zip_longest(*chunks, fillvalue=""), 1):
                 values = list(values)
                 if part > 1:
                     values[0] = _text(row[group[0][0]])
-                data.append([paragraph(record), paragraph(part)] + [paragraph(v) for v in values])
-        widths = [46, 30] + [(width - 76) / len(group)] * len(group)
+                data.append(
+                    [paragraph(record if part == 1 else f"{record}.{part}", muted)]
+                    + [
+                        paragraph(value, number if key in numeric else style)
+                        for (key, _), value in zip(group, values, strict=True)
+                    ]
+                )
+        total = sum(ideal[key] for key, _ in group)
+        scale = min((width - INDEX_WIDTH) / total, 1.8)
+        widths = [INDEX_WIDTH] + [ideal[key] * scale for key, _ in group]
         table = LongTable(data, colWidths=widths, repeatRows=1, hAlign="LEFT", splitInRow=0)
         table.setStyle(
             TableStyle(
                 [
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
+                    ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, STRIPE]),
+                    ("LINEBELOW", (0, 1), (-1, -1), 0.25, RULE),
+                    ("BOX", (0, 0), (-1, -1), 0.5, RULE),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                 ]
             )
         )
-        story.extend([table, Spacer(1, 12)])
+        story.extend([table, Spacer(1, 14)])
     if dataset["totals"] is not None:
-        story.append(paragraph("Full-filter totals"))
-        story.extend(
-            paragraph(f"{key}: {_text(value)}") for key, value in dataset["totals"].items()
+        story.append(paragraph("Full-filter totals", section))
+        totals = Table(
+            [[paragraph(f"{key}: {_text(value)}")] for key, value in dataset["totals"].items()],
+            colWidths=[width],
+            hAlign="LEFT",
         )
+        totals.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), STRIPE),
+                    ("BOX", (0, 0), (-1, -1), 0.5, RULE),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        story.extend([totals, Spacer(1, 10)])
+    story.extend(paragraph(f"{key}: {_text(value)}", muted) for key, value in notes)
     with BytesIO() as output:
         SimpleDocTemplate(
             output,
             pagesize=landscape(A4),
-            rightMargin=36,
-            leftMargin=36,
-            topMargin=36,
-            bottomMargin=36,
+            rightMargin=PAGE_MARGIN,
+            leftMargin=PAGE_MARGIN,
+            topMargin=PAGE_MARGIN,
+            bottomMargin=PAGE_MARGIN,
             title=dataset["title"],
             author="Agentra",
         ).build(story, onFirstPage=report_page_footer, onLaterPages=report_page_footer)
