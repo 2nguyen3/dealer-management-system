@@ -58,7 +58,7 @@ describe('authoritative reports', () => {
         target: { value: kind },
       })
       if (reports[kind].filters.includes('agencyId'))
-        fireEvent.change(screen.getByLabelText('ID đại lý'), {
+        fireEvent.change(screen.getByLabelText('ID'), {
           target: { value: '9223372036854775807' },
         })
       expect(api.apiFetch).not.toHaveBeenCalled()
@@ -133,7 +133,7 @@ describe('authoritative reports', () => {
 
   it('validates exact ID filters before issuing any request', async () => {
     render(<ReportsPage />)
-    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+    fireEvent.change(screen.getByLabelText('ID'), {
       target: { value: '9223372036854775808' },
     })
     apply()
@@ -164,12 +164,12 @@ describe('authoritative reports', () => {
     fireEvent.click(screen.getByText('Trang trước'))
     await screen.findByText('Đại lý nguồn')
     expect(vi.mocked(api.apiFetch).mock.calls[2]![0]).not.toContain('cursor=')
-    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+    fireEvent.change(screen.getByLabelText('ID'), {
       target: { value: '2' },
     })
     expect(api.apiFetch).toHaveBeenCalledTimes(3)
     expect(
-      screen.getByText('Xuất PDF toàn bộ').closest('button')!.disabled,
+      screen.getByText('Xuất PDF').closest('button')!.disabled,
     ).toBe(true)
     apply()
     await screen.findByText('Đại lý nguồn')
@@ -188,7 +188,7 @@ describe('authoritative reports', () => {
     const view = render(<ReportsPage />)
     apply()
     const first = vi.mocked(api.apiFetch).mock.calls[0]!
-    fireEvent.change(screen.getByLabelText('ID đại lý'), {
+    fireEvent.change(screen.getByLabelText('ID'), {
       target: { value: '2' },
     })
     apply()
@@ -230,12 +230,12 @@ describe('authoritative reports', () => {
             }),
         )
       render(<ReportsPage />)
-      fireEvent.change(screen.getByLabelText('ID đại lý'), {
+      fireEvent.change(screen.getByLabelText('ID'), {
         target: { value: '7' },
       })
       apply()
       await screen.findByText('Đại lý nguồn')
-      const button = screen.getByText(`Xuất ${format.toUpperCase()} toàn bộ`)
+      const button = screen.getByText(`Xuất ${format.toUpperCase()}`)
       fireEvent.click(button)
       fireEvent.click(button)
       expect(download).toHaveBeenCalledTimes(1)
@@ -258,7 +258,7 @@ describe('authoritative reports', () => {
     const view = render(<ReportsPage />)
     apply()
     await screen.findByText('Đại lý nguồn')
-    fireEvent.click(screen.getByText('Xuất PDF toàn bộ'))
+    fireEvent.click(screen.getByText('Xuất PDF'))
     const signal = download.mock.calls[0]![2]
     auth.allowedFunctions = []
     view.rerender(<ReportsPage />)

@@ -81,15 +81,27 @@ export function DashboardPage() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
+      <div className="page-header dash-header">
         <div>
-          <p className="eyebrow">AGENTRA / OVERVIEW</p>
           <h1 className="page-title">Bảng điều khiển tổng quan</h1>
           <p className="page-desc">
             Chỉ số được máy chủ tổng hợp theo quyền truy cập và tháng nghiệp vụ
             Việt Nam.
           </p>
         </div>
+        {admitted && (
+          <form className="dash-month" onSubmit={apply} noValidate>
+            <Input
+              id="dashboard-month"
+              label="Tháng nghiệp vụ (Việt Nam)"
+              type="month"
+              required
+              value={draftMonth}
+              onChange={(e) => setDraftMonth(e.target.value)}
+            />
+            <Button type="submit">Xem tháng</Button>
+          </form>
+        )}
       </div>
       {!admitted ? (
         <Alert type="info">
@@ -98,23 +110,6 @@ export function DashboardPage() {
         </Alert>
       ) : (
         <>
-          <form className="card" onSubmit={apply}>
-            <div className="page-actions">
-              <Input
-                id="dashboard-month"
-                label="Tháng nghiệp vụ (Việt Nam)"
-                type="month"
-                required
-                value={draftMonth}
-                onChange={(e) => setDraftMonth(e.target.value)}
-              />
-              <Button type="submit">Xem tháng</Button>
-            </div>
-            <p className="text-muted">
-              Chỉ tải một bản tổng hợp khi mở màn hình hoặc áp dụng tháng. Không
-              tải trước danh sách đại lý, mặt hàng hay chứng từ.
-            </p>
-          </form>
           {formError && <Alert type="error">{formError}</Alert>}
           {loading && <Spinner label="Đang tải bảng điều khiển..." />}
           {error && (
@@ -127,11 +122,11 @@ export function DashboardPage() {
           )}
           {data && (
             <>
-              <p role="status">
+              <p role="status" className="dash-status">
                 Tháng {data.month}. Thời điểm chụp dữ liệu:{' '}
                 <time dateTime={data.asOf}>{data.asOf}</time>
               </p>
-              <p className="text-muted">
+              <p className="text-muted dash-note">
                 Nợ, dư có, tồn kho và hàng chờ là hiện tại tại thời điểm chụp.
                 Doanh số, nhập hàng, thu tiền, hoàn tiền và tiền xác minh chưa
                 ghi phiếu thu thuộc tháng đã chọn.
@@ -148,7 +143,7 @@ export function DashboardPage() {
                     không thay thế bằng số 0.
                   </Alert>
                 ))}
-              <div className="stats-grid">
+              <div className="stats-grid dash-grid">
                 {agencies && (
                   <section className="card">
                     <h2>Đại lý hiện tại</h2>

@@ -18,6 +18,13 @@ import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { Balance } from './Balance'
 import { SourceStatement } from './SourceStatement'
 
+const totalLabels: Record<string, string> = {
+  currentDebt: 'Dư nợ',
+  currentCredit: 'Dư có',
+  reservedCredit: 'Dư có giữ chỗ',
+  availableCredit: 'Dư có khả dụng',
+}
+
 function overview(value: unknown): Row {
   const data = record(value)
   id(data.agencyId)
@@ -43,17 +50,19 @@ function Invoices({ agencyId }: { agencyId: string }) {
     invoice,
   )
   return (
-    <section>
+    <section className="receivable-invoices">
       <h3>Số dư hóa đơn</h3>
       {list.error && <Alert type="error">{list.error}</Alert>}
       <Table caption="Số dư hóa đơn">
         <thead>
           <tr>
-            <th>Phiếu xuất</th>
-            <th>Ngày</th>
-            <th>Tổng tiền</th>
-            <th>Còn nợ</th>
-            <th>Thanh toán</th>
+            <th scope="col">Phiếu xuất</th>
+            <th scope="col">Ngày</th>
+            <th scope="col" className="cell-number">
+              Tổng tiền
+            </th>
+            <th scope="col" className="cell-number">Còn nợ</th>
+            <th scope="col">Thanh toán</th>
           </tr>
         </thead>
         <tbody>
@@ -61,8 +70,12 @@ function Invoices({ agencyId }: { agencyId: string }) {
             <tr key={String(item.issueDocumentId)}>
               <td>{String(item.code)}</td>
               <td>{formatDate(String(item.businessDate))}</td>
-              <td>{formatVND(String(item.totalAmount))}</td>
-              <td>{formatVND(String(item.outstandingAmount))}</td>
+              <td className="cell-number">
+                {formatVND(String(item.totalAmount))}
+              </td>
+              <td className="cell-number">
+                {formatVND(String(item.outstandingAmount))}
+              </td>
               <td>{String(item.settlementStatus)}</td>
             </tr>
           ))}
@@ -85,61 +98,94 @@ export function ReceivablesPage() {
   const list = useSourcePage('/receivables', { q }, overview)
   return (
     <div className="page-container">
-      <h1 className="page-title">Công nợ đại lý</h1>
-      <Input
-        label="Tìm theo mã hoặc tên đại lý"
-        value={q}
-        onChange={(event) => setQ(event.target.value)}
-      />
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Công nợ đại lý</h1>
+          <p className="page-desc">
+            Dư nợ và hạn mức còn lại của từng đại lý, do máy chủ tổng hợp.
+          </p>
+        </div>
+      </div>
+      <div className="filter-bar filter-bar--row">
+        <Input
+          label="Tìm theo mã hoặc tên đại lý"
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+        />
+      </div>
       {list.error && <Alert type="error">{list.error}</Alert>}
       {list.metadata?.totals !== undefined && (
+        <section
+          className="card receivable-totals"
+          aria-label="Tổng theo bộ lọc"
+        >
+          <h3>Tổng theo bộ lọc (máy chủ)</h3>
+          <dl className="receivable-totals-grid">
+            {Object.entries(record(list.metadata.totals)).map(([key, value]) => (
+              <div key={key}>
+                <dt>{totalLabels[key] ?? key}</dt>
+                <dd>{formatVND(decimal(value))}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+      {!list.loading && !list.error && list.items.length === 0 ? (
+        <div className="card empty-card">
+          <p>Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm.</p>
+        </div>
+      ) : (
         <div className="card">
-          <h2>Tổng theo bộ lọc (máy chủ)</h2>
-          {Object.entries(record(list.metadata.totals)).map(([key, value]) => (
-            <p key={key}>
-              {key}: {formatVND(decimal(value))}
-            </p>
-          ))}
+          <Table caption="Công nợ đại lý">
+            <thead>
+              <tr>
+                <th scope="col">Mã đại lý</th>
+                <th scope="col">Tên đại lý</th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Dư nợ
+                </th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Hạn mức còn lại
+                </th>
+                <th scope="col" style={{ textAlign: 'center' }}>
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.items.map((item) => {
+                const open = () => {
+                  setSelected(String(item.agencyId))
+                  setStatement(false)
+                }
+                return (
+                  <tr key={String(item.agencyId)}>
+                    <td>{String(item.agencyCode)}</td>
+                    <td>{String(item.agencyName)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {formatVND(String(item.currentDebt))}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {formatVND(String(item.remainingCreditLimit))}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <Button onClick={open}>Chi tiết</Button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </Table>
+          <Pagination
+            hasNext={list.hasMore}
+            hasPrevious={list.hasPrevious}
+            onNext={list.next}
+            onPrevious={list.previous}
+            isLoading={list.loading}
+            totalShowing={list.items.length}
+          />
         </div>
       )}
-      <Table caption="Công nợ đại lý">
-        <thead>
-          <tr>
-            <th>Mã</th>
-            <th>Đại lý</th>
-            <th>Dư nợ</th>
-            <th>Hạn mức còn lại</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.items.map((item) => (
-            <tr key={String(item.agencyId)}>
-              <td>{String(item.agencyCode)}</td>
-              <td>{String(item.agencyName)}</td>
-              <td>{formatVND(String(item.currentDebt))}</td>
-              <td>{formatVND(String(item.remainingCreditLimit))}</td>
-              <td>
-                <Button
-                  onClick={() => {
-                    setSelected(String(item.agencyId))
-                    setStatement(false)
-                  }}
-                >
-                  Xem hóa đơn
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <Pagination
-        hasNext={list.hasMore}
-        hasPrevious={list.hasPrevious}
-        onNext={list.next}
-        onPrevious={list.previous}
-        isLoading={list.loading}
-      />
       <Modal
         isOpen={!!selected}
         onClose={() => setSelected('')}
@@ -150,7 +196,13 @@ export function ReceivablesPage() {
           <>
             <Balance key={`balance-${selected}`} agencyId={selected} />
             <Invoices key={selected} agencyId={selected} />
-            <Button onClick={() => setStatement(true)}>Mở sổ công nợ</Button>
+            {!statement && (
+              <div className="receivable-modal-actions">
+                <Button variant="outline" onClick={() => setStatement(true)}>
+                  Mở sổ công nợ
+                </Button>
+              </div>
+            )}
             {statement && (
               <SourceStatement
                 key={`statement-${selected}`}

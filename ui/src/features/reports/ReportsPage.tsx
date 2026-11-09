@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { FileTextIcon, TableIcon } from '../../components/ui/Icons'
+import { Select } from '../../components/ui/Select'
 import { Spinner } from '../../components/ui/Spinner'
 import { Table } from '../../components/ui/Table'
 import { apiFetch } from '../../lib/api'
@@ -151,15 +153,44 @@ export function ReportsPage() {
   const columns = query ? Object.keys(rowRules[query.kind]) : []
   return (
     <div className="page-container">
-      <div className="page-header">
+      <div className="page-header reports-header">
         <div>
-          <p className="eyebrow">AGENTRA / REPORTS</p>
           <h1 className="page-title">Báo cáo kinh doanh</h1>
           <p className="page-desc">
-            Số liệu từ máy chủ. Không suy diễn từ danh sách đại lý, hàng hóa
-            hoặc phiếu xuất.
+            Tra cứu số liệu bán hàng, công nợ, tồn kho và thu tiền theo kỳ; xuất
+            toàn bộ kết quả ra PDF hoặc XLSX.
           </p>
         </div>
+        {!!available.length && (
+          <div className="reports-export">
+            <Button
+              type="button"
+              variant="primary"
+              icon={<FileTextIcon size={16} />}
+              disabled={
+                !page ||
+                dirty ||
+                (exportStatus?.key === key && exportStatus.phase === 'loading')
+              }
+              onClick={() => void exportFile('pdf')}
+            >
+              Xuất PDF
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              icon={<TableIcon size={16} />}
+              disabled={
+                !page ||
+                dirty ||
+                (exportStatus?.key === key && exportStatus.phase === 'loading')
+              }
+              onClick={() => void exportFile('xlsx')}
+            >
+              Xuất XLSX
+            </Button>
+          </div>
+        )}
       </div>
       {!available.length ? (
         <Alert type="info">
@@ -168,30 +199,26 @@ export function ReportsPage() {
         </Alert>
       ) : (
         <>
-          <form className="card" onSubmit={apply}>
-            <div className="form-grid">
-              <label className="form-field">
-                Loại báo cáo
-                <select
-                  className="input"
-                  value={draft.kind}
-                  onChange={(e) => {
-                    const kind = e.target.value as ReportKind
-                    setDraft({
-                      ...draft,
-                      kind,
-                      filters: {},
-                      sort: reports[kind].sorts[0]!,
-                    })
-                  }}
-                >
-                  {available.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {reports[kind].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <form className="card reports-filter" onSubmit={apply}>
+            <div className="form-grid reports-grid">
+              <Select
+                id="report-kind"
+                label="Loại báo cáo"
+                value={draft.kind}
+                onChange={(e) => {
+                  const kind = e.target.value as ReportKind
+                  setDraft({
+                    ...draft,
+                    kind,
+                    filters: {},
+                    sort: reports[kind].sorts[0]!,
+                  })
+                }}
+                options={available.map((kind) => ({
+                  value: kind,
+                  label: reports[kind].label,
+                }))}
+              />
               <Input
                 id="report-from"
                 label="Từ ngày"
@@ -217,7 +244,6 @@ export function ReportsPage() {
                   label={labels[filter]}
                   inputMode="numeric"
                   value={draft.filters[filter] || ''}
-                  helperText="Để trống để không lọc; dùng ID từ màn hình nghiệp vụ."
                   onChange={(e) =>
                     setDraft({
                       ...draft,
@@ -226,21 +252,16 @@ export function ReportsPage() {
                   }
                 />
               ))}
-              <label className="form-field">
-                Sắp xếp
-                <select
-                  className="input"
-                  value={draft.sort}
-                  onChange={(e) => setDraft({ ...draft, sort: e.target.value })}
-                >
-                  {reports[draft.kind].sorts.map((sort) => (
-                    <option key={sort} value={sort}>
-                      {sort.startsWith('-') ? 'Giảm: ' : 'Tăng: '}
-                      {labels[sort.replace(/^-/, '')]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Select
+                id="report-sort"
+                label="Sắp xếp"
+                value={draft.sort}
+                onChange={(e) => setDraft({ ...draft, sort: e.target.value })}
+                options={reports[draft.kind].sorts.map((sort) => ({
+                  value: sort,
+                  label: `${sort.startsWith('-') ? 'Giảm: ' : 'Tăng: '}${labels[sort.replace(/^-/, '')]}`,
+                }))}
+              />
               <Input
                 id="report-limit"
                 label="Số dòng mỗi trang (1-100)"
@@ -251,41 +272,14 @@ export function ReportsPage() {
                 onChange={(e) => setDraft({ ...draft, limit: e.target.value })}
               />
             </div>
-            <div className="page-actions">
-              <Button type="submit" disabled={loading && !dirty}>
+            <div className="reports-actions">
+              <Button
+                type="submit"
+                disabled={loading && !dirty}
+              >
                 Xem báo cáo
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  !page ||
-                  dirty ||
-                  (exportStatus?.key === key &&
-                    exportStatus.phase === 'loading')
-                }
-                onClick={() => void exportFile('pdf')}
-              >
-                Xuất PDF toàn bộ
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  !page ||
-                  dirty ||
-                  (exportStatus?.key === key &&
-                    exportStatus.phase === 'loading')
-                }
-                onClick={() => void exportFile('xlsx')}
-              >
-                Xuất XLSX toàn bộ
-              </Button>
             </div>
-            <p className="text-muted">
-              Chỉ tải khi nhấn Xem báo cáo. Xuất dùng cùng kỳ và bộ lọc đã áp
-              dụng, không giới hạn ở trang hiện tại.
-            </p>
           </form>
           {formError && <Alert type="error">{formError}</Alert>}
           {exportStatus?.key === key && (
@@ -313,7 +307,10 @@ export function ReportsPage() {
             </Alert>
           )}
           {page && query && (
-            <section className="card" aria-label={reports[query.kind].label}>
+            <section
+              className="card reports-result"
+              aria-label={reports[query.kind].label}
+            >
               <h2>{reports[query.kind].label}</h2>
               <p>
                 Kỳ [{page.fromDate}, {page.toDate})
@@ -322,12 +319,6 @@ export function ReportsPage() {
                 Máy chủ tạo lúc:{' '}
                 <time dateTime={page.generatedAt}>{page.generatedAt}</time>
               </p>
-              {query.kind === 'sales' && (
-                <p>
-                  Tỷ lệ do máy chủ tính theo doanh số gộp toàn doanh nghiệp,
-                  không theo tổng trang hoặc tổng bộ lọc.
-                </p>
-              )}
               {query.kind === 'cash-and-credit' && (
                 <p>
                   Dư có cuối kỳ là lịch sử tại cuối kỳ; phần đang dành và khả
@@ -360,7 +351,7 @@ export function ReportsPage() {
                     {page.items.map((row) => (
                       <tr key={String(row.agencyId ?? row.productId)}>
                         {columns.map((col) => (
-                          <td key={col} className="font-mono">
+                          <td key={col}>
                             {row[col]}
                           </td>
                         ))}
@@ -369,20 +360,8 @@ export function ReportsPage() {
                   </tbody>
                 </Table>
               )}
-              {page.totals && (
-                <section aria-label="Tổng toàn bộ kết quả đã lọc">
-                  <h3>Tổng toàn bộ kết quả đã lọc (không riêng trang)</h3>
-                  <dl className="form-grid">
-                    {Object.entries(page.totals).map(([name, value]) => (
-                      <div key={name}>
-                        <dt>{labels[name]}</dt>
-                        <dd className="font-mono">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              )}
               <div className="page-actions">
+                <span>{page.items.length} dòng trên trang</span>
                 <Button
                   variant="outline"
                   disabled={!history.length}
@@ -403,8 +382,20 @@ export function ReportsPage() {
                 >
                   Trang tiếp
                 </Button>
-                <span>{page.items.length} dòng trên trang</span>
               </div>
+              {page.totals && (
+                <section aria-label="Tổng toàn bộ kết quả đã lọc">
+                  <h3>Tổng toàn bộ kết quả đã lọc</h3>
+                  <dl className="form-grid">
+                    {Object.entries(page.totals).map(([name, value]) => (
+                      <div key={name}>
+                        <dt>{labels[name]}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
             </section>
           )}
         </>

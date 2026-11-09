@@ -296,7 +296,7 @@ def test_pdf_newline_continuations_fit_pages_and_always_repeat_record_identity()
 def test_pdf_wide_groups_long_tokens_markup_and_single_column(tmp_path):
     source = dataset(count=1)
     source["rows"][0]["agencyName"] = "<img src='https://evil.invalid'>" + "X" * 1800
-    for index in range(5):
+    for index in range(24):
         key = f"currentValue{index}"
         source["columns"].append((key, f"Current value {index}"))
         source["rows"][0][key] = "0.001"
@@ -307,8 +307,8 @@ def test_pdf_wide_groups_long_tokens_markup_and_single_column(tmp_path):
     reader = PdfReader(BytesIO(content))
     text = "".join(page.extract_text() for page in reader.pages)
     assert len(reader.pages) >= 3
-    assert "<img src='https://evil.invalid'>" in text
-    assert sum(len(run) for run in re.findall("X{2,}", text)) == 1800
+    assert "<imgsrc='https://evil.invalid'>" in "".join(text.split())
+    assert text.replace("XLSX", "").count("X") == 1800
     assert all(source["rows"][0]["agencyId"] in page.extract_text() for page in reader.pages)
     assert not any(page.get("/Annots") for page in reader.pages)
     source["columns"] = [identity_column]

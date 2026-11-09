@@ -118,6 +118,7 @@ export function CorrectionDialog({
         công nợ và các ràng buộc lịch sử; không xóa bằng chứng tiền thực nhận.
       </p>
       <form
+        noValidate
         onSubmit={(event) => {
           event.preventDefault()
           void submit()

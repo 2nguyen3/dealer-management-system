@@ -88,7 +88,7 @@ export function AgencyCreditPage() {
   return (
     <div className="page-container">
       <h1 className="page-title">Hạn mức & Dư có đại lý</h1>
-      <form onSubmit={submit} className="filter-bar">
+      <form onSubmit={submit} className="filter-bar filter-bar--row">
         <Input
           label="ID đại lý"
           value={input}
