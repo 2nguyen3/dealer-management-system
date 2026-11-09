@@ -1,0 +1,18 @@
+Tạo hình sơ đồ kiến trúc hệ thống Agentra (Dealer Management System) để chèn vào báo cáo học phần Công nghệ phần mềm. Đây là sơ đồ kỹ thuật hai chiều, không phải phối cảnh, hình 3D hay hình minh họa quảng cáo.
+
+Định dạng: khổ ngang tỷ lệ 4:3, nền trắng hoàn toàn, nét và chữ đen, không màu, không gradient, không đổ bóng. Dùng font sans-serif hỗ trợ tiếng Việt rõ ràng. Các hình chữ nhật có viền mảnh đồng nhất, khoảng cách rộng, đường nối vuông góc. Tiêu đề: “KIẾN TRÚC HỆ THỐNG AGENTRA”. Phụ đề: “Client–server ba tầng · Backend nguyên khối mô-đun”.
+
+Bố cục chính bên trái gồm ba khung lớn từ trên xuống:
+1. “TẦNG 1. TRÌNH BÀY”: hai khối đặt cạnh nhau: “Trình duyệt người dùng / React 19 · TypeScript · SPA” và “Nginx / Phục vụ UI · Proxy /api/”. Nối hai chiều bằng HTTP. React chạy trong trình duyệt, không chạy bên trong Nginx.
+2. “TẦNG 2. ỨNG DỤNG”: ba khối dọc trong cùng một backend FastAPI: “Router / Schema / Dependencies: HTTP, kiểm tra dữ liệu, xác thực và RBAC”; “Service: danh mục, chứng từ, kho, công nợ, thanh toán, báo cáo”; “Repository / SQLAlchemy 2 / psycopg 3: truy vấn và transaction”. Nối hai chiều giữa các khối liên tiếp. Ở cuối khung ghi chú: “Xuyên suốt: cấu hình, lỗi API, request ID, logging, phiên DB”. Đây là các phần nội bộ của một ứng dụng, không phải ba microservice.
+3. “TẦNG 3. DỮ LIỆU”: “PostgreSQL trên Supabase (dịch vụ bên ngoài)”; nội dung phụ “Bảng, khóa/ràng buộc, trigger, ledger, view/function”. Nối hai chiều từ Repository đến PostgreSQL, nhãn “SQL · kết nối TLS”.
+
+Nginx nối hai chiều đến Router với nhãn “/api/v1 · JSON”. Bên phải, ngoài các khung, có tiêu đề “DỊCH VỤ TÍCH HỢP NGOÀI” và hai khối:
+- “VNPAY / Thanh toán online / Tích hợp sandbox”. Service nối hai chiều với VNPAY: “Checkout / Query / Refund”. VNPAY có mũi tên riêng về Router: “IPN đã ký, qua public ingress”. Đây là luồng logic rút gọn; callback HTTP thực tế đi qua ingress/reverse proxy. Không vẽ mũi tên trực tiếp VNPAY đến database.
+- “Máy chủ SMTP / Email đặt lại mật khẩu / Phụ thuộc cấu hình”. Nối nét đứt một chiều từ Service đến SMTP với nhãn “SMTP / TLS”.
+
+Ghi chú cuối hình: “Mũi tên hai chiều: yêu cầu/phản hồi. Nét đứt: tích hợp email phụ thuộc cấu hình. Sơ đồ từ mã nguồn, không xác nhận trạng thái dịch vụ đang chạy.”
+
+Ràng buộc: không thêm Redis, Kafka, Kubernetes, microservices, Supabase Auth, chatbot AI hoặc kết nối trực tiếp từ trình duyệt đến PostgreSQL. Không đưa khóa, mật khẩu, URL nội bộ thực tế hoặc dữ liệu người dùng lên hình. Không coi trang Return của VNPAY là bằng chứng thanh toán thành công. Không gọi ba phần Router/Service/Repository là ba tầng triển khai riêng biệt.
+
+Để có sơ đồ chính xác, chỉnh sửa được: ưu tiên file BC/So_do/Kien_truc_he_thong.drawio. Ảnh AI chỉ là phương án minh họa; phải kiểm tra lại dấu tiếng Việt, tên công nghệ, nhãn và hướng mũi tên trước khi dùng.

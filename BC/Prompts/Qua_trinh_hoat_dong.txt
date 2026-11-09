@@ -1,0 +1,92 @@
+Vẽ lưu đồ quá trình hoạt động tổng quát của hệ thống Agentra (Dealer Management System) để chèn vào báo cáo môn Công nghệ phần mềm. Nội dung bằng tiếng Việt có dấu, chính xác và dễ đọc. Đây là lưu đồ xử lý, KHÔNG phải sơ đồ kiến trúc, sơ đồ database hay danh sách các chức năng.
+
+TIÊU ĐỀ
+“QUÁ TRÌNH HOẠT ĐỘNG CỦA HỆ THỐNG AGENTRA”
+
+PHONG CÁCH
+- Đen trắng hoàn toàn: nền trắng, chữ đen, viền đen; không màu, gradient, bóng đổ, 3D hoặc icon trang trí.
+- Khổ A3 dọc, độ phân giải cao; bố cục từ trên xuống, nhánh phụ sang hai bên. Chữ sans-serif hỗ trợ tiếng Việt, kích thước đồng đều và đủ lớn khi in.
+- Hình bầu dục cho bắt đầu/kết thúc; chữ nhật cho bước xử lý; hình thoi cho quyết định. Dùng mũi tên một chiều, đường nối vuông góc, ghi rõ nhãn các nhánh.
+- Không để đường nối xuyên qua khối, không chồng chữ, không thu nhỏ chữ để nhét nội dung. Mỗi khối tối đa 2–3 dòng.
+- Các mã N01, N02... dưới đây chỉ dùng mô tả kết nối, KHÔNG in mã lên hình.
+
+PHẦN 1. TRUY CẬP VÀ XÁC THỰC
+N01 [bầu dục]: “Bắt đầu”.
+N02 [chữ nhật]: “Người dùng truy cập ứng dụng web”.
+N03 [chữ nhật]: “Tải giao diện React / Khôi phục phiên nếu có”.
+N04 [hình thoi]: “Có phiên hợp lệ?”.
+N05 [chữ nhật]: “Nhập thông tin đăng nhập”.
+N06 [chữ nhật]: “Backend kiểm tra tài khoản và mật khẩu”.
+N07 [hình thoi]: “Đăng nhập hợp lệ?”.
+N08 [chữ nhật]: “Hiển thị lỗi đăng nhập”.
+N09 [chữ nhật]: “Tạo phiên / Cấp access token và refresh token”.
+N10 [chữ nhật]: “Tải hồ sơ, quyền / Hiển thị chức năng phù hợp”.
+
+Kết nối chính xác:
+N01 → N02 → N03 → N04.
+N04 — Có → N10.
+N04 — Không → N05 → N06 → N07.
+N07 — Không → N08 → N05.
+N07 — Có → N09 → N10.
+
+PHẦN 2. THAO TÁC VÀ KIỂM TRA YÊU CẦU
+N11 [chữ nhật]: “Người dùng chọn chức năng / Nhập dữ liệu hoặc bộ lọc”.
+N12 [chữ nhật]: “React gửi yêu cầu API / Nginx chuyển tiếp tới FastAPI”.
+N13 [chữ nhật]: “Backend kiểm tra xác thực, quyền và dữ liệu”.
+N14 [hình thoi]: “Yêu cầu được chấp nhận?”.
+N15 [chữ nhật]: “Trả lỗi / Không thực hiện nghiệp vụ”.
+N16 [chữ nhật]: “Hiển thị lỗi; yêu cầu đăng nhập lại nếu cần”.
+N17 [hình thoi]: “Loại thao tác?”.
+
+Kết nối chính xác:
+N10 → N11 → N12 → N13 → N14.
+N14 — Không → N15 → N16 → N27.
+N14 — Có → N17.
+
+PHẦN 3. HAI NHÁNH ĐỌC VÀ GHI
+Đặt nhánh “Tra cứu / Báo cáo” bên trái và nhánh “Thay đổi dữ liệu” bên phải. Hai nhánh có chiều rộng tương đương, không lẫn vào nhau.
+
+Nhánh trái:
+N18 [chữ nhật]: “Truy vấn PostgreSQL / Lọc, phân trang hoặc tổng hợp”.
+N19 [chữ nhật]: “Tạo dữ liệu phản hồi / Hoặc tệp báo cáo”.
+N17 — Tra cứu / Báo cáo → N18 → N19 → N25.
+Thêm chú thích nhỏ cạnh N18: “Nếu truy vấn thất bại: trả lỗi, không coi là kết quả rỗng”. Dùng đường nối N18 — Lỗi → N15; đường đến N19 ghi “Thành công”.
+
+Nhánh phải:
+N20 [chữ nhật]: “Mở transaction / Kiểm tra trạng thái và quy tắc nghiệp vụ”.
+N21 [chữ nhật]: “Khóa, kiểm tra phiên bản / Ghi dữ liệu và kiểm tra ràng buộc”.
+N22 [hình thoi]: “Giao dịch hoàn tất thành công?”.
+N23 [chữ nhật]: “Rollback nếu chưa commit / Trả lỗi nghiệp vụ”.
+N24 [chữ nhật]: “Dữ liệu đã commit / Tạo phản hồi thành công”.
+N17 — Thay đổi dữ liệu → N20 → N21 → N22.
+N22 — Không → N23 → N16.
+N22 — Có → N24 → N25.
+Chú thích cạnh nhánh ghi: “If-Match và Idempotency-Key áp dụng ở các thao tác yêu cầu. Lưu nháp chưa làm phát sinh tác động ghi sổ; khi ghi sổ hợp lệ mới tạo bút toán kho/công nợ/dư có tùy loại chứng từ.”
+N22 là kết quả tổng hợp của transaction: có lỗi khi kiểm tra hoặc ghi dữ liệu thì đi nhánh Không; chỉ đi nhánh Có khi commit đã thành công. Không vẽ việc luôn ghi dữ liệu dù điều kiện nghiệp vụ không đạt.
+
+PHẦN 4. PHẢN HỒI VÀ KẾT THÚC
+N25 [chữ nhật]: “API trả kết quả qua Nginx”.
+N26 [chữ nhật]: “React hiển thị dữ liệu / Cập nhật trạng thái giao diện”.
+N27 [hình thoi]: “Tiếp tục sử dụng?”.
+N28 [chữ nhật]: “Đăng xuất / Xóa thông tin phiên trên giao diện”.
+N29 [bầu dục]: “Kết thúc”.
+
+Kết nối chính xác:
+N25 → N26 → N27.
+N27 — Có → N03, bằng đường vòng ngoài cùng bên trái, nhãn “Kiểm tra/khôi phục phiên trước thao tác tiếp”.
+N27 — Không / Đăng xuất → N28 → N29.
+Chú thích N28: “Gửi yêu cầu thu hồi phiên đến backend; frontend xóa phiên cục bộ ngay cả khi yêu cầu mạng thất bại”. Không thể hiện việc đóng tab tự động bảo đảm phiên đã được thu hồi tại máy chủ.
+
+GHI CHÚ CUỐI HÌNH
+“Luồng xử lý tổng quát. Backend quyết định quyền và kết quả nghiệp vụ; PostgreSQL bảo vệ toàn vẹn dữ liệu. Không thông báo ghi thành công trước khi commit.”
+
+RÀNG BUỘC NỘI DUNG
+- React không truy cập trực tiếp PostgreSQL; không bỏ qua FastAPI khi đọc hoặc ghi dữ liệu.
+- Không biểu diễn thao tác tra cứu thành cập nhật tồn kho/công nợ.
+- Không mô tả mọi thao tác ghi đều sinh cả ba loại bút toán kho, công nợ và dư có.
+- Không thêm chatbot AI, microservice, Kafka hoặc Redis.
+- Không tự động gửi lại lệnh ghi khi mạng lỗi; mất phản hồi không chứng minh transaction chưa commit.
+- Không đưa toàn bộ vòng đời VNPAY vào nhánh transaction của hình này: trao đổi với cổng thanh toán có vòng đời riêng, không giữ một transaction DB xuyên suốt thời gian người dùng thanh toán. Nếu cần ghi chú, chỉ ghi: “Thanh toán online có luồng xác minh riêng; Return không phải bằng chứng đã thu tiền”.
+- Không tự thêm trạng thái thành công giả, không ghi “đã kiểm thử” hoặc “đã triển khai production”.
+
+Nguồn nội dung: BC/02_Qua_trinh_hoat_dong.md. Đầu ra yêu cầu là một hình lưu đồ trắng đen rõ ràng, đúng nhãn và kết nối nêu trên; không kèm đoạn văn giải thích dài bên ngoài hình.
