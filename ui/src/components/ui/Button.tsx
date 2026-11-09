@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { Button as ShadcnButton } from '../shadcn/button'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline'
@@ -17,14 +18,17 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseClass = 'btn'
-  const variantClass = `btn--${variant}`
-  const sizeClass = `btn--${size}`
-  const loadingClass = isLoading ? 'btn--loading' : ''
-
   return (
-    <button
-      className={`${baseClass} ${variantClass} ${sizeClass} ${loadingClass} ${className}`.trim()}
+    <ShadcnButton
+      variant={
+        variant === 'primary'
+          ? 'default'
+          : variant === 'danger'
+            ? 'destructive'
+            : variant
+      }
+      size={size === 'md' ? 'default' : size}
+      className={className}
       disabled={disabled || isLoading}
       {...props}
     >
@@ -36,6 +40,6 @@ export function Button({
         </span>
       ) : null}
       <span className="btn-text">{children}</span>
-    </button>
+    </ShadcnButton>
   )
 }

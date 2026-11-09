@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react'
+import { Badge as ShadcnBadge } from '../shadcn/badge'
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral'
@@ -12,8 +13,12 @@ export function Badge({
   ...props
 }: BadgeProps) {
   return (
-    <span className={`badge badge--${variant} ${className}`.trim()} {...props}>
+    <ShadcnBadge
+      variant={variant === 'danger' ? 'destructive' : 'secondary'}
+      className={`badge badge--${variant} ${className}`.trim()}
+      {...props}
+    >
       {children}
-    </span>
+    </ShadcnBadge>
   )
 }

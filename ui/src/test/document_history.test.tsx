@@ -7,7 +7,6 @@ import {
 } from '../features/authentication/useAuth'
 import { DocumentHistoryPage } from '../features/document_history/DocumentHistoryPage'
 import * as apiModule from '../lib/api'
-import * as cacheModule from '../lib/cache'
 import type { UserResponse } from '../lib/types'
 
 describe('DocumentHistoryPage Component', () => {
@@ -36,79 +35,57 @@ describe('DocumentHistoryPage Component', () => {
 
   const sampleDocs = [
     {
-      id: 'doc-001',
+      id: '301',
       code: 'PX-301',
-      kind: 'STOCK_ISSUE',
+      kind: 'STOCK_ISSUE' as const,
       agencyId: '101',
-      status: 'POSTED',
-      createdAt: '2026-10-05T08:00:00Z',
-      currentRevision: {
-        id: 'rev-301-1',
-        documentId: 'doc-001',
-        revisionNo: 1,
-        state: 'POSTED',
-        businessDate: '2026-10-05',
-        totalAmount: '1020000',
-        agencySnapshot: {
-          name: 'Đại lý Minh Phát',
-          address: '120 Nguyễn Trãi, Quận 1',
-        },
-        lines: [
-          {
-            id: 'l-1',
-            productId: 'p-1',
-            productName: 'Nước ngọt lon 330ml',
-            quantity: '10',
-            unitPrice: '102000',
-            amount: '1020000',
-          },
-        ],
-      },
+      agencyName: 'Đại lý Minh Phát',
+      originDocumentId: null,
+      receiptType: null,
+      status: 'POSTED' as const,
+      revisionNo: 1,
+      businessDate: '2026-10-05',
+      totalAmount: '1020000',
+      immediatePayment: '0',
     },
     {
-      id: 'doc-002',
+      id: '201',
       code: 'PN-201',
-      kind: 'STOCK_RECEIPT',
+      kind: 'STOCK_RECEIPT' as const,
       agencyId: null,
-      status: 'POSTED',
-      createdAt: '2026-10-04T09:00:00Z',
-      currentRevision: {
-        id: 'rev-201-1',
-        documentId: 'doc-002',
-        revisionNo: 1,
-        state: 'POSTED',
-        businessDate: '2026-10-04',
-        totalAmount: '5000000',
-        lines: [],
-      },
+      agencyName: null,
+      originDocumentId: null,
+      receiptType: null,
+      status: 'POSTED' as const,
+      revisionNo: 1,
+      businessDate: '2026-10-04',
+      totalAmount: '5000000',
+      immediatePayment: '0',
     },
   ]
 
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
-      async (path: string) => {
-        if (path.startsWith('/agencies')) {
-          return {
-            data: [{ id: '101', code: 'DL-101', name: 'Đại lý Minh Phát' }],
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/documents')) {
-          return {
-            data: sampleDocs,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/documents')) {
         return {
-          data: [],
+          data: {
+            items: sampleDocs,
+            pagination: { limit: 25, hasMore: false, nextCursor: null },
+          },
           status: 200,
-          headers: new Headers(),
+          etag: '"sample-etag"',
         } as unknown as apiModule.ApiResponse<unknown>
-      },
-    )
+      }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, hasMore: false, nextCursor: null },
+        },
+        status: 200,
+        etag: null,
+      } as unknown as apiModule.ApiResponse<unknown>
+    })
   })
 
   it('renders document history table', async () => {
@@ -126,12 +103,14 @@ describe('DocumentHistoryPage Component', () => {
       expect(screen.getByText('PX-301')).toBeDefined()
       expect(screen.getByText('PN-201')).toBeDefined()
       expect(screen.getByText('Đại lý Minh Phát')).toBeDefined()
-      expect(screen.getAllByText('Xuất hàng (PX)').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('Nhập hàng (PN)').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Phiếu xuất hàng').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Phiếu nhập hàng').length).toBeGreaterThan(0)
     })
   })
 
   it('filters documents by search query', async () => {
+    const fetchSpy = vi.spyOn(apiModule, 'apiFetch')
+
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -144,13 +123,20 @@ describe('DocumentHistoryPage Component', () => {
       expect(screen.getByText('PX-301')).toBeDefined()
     })
 
-    const searchInput = screen.getByPlaceholderText(
-      'Tìm theo mã chứng từ, tên đối tác, ghi chú...',
-    )
-    fireEvent.change(searchInput, { target: { value: 'PN-201' } })
+    const searchInput = screen.getByLabelText(/Tìm chứng từ/i, {
+      selector: 'input',
+    })
+    fireEvent.change(searchInput, { target: { value: 'PX-301' } })
 
-    expect(screen.queryByText('PX-301')).toBeNull()
-    expect(screen.getByText('PN-201')).toBeDefined()
+    const submitBtn = screen.getByRole('button', { name: 'Áp dụng bộ lọc' })
+    fireEvent.click(submitBtn)
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('q=PX-301'),
+        expect.any(Object),
+      )
+    })
   })
 
   it('opens and closes printable voucher modal', async () => {
@@ -166,17 +152,20 @@ describe('DocumentHistoryPage Component', () => {
       expect(screen.getByText('PX-301')).toBeDefined()
     })
 
-    const printBtns = screen.getAllByText('In')
-    fireEvent.click(printBtns[0]!)
+    const versionBtn = screen.getByRole('button', {
+      name: 'Phiên bản PX-301',
+    })
+    fireEvent.click(versionBtn)
 
-    expect(screen.getByText(/PHIẾU XUẤT KHO KIÊM BÁN HÀNG/)).toBeDefined()
-    expect(screen.getByText('In phiếu này')).toBeDefined()
+    await waitFor(() => {
+      expect(screen.getByText(/Lịch sử PX-301/i)).toBeDefined()
+    })
 
-    const closeBtn = screen.getByText('Đóng')
+    const closeBtn = screen.getByRole('button', { name: /Đóng hộp thoại/i })
     fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByText('In phiếu này')).toBeNull()
+      expect(screen.queryByText(/Lịch sử PX-301/i)).toBeNull()
     })
   })
 })

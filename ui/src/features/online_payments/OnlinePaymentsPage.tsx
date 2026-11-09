@@ -1,322 +1,185 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert } from '../../components/ui/Alert'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { PlusIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Pagination } from '../../components/ui/Pagination'
 import { Select } from '../../components/ui/Select'
 import { Spinner } from '../../components/ui/Spinner'
 import { Table } from '../../components/ui/Table'
-import { apiFetch, type ApiResponse } from '../../lib/api'
-import { cachedApiFetch, getCachedData, invalidateCache } from '../../lib/cache'
+import { apiFetch } from '../../lib/api'
+import { invalidateCache } from '../../lib/cache'
 import { formatDateTime, formatVND } from '../../lib/formatters'
-import type { Agency, AgencyBalance, OnlinePayment } from '../../lib/types'
 import { useAuth } from '../authentication/useAuth'
+import {
+  decimal,
+  id,
+  Intent,
+  message,
+  page,
+  positiveMoney,
+  record,
+  text,
+  type Row,
+} from '../payment_receipts/contracts'
+import { useSourcePage } from '../payment_receipts/useSourcePage'
+
+function payment(value: unknown): Row {
+  const data = record(value)
+  id(data.id)
+  id(data.agencyId)
+  decimal(data.amount)
+  text(data.provider)
+  text(data.merchantReference)
+  if (!['PENDING', 'SUCCESS', 'FAILED', 'EXPIRED'].includes(text(data.status)))
+    throw new Error('Invalid payment status')
+  if (data.status === 'SUCCESS') {
+    id(data.receiptDocumentId)
+    text(data.paymentTime)
+    text(data.providerTransactionId)
+  } else if (data.receiptDocumentId !== null)
+    throw new Error('Unverified payment cannot have a receipt')
+  return data
+}
+
+function eventSummary(value: unknown): Row {
+  const data = record(value)
+  id(data.id)
+  text(data.providerStatus)
+  record(data.verifiedData)
+  return data
+}
+
+function checkoutUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
 
 export function OnlinePaymentsPage() {
   const { hasPermission } = useAuth()
   const canManage = hasPermission('payments.online')
-
-  const [agencies, setAgencies] = useState<Agency[]>(() => {
-    const cached = getCachedData<Agency[] | { items: Agency[] }>('/agencies')
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [payments, setPayments] = useState<OnlinePayment[]>(() => {
-    const cached = getCachedData<OnlinePayment[] | { items: OnlinePayment[] }>(
-      '/online-payments',
-    )
-    if (!cached) return []
-    return Array.isArray(cached) ? cached : cached.items || []
-  })
-  const [balances, setBalances] = useState<Record<string, AgencyBalance>>({})
-  const [isLoading, setIsLoading] = useState(() => payments.length === 0)
-  const [error, setError] = useState<string | null>(null)
-  const [successNotice, setSuccessNotice] = useState<string | null>(null)
-
-  // Filters & Pagination
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterAgency, setFilterAgency] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterProvider, setFilterProvider] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
-
-  // Detail Modal
-  const [detailItem, setDetailItem] = useState<OnlinePayment | null>(null)
-  const [detailEvents, setDetailEvents] = useState<
-    Array<{
-      id: string
-      eventType: string
-      payload?: string
-      createdAt: string
-    }>
-  >([])
-  const [isDetailLoading, setIsDetailLoading] = useState(false)
-  const [actionNotice, setActionNotice] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [isReconciling, setIsReconciling] = useState(false)
-
-  // Create Modal
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [selectedAgencyId, setSelectedAgencyId] = useState('')
-  const [provider, setProvider] = useState('SANDBOX')
-  const [amount, setAmount] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [createdCheckoutUrl, setCreatedCheckoutUrl] = useState<string | null>(
-    null,
+  const [reference, setReference] = useState('')
+  const [agencyFilter, setAgencyFilter] = useState('')
+  const [status, setStatus] = useState('')
+  const list = useSourcePage(
+    '/online-payments',
+    { merchantReference: reference, agencyId: agencyFilter, status },
+    payment,
   )
-
-  const loadData = (bypassCache = false) => {
-    if (bypassCache) {
-      invalidateCache('/online-payments')
-      setIsLoading(true)
-    }
-
-    Promise.all([
-      cachedApiFetch<Agency[] | { items: Agency[] }>('/agencies'),
-      bypassCache
-        ? apiFetch<OnlinePayment[] | { items: OnlinePayment[] }>(
-            '/online-payments',
-          )
-        : cachedApiFetch<OnlinePayment[] | { items: OnlinePayment[] }>(
-            '/online-payments',
-          ),
-      cachedApiFetch<AgencyBalance[] | { items: AgencyBalance[] }>(
-        '/receivables/balances',
-      ).catch(() => ({ data: [] as AgencyBalance[] })),
-    ])
-      .then(([aRes, pRes, bRes]) => {
-        const aItems = Array.isArray(aRes.data)
-          ? aRes.data
-          : aRes.data.items || []
-        const pItems = Array.isArray(pRes.data)
-          ? pRes.data
-          : pRes.data.items || []
-        const bItems = Array.isArray(bRes.data)
-          ? bRes.data
-          : 'items' in bRes.data
-            ? bRes.data.items || []
-            : []
-
-        setAgencies(aItems)
-        setPayments(pItems)
-
-        const bMap: Record<string, AgencyBalance> = {}
-        for (const b of bItems) {
-          bMap[b.agencyId] = b
-        }
-        setBalances(bMap)
-      })
-      .catch((err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải danh sách giao dịch trực tuyến.')
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
-  }
+  const [selected, setSelected] = useState<string | null>(null)
+  const [detail, setDetail] = useState<Row | null>(null)
+  const [events, setEvents] = useState<Row[]>([])
+  const [eventsMore, setEventsMore] = useState(false)
+  const [version, setVersion] = useState(0)
+  const [open, setOpen] = useState(false)
+  const [agencyId, setAgencyId] = useState('')
+  const [amount, setAmount] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const intent = useRef(new Intent())
 
   useEffect(() => {
-    let isMounted = true
-    Promise.all([
-      cachedApiFetch<Agency[] | { items: Agency[] }>('/agencies'),
-      cachedApiFetch<OnlinePayment[] | { items: OnlinePayment[] }>(
-        '/online-payments',
-      ).catch(() => ({ data: [] as OnlinePayment[] })),
-      cachedApiFetch<AgencyBalance[] | { items: AgencyBalance[] }>(
-        '/receivables/balances',
-      ).catch(() => ({ data: [] as AgencyBalance[] })),
-    ])
-      .then(([aRes, pRes, bRes]) => {
-        if (!isMounted) return
-        const aItems = Array.isArray(aRes.data)
-          ? aRes.data
-          : aRes.data.items || []
-        const pItems = Array.isArray(pRes.data)
-          ? pRes.data
-          : 'items' in pRes.data
-            ? pRes.data.items || []
-            : []
-        const bItems = Array.isArray(bRes.data)
-          ? bRes.data
-          : 'items' in bRes.data
-            ? bRes.data.items || []
-            : []
-
-        setAgencies(aItems)
-        setPayments(pItems)
-
-        const bMap: Record<string, AgencyBalance> = {}
-        for (const b of bItems) {
-          bMap[b.agencyId] = b
-        }
-        setBalances(bMap)
-      })
-      .catch((err: unknown) => {
-        if (!isMounted) return
-        const e = err as { message?: string }
-        setError(e.message || 'Không thể tải danh sách giao dịch trực tuyến.')
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  // Agency selection balance
-  const selectedAgencyBalance = selectedAgencyId
-    ? balances[selectedAgencyId]
-    : undefined
-
-  // Filtered payments
-  const filteredPayments = useMemo(() => {
-    return payments.filter((item) => {
-      if (filterAgency && String(item.agencyId) !== filterAgency) {
-        return false
-      }
-      if (filterStatus && item.status !== filterStatus) {
-        return false
-      }
-      if (filterProvider && item.provider !== filterProvider) {
-        return false
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim()
-        const matchRef = item.merchantReference?.toLowerCase().includes(q)
-        const matchId = item.id?.toLowerCase().includes(q)
-        const matchAgency = item.agencyName?.toLowerCase().includes(q)
-        if (!matchRef && !matchId && !matchAgency) return false
-      }
-      return true
+    if (!selected) return
+    const controller = new AbortController()
+    let current = true
+    apiFetch<unknown>(`/online-payments/${selected}`, {
+      signal: controller.signal,
     })
-  }, [payments, filterAgency, filterStatus, filterProvider, searchQuery])
-
-  // Pagination slice
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filteredPayments.slice(start, start + pageSize)
-  }, [filteredPayments, page, pageSize])
-
-  const openDetail = (item: OnlinePayment) => {
-    setActionError(null)
-    setActionNotice(null)
-    setDetailItem(item)
-    setDetailEvents([])
-    setIsDetailLoading(true)
-
-    Promise.all([
-      apiFetch<OnlinePayment>(`/online-payments/${item.id}`).catch(() => ({
-        data: item,
-      })),
-      apiFetch<
-        Array<{
-          id: string
-          eventType: string
-          payload?: string
-          createdAt: string
-        }>
-      >(`/online-payments/${item.id}/events`).catch(() => ({ data: [] })),
-    ])
-      .then(([pRes, eRes]) => {
-        setDetailItem(pRes.data)
-        setDetailEvents(Array.isArray(eRes.data) ? eRes.data : [])
+      .then((response) => {
+        const item = payment(response.data)
+        if (current) setDetail(item)
       })
-      .finally(() => {
-        setIsDetailLoading(false)
+      .catch((failure: unknown) => {
+        if (current) setError(message(failure))
       })
-  }
+    if (canManage)
+      apiFetch<unknown>(`/online-payments/${selected}/events?limit=25`, {
+        signal: controller.signal,
+      })
+        .then((response) => {
+          const result = page(response.data, eventSummary)
+          if (current) {
+            setEvents(result.items)
+            setEventsMore(result.pagination.hasMore)
+          }
+        })
+        .catch((failure: unknown) => {
+          if (current) setError(message(failure))
+        })
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [selected, version, canManage])
 
-  const handleReconcile = async (paymentId: string) => {
-    setActionError(null)
-    setActionNotice(null)
-    setIsReconciling(true)
+  const create = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy || !canManage) return
+    setError('')
+    setNotice('')
     try {
-      const res: ApiResponse<OnlinePayment> = await apiFetch(
-        `/online-payments/${paymentId}/reconcile`,
-        {
-          method: 'POST',
-          idempotencyKey: crypto.randomUUID(),
-        },
-      )
-      setDetailItem(res.data)
-      setActionNotice(
-        `Đối soát thành công! Trạng thái hiện tại: ${res.data.status}.`,
-      )
-      loadData(true)
-    } catch (err: unknown) {
-      const e = err as { message?: string }
-      setActionError(e.message || 'Không thể thực hiện đối soát giao dịch.')
-    } finally {
-      setIsReconciling(false)
-    }
-  }
-
-  const handleCreateSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!selectedAgencyId) {
-      setFormError('Vui lòng chọn đại lý.')
-      return
-    }
-    const cleanAmount = amount.replace(/\D/g, '')
-    if (!cleanAmount || cleanAmount === '0') {
-      setFormError('Vui lòng nhập số tiền thanh toán hợp lệ.')
-      return
-    }
-
-    setFormError(null)
-    setIsSubmitting(true)
-    setCreatedCheckoutUrl(null)
-
-    try {
-      const res: ApiResponse<OnlinePayment> = await apiFetch(
-        '/online-payments',
-        {
-          method: 'POST',
-          idempotencyKey: crypto.randomUUID(),
-          body: {
-            agencyId: selectedAgencyId,
-            provider,
-            amount: cleanAmount,
-          },
-        },
-      )
-
-      setSuccessNotice('Khởi tạo giao dịch thanh toán trực tuyến thành công.')
-      if (res.data?.checkoutUrl) {
-        setCreatedCheckoutUrl(res.data.checkoutUrl)
-      } else {
-        setIsCreateOpen(false)
+      const body = {
+        agencyId: id(agencyId),
+        provider: 'VNPAY',
+        amount: positiveMoney(amount),
       }
-      loadData(true)
-    } catch (err: unknown) {
-      const e = err as { message?: string }
-      setFormError(e.message || 'Không thể khởi tạo giao dịch.')
+      setBusy(true)
+      const response = await intent.current.send<unknown>('/online-payments', {
+        method: 'POST',
+        body,
+      })
+      const item = payment(response.data)
+      setOpen(false)
+      setSelected(id(item.id))
+      setDetail(item)
+      setNotice(
+        response.status === 202
+          ? 'Đang khởi tạo checkout. Theo dõi giao dịch hiện tại, không tạo lại.'
+          : 'Đã khởi tạo giao dịch, chưa xác nhận nhận tiền.',
+      )
+      invalidateCache('/online-payments')
+      list.reload()
+    } catch (failure) {
+      setError(message(failure))
     } finally {
-      setIsSubmitting(false)
+      setBusy(false)
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'SUCCESS':
-        return <Badge variant="success">Thành công</Badge>
-      case 'PENDING':
-        return <Badge variant="warning">Đang chờ</Badge>
-      case 'FAILED':
-        return <Badge variant="danger">Thất bại</Badge>
-      case 'EXPIRED':
-        return <Badge variant="neutral">Hết hạn</Badge>
-      default:
-        return <Badge variant="neutral">{status}</Badge>
+  const reconcile = async () => {
+    if (!selected || busy || !canManage) return
+    setBusy(true)
+    setError('')
+    try {
+      const response = await intent.current.send<unknown>(
+        `/online-payments/${selected}/reconcile`,
+        { method: 'POST' },
+      )
+      setDetail(payment(response.data))
+      setVersion((value) => value + 1)
+      for (const prefix of [
+        '/online-payments',
+        '/payment-receipts',
+        '/agencies',
+        '/receivables',
+      ])
+        invalidateCache(prefix)
+      list.reload()
+    } catch (failure) {
+      setError(message(failure))
+    } finally {
+      setBusy(false)
     }
   }
+  const url = checkoutUrl(detail?.checkoutUrl)
 
   return (
     <div className="page-container">
@@ -324,510 +187,180 @@ export function OnlinePaymentsPage() {
         <div>
           <h1 className="page-title">Thanh toán trực tuyến</h1>
           <p className="page-desc">
-            Khởi tạo link/QR thanh toán nợ đại lý qua cổng thanh toán sandbox và
-            theo dõi đối soát giao dịch
+            Chuyển hướng và trang return không phải bằng chứng thanh toán. Chỉ
+            trạng thái máy chủ đã xác minh mới có thẩm quyền.
           </p>
         </div>
         {canManage && (
-          <Button
-            variant="primary"
-            onClick={() => {
-              setFormError(null)
-              setCreatedCheckoutUrl(null)
-              setSelectedAgencyId('')
-              setAmount('')
-              setIsCreateOpen(true)
-            }}
-          >
-            <PlusIcon size={16} /> Tạo thanh toán mới
-          </Button>
+          <Button onClick={() => setOpen(true)}>Tạo thanh toán mới</Button>
         )}
       </div>
-
-      {successNotice && <Alert type="success">{successNotice}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
-
-      <div className="card filter-bar">
-        <div className="filter-inputs">
-          <Input
-            placeholder="Tìm theo mã giao dịch, đại lý..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setPage(1)
-            }}
-          />
-          <Select
-            value={filterAgency}
-            onChange={(e) => {
-              setFilterAgency(e.target.value)
-              setPage(1)
-            }}
-            options={[
-              { value: '', label: 'Tất cả đại lý' },
-              ...agencies.map((a) => ({
-                value: a.id,
-                label: `${a.code} - ${a.name}`,
-              })),
-            ]}
-          />
-          <Select
-            value={filterProvider}
-            onChange={(e) => {
-              setFilterProvider(e.target.value)
-              setPage(1)
-            }}
-            options={[
-              { value: '', label: 'Tất cả cổng thanh toán' },
-              { value: 'SANDBOX', label: 'Cổng Sandbox' },
-              { value: 'VNPAY', label: 'VNPay' },
-              { value: 'MOMO', label: 'MoMo' },
-              { value: 'VIETQR', label: 'VietQR' },
-            ]}
-          />
-          <Select
-            value={filterStatus}
-            onChange={(e) => {
-              setFilterStatus(e.target.value)
-              setPage(1)
-            }}
-            options={[
-              { value: '', label: 'Tất cả trạng thái' },
-              { value: 'PENDING', label: 'Đang chờ (PENDING)' },
-              { value: 'SUCCESS', label: 'Thành công (SUCCESS)' },
-              { value: 'FAILED', label: 'Thất bại (FAILED)' },
-              { value: 'EXPIRED', label: 'Hết hạn (EXPIRED)' },
-            ]}
-          />
-        </div>
+      {notice && <Alert type="info">{notice}</Alert>}
+      <div className="filter-bar">
+        <Input
+          label="Mã tham chiếu"
+          value={reference}
+          onChange={(event) => setReference(event.target.value)}
+        />
+        <Input
+          label="ID đại lý"
+          value={agencyFilter}
+          onChange={(event) => setAgencyFilter(event.target.value)}
+        />
+        <Select
+          label="Trạng thái"
+          value={status}
+          onChange={(event) => setStatus(event.target.value)}
+          options={['', 'PENDING', 'SUCCESS', 'FAILED', 'EXPIRED'].map(
+            (value) => ({ value, label: value || 'Tất cả' }),
+          )}
+        />
+        <Button onClick={list.reload}>Tải lại</Button>
       </div>
-
-      {isLoading ? (
-        <div className="page-loading">
-          <Spinner label="Đang tải danh sách giao dịch trực tuyến..." />
-        </div>
-      ) : filteredPayments.length === 0 ? (
-        <div className="card empty-card">
-          <p>Không có giao dịch thanh toán trực tuyến nào phù hợp.</p>
-        </div>
+      {list.error && <Alert type="error">{list.error}</Alert>}
+      {list.loading ? (
+        <Spinner />
       ) : (
         <div className="card">
-          <Table caption="Danh sách giao dịch thanh toán trực tuyến">
+          <Table caption="Giao dịch trực tuyến">
             <thead>
               <tr>
-                <th scope="col">Mã giao dịch</th>
-                <th scope="col">Đại lý</th>
-                <th scope="col">Cổng</th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Số tiền
-                </th>
-                <th scope="col">Trạng thái</th>
-                <th scope="col">Thời gian tạo</th>
-                <th scope="col" style={{ textAlign: 'center' }}>
-                  Thao tác
-                </th>
+                <th>Mã tham chiếu</th>
+                <th>Đại lý</th>
+                <th>Cổng</th>
+                <th>Số tiền</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedItems.map((p) => (
-                <tr key={p.id}>
-                  <td className="font-mono font-bold">
-                    {p.merchantReference || p.id}
-                  </td>
+              {list.items.map((item) => (
+                <tr key={String(item.id)}>
+                  <td>{String(item.merchantReference)}</td>
+                  <td>#{String(item.agencyId)}</td>
+                  <td>{String(item.provider)}</td>
+                  <td>{formatVND(String(item.amount))}</td>
+                  <td>{String(item.status)}</td>
                   <td>
-                    <strong>{p.agencyName || `Đại lý #${p.agencyId}`}</strong>
-                  </td>
-                  <td>
-                    <span className="badge badge--neutral">{p.provider}</span>
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                    {formatVND(p.amount)}
-                  </td>
-                  <td>{getStatusBadge(p.status)}</td>
-                  <td>{formatDateTime(p.createdAt)}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        justifyContent: 'center',
+                    <Button
+                      onClick={() => {
+                        setSelected(String(item.id))
+                        setDetail(null)
+                        setEvents([])
+                        setError('')
                       }}
                     >
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openDetail(p)}
-                      >
-                        Chi tiết
-                      </Button>
-                      {p.checkoutUrl && p.status === 'PENDING' && (
-                        <a
-                          href={p.checkoutUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn--primary btn--sm"
-                          style={{ textDecoration: 'none' }}
-                        >
-                          Mở link
-                        </a>
-                      )}
-                    </div>
+                      Chi tiết
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </Table>
-
+          {!list.items.length && <p>Không có giao dịch phù hợp.</p>}
           <Pagination
-            limit={pageSize}
-            onLimitChange={(size: number) => {
-              setPageSize(size)
-              setPage(1)
-            }}
-            totalShowing={paginatedItems.length}
-            hasPrevious={page > 1}
-            hasNext={page * pageSize < filteredPayments.length}
-            onPrevious={() => setPage((pr) => Math.max(1, pr - 1))}
-            onNext={() => setPage((pr) => pr + 1)}
+            hasNext={list.hasMore}
+            hasPrevious={list.hasPrevious}
+            onNext={list.next}
+            onPrevious={list.previous}
+            totalShowing={list.items.length}
           />
         </div>
       )}
-
-      {/* Detail Modal */}
-      {detailItem && (
-        <Modal
-          isOpen={true}
-          title={`Chi tiết giao dịch #${detailItem.merchantReference || detailItem.id}`}
-          onClose={() => setDetailItem(null)}
-          maxWidth="lg"
-        >
-          {actionNotice && <Alert type="success">{actionNotice}</Alert>}
-          {actionError && <Alert type="error">{actionError}</Alert>}
-
-          {isDetailLoading ? (
-            <div className="modal-loading">
-              <Spinner label="Đang tải chi tiết giao dịch..." />
-            </div>
-          ) : (
-            <div className="detail-modal-body">
-              <div className="detail-grid">
-                <div>
-                  <span className="detail-label">Mã giao dịch:</span>
-                  <span className="font-mono font-bold">{detailItem.id}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Mã tham chiếu:</span>
-                  <span className="font-mono">
-                    {detailItem.merchantReference || '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Đại lý:</span>
-                  <span>
-                    {detailItem.agencyName || `Đại lý #${detailItem.agencyId}`}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Cổng thanh toán:</span>
-                  <span>{detailItem.provider}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Số tiền giao dịch:</span>
-                  <span
-                    className="font-bold text-success"
-                    style={{ fontSize: '1.1rem' }}
-                  >
-                    {formatVND(detailItem.amount)}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Trạng thái:</span>
-                  <span>{getStatusBadge(detailItem.status)}</span>
-                </div>
-                <div>
-                  <span className="detail-label">
-                    Mã đối tác (Provider ID):
-                  </span>
-                  <span className="font-mono">
-                    {detailItem.providerTransactionId || 'Chưa nhận'}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Thời điểm thanh toán:</span>
-                  <span>
-                    {detailItem.paymentTime
-                      ? formatDateTime(detailItem.paymentTime)
-                      : 'Chưa hoàn tất'}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Phiếu thu ghi nhận:</span>
-                  <span>
-                    {detailItem.receiptDocumentId ? (
-                      <span className="font-mono font-bold text-primary">
-                        {detailItem.receiptDocumentCode ||
-                          `#${detailItem.receiptDocumentId}`}
-                      </span>
-                    ) : (
-                      'Chưa lập (chờ thanh toán thành công)'
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <span className="detail-label">Hạn thanh toán:</span>
-                  <span>
-                    {detailItem.expiresAt
-                      ? formatDateTime(detailItem.expiresAt)
-                      : '—'}
-                  </span>
-                </div>
-              </div>
-
-              {detailItem.checkoutUrl && detailItem.status === 'PENDING' && (
-                <div
-                  style={{
-                    marginTop: '1.25rem',
-                    padding: '0.75rem',
-                    background: 'var(--color-bg-subtle, #f8f9fa)',
-                    borderRadius: '6px',
-                  }}
-                >
-                  <span className="detail-label">Đường dẫn thanh toán:</span>
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      alignItems: 'center',
-                      marginTop: '0.25rem',
-                    }}
-                  >
-                    <Input
-                      value={detailItem.checkoutUrl}
-                      readOnly
-                      style={{ fontSize: '0.875rem' }}
-                    />
-                    <a
-                      href={detailItem.checkoutUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn--primary btn--sm"
-                      style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-                    >
-                      Mở trang
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Event Log Section */}
-              <div style={{ marginTop: '1.5rem' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
-                  Lịch sử sự kiện (Webhook & Đối soát)
-                </h3>
-                {detailEvents.length === 0 ? (
-                  <p
-                    style={{
-                      color: 'var(--color-text-muted, #6c757d)',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Chưa có sự kiện callback webhook nào từ cổng thanh toán.
+      <Modal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title="Tạo thanh toán trực tuyến"
+      >
+        <form onSubmit={create}>
+          {error && <Alert type="error">{error}</Alert>}
+          <Input
+            label="ID đại lý thanh toán"
+            value={agencyId}
+            onChange={(event) => setAgencyId(event.target.value)}
+            required
+          />
+          <Input
+            label="Số tiền thanh toán (VND nguyên)"
+            inputMode="numeric"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            required
+          />
+          <p>
+            Cổng: VNPAY. Chỉ cổng đã được chọn cho hệ thống này; máy chủ kiểm
+            tra cấu hình trước khi tạo checkout.
+          </p>
+          <div className="modal-actions">
+            <Button type="submit" isLoading={busy}>
+              Khởi tạo thanh toán
+            </Button>
+            <Button onClick={() => setOpen(false)}>Đóng</Button>
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={!!selected}
+        onClose={() => {
+          setSelected(null)
+          setDetail(null)
+        }}
+        title="Chi tiết giao dịch"
+        maxWidth="lg"
+      >
+        {!detail ? (
+          <Spinner />
+        ) : (
+          <>
+            <p>
+              {String(detail.merchantReference)}: {String(detail.status)}
+            </p>
+            <p>Số tiền: {formatVND(String(detail.amount))}</p>
+            <p>
+              Phiếu thu xác minh:{' '}
+              {detail.receiptDocumentId
+                ? `#${String(detail.receiptDocumentId)}`
+                : 'Chưa có'}
+            </p>
+            <p>
+              Thời điểm thanh toán:{' '}
+              {detail.paymentTime
+                ? formatDateTime(String(detail.paymentTime))
+                : 'Chưa xác minh'}
+            </p>
+            {url && detail.status === 'PENDING' && (
+              <a href={url} target="_blank" rel="noreferrer">
+                Mở trang thanh toán
+              </a>
+            )}
+            {canManage && detail.status !== 'SUCCESS' && (
+              <Button disabled={busy} onClick={reconcile}>
+                Đối soát giao dịch hiện tại
+              </Button>
+            )}
+            <Button onClick={() => setVersion((value) => value + 1)}>
+              Kiểm tra trạng thái
+            </Button>
+            {canManage && (
+              <>
+                <h3>Sự kiện đã chuẩn hóa</h3>
+                {events.map((event) => (
+                  <p key={String(event.id)}>
+                    {String(event.eventKey)}: {String(event.providerStatus)}
                   </p>
-                ) : (
-                  <Table caption="Nhật ký sự kiện">
-                    <thead>
-                      <tr>
-                        <th>Sự kiện</th>
-                        <th>Thời gian</th>
-                        <th>Nội dung</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailEvents.map((ev) => (
-                        <tr key={ev.id}>
-                          <td>
-                            <span className="badge badge--neutral">
-                              {ev.eventType}
-                            </span>
-                          </td>
-                          <td>{formatDateTime(ev.createdAt)}</td>
-                          <td
-                            className="font-mono"
-                            style={{ fontSize: '0.8rem' }}
-                          >
-                            {ev.payload || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
+                ))}
+                {eventsMore && (
+                  <p>
+                    Chỉ hiển thị trang 25 sự kiện đầu, không phải toàn bộ lịch
+                    sử.
+                  </p>
                 )}
-              </div>
-
-              <div className="modal-actions" style={{ marginTop: '2rem' }}>
-                {canManage && detailItem.status === 'PENDING' && (
-                  <Button
-                    variant="primary"
-                    isLoading={isReconciling}
-                    onClick={() => handleReconcile(detailItem.id)}
-                  >
-                    Kiểm tra đối soát ngay
-                  </Button>
-                )}
-                <Button variant="secondary" onClick={() => setDetailItem(null)}>
-                  Đóng
-                </Button>
-              </div>
-            </div>
-          )}
-        </Modal>
-      )}
-
-      {/* Create Modal */}
-      {isCreateOpen && (
-        <Modal
-          isOpen={true}
-          title="Tạo thanh toán trực tuyến"
-          onClose={() => setIsCreateOpen(false)}
-          maxWidth="md"
-        >
-          {createdCheckoutUrl ? (
-            <div>
-              <Alert type="success">
-                Đã khởi tạo link thanh toán thành công! Bạn có thể chuyển hướng
-                đại lý tới cổng thanh toán.
-              </Alert>
-              <div style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
-                <label className="form-label">Link thanh toán:</label>
-                <Input value={createdCheckoutUrl} readOnly />
-              </div>
-              <div className="modal-actions">
-                <a
-                  href={createdCheckoutUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn--primary"
-                  style={{ textDecoration: 'none' }}
-                >
-                  Đến trang thanh toán
-                </a>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setIsCreateOpen(false)
-                    setCreatedCheckoutUrl(null)
-                  }}
-                >
-                  Đóng
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleCreateSubmit}>
-              {formError && <Alert type="error">{formError}</Alert>}
-
-              <div className="form-group">
-                <Select
-                  id="online-agency"
-                  label="Đại lý thanh toán"
-                  value={selectedAgencyId}
-                  onChange={(e) => setSelectedAgencyId(e.target.value)}
-                  options={[
-                    { value: '', label: '-- Chọn đại lý --' },
-                    ...agencies.map((a) => ({
-                      value: a.id,
-                      label: `${a.code} - ${a.name}`,
-                    })),
-                  ]}
-                  required
-                />
-              </div>
-
-              {selectedAgencyBalance && (
-                <div
-                  style={{
-                    background: 'var(--color-bg-subtle, #f8f9fa)',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '6px',
-                    marginBottom: '1rem',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '0.25rem',
-                    }}
-                  >
-                    <span>Dư nợ hiện tại:</span>
-                    <strong className="text-danger">
-                      {formatVND(selectedAgencyBalance.currentDebt)}
-                    </strong>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      setAmount(selectedAgencyBalance.currentDebt || '0')
-                    }
-                  >
-                    Thanh toán toàn bộ nợ
-                  </Button>
-                </div>
-              )}
-
-              <div className="form-group">
-                <Select
-                  id="online-provider"
-                  label="Cổng thanh toán"
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  options={[
-                    { value: 'SANDBOX', label: 'Cổng Sandbox thử nghiệm' },
-                    { value: 'VNPAY', label: 'VNPay Cổng nội địa' },
-                    { value: 'MOMO', label: 'Ví điện tử MoMo' },
-                    { value: 'VIETQR', label: 'Mã chuẩn VietQR' },
-                  ]}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="online-amount">
-                  Số tiền thanh toán (₫) (*)
-                </label>
-                <Input
-                  id="online-amount"
-                  type="text"
-                  placeholder="Nhập số tiền..."
-                  value={amount ? Number(amount).toLocaleString('vi-VN') : ''}
-                  onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
-                  required
-                />
-              </div>
-
-              <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  isLoading={isSubmitting}
-                >
-                  Khởi tạo thanh toán
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setIsCreateOpen(false)}
-                >
-                  Hủy bỏ
-                </Button>
-              </div>
-            </form>
-          )}
-        </Modal>
-      )}
+              </>
+            )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

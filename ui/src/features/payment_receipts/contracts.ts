@@ -1,0 +1,251 @@
+import { apiFetch, type RequestOptions } from '../../lib/api'
+
+export type Row = Record<string, unknown>
+export interface Page<T> {
+  items: T[]
+  pagination: { limit: number; nextCursor: string | null; hasMore: boolean }
+  metadata: Row
+}
+
+export function record(value: unknown): Row {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid server response')
+  }
+  return value as Row
+}
+
+export function text(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Invalid server text')
+  return value
+}
+
+export function decimal(value: unknown): string {
+  const result = text(value)
+  if (!/^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(result)) {
+    throw new Error('Invalid server numeric string')
+  }
+  return result
+}
+
+export function positiveMoney(value: string): string {
+  if (!/^[1-9][0-9]{0,17}$/.test(value)) {
+    throw new Error('Số tiền phải là số nguyên dương, tối đa 18 chữ số.')
+  }
+  return value
+}
+
+export function id(value: unknown): string {
+  const result = text(value)
+  if (
+    !/^[1-9][0-9]{0,18}$/.test(result) ||
+    BigInt(result) > 9223372036854775807n
+  ) {
+    throw new Error('Invalid identifier')
+  }
+  return result
+}
+
+export function catalog(value: unknown): number {
+  const number =
+    typeof value === 'string' && /^[1-9][0-9]*$/.test(value)
+      ? Number(value)
+      : value
+  if (
+    typeof number !== 'number' ||
+    !Number.isInteger(number) ||
+    number < 1 ||
+    number > 2147483647
+  )
+    throw new Error('Invalid catalogue ID')
+  return number
+}
+
+export function money(value: unknown): string {
+  const result = text(value)
+  if (!/^(0|[1-9][0-9]{0,17})$/.test(result))
+    throw new Error('Invalid whole VND amount')
+  return result
+}
+
+export function quantity(value: unknown): string {
+  const result = text(value)
+  if (!/^(0|[1-9][0-9]{0,14})(\.[0-9]{1,3})?$/.test(result))
+    throw new Error('Invalid exact quantity')
+  return result
+}
+
+export function businessDate(value: unknown): string {
+  const result = text(value)
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(result) ||
+    result.startsWith('0000') ||
+    Number.isNaN(Date.parse(`${result}T00:00:00Z`)) ||
+    new Date(`${result}T00:00:00Z`).toISOString().slice(0, 10) !== result
+  ) {
+    throw new Error('Invalid business date')
+  }
+  return result
+}
+
+export function vietnamDate(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const part = (type: string) =>
+    parts.find((entry) => entry.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+export function page<T>(
+  value: unknown,
+  decode: (value: unknown) => T,
+): Page<T> {
+  const data = record(value)
+  const pagination = record(data.pagination)
+  if (
+    !Array.isArray(data.items) ||
+    typeof pagination.hasMore !== 'boolean' ||
+    typeof pagination.limit !== 'number' ||
+    !(
+      pagination.nextCursor === null ||
+      typeof pagination.nextCursor === 'string'
+    ) ||
+    (pagination.hasMore && !pagination.nextCursor)
+  ) {
+    throw new Error('Invalid server pagination')
+  }
+  return {
+    items: data.items.map(decode),
+    pagination: pagination as unknown as Page<T>['pagination'],
+    metadata: data,
+  }
+}
+
+export function queryPath(
+  path: string,
+  filters: Record<string, string>,
+): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters))
+    if (value !== '') query.set(key, value)
+  return `${path}?${query}`
+}
+
+export function message(error: unknown): string {
+  return error instanceof Error ? error.message : 'Yêu cầu thất bại.'
+}
+
+// Retain a key until a confirmed response. An uncertain retry must use identical bytes.
+export class Intent {
+  private pending = new Map<string, { fingerprint: string; key: string }>()
+  private busy = false
+
+  async send<T>(path: string, options: RequestOptions = {}, keyed = true) {
+    if (this.busy) throw new Error('Một yêu cầu đang được xử lý.')
+    const fingerprint = JSON.stringify([
+      options.method,
+      options.body,
+      options.ifMatch,
+    ])
+    const previous = this.pending.get(path)
+    if (previous && !keyed)
+      throw new Error(
+        'Kết quả chưa rõ. Tải lại và kiểm tra trước khi gửi lại thao tác không có idempotency.',
+      )
+    if (previous && previous.fingerprint !== fingerprint) {
+      throw new Error(
+        'Kết quả trước chưa rõ. Giữ nguyên nội dung để thử lại hoặc tải lại và đối soát trước khi đổi yêu cầu.',
+      )
+    }
+    const intent = previous ?? { fingerprint, key: crypto.randomUUID() }
+    this.pending.set(path, intent)
+    this.busy = true
+    try {
+      const result = await apiFetch<T>(path, {
+        ...options,
+        ...(keyed ? { idempotencyKey: intent.key } : {}),
+      })
+      this.pending.delete(path)
+      return result
+    } catch (error) {
+      // Explicit client rejections did not commit; network/5xx responses remain uncertain.
+      const status = recordErrorStatus(error)
+      if (status >= 400 && status < 500 && status !== 408)
+        this.pending.delete(path)
+      throw error
+    } finally {
+      this.busy = false
+    }
+  }
+}
+
+function recordErrorStatus(error: unknown): number {
+  return error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    typeof error.status === 'number'
+    ? error.status
+    : 0
+}
+
+export interface FinancialDocument {
+  id: string
+  code: string
+  kind: string
+  agencyId: string
+  originDocumentId: string | null
+  receiptType: string | null
+  status: string
+  currentRevision: {
+    id: string
+    businessDate: string
+    totalAmount: string
+    paymentMethod: string | null
+    agencySnapshot: { name: string } | null
+    note: string | null
+    reason: string | null
+  }
+  reservedAmount?: string
+  refundedAmount?: string
+  latestAttemptId?: string | null
+  latestAttemptState?: string | null
+}
+
+export function documentDetail(value: unknown): FinancialDocument {
+  const data = record(value)
+  const revision = record(data.currentRevision)
+  id(data.id)
+  id(data.agencyId)
+  id(revision.id)
+  text(data.code)
+  text(data.kind)
+  if (!['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'].includes(text(data.status)))
+    throw new Error('Invalid document status')
+  businessDate(revision.businessDate)
+  decimal(revision.totalAmount)
+  if (data.kind === 'REFUND') {
+    decimal(data.reservedAmount)
+    decimal(data.refundedAmount)
+    if (
+      data.latestAttemptState !== null &&
+      !['PENDING', 'UNKNOWN', 'SUCCESS', 'FAILED'].includes(
+        text(data.latestAttemptState),
+      )
+    )
+      throw new Error('Invalid attempt state')
+  }
+  return data as unknown as FinancialDocument
+}
+
+export function documentSummary(value: unknown): Row {
+  const data = record(value)
+  id(data.id)
+  text(data.code)
+  text(data.status)
+  businessDate(data.businessDate)
+  decimal(data.totalAmount)
+  return data
+}

@@ -22,4 +22,22 @@ Read-only access remains possible without manage grants; no MANAGEMENT bypass. P
 
 ## Browser routes
 
+## Alignment And Redesign Packet, 2026-10-30
+
+Source inspection supersedes the starter description: `src/app/App.tsx` already
+mounts business pages. Repair rather than replace their feature ownership. Use
+`src/app/navigation.ts` for route admission and menu policy, including explicit
+allOf/anyOf composition. Read-only endpoint grants must admit readers without
+granting mutation actions. Chatbot remains unavailable because M32 is unpublished.
+The menu search filters local metadata only; neither shell nor home prefetches
+business collections. Mobile navigation closes on Escape and route selection,
+restores focus and never leaves hidden links keyboard-focusable.
+
+Visual direction: Vietnamese-first blue Agentra workspace, restrained motion,
+consistent control radii, tabular numeric text and readable dense tables. Preserve
+semantic HTML. Optional conceptual warehouse artwork is not live stock data; load
+WebGL only on explicit request and keep a static accessible fallback. HyperFrames
+is a video-authoring tool, not the application's runtime or a reason to replace
+React. No database credentials become public frontend configuration.
+
 Proposed route group: `/application-shell`; `/<id>` for supported detail, `/new` and `/<id>/edit` only where corresponding read/create/edit operations and permissions exist. These are frontend routes, not replacements for source API paths. F01–F03 use their documented foundation/auth/shell routes instead. Update this proposal before code if routing changes; deep links must guard both identity and source-specific permission.

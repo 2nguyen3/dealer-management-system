@@ -5,6 +5,8 @@ import {
   getAccessToken,
   getCurrentUser,
   getStoredRefreshToken,
+  fetchCurrentUser,
+  isTokenResponse,
   refreshSession,
   registerAuthenticatedAbortController,
   saveSession,
@@ -18,7 +20,7 @@ describe('Session & Tab Coordination', () => {
     tokenType: 'Bearer',
     expiresAt: '2026-10-23T12:00:00Z',
     refreshToken: 'test-refresh-token-456',
-    refreshExpiresAt: '2026-10-30T12:00:00Z',
+    refreshExpiresAt: '2099-10-30T12:00:00Z',
     user: {
       id: '1',
       fullName: 'Nguyễn Văn A',
@@ -126,5 +128,202 @@ describe('Session & Tab Coordination', () => {
     expect(getAccessToken()).toBe('custom-token')
     setAccessToken(null)
     expect(getAccessToken()).toBeNull()
+  })
+
+  it.each(['logout', 'switch'] as const)(
+    'never publishes a late refresh success after %s',
+    async (action) => {
+      saveSession(mockTokenResponse)
+      let resolve!: (response: Response) => void
+      const spy = vi.spyOn(globalThis, 'fetch').mockReturnValue(
+        new Promise((yes) => {
+          resolve = yes
+        }),
+      )
+      const pending = refreshSession('/api/v1')
+      if (action === 'logout') clearSession()
+      else
+        saveSession({
+          ...mockTokenResponse,
+          accessToken: 'other',
+          user: { ...mockTokenResponse.user, id: '2' },
+        })
+      expect(spy.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+      resolve(new Response(JSON.stringify(mockTokenResponse)))
+      expect(await pending).toBeNull()
+      expect(getAccessToken()).toBe(action === 'logout' ? null : 'other')
+    },
+  )
+
+  it('an old failed refresh does not clear the new account or its in-flight refresh', async () => {
+    saveSession(mockTokenResponse)
+    let reject!: (reason: unknown) => void
+    let resolve!: (response: Response) => void
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValueOnce(
+        new Promise((_yes, no) => {
+          reject = no
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((yes) => {
+          resolve = yes
+        }),
+      )
+    const old = refreshSession('/api/v1')
+    saveSession({
+      ...mockTokenResponse,
+      accessToken: 'other',
+      refreshToken: 'other-refresh',
+      user: { ...mockTokenResponse.user, id: '2' },
+    })
+    const current = refreshSession('/api/v1')
+    reject(new TypeError('old request'))
+    expect(await old).toBeNull()
+    const coalesced = refreshSession('/api/v1')
+    expect(spy).toHaveBeenCalledTimes(2)
+    resolve(
+      new Response(
+        JSON.stringify({
+          ...mockTokenResponse,
+          accessToken: 'newer',
+          user: { ...mockTokenResponse.user, id: '2' },
+        }),
+      ),
+    )
+    expect((await current)?.accessToken).toBe('newer')
+    expect((await coalesced)?.accessToken).toBe('newer')
+  })
+
+  it('clears an uncertain refresh response instead of reusing its single-use token', async () => {
+    saveSession(mockTokenResponse)
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('lost reply'))
+    expect(await refreshSession('/api/v1')).toBeNull()
+    expect(getStoredRefreshToken()).toBeNull()
+  })
+
+  it.each([
+    null,
+    {},
+    {
+      ...mockTokenResponse,
+      user: { ...mockTokenResponse.user, id: 9007199254740990 },
+    },
+    { ...mockTokenResponse, accessToken: {} },
+    { ...mockTokenResponse, tokenType: 'Basic' },
+  ])('rejects malformed token envelopes without persisting them', (value) => {
+    expect(isTokenResponse(value)).toBe(false)
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('rejects invalid refresh JSON and identity mismatch', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('not json'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...mockTokenResponse,
+            user: { ...mockTokenResponse.user, id: '2' },
+          }),
+        ),
+      )
+    saveSession(mockTokenResponse)
+    expect(await refreshSession('/api/v1')).toBeNull()
+    saveSession(mockTokenResponse)
+    expect(await refreshSession('/api/v1')).toBeNull()
+    expect(getCurrentUser()).toBeNull()
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('handles malformed/expired stored refresh tokens and disabled storage safely', () => {
+    sessionStorage.setItem('agentra_auth_session', '{broken')
+    expect(getStoredRefreshToken()).toBeNull()
+    sessionStorage.setItem(
+      'agentra_auth_session',
+      JSON.stringify({
+        refreshToken: {},
+        refreshExpiresAt: '2099-01-01T00:00:00Z',
+      }),
+    )
+    expect(getStoredRefreshToken()).toBeNull()
+    sessionStorage.setItem(
+      'agentra_auth_session',
+      JSON.stringify({
+        refreshToken: 'expired',
+        refreshExpiresAt: '2000-01-01T00:00:00Z',
+      }),
+    )
+    expect(getStoredRefreshToken()).toBeNull()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('denied')
+    })
+    saveSession(mockTokenResponse)
+    expect(getAccessToken()).toBe(mockTokenResponse.accessToken)
+    expect(getStoredRefreshToken()).toBeNull()
+    clearSession()
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('validates profile grants and exact ID without inferring management privileges', async () => {
+    saveSession(mockTokenResponse)
+    const valid = {
+      user: { ...mockTokenResponse.user, id: '1' },
+      allowedFunctions: ['agency.read'],
+    }
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(valid)))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ ...valid, allowedFunctions: ['unknown.admin'] }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...valid,
+            allowedFunctions: ['agency.read', 'agency.read'],
+          }),
+        ),
+      )
+    expect(
+      await fetchCurrentUser('/api/v1', mockTokenResponse.accessToken),
+    ).toEqual(valid)
+    await expect(
+      fetchCurrentUser('/api/v1', mockTokenResponse.accessToken),
+    ).rejects.toThrow('Invalid profile')
+    await expect(
+      fetchCurrentUser('/api/v1', mockTokenResponse.accessToken),
+    ).rejects.toThrow('Invalid profile')
+    expect(spy).toHaveBeenCalledTimes(3)
+  })
+
+  it('cancels profiles with a caller signal on logout and rejects late body reads', async () => {
+    saveSession(mockTokenResponse)
+    let resolve!: (value: unknown) => void
+    const response = new Response('{}')
+    vi.spyOn(response, 'json').mockReturnValue(
+      new Promise((yes) => {
+        resolve = yes
+      }),
+    )
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+    const caller = new AbortController()
+    const pending = fetchCurrentUser(
+      '/api/v1',
+      mockTokenResponse.accessToken,
+      caller.signal,
+    )
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    await vi.waitFor(() => expect(response.json).toHaveBeenCalled())
+    clearSession()
+    resolve({ user: mockTokenResponse.user, allowedFunctions: ['agency.read'] })
+    await rejected
+    expect(spy.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    expect(caller.signal.aborted).toBe(false)
   })
 })

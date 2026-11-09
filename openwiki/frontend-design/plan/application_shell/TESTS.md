@@ -26,4 +26,17 @@ Read-only access remains possible without manage grants; no MANAGEMENT bypass. F
 
 ## Required integrated evidence
 
+## Actual Alignment Register, 2026-10-30
+
+| Actual symbol | Success | Failure | Boundary |
+| --- | --- | --- | --- |
+| `allowsNavigation`, `routePermissions` | Each endpoint reader reaches its route/menu | Missing member of report allOf denies access | Empty grants, unknown route, every anyOf member, no role bypass |
+| `ShellLayout` | Local menu filtering and navigation | Logout failure stays actionable | Escape, focus return, mobile hidden links, zero shell business requests |
+| `ProtectedRoute` | Current grants admit route | Unauthenticated redirect/denied page | Loading, search preserved, explicit policy overrides old narrower route prop |
+| `HomePage` | Authorized task links | No grants yields explicit empty state | No business fetch, no fabricated metrics |
+
+Use colocated/unit tests and `src/test/shell_and_navigation.test.tsx`; browser
+viewport and keyboard evidence is recorded separately. Full closure still requires
+the existing per-file 100% statement/branch gate, not a passing build alone.
+
 Mocked browser scenarios exercise valid navigation, loading, forbidden, conflict, uncertain outcome, keyboard/focus and narrow viewport. Live scenarios wait for **Full published API, persisted-kind compatibility and backend evidence**; use real browser/network in an isolated backend environment. Re-check later correction/refund/provider consumers where this module's reads change. Record exact commands, cases, coverage JSON, environment and screenshots/results in VERIFICATION. Existing `npm run lint`, `npm run typecheck`, `npm run format:check`, `npm run build` run from `ui/`; tests/coverage/E2E scripts are proposed until F01 installs them.

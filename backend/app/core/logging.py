@@ -5,5 +5,6 @@ Call sites emit fixed event labels, without credential values or exception text.
 
 import logging
 
+app_logger = logging.getLogger("app.core.request_context")
 auth_logger = logging.getLogger("app.modules.auth.service")
 health_logger = logging.getLogger("app.modules.health.router")

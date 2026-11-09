@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { API_BASE_URL } from '../../lib/api'
-import { invalidateCache, prefetchMasterData } from '../../lib/cache'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { API_BASE_URL, apiFetch } from '../../lib/api'
 import type { FunctionCode, TokenResponse, UserResponse } from '../../lib/types'
 import {
   clearSession,
   fetchCurrentUser,
   getAccessToken,
+  getSessionGeneration,
   getStoredRefreshToken,
+  isTokenResponse,
   refreshSession,
   saveSession,
   subscribeAuthChange,
@@ -16,136 +17,143 @@ import { AuthContext } from './useAuth'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null)
   const [allowedFunctions, setAllowedFunctions] = useState<FunctionCode[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const mounted = useRef(false)
+  const profileController = useRef<AbortController | null>(null)
+  const profilePromise = useRef<Promise<void>>(Promise.resolve())
+  const loginAttempt = useRef(0)
 
   const loadProfile = useCallback(async (token: string) => {
+    profileController.current?.abort()
+    const controller = new AbortController()
+    profileController.current = controller
+    const generation = getSessionGeneration()
+    setAllowedFunctions([])
     try {
-      const current = await fetchCurrentUser(API_BASE_URL, token)
+      const current = await fetchCurrentUser(
+        API_BASE_URL,
+        token,
+        controller.signal,
+      )
+      if (
+        !mounted.current ||
+        controller.signal.aborted ||
+        generation !== getSessionGeneration()
+      )
+        return
       setUser(current.user)
       setAllowedFunctions(current.allowedFunctions)
-      // Warm up cache for core business operations in background
-      prefetchMasterData()
-    } catch {
-      // Failed to get profile: invalidate session
+    } catch (error) {
+      if (
+        !mounted.current ||
+        controller.signal.aborted ||
+        generation !== getSessionGeneration()
+      )
+        return
       clearSession()
-      setUser(null)
-      setAllowedFunctions([])
+      throw error
+    } finally {
+      if (mounted.current && profileController.current === controller)
+        setIsLoading(false)
     }
   }, [])
 
-  // Restore session on mount (same-tab restoration)
   useEffect(() => {
-    let isMounted = true
-
-    const initAuth = async () => {
-      const storedToken = getStoredRefreshToken()
-      if (!storedToken) {
-        if (isMounted) setIsLoading(false)
-        return
-      }
-
-      try {
-        const refreshed = await refreshSession(API_BASE_URL)
-        if (refreshed?.accessToken && isMounted) {
-          await loadProfile(refreshed.accessToken)
-        }
-      } catch {
-        if (isMounted) {
-          clearSession()
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    void initAuth()
-
+    let active = true
+    mounted.current = true
     const unsubscribe = subscribeAuthChange((changedUser) => {
-      if (!changedUser) {
-        setUser(null)
-        setAllowedFunctions([])
+      profileController.current?.abort()
+      setUser(null)
+      setAllowedFunctions([])
+      if (changedUser && getAccessToken()) {
+        setIsLoading(true)
+        const promise = loadProfile(getAccessToken()!)
+        profilePromise.current = promise
+        void promise.catch(() => {})
+      } else {
+        setIsLoading(false)
       }
     })
-
+    const initAuth = async () => {
+      if (getAccessToken()) {
+        profilePromise.current = loadProfile(getAccessToken()!)
+        await profilePromise.current
+      } else if (getStoredRefreshToken()) {
+        await refreshSession(API_BASE_URL)
+        await profilePromise.current
+      } else {
+        clearSession()
+      }
+      if (active && mounted.current) setIsLoading(false)
+    }
+    void initAuth().catch(() => {})
+    const attemptRef = loginAttempt
     return () => {
-      isMounted = false
+      mounted.current = false
+      active = false
+      attemptRef.current++
+      profileController.current?.abort()
       unsubscribe()
     }
   }, [loadProfile])
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (!response.ok) {
-        let errJson: { code?: string; message?: string } | null = null
-        try {
-          errJson = (await response.json()) as {
-            code?: string
-            message?: string
-          }
-        } catch {
-          // not json
-        }
-        const err = new Error(errJson?.message || 'Đăng nhập thất bại')
-        ;(err as unknown as { code?: string; status?: number }).code =
-          errJson?.code
-        ;(err as unknown as { code?: string; status?: number }).status =
-          response.status
-        throw err
-      }
-
-      const tokenData = (await response.json()) as TokenResponse
-      saveSession(tokenData)
-      await loadProfile(tokenData.accessToken)
-    },
-    [loadProfile],
-  )
+  const login = useCallback(async (email: string, password: string) => {
+    const attempt = ++loginAttempt.current
+    clearSession()
+    const generation = getSessionGeneration()
+    const response = await apiFetch<TokenResponse>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+      requiresAuth: false,
+      validate: isTokenResponse,
+    })
+    if (
+      !mounted.current ||
+      attempt !== loginAttempt.current ||
+      generation !== getSessionGeneration()
+    ) {
+      throw new DOMException('Session changed', 'AbortError')
+    }
+    saveSession(response.data)
+    const savedGeneration = getSessionGeneration()
+    await profilePromise.current
+    if (
+      !mounted.current ||
+      attempt !== loginAttempt.current ||
+      savedGeneration !== getSessionGeneration()
+    ) {
+      throw new DOMException('Session changed', 'AbortError')
+    }
+  }, [])
 
   const logout = useCallback(async () => {
     const refreshToken = getStoredRefreshToken()
+    loginAttempt.current++
+    // Local revocation is immediate, regardless of a slow/failed server logout.
+    clearSession()
     if (refreshToken) {
       try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
+        await apiFetch('/auth/logout', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ refreshToken }),
+          body: { refreshToken },
+          requiresAuth: false,
         })
       } catch {
-        // Ignore transport errors on logout
+        // A failed remote revocation never restores local credentials.
       }
     }
-    clearSession()
-    invalidateCache()
-    setUser(null)
-    setAllowedFunctions([])
   }, [])
 
   const refreshProfile = useCallback(async () => {
     const token = getAccessToken()
-    if (token) {
-      await loadProfile(token)
-    }
+    if (token) await loadProfile(token)
   }, [loadProfile])
 
   const hasPermission = useCallback(
     (permission: FunctionCode | FunctionCode[]): boolean => {
-      if (Array.isArray(permission)) {
-        return permission.some((p) => allowedFunctions.includes(p))
-      }
-      return allowedFunctions.includes(permission)
+      return Array.isArray(permission)
+        ? permission.some((code) => allowedFunctions.includes(code))
+        : allowedFunctions.includes(permission)
     },
     [allowedFunctions],
   )

@@ -1,7 +1,8 @@
 # Agentra frontend
 
-React 19 + Vite + strict TypeScript, ESLint, and Prettier. Use Node.js 24 LTS
-(minimum 22.12) and npm. Commit `package-lock.json` when dependencies change.
+React 19 + Vite + strict TypeScript, Tailwind CSS v4, shadcn/ui components,
+ESLint, and Prettier. Use Node.js 24 LTS (minimum 22.12) and npm. Commit
+`package-lock.json` when dependencies change.
 
 ## Local development
 
@@ -15,8 +16,9 @@ npm run dev
 Open http://localhost:5173. Run the backend on port 8000 in a second terminal.
 Vite proxies `/api` to FastAPI so local requests use the same origin.
 
-The starter page checks API liveness and links to Swagger UI. It does not check
-the database; use `/api/v1/health/ready` to verify Supabase connectivity.
+The application uses authenticated, permission-aware navigation. The home page
+shows accessible business functions without preloading their data. Use
+`/api/v1/health/ready` to verify backend database connectivity.
 
 The default API base URL is `/api/v1`. To override it, copy `.env.example` to
 `.env` and set `VITE_API_BASE_URL`. Vite variables are public and are embedded
@@ -28,13 +30,21 @@ An external API origin also needs the frontend origin in backend `CORS_ORIGINS`.
 ```text
 src/
   app/          # Application composition
+  components/
+    shadcn/     # Generated shadcn/ui sources
+    ui/         # Existing component API adapters and application widgets
+  features/     # Business and authentication screens
   lib/          # Shared infrastructure, including API calls
   main.tsx      # React entry point
-  styles.css    # Global styles
+  styles.css    # Tailwind import, theme tokens, and application styles
 ```
 
-Group future features under `src/features/<feature>/`, keeping their components,
-hooks, and types together. Promote code to shared modules when it is reused.
+`components.json` configures the shadcn CLI; run `npx shadcn@latest add <name>`
+from `ui/`. Generated files live in `src/components/shadcn/` rather than
+`src/components/ui/` because Windows file names are case-insensitive and the
+existing `Button.tsx`/`Input.tsx` adapters must not be overwritten. Keep shared
+component APIs stable while migrating screens. Group feature code under
+`src/features/<feature>/`.
 
 ## Commands
 
@@ -43,6 +53,7 @@ npm run lint
 npm run typecheck
 npm run format:check
 npm run build
+npm run test
 npm run preview
 ```
 

@@ -7,7 +7,6 @@ import {
 } from '../features/authentication/useAuth'
 import { DocumentCorrectionsPage } from '../features/document_corrections/DocumentCorrectionsPage'
 import * as apiModule from '../lib/api'
-import * as cacheModule from '../lib/cache'
 import type { UserResponse } from '../lib/types'
 
 describe('DocumentCorrectionsPage Component', () => {
@@ -25,15 +24,36 @@ describe('DocumentCorrectionsPage Component', () => {
 
   const mockAuthContext: AuthContextValue = {
     user: mockUser,
-    allowedFunctions: ['documents.correct', 'documents.cancel'],
+    allowedFunctions: [
+      'documents.correct',
+      'documents.cancel',
+      'stock.issue.post',
+      'stock.issue.prepare',
+      'debt.read',
+      'sales.read',
+    ],
     isAuthenticated: true,
     isLoading: false,
     hasPermission: (perm) =>
       Array.isArray(perm)
         ? perm.some((p) =>
-            ['documents.correct', 'documents.cancel'].includes(p),
+            [
+              'documents.correct',
+              'documents.cancel',
+              'stock.issue.post',
+              'stock.issue.prepare',
+              'debt.read',
+              'sales.read',
+            ].includes(p),
           )
-        : ['documents.correct', 'documents.cancel'].includes(perm),
+        : [
+            'documents.correct',
+            'documents.cancel',
+            'stock.issue.post',
+            'stock.issue.prepare',
+            'debt.read',
+            'sales.read',
+          ].includes(perm),
     login: vi.fn(),
     logout: vi.fn(),
     refreshProfile: vi.fn(),
@@ -41,68 +61,94 @@ describe('DocumentCorrectionsPage Component', () => {
 
   const samplePostedDocs = [
     {
-      id: 'doc-301',
+      id: '301',
       code: 'PX-301',
-      kind: 'STOCK_ISSUE',
+      kind: 'STOCK_ISSUE' as const,
       agencyId: '101',
-      status: 'POSTED',
-      createdAt: '2026-10-05T08:00:00Z',
-      currentRevision: {
-        id: 'rev-301-1',
-        revisionNo: 1,
-        state: 'POSTED',
-        businessDate: '2026-10-05',
-        totalAmount: '1020000',
-        agencySnapshot: {
-          name: 'Đại lý Minh Phát',
-        },
-      },
-    },
-    {
-      id: 'doc-401',
-      code: 'PT-401',
-      kind: 'PAYMENT_RECEIPT',
-      agencyId: '102',
-      status: 'POSTED',
-      createdAt: '2026-10-06T10:00:00Z',
-      currentRevision: {
-        id: 'rev-401-1',
-        revisionNo: 1,
-        state: 'POSTED',
-        businessDate: '2026-10-06',
-        totalAmount: '500000',
-        agencySnapshot: {
-          name: 'Đại lý Toàn Thắng',
-        },
-      },
+      agencyName: 'Đại lý Minh Phát',
+      originDocumentId: null,
+      receiptType: null,
+      status: 'POSTED' as const,
+      revisionNo: 1,
+      businessDate: '2026-10-05',
+      totalAmount: '1020000',
+      immediatePayment: '0',
     },
   ]
 
+  const sampleDetail = {
+    id: '301',
+    code: 'PX-301',
+    kind: 'STOCK_ISSUE',
+    status: 'POSTED',
+    agencyId: '101',
+    originDocumentId: null,
+    receiptType: null,
+    currentRevision: {
+      id: '1',
+      documentId: '301',
+      revisionNo: 1,
+      state: 'POSTED',
+      businessDate: '2026-10-05',
+      totalAmount: '1020000',
+      immediatePayment: '0',
+      sellingPriceRate: '1.2',
+      paymentMethod: null,
+      agencySnapshot: {
+        name: 'Đại lý Minh Phát',
+        address: '120 Nguyễn Trãi, Quận 1',
+        phone: '0901234567',
+        email: 'daily@example.com',
+      },
+      reason: null,
+      note: null,
+      createdAt: '2026-10-05T08:00:00Z',
+      lines: [
+        {
+          id: '1',
+          productId: '1',
+          productName: 'Nước ngọt lon 330ml',
+          unitName: 'Lon',
+          quantity: '10',
+          unitPrice: '102000',
+          lineAmount: '1020000',
+          originLineId: null,
+          basePurchasePrice: null,
+          returnAmount: null,
+        },
+      ],
+    },
+  }
+
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
-      async (path: string) => {
-        if (path.startsWith('/agencies')) {
-          return {
-            data: [{ id: '101', code: 'DL-101', name: 'Đại lý Minh Phát' }],
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/documents')) {
-          return {
-            data: samplePostedDocs,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/documents')) {
         return {
-          data: [],
+          data: {
+            items: samplePostedDocs,
+            pagination: { limit: 25, hasMore: false, nextCursor: null },
+          },
           status: 200,
-          headers: new Headers(),
+          etag: '"sample-etag"',
         } as unknown as apiModule.ApiResponse<unknown>
-      },
-    )
+      }
+      if (path.startsWith('/stock-issues/301')) {
+        return {
+          data: sampleDetail,
+          status: 200,
+          etag: '"sample-etag"',
+        } as unknown as apiModule.ApiResponse<unknown>
+      }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, hasMore: false, nextCursor: null },
+        },
+        status: 200,
+        etag: null,
+      } as unknown as apiModule.ApiResponse<unknown>
+    })
   })
 
   it('renders posted documents eligible for corrections', async () => {
@@ -118,9 +164,7 @@ describe('DocumentCorrectionsPage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('PX-301')).toBeDefined()
-      expect(screen.getByText('PT-401')).toBeDefined()
-      expect(screen.getAllByText('Điều chỉnh').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('Hủy chứng từ').length).toBeGreaterThan(0)
+      expect(screen.getByText('Kiểm tra PX-301')).toBeDefined()
     })
   })
 
@@ -137,18 +181,26 @@ describe('DocumentCorrectionsPage Component', () => {
       expect(screen.getByText('PX-301')).toBeDefined()
     })
 
-    const cancelBtns = screen.getAllByText('Hủy chứng từ')
-    fireEvent.click(cancelBtns[0]!)
+    const inspectBtn = screen.getByRole('button', { name: 'Kiểm tra PX-301' })
+    fireEvent.click(inspectBtn)
 
-    expect(screen.getByText(/Hủy chứng từ đã ghi sổ PX-301/)).toBeDefined()
-    expect(screen.getByText(/Cảnh báo an toàn nghiệp vụ/)).toBeDefined()
-    expect(screen.getByText(/Lý do hủy bỏ chứng từ/)).toBeDefined()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Hủy chứng từ' })).toBeDefined()
+    })
 
-    const closeBtn = screen.getByText('Hủy bỏ')
+    const cancelBtn = screen.getByRole('button', { name: 'Hủy chứng từ' })
+    fireEvent.click(cancelBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Hủy chứng từ PX-301/i)).toBeDefined()
+      expect(screen.getByLabelText(/Lý do bắt buộc/i)).toBeDefined()
+    })
+
+    const closeBtn = screen.getByRole('button', { name: 'Đóng' })
     fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByText(/Cảnh báo an toàn nghiệp vụ/)).toBeNull()
+      expect(screen.queryByText(/Hủy chứng từ PX-301/i)).toBeNull()
     })
   })
 
@@ -165,20 +217,27 @@ describe('DocumentCorrectionsPage Component', () => {
       expect(screen.getByText('PX-301')).toBeDefined()
     })
 
-    const correctBtns = screen.getAllByText('Điều chỉnh')
-    fireEvent.click(correctBtns[0]!)
+    const inspectBtn = screen.getByRole('button', { name: 'Kiểm tra PX-301' })
+    fireEvent.click(inspectBtn)
 
-    expect(
-      screen.getByText(/Điều chỉnh chứng từ đã ghi sổ PX-301/),
-    ).toBeDefined()
-    expect(screen.getByText(/Cơ chế sửa sai \(Version Replay\)/)).toBeDefined()
-    expect(screen.getByText('Ngày nghiệp vụ mới (*)')).toBeDefined()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Điều chỉnh' })).toBeDefined()
+    })
 
-    const closeBtn = screen.getByText('Hủy bỏ')
+    const correctBtn = screen.getByRole('button', { name: 'Điều chỉnh' })
+    fireEvent.click(correctBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Thay thế toàn bộ PX-301/i)).toBeDefined()
+      expect(screen.getByLabelText(/Ngày nghiệp vụ mới/i)).toBeDefined()
+      expect(screen.getByLabelText(/Lý do bắt buộc/i)).toBeDefined()
+    })
+
+    const closeBtn = screen.getByRole('button', { name: 'Đóng' })
     fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByText(/Cơ chế sửa sai/)).toBeNull()
+      expect(screen.queryByText(/Thay thế toàn bộ PX-301/i)).toBeNull()
     })
   })
 })

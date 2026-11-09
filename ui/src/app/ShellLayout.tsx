@@ -1,270 +1,135 @@
-import { useState, type ReactNode } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
 import {
-  BuildingIcon,
-  DollarSignIcon,
-  FileTextIcon,
   KeyIcon,
   LogOutIcon,
   MenuIcon,
-  PackageIcon,
-  SettingsIcon,
-  ShieldIcon,
-  UserIcon,
+  SearchIcon,
   XIcon,
 } from '../components/ui/Icons'
-import { useAuth } from '../features/authentication/useAuth'
 import { ChangePasswordModal } from '../features/authentication/ChangePasswordModal'
-import type { FunctionCode } from '../lib/types'
-
-interface NavItemConfig {
-  path: string
-  label: string
-  requiredPermission?: FunctionCode | FunctionCode[]
-}
-
-interface NavGroupConfig {
-  title: string
-  icon: ReactNode
-  items: NavItemConfig[]
-}
+import { useAuth } from '../features/authentication/useAuth'
+import {
+  allowsNavigation,
+  navigationGroups,
+  routePermissions,
+} from './navigation'
 
 export function ShellLayout() {
   const { user, logout, hasPermission } = useAuth()
   const navigate = useNavigate()
-
+  const location = useLocation()
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [navigationSearch, setNavigationSearch] = useState('')
+  const [logoutError, setLogoutError] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const sidebar = useRef<HTMLElement>(null)
+  const searchInput = useRef<HTMLInputElement>(null)
+  const pageLabel =
+    navigationGroups
+      .flatMap((group) => group.items)
+      .find((item) => item.path === location.pathname)?.label ||
+    'Không gian làm việc'
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
+  const closeMobileNavigation = () => {
+    setIsMobileNavOpen(false)
+    menuButton.current?.focus()
   }
 
-  const navGroups: NavGroupConfig[] = [
-    {
-      title: 'Đại lý',
-      icon: <BuildingIcon size={18} />,
-      items: [
-        {
-          path: '/agencies',
-          label: 'Hồ sơ đại lý',
-          requiredPermission: 'agency.read',
-        },
-        {
-          path: '/agency-credit',
-          label: 'Hạn mức & Dư có',
-          requiredPermission: 'agency.read',
-        },
-      ],
-    },
-    {
-      title: 'Kho & Hàng hóa',
-      icon: <PackageIcon size={18} />,
-      items: [
-        {
-          path: '/products',
-          label: 'Danh mục mặt hàng',
-          requiredPermission: 'product.manage',
-        },
-        {
-          path: '/stock-receipts',
-          label: 'Phiếu nhập hàng',
-          requiredPermission: ['stock.receipt.prepare', 'stock.receipt.post'],
-        },
-        {
-          path: '/stock-issues',
-          label: 'Phiếu xuất hàng',
-          requiredPermission: ['stock.issue.prepare', 'stock.issue.post'],
-        },
-        {
-          path: '/inventory',
-          label: 'Tồn kho & Thẻ kho',
-          requiredPermission: 'inventory.read',
-        },
-        {
-          path: '/stock-adjustments',
-          label: 'Điều chỉnh kho',
-          requiredPermission: [
-            'stock.adjustment.prepare',
-            'stock.adjustment.post',
-          ],
-        },
-        {
-          path: '/stock-counts',
-          label: 'Kiểm kê kho',
-          requiredPermission: 'stock.count',
-        },
-      ],
-    },
-    {
-      title: 'Thu tiền & Công nợ',
-      icon: <DollarSignIcon size={18} />,
-      items: [
-        {
-          path: '/payment-receipts',
-          label: 'Phiếu thu tiền',
-          requiredPermission: ['cash.receipt.prepare', 'cash.receipt.post'],
-        },
-        {
-          path: '/online-payments',
-          label: 'Thanh toán trực tuyến',
-          requiredPermission: ['payments.online', 'debt.read'],
-        },
-        {
-          path: '/upfront-payments',
-          label: 'Xác nhận trả ngay',
-          requiredPermission: 'cash.upfront.verify',
-        },
-        {
-          path: '/receivables',
-          label: 'Công nợ đại lý',
-          requiredPermission: 'debt.read',
-        },
-        {
-          path: '/sales-returns',
-          label: 'Phiếu trả hàng',
-          requiredPermission: ['returns.prepare', 'returns.post'],
-        },
-        {
-          path: '/credit-applications',
-          label: 'Bù trừ dư có',
-          requiredPermission: ['credit.apply', 'debt.read'],
-        },
-        {
-          path: '/refunds',
-          label: 'Hoàn tiền đại lý',
-          requiredPermission: [
-            'cash.refund.prepare',
-            'cash.refund.post',
-            'debt.read',
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Danh mục & Quy định',
-      icon: <SettingsIcon size={18} />,
-      items: [
-        {
-          path: '/districts',
-          label: 'Danh sách quận',
-          requiredPermission: 'district.manage',
-        },
-        {
-          path: '/agency-types',
-          label: 'Loại đại lý',
-          requiredPermission: 'agency_type.manage',
-        },
-        {
-          path: '/units',
-          label: 'Đơn vị tính',
-          requiredPermission: 'unit.manage',
-        },
-        {
-          path: '/business-rules',
-          label: 'Thay đổi quy định',
-          requiredPermission: 'rules.manage',
-        },
-      ],
-    },
-    {
-      title: 'Báo cáo & Thống kê',
-      icon: <FileTextIcon size={18} />,
-      items: [
-        {
-          path: '/dashboard',
-          label: 'Bảng điều khiển',
-        },
-        {
-          path: '/reports',
-          label: 'Báo cáo kinh doanh',
-          requiredPermission: [
-            'reports.read',
-            'sales.read',
-            'debt.read',
-            'inventory.read',
-          ],
-        },
-        {
-          path: '/chatbot',
-          label: 'Trợ lý ảo Chatbot',
-        },
-      ],
-    },
-    {
-      title: 'Quản trị hệ thống',
-      icon: <ShieldIcon size={18} />,
-      items: [
-        {
-          path: '/users',
-          label: 'Tài khoản người dùng',
-          requiredPermission: 'users.manage',
-        },
-        {
-          path: '/user-groups',
-          label: 'Nhóm người dùng',
-          requiredPermission: 'groups.manage',
-        },
-        {
-          path: '/permissions',
-          label: 'Phân quyền chức năng',
-          requiredPermission: 'permissions.manage',
-        },
-        {
-          path: '/audit-logs',
-          label: 'Nhật ký hệ thống',
-          requiredPermission: 'audit.read',
-        },
-        {
-          path: '/document-history',
-          label: 'Lịch sử chứng từ',
-        },
-        {
-          path: '/document-corrections',
-          label: 'Sửa sai & Hủy chứng từ',
-          requiredPermission: ['documents.correct', 'documents.cancel'],
-        },
-      ],
-    },
-  ]
+  useEffect(() => {
+    if (!isMobileNavOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    searchInput.current?.focus()
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setIsMobileNavOpen(false)
+        menuButton.current?.focus()
+      }
+      if (event.key !== 'Tab') return
+      const controls = sidebar.current?.querySelectorAll<HTMLElement>(
+        'a[href], input, button',
+      )
+      const first = controls?.[0]
+      const last = controls?.[controls.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [isMobileNavOpen])
 
-  // Filter groups and items by user's actual permissions
-  const visibleGroups = navGroups
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    setLogoutError(false)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } catch {
+      setLogoutError(true)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
+  const search = navigationSearch.trim().toLocaleLowerCase('vi')
+  const visibleGroups = navigationGroups
     .map((group) => ({
       ...group,
       items: group.items.filter(
         (item) =>
-          !item.requiredPermission || hasPermission(item.requiredPermission),
+          allowsNavigation(hasPermission, routePermissions[item.path]) &&
+          (!search ||
+            `${group.title} ${item.label}`
+              .toLocaleLowerCase('vi')
+              .includes(search)),
       ),
     }))
     .filter((group) => group.items.length > 0)
 
   return (
     <div className="shell-container">
-      {/* Top Header */}
+      <a className="skip-link" href="#main-content">
+        Đến nội dung chính
+      </a>
       <header className="shell-header">
         <div className="shell-header-left">
           <button
+            ref={menuButton}
             type="button"
             className="shell-mobile-toggle"
-            onClick={() => setIsMobileNavOpen((prev) => !prev)}
+            onClick={() => setIsMobileNavOpen((value) => !value)}
             aria-label={isMobileNavOpen ? 'Đóng menu' : 'Mở menu'}
+            aria-expanded={isMobileNavOpen}
+            aria-controls="workspace-navigation"
           >
             {isMobileNavOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}
           </button>
-          <NavLink to="/" className="shell-logo">
-            <span className="brand-wordmark">Agentra</span>
-            <span className="shell-logo-badge">DMS</span>
-          </NavLink>
+          <span className="shell-mobile-brand">agentra</span>
+          <div className="shell-breadcrumb">
+            <span>Không gian làm việc</span>
+            <strong>{pageLabel}</strong>
+          </div>
         </div>
-
         <div className="shell-header-right">
           {user && (
             <div className="shell-user-info">
               <div className="shell-user-avatar" aria-hidden="true">
-                <UserIcon size={18} />
+                {user.fullName.trim().charAt(0).toLocaleUpperCase('vi')}
               </div>
               <div className="shell-user-details">
                 <span className="shell-user-name">{user.fullName}</span>
@@ -274,91 +139,115 @@ export function ShellLayout() {
               </div>
             </div>
           )}
-
           <div className="shell-header-actions">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               className="shell-action-btn"
               onClick={() => setIsPasswordModalOpen(true)}
               title="Đổi mật khẩu"
+              aria-label="Đổi mật khẩu"
             >
               <KeyIcon size={16} />
               <span className="shell-action-label">Đổi mật khẩu</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               className="shell-action-btn shell-action-btn--logout"
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
+              disabled={isLoggingOut}
               title="Đăng xuất"
+              aria-label="Đăng xuất"
             >
               <LogOutIcon size={16} />
-              <span className="shell-action-label">Đăng xuất</span>
-            </button>
+              <span className="shell-action-label">
+                {isLoggingOut ? 'Đang thoát…' : 'Đăng xuất'}
+              </span>
+            </Button>
           </div>
         </div>
       </header>
-
       <div className="shell-body">
-        {/* Sidebar Navigation */}
         <aside
-          className={`shell-sidebar ${isMobileNavOpen ? 'shell-sidebar--open' : ''}`.trim()}
+          ref={sidebar}
+          id="workspace-navigation"
+          className={`shell-sidebar ${isMobileNavOpen ? 'shell-sidebar--open' : ''}`}
         >
-          <nav className="shell-nav" aria-label="Điều hướng nghiệp vụ">
+          <div className="sidebar-brand">
             <NavLink
               to="/"
-              end
-              className={({ isActive }) =>
-                `shell-nav-link shell-nav-link--root ${isActive ? 'shell-nav-link--active' : ''}`.trim()
-              }
-              onClick={() => setIsMobileNavOpen(false)}
+              className="shell-logo"
+              aria-label="Agentra - Bàn làm việc"
             >
-              <FileTextIcon size={18} />
-              <span>Tổng quan làm việc</span>
+              agentra<span className="brand-period">.</span>
             </NavLink>
-
+            <span>HỆ THỐNG PHÂN PHỐI</span>
+          </div>
+          <label className="nav-search">
+            <span className="sr-only">Tìm chức năng</span>
+            <SearchIcon size={16} />
+            <input
+              ref={searchInput}
+              type="search"
+              placeholder="Tìm chức năng…"
+              value={navigationSearch}
+              onChange={(event) => setNavigationSearch(event.target.value)}
+            />
+          </label>
+          <nav className="shell-nav" aria-label="Điều hướng nghiệp vụ">
             {visibleGroups.map((group) => (
               <div key={group.title} className="shell-nav-group">
-                <div className="shell-nav-group-title">
-                  <span className="shell-nav-group-icon" aria-hidden="true">
-                    {group.icon}
-                  </span>
-                  <span>{group.title}</span>
-                </div>
+                <div className="shell-nav-group-title">{group.title}</div>
                 <div className="shell-nav-group-items">
                   {group.items.map((item) => (
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      end={item.path === '/'}
                       className={({ isActive }) =>
-                        `shell-nav-link ${isActive ? 'shell-nav-link--active' : ''}`.trim()
+                        `shell-nav-link ${isActive ? 'shell-nav-link--active' : ''}`
                       }
-                      onClick={() => setIsMobileNavOpen(false)}
+                      onClick={() => {
+                        if (isMobileNavOpen) closeMobileNavigation()
+                      }}
                     >
                       <span>{item.label}</span>
+                      {item.unavailable && (
+                        <span className="nav-soon">Sắp có</span>
+                      )}
                     </NavLink>
                   ))}
                 </div>
               </div>
             ))}
+            {visibleGroups.length === 0 && (
+              <p className="nav-no-results" role="status">
+                Không tìm thấy chức năng phù hợp.
+              </p>
+            )}
           </nav>
         </aside>
-
-        {/* Mobile Backdrop */}
         {isMobileNavOpen && (
-          <div
+          <button
+            type="button"
             className="shell-sidebar-backdrop"
-            onClick={() => setIsMobileNavOpen(false)}
-            aria-hidden="true"
+            onClick={closeMobileNavigation}
+            aria-label="Đóng điều hướng"
+            tabIndex={-1}
           />
         )}
-
-        {/* Main Content Area */}
-        <main className="shell-content" id="main-content">
+        <main className="shell-content" id="main-content" tabIndex={-1}>
+          {logoutError && (
+            <p role="alert" className="alert alert--error">
+              Không thể đăng xuất. Vui lòng thử lại.
+            </p>
+          )}
           <Outlet />
         </main>
       </div>
-
-      {/* Change Password Modal */}
       <ChangePasswordModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}

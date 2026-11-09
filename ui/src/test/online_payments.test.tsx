@@ -7,8 +7,7 @@ import {
 } from '../features/authentication/useAuth'
 import { OnlinePaymentsPage } from '../features/online_payments/OnlinePaymentsPage'
 import * as apiModule from '../lib/api'
-import * as cacheModule from '../lib/cache'
-import type { OnlinePayment, UserResponse } from '../lib/types'
+import type { UserResponse } from '../lib/types'
 
 describe('OnlinePaymentsPage Component', () => {
   const mockUser: UserResponse = {
@@ -37,14 +36,15 @@ describe('OnlinePaymentsPage Component', () => {
     refreshProfile: vi.fn(),
   }
 
-  const samplePayments: OnlinePayment[] = [
+  const samplePayments = [
     {
-      id: 'pay-001',
+      id: '1001',
       agencyId: '101',
-      agencyName: 'Đại lý Minh Phát',
-      provider: 'SANDBOX',
+      provider: 'VNPAY',
       merchantReference: 'REF-2026-001',
-      providerTransactionId: 'TXN-999',
+      providerTransactionId: 'TXN-001',
+      receiptDocumentId: '501',
+      paymentTime: '2026-10-10T10:05:00Z',
       amount: '500000',
       status: 'SUCCESS',
       checkoutUrl: 'https://sandbox.payment.vn/pay/001',
@@ -52,12 +52,12 @@ describe('OnlinePaymentsPage Component', () => {
       updatedAt: '2026-10-10T10:05:00Z',
     },
     {
-      id: 'pay-002',
+      id: '1002',
       agencyId: '102',
-      agencyName: 'Đại lý Toàn Thắng',
       provider: 'VNPAY',
       merchantReference: 'REF-2026-002',
       providerTransactionId: null,
+      receiptDocumentId: null,
       amount: '300000',
       status: 'PENDING',
       checkoutUrl: 'https://sandbox.vnpay.vn/pay/002',
@@ -68,32 +68,26 @@ describe('OnlinePaymentsPage Component', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
-      async (path: string) => {
-        if (path.startsWith('/agencies')) {
-          return {
-            data: [
-              { id: '101', code: 'DL-101', name: 'Đại lý Minh Phát' },
-              { id: '102', code: 'DL-102', name: 'Đại lý Toàn Thắng' },
-            ],
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
-        if (path.startsWith('/online-payments')) {
-          return {
-            data: samplePayments,
-            status: 200,
-            headers: new Headers(),
-          } as unknown as apiModule.ApiResponse<unknown>
-        }
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/online-payments')) {
         return {
-          data: [],
+          data: {
+            items: samplePayments,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
           status: 200,
-          headers: new Headers(),
+          etag: '"sample-etag"',
         } as unknown as apiModule.ApiResponse<unknown>
-      },
-    )
+      }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, nextCursor: null, hasMore: false },
+        },
+        status: 200,
+        etag: null,
+      } as unknown as apiModule.ApiResponse<unknown>
+    })
   })
 
   it('renders online payments table with records', async () => {
@@ -110,13 +104,15 @@ describe('OnlinePaymentsPage Component', () => {
     await waitFor(() => {
       expect(screen.getByText('REF-2026-001')).toBeDefined()
       expect(screen.getByText('REF-2026-002')).toBeDefined()
-      expect(screen.getByText('Đại lý Minh Phát')).toBeDefined()
-      expect(screen.getAllByText('Thành công').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('Đang chờ').length).toBeGreaterThan(0)
+      expect(screen.getByText('#101')).toBeDefined()
+      expect(screen.getAllByText('SUCCESS').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('PENDING').length).toBeGreaterThan(0)
     })
   })
 
-  it('filters payments by search text', async () => {
+  it('filters payments by search text and reloads', async () => {
+    const fetchSpy = vi.spyOn(apiModule, 'apiFetch')
+
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -129,13 +125,20 @@ describe('OnlinePaymentsPage Component', () => {
       expect(screen.getByText('REF-2026-001')).toBeDefined()
     })
 
-    const searchInput = screen.getByPlaceholderText(
-      'Tìm theo mã giao dịch, đại lý...',
-    )
+    const searchInput = screen.getByLabelText(/Mã tham chiếu/i, {
+      selector: 'input',
+    })
     fireEvent.change(searchInput, { target: { value: 'REF-2026-002' } })
 
-    expect(screen.queryByText('REF-2026-001')).toBeNull()
-    expect(screen.getByText('REF-2026-002')).toBeDefined()
+    const reloadBtn = screen.getByRole('button', { name: 'Tải lại' })
+    fireEvent.click(reloadBtn)
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('merchantReference=REF-2026-002'),
+        expect.any(Object),
+      )
+    })
   })
 
   it('opens and closes create payment modal', async () => {
@@ -151,18 +154,25 @@ describe('OnlinePaymentsPage Component', () => {
       expect(screen.getByText('REF-2026-001')).toBeDefined()
     })
 
-    const createBtn = screen.getByText('Tạo thanh toán mới')
+    const createBtn = screen.getByRole('button', {
+      name: 'Tạo thanh toán mới',
+    })
     fireEvent.click(createBtn)
 
-    expect(screen.getByText(/Đại lý thanh toán/)).toBeDefined()
-    expect(screen.getByText(/Cổng thanh toán/)).toBeDefined()
-    expect(screen.getByText(/Số tiền thanh toán/)).toBeDefined()
+    expect(
+      screen.getByLabelText(/ID đại lý thanh toán/i, { selector: 'input' }),
+    ).toBeDefined()
+    expect(
+      screen.getByLabelText(/Số tiền thanh toán \(VND nguyên\)/i, {
+        selector: 'input',
+      }),
+    ).toBeDefined()
 
-    const cancelBtn = screen.getByText('Hủy bỏ')
-    fireEvent.click(cancelBtn)
+    const closeBtn = screen.getByRole('button', { name: 'Đóng' })
+    fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByText(/Cổng thanh toán/)).toBeNull()
+      expect(screen.queryByLabelText(/ID đại lý thanh toán/i)).toBeNull()
     })
   })
 })

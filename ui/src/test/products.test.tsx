@@ -49,11 +49,10 @@ describe('ProductsPage Component', () => {
       name: 'Bút bi Thiên Long',
       unitId: 1,
       unitName: 'Cái',
-      minStockAlert: '10',
-      maxStockAlert: '500',
+      lowStockThreshold: '10',
       currentStock: '150',
-      purchasePrice: '4000',
-      sellingPrice: '5000',
+      currentPurchasePrice: '4000',
+      currentSellingPrice: '5000',
       status: 'ACTIVE',
     },
     {
@@ -62,11 +61,10 @@ describe('ProductsPage Component', () => {
       name: 'Tập 96 trang',
       unitId: 2,
       unitName: 'Hộp',
-      minStockAlert: '5',
-      maxStockAlert: '200',
-      currentStock: '3', // Under minStock
-      purchasePrice: '70000',
-      sellingPrice: '85000',
+      lowStockThreshold: '5',
+      currentStock: '3',
+      currentPurchasePrice: '70000',
+      currentSellingPrice: '85000',
       status: 'ACTIVE',
     },
   ]
@@ -77,20 +75,44 @@ describe('ProductsPage Component', () => {
     vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
       async (path: string) => {
         if (path.startsWith('/units')) {
-          return { data: sampleUnits, status: 200, etag: 'etag-units' }
+          return {
+            data: {
+              items: sampleUnits,
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: 'etag-units',
+          }
         }
-        return { data: sampleProducts, status: 200, etag: 'etag-products' }
+        return {
+          data: {
+            items: sampleProducts,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: 'etag-products',
+        }
       },
     )
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
       if (path.startsWith('/products')) {
         return {
-          data: sampleProducts,
+          data: {
+            items: sampleProducts,
+            pagination: { limit: 25, nextCursor: null, hasMore: false },
+          },
           status: 200,
           etag: 'etag-products',
         }
       }
-      return { data: {}, status: 200, etag: null }
+      return {
+        data: {
+          items: [],
+          pagination: { limit: 25, nextCursor: null, hasMore: false },
+        },
+        status: 200,
+        etag: null,
+      }
     })
   })
 
@@ -113,6 +135,8 @@ describe('ProductsPage Component', () => {
   })
 
   it('filters product list by search keyword', async () => {
+    const fetchSpy = vi.spyOn(apiModule, 'apiFetch')
+
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -125,16 +149,23 @@ describe('ProductsPage Component', () => {
       expect(screen.getByText('Bút bi Thiên Long')).toBeDefined()
     })
 
-    const searchInput = screen.getByPlaceholderText(
-      /Tìm theo tên hoặc mã mặt hàng/i,
-    )
+    const searchInput = screen.getByLabelText(/Tìm kiếm/i, {
+      selector: 'input',
+    })
     fireEvent.change(searchInput, { target: { value: 'Bút bi' } })
 
-    expect(screen.getByText('Bút bi Thiên Long')).toBeDefined()
-    expect(screen.queryByText('Tập 96 trang')).toBeNull()
+    const reloadBtn = screen.getByRole('button', { name: 'Tải lại' })
+    fireEvent.click(reloadBtn)
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('q=B%C3%BAt+bi'),
+        expect.any(Object),
+      )
+    })
   })
 
-  it('opens modal when clicking Thêm mặt hàng button', async () => {
+  it('opens modal when clicking Thêm mới button', async () => {
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -148,12 +179,12 @@ describe('ProductsPage Component', () => {
     })
 
     const addBtn = screen.getByRole('button', {
-      name: /Thêm mặt hàng mới/i,
+      name: /Thêm mới/i,
     })
     fireEvent.click(addBtn)
 
     expect(
-      screen.getByRole('heading', { name: /Thêm mặt hàng mới/i }),
+      screen.getByRole('heading', { name: /Thêm Danh mục mặt hàng/i }),
     ).toBeDefined()
   })
 })

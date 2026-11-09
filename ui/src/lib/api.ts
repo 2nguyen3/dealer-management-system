@@ -1,9 +1,9 @@
 import {
   getAccessToken,
+  getSessionGeneration,
   refreshSession,
   registerAuthenticatedAbortController,
 } from '../features/authentication/session'
-import type { ApiErrorPayload } from './types'
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || '/api/v1'
@@ -14,6 +14,7 @@ export class ApiError extends Error {
   readonly code: string
   readonly requestId?: string
   readonly fieldErrors?: Record<string, string>
+  readonly retryAfter?: string
 
   constructor(
     status: number,
@@ -21,6 +22,7 @@ export class ApiError extends Error {
     message: string,
     requestId?: string,
     fieldErrors?: Record<string, string>,
+    retryAfter?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -28,6 +30,7 @@ export class ApiError extends Error {
     this.code = code
     this.requestId = requestId
     this.fieldErrors = fieldErrors
+    this.retryAfter = retryAfter
   }
 }
 
@@ -40,12 +43,15 @@ export interface RequestOptions {
   ifNoneMatch?: string
   idempotencyKey?: string
   requiresAuth?: boolean
+  responseType?: 'json' | 'blob'
+  validate?: (data: unknown) => boolean
 }
 
 export interface ApiResponse<T> {
   data: T
   status: number
   etag: string | null
+  contentType?: string | null
 }
 
 export async function checkApiHealth(signal: AbortSignal): Promise<void> {
@@ -80,49 +86,55 @@ export async function apiFetch<T = unknown>(
     ifNoneMatch,
     idempotencyKey,
     requiresAuth = true,
+    responseType = 'json',
+    validate,
   } = options
 
-  const isAuthEndpoint = path.startsWith('/auth/')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const isAuthEndpoint = normalizedPath.startsWith('/auth/')
+  const generation = getSessionGeneration()
   const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
 
-  const requestHeaders: Record<string, string> = {
-    Accept: 'application/json',
-    ...headers,
-  }
+  const requestHeaders = new Headers(headers)
+  if (!requestHeaders.has('Accept'))
+    requestHeaders.set('Accept', 'application/json')
 
   if (body !== undefined && !(body instanceof FormData)) {
-    requestHeaders['Content-Type'] = 'application/json'
+    requestHeaders.set('Content-Type', 'application/json')
   }
 
   if (ifMatch) {
-    requestHeaders['If-Match'] = ifMatch
+    requestHeaders.set('If-Match', ifMatch)
   }
   if (ifNoneMatch) {
-    requestHeaders['If-None-Match'] = ifNoneMatch
+    requestHeaders.set('If-None-Match', ifNoneMatch)
   }
   if (idempotencyKey) {
-    requestHeaders['Idempotency-Key'] = idempotencyKey
+    requestHeaders.set('Idempotency-Key', idempotencyKey)
   }
 
   const token = getAccessToken()
   if (requiresAuth && token) {
-    requestHeaders['Authorization'] = `Bearer ${token}`
+    requestHeaders.set('Authorization', `Bearer ${token}`)
   }
 
-  let cleanupAbort: (() => void) | undefined
-  let internalController: AbortController | undefined
-
-  if (requiresAuth && !signal) {
-    internalController = new AbortController()
-    cleanupAbort = registerAuthenticatedAbortController(internalController)
+  const controller = new AbortController()
+  const cleanupAbort = requiresAuth
+    ? registerAuthenticatedAbortController(controller)
+    : undefined
+  const effectiveSignal = signal
+    ? AbortSignal.any([signal, controller.signal])
+    : controller.signal
+  const assertCurrent = () => {
+    effectiveSignal.throwIfAborted()
+    if (requiresAuth && generation !== getSessionGeneration()) {
+      throw new DOMException('Session changed', 'AbortError')
+    }
   }
-
-  const effectiveSignal = signal || internalController?.signal
-
-  try {
-    let response: Response
+  const send = async () => {
+    assertCurrent()
     try {
-      response = await fetch(url, {
+      const result = await fetch(url, {
         method,
         headers: requestHeaders,
         body:
@@ -132,48 +144,36 @@ export async function apiFetch<T = unknown>(
               ? body
               : JSON.stringify(body),
         signal: effectiveSignal,
+        cache: 'no-store',
       })
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        throw err
-      }
-      throw new ApiError(
-        0,
-        'NETWORK_ERROR',
-        'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.',
-      )
+      assertCurrent()
+      return result
+    } catch (error) {
+      assertCurrent()
+      if (error instanceof DOMException && error.name === 'AbortError')
+        throw error
+      throw new ApiError(0, 'NETWORK_ERROR', 'Không thể kết nối đến máy chủ.')
     }
+  }
 
-    // 401 Unauthorized handling: attempt silent token refresh for non-auth endpoints
-    if (response.status === 401 && requiresAuth && !isAuthEndpoint) {
-      const refreshed = await refreshSession(API_BASE_URL)
+  try {
+    let response = await send()
+
+    // Mutations are never replayed: 401 alone does not prove pre-auth rejection.
+    if (
+      response.status === 401 &&
+      method === 'GET' &&
+      requiresAuth &&
+      !isAuthEndpoint
+    ) {
+      const refreshed =
+        getAccessToken() !== token
+          ? { accessToken: getAccessToken() }
+          : await refreshSession(API_BASE_URL)
+      assertCurrent()
       if (refreshed?.accessToken) {
-        requestHeaders['Authorization'] = `Bearer ${refreshed.accessToken}`
-        try {
-          response = await fetch(url, {
-            method,
-            headers: requestHeaders,
-            body:
-              body === undefined
-                ? undefined
-                : body instanceof FormData
-                  ? body
-                  : JSON.stringify(body),
-            signal: effectiveSignal,
-          })
-        } catch (retryErr: unknown) {
-          if (
-            retryErr instanceof DOMException &&
-            retryErr.name === 'AbortError'
-          ) {
-            throw retryErr
-          }
-          throw new ApiError(
-            0,
-            'NETWORK_ERROR',
-            'Không thể kết nối đến máy chủ.',
-          )
-        }
+        requestHeaders.set('Authorization', `Bearer ${refreshed.accessToken}`)
+        response = await send()
       }
     }
 
@@ -189,19 +189,29 @@ export async function apiFetch<T = unknown>(
     }
 
     if (!response.ok) {
-      let errorPayload: ApiErrorPayload | null = null
+      let errorPayload: Record<string, unknown> = {}
       try {
-        const json = (await response.json()) as ApiErrorPayload
-        if (typeof json === 'object' && json !== null) {
-          errorPayload = json
+        const json: unknown = await response.json()
+        if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+          errorPayload = json as Record<string, unknown>
         }
       } catch {
         // Response was not JSON
       }
 
-      const code = errorPayload?.code || `HTTP_${response.status}`
+      assertCurrent()
+      const code =
+        typeof errorPayload.code === 'string' &&
+        /^[A-Z][A-Z0-9_]{0,100}$/.test(errorPayload.code)
+          ? errorPayload.code
+          : `HTTP_${response.status}`
       const message =
-        errorPayload?.message ||
+        (response.status < 500 &&
+        typeof errorPayload.message === 'string' &&
+        errorPayload.message.length <= 1000 &&
+        errorPayload.message.trim()
+          ? errorPayload.message
+          : null) ||
         (response.status === 403
           ? 'Bạn không có quyền thực hiện thao tác này.'
           : response.status === 404
@@ -214,24 +224,97 @@ export async function apiFetch<T = unknown>(
                   ? 'Máy chủ gặp sự cố xử lý.'
                   : `Yêu cầu thất bại (HTTP ${response.status})`)
 
+      const fields: Record<string, string> = Object.create(null) as Record<
+        string,
+        string
+      >
+      if (Array.isArray(errorPayload.fieldErrors)) {
+        for (const field of errorPayload.fieldErrors as unknown[]) {
+          if (typeof field !== 'object' || field === null) continue
+          const item = field as Record<string, unknown>
+          if (
+            typeof item.field === 'string' &&
+            typeof item.message === 'string' &&
+            item.message.length <= 1000
+          ) {
+            fields[item.field] = item.message
+          }
+        }
+      }
       throw new ApiError(
         response.status,
         code,
         message,
-        errorPayload?.requestId,
-        errorPayload?.fieldErrors,
+        typeof errorPayload.requestId === 'string' &&
+          /^[\w.-]{1,200}$/.test(errorPayload.requestId)
+          ? errorPayload.requestId
+          : undefined,
+        Object.keys(fields).length ? fields : undefined,
+        response.headers.get('Retry-After') || undefined,
       )
     }
 
-    const data = (await response.json()) as T
+    let data: unknown
+    try {
+      data =
+        responseType === 'blob' ? await response.blob() : await response.json()
+    } catch {
+      assertCurrent()
+      throw new ApiError(
+        response.status,
+        'INVALID_RESPONSE',
+        'Phản hồi máy chủ không hợp lệ.',
+      )
+    }
+    assertCurrent()
+    if (validate && !validate(data)) {
+      throw new ApiError(
+        response.status,
+        'INVALID_RESPONSE',
+        'Phản hồi máy chủ không hợp lệ.',
+      )
+    }
     return {
-      data,
+      data: data as T,
       status: response.status,
       etag,
+      contentType: response.headers.get('Content-Type'),
     }
   } finally {
     if (cleanupAbort) {
       cleanupAbort()
     }
   }
+}
+
+export async function apiDownload(
+  path: string,
+  options: RequestOptions = {},
+): Promise<ApiResponse<Blob>> {
+  const accept = new Headers(options.headers).get('Accept')
+  if (
+    !accept ||
+    ![
+      'application/pdf',
+      'text/html',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ].includes(accept)
+  ) {
+    throw new ApiError(0, 'INVALID_ACCEPT', 'Cần chọn định dạng tải xuống.')
+  }
+  const response = await apiFetch<Blob>(path, {
+    ...options,
+    responseType: 'blob',
+  })
+  if (
+    response.status === 204 ||
+    response.contentType?.split(';')[0]?.trim().toLowerCase() !== accept
+  ) {
+    throw new ApiError(
+      response.status,
+      'INVALID_RESPONSE',
+      'Định dạng tải xuống không hợp lệ.',
+    )
+  }
+  return response
 }
