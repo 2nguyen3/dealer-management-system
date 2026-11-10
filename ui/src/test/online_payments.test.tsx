@@ -268,4 +268,47 @@ describe('OnlinePaymentsPage Component', () => {
     })
   })
 
+  it('keeps 202 resumable after closing the form, replays the same key, and clears on 200', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: { ...samplePayments[1], checkoutUrl: null },
+        status: 202,
+        etag: null,
+      })
+      .mockResolvedValue({ data: samplePayments[1], status: 200, etag: null })
+    mockServer(() => ({ ...samplePayments[1]!, checkoutUrl: null }), create)
+    renderPage()
+    fillCreate()
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    await screen.findByRole('button', { name: 'Tiếp tục khởi tạo checkout' })
+    expect(screen.getByLabelText(/Số tiền thanh toán/)).toHaveProperty(
+      'value',
+      '300000',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng' }))
+    expect(create).toHaveBeenCalledTimes(1)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tiếp tục khởi tạo checkout' }),
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Tiếp tục khởi tạo checkout' }),
+    )
+    const link = await screen.findByRole('link', {
+      name: 'Mở trang thanh toán',
+    })
+    expect(link.getAttribute('href')).toBe(samplePayments[1]?.checkoutUrl)
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noreferrer')
+    expect(create.mock.calls[1]).toEqual(create.mock.calls[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }))
+    fillCreate()
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    await screen.findByRole('link', { name: 'Mở trang thanh toán' })
+    expect(create).toHaveBeenCalledTimes(3)
+    expect(create.mock.calls[2]?.[0]?.idempotencyKey).not.toBe(
+      create.mock.calls[0]?.[0]?.idempotencyKey,
+    )
+  })
+
 })
