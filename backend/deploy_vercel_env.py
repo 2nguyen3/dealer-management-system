@@ -21,6 +21,12 @@ def main() -> int:
         "--update-existing", action="store_true", help="Allow replacing selected keys"
     )
     parser.add_argument("--check", action="store_true", help="Validate locally without uploading")
+    parser.add_argument(
+        "--env-file", default=".env", help="Backend env file, relative to backend/ (default .env)"
+    )
+    parser.add_argument(
+        "--database-only", action="store_true", help="Upload only the DB_* connection keys"
+    )
     args = parser.parse_args()
     npx = shutil.which("npx")
     if npx is None:
@@ -28,7 +34,7 @@ def main() -> int:
         return 1
 
     try:
-        settings = Settings(_env_file=Path(__file__).with_name(".env"))
+        settings = Settings(_env_file=Path(__file__).with_name(args.env_file))
         validate_auth_startup_settings(settings)
     except (ValidationError, ValueError):
         print("Invalid backend settings. Check DB_* and AUTH_SIGNING_KEY locally.")
@@ -46,6 +52,8 @@ def main() -> int:
         "AUTH_AUDIENCE": settings.auth_audience,
         "CORS_ORIGINS": "[]",
     }
+    if args.database_only:
+        values = {name: value for name, value in values.items() if name.startswith("DB_")}
     if args.vnpay:
         if not settings.vnpay_tmn_code or not settings.vnpay_hash_secret.get_secret_value():
             print("VNPAY sandbox merchant credentials are missing from local backend settings.")
