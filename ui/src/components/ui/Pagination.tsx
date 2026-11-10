@@ -1,5 +1,5 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './Button'
-import { ChevronRightIcon } from './Icons'
 
 export interface PaginationProps {
   onNext?: () => void
@@ -23,22 +23,26 @@ export function Pagination({
   totalShowing,
 }: PaginationProps) {
   return (
-    <div className="pagination">
-      <div className="pagination-left">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-4">
         {totalShowing !== undefined && (
-          <span className="pagination-info">
-            Đang hiển thị <strong>{totalShowing}</strong> kết quả
+          <span>
+            Đang hiển thị{' '}
+            <strong className="font-semibold text-foreground tabular-nums">
+              {totalShowing}
+            </strong>{' '}
+            kết quả
           </span>
         )}
         {limit !== undefined && onLimitChange && (
-          <div className="pagination-limit-selector">
+          <div className="flex items-center gap-2">
             <label htmlFor="pagination-limit-select" className="sr-only">
               Số dòng mỗi trang
             </label>
-            <span className="pagination-limit-label">Mỗi trang:</span>
+            <span aria-hidden="true">Mỗi trang:</span>
             <select
               id="pagination-limit-select"
-              className="select select--compact pagination-select"
+              className="h-8 rounded-md border bg-card px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
               disabled={isLoading}
@@ -52,12 +56,13 @@ export function Pagination({
         )}
       </div>
 
-      <div className="pagination-controls">
+      <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="sm"
           onClick={onPrevious}
           disabled={!hasPrevious || isLoading}
+          icon={<ChevronLeft className="size-4" />}
         >
           Trang trước
         </Button>
@@ -66,9 +71,9 @@ export function Pagination({
           size="sm"
           onClick={onNext}
           disabled={!hasNext || isLoading}
-          icon={<ChevronRightIcon size={16} />}
         >
           Trang sau
+          <ChevronRight className="size-4" aria-hidden="true" />
         </Button>
       </div>
     </div>

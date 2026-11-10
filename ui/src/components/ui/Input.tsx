@@ -1,4 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import { Input as ShadcnInput } from '../shadcn/input'
 import { Label } from '../shadcn/label'
 
@@ -31,31 +32,45 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const helperId = inputId && helperText ? `${inputId}-helper` : undefined
 
   return (
-    <div className={`form-field ${error ? 'form-field--error' : ''}`.trim()}>
+    <div
+      className={cn(
+        'form-field grid min-w-0 gap-1.5',
+        error && 'form-field--error',
+      )}
+    >
       {label && (
-        <Label htmlFor={inputId} className="form-label">
-          {label} {required && <span className="form-required">*</span>}
+        <Label htmlFor={inputId} className="text-[13px] text-foreground/85">
+          {label}{' '}
+          {required && (
+            <span className="text-destructive" aria-hidden="true">
+              *
+            </span>
+          )}
         </Label>
       )}
-      <div className="input-wrapper">
+      <div className="relative">
         <ShadcnInput
           ref={ref}
           id={inputId}
-          className={className}
+          className={cn('bg-card', endAdornment && 'pr-10', className)}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId || helperId || undefined}
           required={required}
           {...props}
         />
-        {endAdornment && <div className="input-adornment">{endAdornment}</div>}
+        {endAdornment && (
+          <div className="absolute inset-y-0 right-1 flex items-center">
+            {endAdornment}
+          </div>
+        )}
       </div>
       {error && (
-        <p id={errorId} className="form-error" role="alert">
+        <p id={errorId} className="text-xs text-destructive" role="alert">
           {error}
         </p>
       )}
       {helperText && !error && (
-        <p id={helperId} className="form-helper">
+        <p id={helperId} className="text-xs text-muted-foreground">
           {helperText}
         </p>
       )}

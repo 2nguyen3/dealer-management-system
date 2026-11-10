@@ -1,4 +1,6 @@
+import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import { Button as ShadcnButton } from '../shadcn/button'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -7,6 +9,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean
   icon?: ReactNode
 }
+
+const VARIANTS = {
+  primary: 'default',
+  secondary: 'secondary',
+  danger: 'destructive',
+  ghost: 'ghost',
+  outline: 'outline',
+} as const
 
 export function Button({
   children,
@@ -20,26 +30,21 @@ export function Button({
 }: ButtonProps) {
   return (
     <ShadcnButton
-      variant={
-        variant === 'primary'
-          ? 'default'
-          : variant === 'danger'
-            ? 'destructive'
-            : variant
-      }
+      variant={VARIANTS[variant]}
       size={size === 'md' ? 'default' : size}
-      className={className}
+      className={cn('cursor-pointer', className)}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (
-        <span className="btn-spinner" aria-hidden="true" />
+        <Loader2 className="animate-spin" aria-hidden="true" />
       ) : icon ? (
-        <span className="btn-icon" aria-hidden="true">
+        <span className="inline-flex" aria-hidden="true">
           {icon}
         </span>
       ) : null}
-      <span className="btn-text">{children}</span>
+      {children}
     </ShadcnButton>
   )
 }
