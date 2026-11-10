@@ -1,6 +1,7 @@
 # Agentra frontend
 
 React 19 + Vite + strict TypeScript, Tailwind CSS v4, shadcn/ui components,
+Recharts (via shadcn `chart`), React Router, Vitest,
 ESLint, and Prettier. Use Node.js 24 LTS (minimum 22.12) and npm. Commit
 `package-lock.json` when dependencies change.
 
@@ -33,6 +34,7 @@ src/
   components/
     shadcn/     # Generated shadcn/ui sources
     ui/         # Existing component API adapters and application widgets
+    blocks/     # Page blocks: PageHeader, KpiCard, ChartCard, DateField
   features/     # Business and authentication screens
   lib/          # Shared infrastructure, including API calls
   main.tsx      # React entry point
