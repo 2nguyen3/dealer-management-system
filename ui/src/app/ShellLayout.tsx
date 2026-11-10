@@ -119,7 +119,13 @@ export function ShellLayout() {
           >
             {isMobileNavOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}
           </button>
-          <span className="shell-mobile-brand">agentra</span>
+          <span className="shell-mobile-brand">
+            <img
+              className="app-logo app-logo--mobile"
+              src="/assets/brand/agentra-icon.png"
+              alt="Agentra"
+            />
+          </span>
           <div className="shell-breadcrumb">
             <span>Không gian làm việc</span>
             <strong>{pageLabel}</strong>
@@ -182,7 +188,11 @@ export function ShellLayout() {
               className="shell-logo"
               aria-label="Agentra - Bàn làm việc"
             >
-              agentra<span className="brand-period">.</span>
+              <img
+                className="app-logo app-logo--sidebar"
+                src="/assets/brand/agentra-white.png"
+                alt="Agentra"
+              />
             </NavLink>
             <span>HỆ THỐNG PHÂN PHỐI</span>
           </div>

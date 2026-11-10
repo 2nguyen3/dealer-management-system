@@ -54,7 +54,11 @@ export function ForgotPasswordPage() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-brand">
-            <span className="brand-wordmark">Agentra</span>
+            <img
+              className="app-logo"
+              src="/assets/brand/agentra-dark.png"
+              alt="Agentra"
+            />
             <span className="brand-subtitle">Hệ thống Quản lý Đại lý</span>
           </div>
           <h1 className="auth-title">Quên mật khẩu</h1>

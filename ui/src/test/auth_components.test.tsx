@@ -25,7 +25,14 @@ describe('Authentication Components', () => {
         </BrowserRouter>,
       )
 
-      expect(screen.getByText('Agentra')).toBeDefined()
+      const logos = screen.getAllByAltText('Agentra')
+      expect(logos).toHaveLength(2)
+      expect(logos[0]?.getAttribute('src')).toBe(
+        '/assets/brand/agentra-white.png',
+      )
+      expect(logos[1]?.getAttribute('src')).toBe(
+        '/assets/brand/agentra-dark.png',
+      )
       expect(screen.getByText('Hệ thống Quản lý Đại lý')).toBeDefined()
       expect(
         screen.getByLabelText(/Email/i, { selector: 'input' }),

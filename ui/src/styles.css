@@ -977,6 +977,40 @@ a:hover {
   letter-spacing: -0.04em;
 }
 
+.app-logo {
+  display: block;
+  width: 144px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.app-logo--sidebar {
+  width: 112px;
+  margin-bottom: 10px;
+}
+
+.app-logo--story {
+  width: 176px;
+}
+
+.app-logo--mobile {
+  width: 36px;
+  height: 36px;
+}
+
+.auth-brand > .app-logo {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .auth-story-brand > .app-logo {
+    width: 72px;
+  }
+}
+
 .shell-logo-badge {
   font-size: 11px;
   font-weight: 700;
@@ -2586,7 +2620,7 @@ a:hover {
   }
 
   .auth-form-panel {
-    min-height: calc(100dvh - 76px);
+    min-height: calc(100dvh - 90px);
   }
 }
 

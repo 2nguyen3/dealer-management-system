@@ -83,9 +83,11 @@ export function LoginPage() {
     <div className="auth-page auth-page--login">
       <aside className="auth-story" aria-label="Không gian Agentra">
         <div className="auth-story-brand">
-          <span className="brand-wordmark">
-            agentra<span className="brand-period">.</span>
-          </span>
+          <img
+            className="app-logo app-logo--story"
+            src="/assets/brand/agentra-white.png"
+            alt="Agentra"
+          />
         </div>
         <div className="auth-story-copy">
           <p className="workspace-kicker">HỆ THỐNG PHÂN PHỐI</p>
@@ -100,7 +102,11 @@ export function LoginPage() {
         <div className="auth-card">
           <div className="auth-header">
             <div className="auth-brand">
-              <span className="brand-wordmark">Agentra</span>
+              <img
+                className="app-logo"
+                src="/assets/brand/agentra-dark.png"
+                alt="Agentra"
+              />
               <span className="brand-subtitle">Hệ thống Quản lý Đại lý</span>
             </div>
             <h1 className="auth-title">Đăng nhập</h1>
