@@ -157,3 +157,29 @@ def test_native_sandbox_upload_preserves_credentials_and_replaces_only_callback_
     assert "synthetic-vnpay-secret" not in output
     assert "TEST1234" not in output
 
+
+@pytest.mark.parametrize("provider", ["", "CONTROLLED_TEST"])
+def test_native_upload_rejects_missing_credentials_or_conflicting_provider(monkeypatch, provider):
+    settings = Mock(
+        payment_provider=provider,
+        vnpay_tmn_code="TEST1234" if provider else "",
+        auth_signing_key=Mock(get_secret_value=lambda: "synthetic-signing-key-at-least-32-bytes"),
+    )
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py", "--vnpay"])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=settings))
+    runner = Mock()
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 1
+    runner.assert_not_called()
+
+
+def test_env_check_does_not_upload_or_print_values(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py", "--check"])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=deployment_settings()))
+    runner = Mock()
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 0
+    runner.assert_not_called()
+    assert "synthetic" not in capsys.readouterr().out
