@@ -1,14 +1,37 @@
+import {
+  BookCheck,
+  Eye,
+  History,
+  MoreHorizontal,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  Send,
+  Undo2,
+  XCircle,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { DateField } from '../../components/blocks/DateField'
+import { PageHeader } from '../../components/blocks/PageHeader'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../components/shadcn/dropdown-menu'
+import { Separator } from '../../components/shadcn/separator'
+import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { PlusIcon, TrashIcon } from '../../components/ui/Icons'
+import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Spinner } from '../../components/ui/Spinner'
-import { Table } from '../../components/ui/Table'
 import { apiFetch, ApiError } from '../../lib/api'
 import { invalidateCache } from '../../lib/cache'
+import { formatDate, formatVND } from '../../lib/formatters'
 import { useAuth } from '../authentication/useAuth'
+import { RevisionHistory } from '../document_history/DocumentHistoryPage'
 import { DocumentList } from '../document_history/DocumentList'
 import {
   canReadKind,
@@ -20,192 +43,144 @@ import {
   validId,
   vietnamToday,
   type DocumentDetail,
+  type DocumentSummary,
   type GoodsKind,
   type LineInput,
 } from '../document_history/documentContracts'
+import { Hint, SectionCard } from '../document_history/DocumentParts'
 import {
   errorMessage,
   useDocumentMutation,
 } from '../document_history/useDocumentRequests'
 import { CorrectionDialog } from '../document_corrections/CorrectionDialog'
+import { DocumentSnapshot } from './DocumentSnapshot'
+import { GoodsLineEditor } from './GoodsLineEditor'
+import { canEstimate, emptyLine, summarizeLines } from './lineEstimates'
 
-const emptyLine = (): LineInput => ({
-  productId: '',
-  originLineId: '',
-  quantity: '',
-  unitPrice: '',
-})
-export function GoodsLineEditor({
+const descriptions: Record<GoodsKind, string> = {
+  STOCK_RECEIPT: 'Ghi nhận hàng nhập vào kho.',
+  STOCK_ISSUE:
+    'Lập phiếu giao hàng cho đại lý, nộp phiếu rồi ghi sổ khi xuất kho.',
+  SALES_RETURN: 'Ghi nhận hàng đại lý trả lại theo phiếu xuất gốc.',
+  STOCK_ADJUSTMENT: 'Điều chỉnh tăng hoặc giảm tồn kho, luôn kèm lý do.',
+}
+const postEffects: Record<GoodsKind, string> = {
+  STOCK_RECEIPT: 'tăng tồn kho và cập nhật giá nhập hiện hành',
+  STOCK_ISSUE: 'giảm tồn kho và ghi nhận công nợ cho đại lý',
+  SALES_RETURN: 'nhập lại hàng và giảm công nợ hoặc ghi có cho đại lý',
+  STOCK_ADJUSTMENT: 'thay đổi tồn kho theo số lượng điều chỉnh',
+}
+type FormMode = 'create' | 'header' | 'pending'
+
+/** Sticky editor summary: line count, estimated subtotal and the save actions. */
+function EditorSummary({
   kind,
+  mode,
   lines,
-  onChange,
-  disabled = false,
+  immediatePayment,
+  originLines,
+  busy,
+  onClose,
 }: {
   kind: GoodsKind
+  mode: FormMode
   lines: LineInput[]
-  onChange: (lines: LineInput[]) => void
-  disabled?: boolean
+  immediatePayment: string
+  originLines?: DocumentDetail['currentRevision']['lines'] | null
+  busy: boolean
+  onClose: () => void
 }) {
-  const isReturn = kind === 'SALES_RETURN'
-  const idLabel = isReturn ? 'ID dòng bán gốc' : 'ID mặt hàng'
-  const quantityLabel = `Số lượng${kind === 'STOCK_ADJUSTMENT' ? ' (+/-)' : ''}`
-  function update(index: number, patch: Partial<LineInput>) {
-    onChange(
-      lines.map((item, position) =>
-        position === index ? { ...item, ...patch } : item,
-      ),
-    )
-  }
+  const summary = summarizeLines(kind, lines, originLines)
+  const priced = canEstimate(kind, originLines)
+  const missing = summary.lineCount - summary.pricedLines
+  const payment = exact.money.test(immediatePayment) ? immediatePayment : null
   return (
-    <fieldset className="line-editor" disabled={disabled}>
-      <legend className="line-editor-title">
-        Danh sách dòng hàng
-        <span className="line-editor-count">{lines.length}</span>
-      </legend>
-      {lines.map((line, index) => (
-        <div className="line-card" key={index}>
-          <div className="line-card-head">
-            <span className="line-card-no">Dòng {index + 1}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="line-card-remove"
-              aria-label={`Xóa dòng ${index + 1}`}
-              disabled={lines.length === 1}
-              icon={<TrashIcon size={16} />}
-              onClick={() =>
-                onChange(lines.filter((_, position) => position !== index))
-              }
-            >
-              Xóa
-            </Button>
+    <aside
+      aria-label="Tóm tắt chứng từ"
+      className="space-y-4 rounded-xl border bg-card p-4 shadow-xs lg:sticky lg:top-0"
+    >
+      <h3 className="text-sm font-semibold text-foreground">Tóm tắt</h3>
+      {mode === 'header' ? (
+        <p className="text-[13px] text-muted-foreground">
+          Chỉ sửa thông tin chung; dòng hàng giữ nguyên.
+        </p>
+      ) : (
+        <dl className="space-y-2.5 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-muted-foreground">Số dòng hàng</dt>
+            <dd className="font-medium tabular-nums">{summary.lineCount}</dd>
           </div>
-          <div className="line-card-fields">
-            <Input
-              id={`line-${index}-id`}
-              label={idLabel}
-              aria-label={`${idLabel} ${index + 1}`}
-              required
-              value={isReturn ? line.originLineId : line.productId}
-              onChange={(event) =>
-                update(
-                  index,
-                  isReturn
-                    ? { originLineId: event.target.value }
-                    : { productId: event.target.value },
-                )
-              }
-            />
-            <Input
-              id={`line-${index}-quantity`}
-              label={quantityLabel}
-              aria-label={`${quantityLabel.replace(' (+/-)', '')} ${index + 1}${kind === 'STOCK_ADJUSTMENT' ? ' (+/-)' : ''}`}
-              required
-              inputMode="decimal"
-              value={line.quantity}
-              onChange={(event) =>
-                update(index, { quantity: event.target.value })
-              }
-            />
-            {kind === 'STOCK_RECEIPT' && (
-              <Input
-                id={`line-${index}-price`}
-                label="Đơn giá nhập (VNĐ)"
-                aria-label={`Đơn giá nhập ${index + 1} (VNĐ)`}
-                required
-                inputMode="numeric"
-                value={line.unitPrice}
-                onChange={(event) =>
-                  update(index, { unitPrice: event.target.value })
-                }
-              />
-            )}
-          </div>
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        className="line-editor-add"
-        icon={<PlusIcon size={16} />}
-        onClick={() => onChange([...lines, emptyLine()])}
-      >
-        Thêm dòng
-      </Button>
-    </fieldset>
+          {kind === 'STOCK_ADJUSTMENT' && (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Dòng tăng kho</dt>
+                <dd className="font-medium text-success tabular-nums">
+                  {summary.increases}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Dòng giảm kho</dt>
+                <dd className="font-medium text-destructive tabular-nums">
+                  {summary.decreases}
+                </dd>
+              </div>
+            </>
+          )}
+          {kind === 'STOCK_ISSUE' && (
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Trả ngay dự kiến</dt>
+              <dd className="font-medium tabular-nums">
+                {payment === null ? '—' : formatVND(payment)}
+              </dd>
+            </div>
+          )}
+          {priced && (
+            <>
+              <Separator />
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="font-medium text-foreground">Tạm tính</dt>
+                <dd className="text-lg font-semibold tabular-nums">
+                  {formatVND(summary.subtotal.toString())}
+                </dd>
+              </div>
+              {missing > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {missing} dòng chưa đủ số lượng hoặc đơn giá.
+                </p>
+              )}
+            </>
+          )}
+        </dl>
+      )}
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {kind === 'STOCK_ISSUE'
+          ? 'Giá bán được hệ thống chốt khi nộp phiếu; tồn kho và trả ngay được kiểm tra lại khi ghi sổ.'
+          : 'Số tiền chính thức do hệ thống tính khi lưu.'}
+      </p>
+      <div className="grid gap-2">
+        <Button type="submit" isLoading={busy}>
+          {mode === 'pending' ? 'Lưu thay thế' : 'Lưu nháp'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={onClose}
+        >
+          Đóng
+        </Button>
+      </div>
+    </aside>
   )
 }
-export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
-  const revision = doc.currentRevision
+
+function DetailSkeleton() {
   return (
-    <>
-      <p>
-        {doc.code} / {doc.status} / {revision.state} / v{revision.revisionNo}
-      </p>
-      <p>
-        Ngày nghiệp vụ: {revision.businessDate}. Tổng tiền máy chủ:{' '}
-        {revision.totalAmount} VNĐ.
-      </p>
-      {revision.agencySnapshot && (
-        <p>
-          {revision.agencySnapshot.name} | {revision.agencySnapshot.address} |{' '}
-          {revision.agencySnapshot.phone}
-        </p>
-      )}
-      {revision.reason && <p>Lý do: {revision.reason}</p>}
-      {revision.note && <p>Ghi chú: {revision.note}</p>}
-      {doc.kind === 'STOCK_ISSUE' && (
-        <p>
-          Trả ngay: {revision.immediatePayment}. Còn nợ lúc xuất:{' '}
-          {doc.remainingAtIssue ?? '-'}. Còn nợ hiện tại:{' '}
-          {doc.invoiceBalance?.outstandingAmount ?? '-'}. Xác nhận tiền:{' '}
-          {doc.upfrontConfirmationId ?? '-'}. Phiếu thu tự động:{' '}
-          {doc.autoReceiptId ?? '-'}.
-        </p>
-      )}
-      {doc.kind === 'SALES_RETURN' && (
-        <p>
-          Phiếu xuất gốc: {doc.originDocumentId}. Nợ giảm:{' '}
-          {doc.debtReducedAmount ?? '-'}. Dư có tạo:{' '}
-          {doc.creditCreatedAmount ?? '-'}. Không tự động hoàn tiền.
-        </p>
-      )}
-      {doc.kind === 'STOCK_ADJUSTMENT' && (
-        <p>
-          Nguồn kiểm kê: {doc.stockCountId ?? 'Điều chỉnh độc lập'}. Không tạo
-          doanh thu hay đổi nguồn giá nhập.
-        </p>
-      )}
-      <Table caption="Dòng hàng theo phiên bản máy chủ">
-        <thead>
-          <tr>
-            <th>ID dòng</th>
-            <th>Mặt hàng đã ghi nhận</th>
-            <th>Số lượng</th>
-            <th>Đơn vị</th>
-            <th>Đơn giá</th>
-            <th>Thành tiền</th>
-            <th>Dòng gốc</th>
-          </tr>
-        </thead>
-        <tbody>
-          {revision.lines.map((line) => (
-            <tr key={line.id}>
-              <td>{line.id}</td>
-              <td>
-                {line.productName} (#{line.productId})
-              </td>
-              <td>{line.quantity}</td>
-              <td>{line.unitName}</td>
-              <td>{line.unitPrice}</td>
-              <td>{line.lineAmount}</td>
-              <td>{line.originLineId ?? '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    </>
+    <div role="status" className="space-y-4">
+      <span className="sr-only">Đang tải chứng từ...</span>
+      <Skeleton className="h-36 w-full rounded-xl" />
+      <Skeleton className="h-48 w-full rounded-xl" />
+    </div>
   )
 }
 
@@ -247,9 +222,12 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
   const [correction, setCorrection] = useState<'correct' | 'cancel' | null>(
     null,
   )
+  const [confirmPost, setConfirmPost] = useState(false)
+  const [history, setHistory] = useState<DocumentSummary | null>(null)
   const mutation = useDocumentMutation()
   const scope = `${user?.id}:${allowedFunctions.join(',')}`
   const readable = canReadKind(kind, hasPermission)
+  const issueReadable = canReadKind('STOCK_ISSUE', hasPermission)
   useEffect(() => {
     if (!selected || !readable) return
     const controller = new AbortController()
@@ -284,7 +262,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
     setDetailLoading(true)
     setVersion((value) => value + 1)
   }
-  function openForm(mode: 'create' | 'header' | 'pending') {
+  function openForm(mode: FormMode) {
     const revision = mode === 'create' ? null : detail?.doc.currentRevision
     setDate(revision?.businessDate ?? vietnamToday())
     setNote(revision?.note ?? '')
@@ -308,9 +286,10 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
     setEditHeader(mode === 'header')
     setReplacePending(mode === 'pending')
   }
-  async function loadSource() {
-    if (!validId(originId) || sourceBusy) return
+  // Demand-loads the chosen original issue once per selection; a newer choice aborts it.
+  async function loadSource(originId: string) {
     sourceController.current?.abort()
+    if (!validId(originId)) return
     const controller = new AbortController()
     sourceController.current = controller
     setSourceBusy(true)
@@ -328,6 +307,15 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
     } finally {
       if (!controller.signal.aborted) setSourceBusy(false)
     }
+  }
+  function chooseOrigin(id: string) {
+    sourceController.current?.abort()
+    setSourceBusy(false)
+    setOriginId(id)
+    setSource(null)
+    // Lines belong to the previous original issue; start over for the new one.
+    setLines([emptyLine()])
+    if (id && issueReadable) void loadSource(id)
   }
   async function save() {
     if (!hasPermission(config.prepare) || mutation.busy) return
@@ -352,12 +340,11 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
         body.reason = reason.trim() || detail?.doc.currentRevision.reason
       if (!editHeader) body.lines = inputLines(kind, lines)
       if (create && kind === 'STOCK_ISSUE') {
-        if (!validId(agencyId)) throw new Error('ID đại lý không hợp lệ.')
+        if (!validId(agencyId)) throw new Error('Vui lòng chọn đại lý.')
         body.agencyId = agencyId
       }
       if (create && kind === 'SALES_RETURN') {
-        if (!validId(originId))
-          throw new Error('ID phiếu xuất gốc không hợp lệ.')
+        if (!validId(originId)) throw new Error('Vui lòng chọn phiếu xuất gốc.')
         body.originDocumentId = originId
       }
       if (editHeader || replacePending) {
@@ -374,7 +361,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
       setCreate(false)
       setEditHeader(false)
       setReplacePending(false)
-      setNotice('Máy chủ đã xác nhận lưu chứng từ.')
+      setNotice('Đã lưu chứng từ.')
       invalidateCache(config.path)
       reload()
     } catch (error) {
@@ -394,13 +381,15 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
       await mutation.run(`${config.path}/${detail.doc.id}/${actionName}`, {
         ifMatch: detail.etag,
       })
-      setNotice('Máy chủ đã xác nhận thao tác.')
+      setNotice(actionName === 'post' ? 'Đã ghi sổ chứng từ.' : 'Đã nộp phiếu.')
       invalidateCache(config.path)
       reload()
     } catch (error) {
       setDetailError(errorMessage(error))
       if (error instanceof ApiError && [412, 428].includes(error.status))
         setDetail({ ...detail, etag: null })
+    } finally {
+      setConfirmPost(false)
     }
   }
   const draft =
@@ -408,6 +397,24 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
     detail.doc.currentRevision.state === 'DRAFT'
   const independent =
     kind !== 'STOCK_ADJUSTMENT' || detail?.doc.stockCountId === null
+  const canPost =
+    !!detail &&
+    independent &&
+    hasPermission(config.post) &&
+    (kind === 'STOCK_ISSUE'
+      ? detail.doc.status === 'PENDING' &&
+        detail.doc.currentRevision.state === 'READY'
+      : draft)
+  const formOpen = create || editHeader || replacePending
+  const formMode: FormMode = create
+    ? 'create'
+    : replacePending
+      ? 'pending'
+      : 'header'
+  const originLines =
+    create && kind === 'SALES_RETURN' && issueReadable
+      ? (source?.currentRevision.lines ?? null)
+      : undefined
   const closeForm = () => {
     if (!mutation.busy) {
       setCreate(false)
@@ -417,33 +424,142 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
       setSourceBusy(false)
     }
   }
-  return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{config.title}</h1>
-          <p className="page-desc">
-            Dữ liệu và số tiền do máy chủ xác nhận. Không sửa dữ liệu gốc đã ghi
-            sổ.
-          </p>
-        </div>
-        {hasPermission(config.prepare) && (
-          <Button onClick={() => openForm('create')}>Lập phiếu mới</Button>
+  const detailActions = detail && (
+    <div className="flex w-full flex-wrap items-center justify-end gap-2">
+      <Button
+        variant="ghost"
+        className="mr-auto"
+        icon={<RefreshCw className="size-4" />}
+        onClick={reload}
+        disabled={mutation.busy}
+      >
+        Tải lại
+      </Button>
+      {detail.doc.status !== 'CANCELLED' && (
+        <Button
+          variant="outline"
+          className="text-destructive hover:text-destructive"
+          icon={<XCircle className="size-4" />}
+          disabled={mutation.busy}
+          onClick={() => setCorrection('cancel')}
+        >
+          Hủy phiếu
+        </Button>
+      )}
+      {detail.doc.status === 'POSTED' && (
+        <Button
+          variant="outline"
+          icon={<Undo2 className="size-4" />}
+          disabled={mutation.busy}
+          onClick={() => setCorrection('correct')}
+        >
+          Sửa sai
+        </Button>
+      )}
+      {draft && independent && hasPermission(config.prepare) && (
+        <Button
+          variant="outline"
+          icon={<PencilLine className="size-4" />}
+          disabled={!detail.etag || mutation.busy}
+          onClick={() => openForm('header')}
+        >
+          Sửa thông tin nháp
+        </Button>
+      )}
+      {kind === 'STOCK_ISSUE' &&
+        detail.doc.status === 'PENDING' &&
+        hasPermission(config.prepare) && (
+          <Button
+            variant="outline"
+            icon={<PencilLine className="size-4" />}
+            disabled={!detail.etag || mutation.busy}
+            onClick={() => openForm('pending')}
+          >
+            Thay nội dung chờ xuất
+          </Button>
         )}
-      </div>
+      {kind === 'STOCK_ISSUE' && draft && hasPermission(config.prepare) && (
+        <Button
+          icon={<Send className="size-4" />}
+          disabled={!detail.etag}
+          isLoading={mutation.busy}
+          onClick={() => void action('submit')}
+        >
+          Nộp phiếu
+        </Button>
+      )}
+      {canPost && (
+        <Button
+          icon={<BookCheck className="size-4" />}
+          disabled={!detail.etag || mutation.busy}
+          onClick={() => setConfirmPost(true)}
+        >
+          Ghi sổ
+        </Button>
+      )}
+    </div>
+  )
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Kho hàng"
+        title={config.title}
+        description={descriptions[kind]}
+        className="mb-0"
+        actions={
+          hasPermission(config.prepare) && (
+            <Button
+              icon={<Plus className="size-4" />}
+              onClick={() => openForm('create')}
+            >
+              Tạo phiếu
+            </Button>
+          )
+        }
+      />
       {notice && <Alert type="success">{notice}</Alert>}
       <DocumentList
-        key={version}
         kind={kind}
+        version={version}
+        onRowClick={(row) => openDetail(row.id)}
         actions={(row) => (
-          <Button variant="outline" onClick={() => openDetail(row.id)}>
-            Chi tiết {row.code}
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Chi tiết ${row.code}`}
+              onClick={() => openDetail(row.id)}
+            >
+              Chi tiết
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="size-8 p-0"
+                  aria-label={`Thao tác khác ${row.code}`}
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => openDetail(row.id)}>
+                  <Eye aria-hidden="true" />
+                  Xem chi tiết
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setHistory(row)}>
+                  <History aria-hidden="true" />
+                  Lịch sử phiên bản
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       />
       <Modal
         isOpen={!!selected}
-        title="Chi tiết chứng từ"
+        title={detail ? `Chi tiết ${detail.doc.code}` : 'Chi tiết chứng từ'}
         onClose={() => {
           if (!mutation.busy) {
             setSelected(null)
@@ -451,228 +567,195 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
             setCorrection(null)
           }
         }}
-        maxWidth="lg"
+        maxWidth="xl"
+        footer={detailActions || undefined}
       >
-        {detailLoading && <Spinner label="Đang tải phiên bản và ETag..." />}
-        {detailError && <Alert type="error">{detailError}</Alert>}
-        {detail && (
-          <>
-            <DocumentSnapshot doc={detail.doc} />
-            {kind === 'STOCK_ISSUE' &&
-              detail.doc.currentRevision.state === 'READY' && (
-                <p>
-                  READY đã chốt giá, không giữ chỗ tồn kho. Máy chủ kiểm tra
-                  bằng chứng trả ngay và tồn kho khi xuất.
-                </p>
-              )}
-            <div className="modal-actions">
-              <Button
-                variant="outline"
-                onClick={reload}
-                disabled={mutation.busy}
-              >
-                Tải lại phiên bản
-              </Button>
-              {draft && independent && hasPermission(config.prepare) && (
-                <Button
-                  disabled={!detail.etag || mutation.busy}
-                  onClick={() => openForm('header')}
-                >
-                  Sửa thông tin nháp
-                </Button>
-              )}
+        <div className="space-y-4">
+          {detailError && <Alert type="error">{detailError}</Alert>}
+          {detailLoading && <DetailSkeleton />}
+          {detail && (
+            <>
+              <DocumentSnapshot doc={detail.doc} />
               {kind === 'STOCK_ISSUE' &&
-                draft &&
-                hasPermission(config.prepare) && (
-                  <Button
-                    disabled={!detail.etag}
-                    isLoading={mutation.busy}
-                    onClick={() => void action('submit')}
-                  >
-                    Nộp phiếu
-                  </Button>
+                detail.doc.currentRevision.state === 'READY' && (
+                  <Hint>
+                    Phiếu đã sẵn sàng và chốt giá. Tồn kho và khoản trả ngay
+                    được kiểm tra lại khi ghi sổ.
+                  </Hint>
                 )}
-              {kind === 'STOCK_ISSUE' &&
-                detail.doc.status === 'PENDING' &&
-                hasPermission(config.prepare) && (
-                  <Button
-                    disabled={!detail.etag || mutation.busy}
-                    onClick={() => openForm('pending')}
-                  >
-                    Thay nội dung chờ xuất
-                  </Button>
-                )}
-              {independent &&
-                hasPermission(config.post) &&
-                (kind === 'STOCK_ISSUE'
-                  ? detail.doc.status === 'PENDING' &&
-                    detail.doc.currentRevision.state === 'READY'
-                  : draft) && (
-                  <Button
-                    disabled={!detail.etag}
-                    isLoading={mutation.busy}
-                    onClick={() => void action('post')}
-                  >
-                    Ghi sổ
-                  </Button>
-                )}
-              {detail.doc.status !== 'CANCELLED' && (
-                <Button
-                  variant="outline"
-                  disabled={mutation.busy}
-                  onClick={() => setCorrection('cancel')}
-                >
-                  Xem quyền hủy
-                </Button>
+              {!independent && (
+                <Hint>
+                  Phiếu điều chỉnh sinh từ biên bản kiểm kê được ghi sổ cùng
+                  biên bản, không sửa hoặc ghi sổ riêng tại đây.
+                </Hint>
               )}
-              {detail.doc.status === 'POSTED' && (
-                <Button
-                  variant="outline"
-                  disabled={mutation.busy}
-                  onClick={() => setCorrection('correct')}
-                >
-                  Xem quyền sửa sai
-                </Button>
-              )}
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </Modal>
       <Modal
-        isOpen={create || editHeader || replacePending}
+        isOpen={confirmPost && !!detail}
+        title="Xác nhận ghi sổ"
+        maxWidth="sm"
+        onClose={() => {
+          if (!mutation.busy) setConfirmPost(false)
+        }}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={mutation.busy}
+              onClick={() => setConfirmPost(false)}
+            >
+              Quay lại
+            </Button>
+            <Button
+              icon={<BookCheck className="size-4" />}
+              isLoading={mutation.busy}
+              onClick={() => void action('post')}
+            >
+              Xác nhận ghi sổ
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-foreground">
+          Ghi sổ <strong>{detail?.doc.code}</strong> sẽ {postEffects[kind]}.
+        </p>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          Sau khi ghi sổ, chỉ có thể sửa sai hoặc hủy bằng phiên bản mới có lý
+          do.
+        </p>
+      </Modal>
+      <Modal
+        isOpen={formOpen}
         title={
           create
-            ? 'Lập phiếu mới'
+            ? `Tạo ${config.title.toLowerCase()}`
             : replacePending
               ? 'Thay toàn bộ nội dung chờ xuất'
               : 'Sửa thông tin nháp'
         }
         onClose={closeForm}
-        maxWidth="lg"
+        maxWidth="xl"
       >
         <form
           noValidate
+          className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
           onSubmit={(event) => {
             event.preventDefault()
             void save()
           }}
         >
-          {formError && <Alert type="error">{formError}</Alert>}
-          <fieldset disabled={mutation.busy}>
-            <Input
-              label="Ngày nghiệp vụ"
-              aria-label="Ngày nghiệp vụ"
-              required
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-            {create && kind === 'STOCK_ISSUE' && (
-              <Input
-                label="ID đại lý"
-                aria-label="ID đại lý"
-                required
-                value={agencyId}
-                onChange={(event) => setAgencyId(event.target.value)}
-              />
-            )}
-            {create && kind === 'SALES_RETURN' && (
-              <>
-                <Input
-                  label="ID phiếu xuất gốc"
-                  aria-label="ID phiếu xuất gốc"
+          <div className="min-w-0 space-y-4">
+            {formError && <Alert type="error">{formError}</Alert>}
+            <SectionCard title="Thông tin chung">
+              <fieldset
+                disabled={mutation.busy}
+                className="grid min-w-0 gap-4 sm:grid-cols-2"
+              >
+                <legend className="sr-only">Thông tin chung</legend>
+                <DateField
+                  label="Ngày nghiệp vụ"
                   required
-                  value={originId}
-                  onChange={(event) => {
-                    sourceController.current?.abort()
-                    setSourceBusy(false)
-                    setOriginId(event.target.value)
-                    setSource(null)
-                  }}
+                  disabled={mutation.busy}
+                  value={date}
+                  onChange={setDate}
                 />
-                {canReadKind('STOCK_ISSUE', hasPermission) && (
-                  <Button
-                    type="button"
-                    onClick={() => void loadSource()}
-                    disabled={!validId(originId)}
-                    isLoading={sourceBusy}
-                  >
-                    Xem phiếu xuất gốc
-                  </Button>
+                {create && kind === 'STOCK_ISSUE' && (
+                  <EntityPicker
+                    resource="agencies"
+                    label="Đại lý"
+                    required
+                    disabled={mutation.busy}
+                    params={{ status: 'ACTIVE' }}
+                    value={agencyId}
+                    onChange={(id) => setAgencyId(id)}
+                  />
                 )}
-                {source && (
-                  <>
+                {create &&
+                  kind === 'SALES_RETURN' &&
+                  (issueReadable ? (
+                    <EntityPicker
+                      resource="stock-issues"
+                      label="Phiếu xuất gốc"
+                      required
+                      disabled={mutation.busy}
+                      params={{ status: 'POSTED' }}
+                      value={originId}
+                      onChange={(id) => chooseOrigin(id)}
+                    />
+                  ) : (
+                    <Input
+                      label="Mã số phiếu xuất gốc"
+                      aria-label="Mã số phiếu xuất gốc"
+                      required
+                      value={originId}
+                      onChange={(event) => chooseOrigin(event.target.value)}
+                    />
+                  ))}
+                {kind === 'STOCK_ISSUE' && (
+                  <Input
+                    label="Trả ngay dự kiến (VNĐ)"
+                    aria-label="Trả ngay dự kiến (VNĐ)"
+                    required
+                    inputMode="numeric"
+                    className="tabular-nums"
+                    value={immediatePayment}
+                    onChange={(event) =>
+                      setImmediatePayment(event.target.value)
+                    }
+                  />
+                )}
+                {(kind === 'STOCK_ADJUSTMENT' || replacePending) && (
+                  <Input
+                    label="Lý do"
+                    aria-label="Lý do"
+                    required={!editHeader}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                )}
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Ghi chú"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </div>
+              </fieldset>
+              {sourceBusy && <Spinner label="Đang tải phiếu xuất gốc..." />}
+              {source && (
+                <details className="group mt-4 rounded-lg border bg-muted/30 px-3 py-2">
+                  <summary className="cursor-pointer text-[13px] font-medium text-foreground">
+                    Xem phiếu xuất gốc {source.code} (
+                    {formatDate(source.currentRevision.businessDate)})
+                  </summary>
+                  <div className="mt-3">
                     <DocumentSnapshot doc={source} />
-                    <p>
-                      Chọn dòng gốc, sau đó nhập lượng hàng thực nhận. Máy chủ
-                      kiểm tra lượng đã trả; không suy ra lượng còn có thể trả
-                      tại đây.
-                    </p>
-                    {source.currentRevision.lines.map((line) => (
-                      <Button
-                        key={line.id}
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          setLines([
-                            ...lines.filter((item) => item.originLineId),
-                            { ...emptyLine(), originLineId: line.id },
-                          ])
-                        }
-                      >
-                        Chọn dòng {line.id}: {line.productName}
-                      </Button>
-                    ))}
-                  </>
-                )}
-              </>
-            )}
-            {kind === 'STOCK_ISSUE' && (
-              <Input
-                label="Trả ngay dự kiến (VNĐ)"
-                aria-label="Trả ngay dự kiến (VNĐ)"
-                required
-                inputMode="numeric"
-                value={immediatePayment}
-                onChange={(event) => setImmediatePayment(event.target.value)}
+                  </div>
+                </details>
+              )}
+            </SectionCard>
+            {!editHeader && (
+              <GoodsLineEditor
+                kind={kind}
+                lines={lines}
+                onChange={setLines}
+                disabled={mutation.busy}
+                originLines={originLines}
               />
             )}
-            {(kind === 'STOCK_ADJUSTMENT' || replacePending) && (
-              <Input
-                label="Lý do"
-                aria-label="Lý do"
-                required={!editHeader}
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-            )}
-            <Input
-              label="Ghi chú"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </fieldset>
-          {!editHeader && (
-            <GoodsLineEditor
-              kind={kind}
-              lines={lines}
-              onChange={setLines}
-              disabled={mutation.busy}
-            />
-          )}
-          <div className="modal-actions">
-            <Button type="submit" isLoading={mutation.busy}>
-              Lưu chứng từ
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={mutation.busy}
-              onClick={closeForm}
-            >
-              Đóng
-            </Button>
           </div>
+          <EditorSummary
+            kind={kind}
+            mode={formMode}
+            lines={lines}
+            immediatePayment={immediatePayment}
+            originLines={originLines}
+            busy={mutation.busy}
+            onClose={closeForm}
+          />
         </form>
       </Modal>
       {correction && detail && (
@@ -686,6 +769,9 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
             reload()
           }}
         />
+      )}
+      {history && (
+        <RevisionHistory doc={history} onClose={() => setHistory(null)} />
       )}
     </div>
   )
