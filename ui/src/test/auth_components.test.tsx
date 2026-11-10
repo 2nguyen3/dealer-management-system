@@ -27,13 +27,13 @@ describe('Authentication Components', () => {
 
       const logos = screen.getAllByAltText('Agentra')
       expect(logos).toHaveLength(2)
-      expect(logos[0]?.getAttribute('src')).toBe(
-        '/assets/brand/agentra-white.png',
-      )
-      expect(logos[1]?.getAttribute('src')).toBe(
+      expect(logos.map((logo) => logo.getAttribute('src'))).toEqual([
         '/assets/brand/agentra-dark.png',
-      )
-      expect(screen.getByText('Hệ thống Quản lý Đại lý')).toBeDefined()
+        '/assets/brand/agentra-dark.png',
+      ])
+      expect(
+        screen.getByTitle(/nhà máy sản xuất, xe giao hàng và đại lý/),
+      ).toBeDefined()
       expect(
         screen.getByLabelText(/Email/i, { selector: 'input' }),
       ).toBeDefined()

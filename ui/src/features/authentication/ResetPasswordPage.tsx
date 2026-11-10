@@ -1,10 +1,13 @@
+import { ArrowLeft, CircleCheck, Lock } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { EyeIcon, EyeOffIcon, LockIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { apiFetch } from '../../lib/api'
+import { AuthLayout } from './AuthLayout'
+import { PasswordToggle } from './PasswordToggle'
 
 export function ResetPasswordPage() {
   const [token] = useState<string | null>(() => {
@@ -46,6 +49,11 @@ export function ResetPasswordPage() {
       : 'Không tìm thấy mã đặt lại mật khẩu hoặc liên kết đã hết hiệu lực.'
   })
 
+  const [fieldError, setFieldError] = useState<{
+    field: 'new' | 'confirm'
+    message: string
+  } | null>(null)
+
   useEffect(() => {
     // Immediately clear token from URL history to avoid leaking it
     if (window.location.hash || window.location.search.includes('token=')) {
@@ -62,13 +70,17 @@ export function ResetPasswordPage() {
       return
     }
 
+    setFieldError(null)
     if (!newPassword) {
-      setErrorMessage('Vui lòng nhập mật khẩu mới.')
+      setFieldError({ field: 'new', message: 'Vui lòng nhập mật khẩu mới.' })
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setErrorMessage('Xác nhận mật khẩu mới không khớp.')
+      setFieldError({
+        field: 'confirm',
+        message: 'Xác nhận mật khẩu mới không khớp.',
+      })
       return
     }
 
@@ -101,100 +113,88 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-header">
-          <div className="auth-brand">
-            <img
-              className="app-logo"
-              src="/assets/brand/agentra-dark.png"
-              alt="Agentra"
-            />
-            <span className="brand-subtitle">Hệ thống Quản lý Đại lý</span>
+    <AuthLayout
+      title="Đặt lại mật khẩu"
+      description="Tạo mật khẩu mới cho tài khoản của bạn"
+    >
+      {isSuccess ? (
+        <div className="space-y-5">
+          <div className="flex justify-center" aria-hidden="true">
+            <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CircleCheck className="size-6" />
+            </span>
           </div>
-          <h1 className="auth-title">Đặt lại mật khẩu</h1>
-          <p className="auth-desc">Tạo mật khẩu mới cho tài khoản của bạn</p>
-        </div>
-
-        {errorMessage && (
-          <Alert type="error" className="auth-alert">
-            {errorMessage}
+          <Alert type="success" title="Đặt lại mật khẩu thành công">
+            Mật khẩu mới của bạn đã được cập nhật thành công. Vui lòng đăng nhập
+            bằng mật khẩu mới.
           </Alert>
-        )}
-
-        {isSuccess ? (
-          <div className="auth-success-box">
-            <Alert type="success" title="Đặt lại mật khẩu thành công">
-              Mật khẩu mới của bạn đã được cập nhật thành công. Vui lòng đăng
-              nhập bằng mật khẩu mới.
-            </Alert>
-            <div className="auth-actions-centered">
-              <Link to="/login" className="btn btn--primary">
-                Đăng nhập ngay
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="auth-form" noValidate>
-            <div className="password-field-container">
-              <Input
-                id="new-password"
-                label="Mật khẩu mới"
-                type={showPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="new-password"
-                required
-                autoFocus
-                endAdornment={
-                  <button
-                    type="button"
-                    className="password-toggle-btn"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon size={18} />
-                    ) : (
-                      <EyeIcon size={18} />
-                    )}
-                  </button>
-                }
+          <ShadcnButton asChild size="lg" className="w-full">
+            <Link to="/login">Đăng nhập ngay</Link>
+          </ShadcnButton>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {errorMessage && <Alert type="error">{errorMessage}</Alert>}
+          <Input
+            id="new-password"
+            label="Mật khẩu mới"
+            type={showPassword ? 'text' : 'password'}
+            value={newPassword}
+            onChange={(e) => {
+              setNewPassword(e.target.value)
+              setFieldError(null)
+            }}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            error={fieldError?.field === 'new' ? fieldError.message : undefined}
+            required
+            autoFocus
+            endAdornment={
+              <PasswordToggle
+                visible={showPassword}
+                controls="new-password"
+                onToggle={() => setShowPassword((prev) => !prev)}
               />
-            </div>
-
-            <Input
-              id="confirm-password"
-              label="Xác nhận mật khẩu mới"
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              required
-            />
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="auth-submit-btn"
-              isLoading={isLoading}
-              disabled={!token}
-              icon={<LockIcon size={18} />}
+            }
+          />
+          <Input
+            id="confirm-password"
+            label="Xác nhận mật khẩu mới"
+            type={showPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value)
+              setFieldError(null)
+            }}
+            placeholder="••••••••"
+            autoComplete="new-password"
+            error={
+              fieldError?.field === 'confirm' ? fieldError.message : undefined
+            }
+            required
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            isLoading={isLoading}
+            disabled={!token}
+            icon={<Lock className="size-4" />}
+          >
+            Cập nhật mật khẩu
+          </Button>
+          <div className="text-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              Cập nhật mật khẩu
-            </Button>
-
-            <div className="auth-footer-link">
-              <Link to="/login" className="back-link">
-                ← Quay lại Đăng nhập
-              </Link>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Quay lại Đăng nhập
+            </Link>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   )
 }

@@ -1,9 +1,11 @@
+import { LogIn } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { EyeIcon, EyeOffIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
+import { AuthLayout } from './AuthLayout'
+import { PasswordToggle } from './PasswordToggle'
 import { useAuth } from './useAuth'
 
 export function LoginPage() {
@@ -16,6 +18,10 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [fieldError, setFieldError] = useState<{
+    field: 'email' | 'password'
+    message: string
+  } | null>(null)
   const requestedReturn = searchParams.get('returnTo') || '/'
   const returnTo =
     requestedReturn.startsWith('/') &&
@@ -34,14 +40,15 @@ export function LoginPage() {
     e.preventDefault()
     if (isLoading) return
     setErrorMessage(null)
+    setFieldError(null)
 
     if (!email) {
-      setErrorMessage('Vui lòng nhập địa chỉ email.')
+      setFieldError({ field: 'email', message: 'Vui lòng nhập địa chỉ email.' })
       return
     }
 
     if (!password) {
-      setErrorMessage('Vui lòng nhập mật khẩu.')
+      setFieldError({ field: 'password', message: 'Vui lòng nhập mật khẩu.' })
       return
     }
 
@@ -80,103 +87,69 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-page auth-page--login">
-      <aside className="auth-story" aria-label="Không gian Agentra">
-        <div className="auth-story-brand">
-          <img
-            className="app-logo app-logo--story"
-            src="/assets/brand/agentra-white.png"
-            alt="Agentra"
-          />
-        </div>
-        <div className="auth-story-copy">
-          <p className="workspace-kicker">HỆ THỐNG PHÂN PHỐI</p>
-          <h2>Quản lý đại lý và hàng hóa.</h2>
-          <p>Theo dõi giao dịch, tồn kho và công nợ theo quyền tài khoản.</p>
-        </div>
-        <div className="auth-story-footer">
-          <span>Agentra DMS</span>
-        </div>
-      </aside>
-      <div className="auth-form-panel">
-        <div className="auth-card">
-          <div className="auth-header">
-            <div className="auth-brand">
-              <img
-                className="app-logo"
-                src="/assets/brand/agentra-dark.png"
-                alt="Agentra"
-              />
-              <span className="brand-subtitle">Hệ thống Quản lý Đại lý</span>
-            </div>
-            <h1 className="auth-title">Đăng nhập</h1>
-            <p className="auth-desc">Dùng tài khoản được cấp để tiếp tục.</p>
-          </div>
-
-          {errorMessage && (
-            <Alert type="error" className="auth-alert">
-              {errorMessage}
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit} className="auth-form" noValidate>
-            <Input
-              id="login-email"
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ban@congty.vn"
-              autoComplete="email"
-              required
-              autoFocus
+    <AuthLayout
+      title="Đăng nhập"
+      description="Dùng tài khoản được cấp để tiếp tục."
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {errorMessage && <Alert type="error">{errorMessage}</Alert>}
+        <Input
+          id="login-email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value)
+            if (fieldError?.field === 'email') setFieldError(null)
+          }}
+          placeholder="ban@congty.vn"
+          autoComplete="email"
+          error={fieldError?.field === 'email' ? fieldError.message : undefined}
+          required
+          autoFocus
+        />
+        <Input
+          id="login-password"
+          label="Mật khẩu"
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value)
+            if (fieldError?.field === 'password') setFieldError(null)
+          }}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          error={
+            fieldError?.field === 'password' ? fieldError.message : undefined
+          }
+          required
+          endAdornment={
+            <PasswordToggle
+              visible={showPassword}
+              controls="login-password"
+              onToggle={() => setShowPassword((prev) => !prev)}
             />
-
-            <div className="password-field-container">
-              <Input
-                id="login-password"
-                label="Mật khẩu"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-                endAdornment={
-                  <button
-                    type="button"
-                    className="password-toggle-btn"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon size={18} />
-                    ) : (
-                      <EyeIcon size={18} />
-                    )}
-                  </button>
-                }
-              />
-            </div>
-
-            <div className="auth-form-meta">
-              <Link to="/forgot-password" className="forgot-password-link">
-                Quên mật khẩu?
-              </Link>
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="auth-submit-btn"
-              isLoading={isLoading}
-            >
-              Đăng nhập
-            </Button>
-          </form>
+          }
+        />
+        <div className="flex justify-end">
+          <Link
+            to="/forgot-password"
+            className="rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            Quên mật khẩu?
+          </Link>
         </div>
-      </div>
-    </div>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="w-full"
+          isLoading={isLoading}
+          icon={<LogIn className="size-4" />}
+        >
+          Đăng nhập
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }
