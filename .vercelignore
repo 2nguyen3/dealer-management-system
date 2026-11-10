@@ -1,0 +1,27 @@
+# Only application sources and deployment configuration belong in the upload.
+/*
+!backend
+!ui
+!vercel.json
+!.vercelignore
+
+**/.env
+**/.env.*
+**/.venv/**
+**/node_modules/**
+**/dist/**
+**/__pycache__/**
+**/*.py[cod]
+**/.pytest_cache/**
+**/.ruff_cache/**
+**/.coverage*
+**/*coverage*.json
+**/htmlcov/**
+**/*.tsbuildinfo
+**/tests/**
+**/src/test/**
+**/*.test.*
+**/*.spec.*
+**/AGENTS.md
+**/CLAUDE.md
+**/.vercel/**
