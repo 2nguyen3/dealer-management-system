@@ -71,6 +71,10 @@ def test_return_is_escaped_readonly_and_does_not_report_payment_as_recorded(nati
     assert result.status_code == 200
     assert "&lt;script&gt;" in result.text and "<script>" not in result.text
     assert "IPN" in result.text and result.headers["Referrer-Policy"] == "no-referrer"
+    assert (
+        'href="/online-payments?merchantReference=%3Cscript%3Ealert%281%29%3C%2Fscript%3E"'
+        in result.text
+    )
     service.complete.assert_not_called()
     assert client.get("/api/v1/integrations/vnpay/return").status_code == 400
     assert not any("/integrations/vnpay" in path for path in client.app.openapi()["paths"])
