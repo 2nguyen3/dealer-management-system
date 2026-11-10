@@ -311,7 +311,10 @@ export function reportPath(
       key === 'typeId' || key === 'districtId'
         ? /^[1-9][0-9]{0,9}$/.test(value) && BigInt(value) <= 2147483647n
         : id(value)
-    if (!valid) throw new Error(`${labels[key]} không hợp lệ.`)
+    if (!valid)
+      throw new Error(
+        `${key === 'agencyId' ? 'ID đại lý' : labels[key]} không hợp lệ.`,
+      )
     params.set(key, value)
   }
   if (!exporting) {
