@@ -197,3 +197,44 @@ def test_native_historical_pending_without_create_command_still_queries_provider
         adapter.client.post.assert_called_once()
         checkout.assert_not_called()
 
+
+def test_native_reconcile_failed_local_setup_keeps_same_command_recoverable(engine, actor, trading):
+    adapter = VnpayAdapter(config(), client=Mock())
+    body = OnlinePaymentCreate(agencyId=trading["agency"], provider="VNPAY", amount="102")
+    key = uuid4()
+    with Session(engine) as session:
+        issue(session, actor, (int(trading["agency"]), int(trading["product"])), day=4)
+        commit(session)
+        online = native_use(session, actor, adapter)
+        with patch.object(
+            VnpayAdapter,
+            "create_checkout",
+            side_effect=ApiError(503, "PROVIDER_UNAVAILABLE", "interrupted local setup"),
+        ):
+            pending = online.create(body, uuid4())
+            assert pending.status == 202
+            with pytest.raises(ApiError, match="PROVIDER_UNAVAILABLE"):
+                online.reconcile(int(pending.body["id"]), key)
+        adapter.client.post.assert_not_called()
+    with engine.connect() as check:
+        assert (
+            check.scalar(
+                text('SELECT state FROM dms.api_idempotency WHERE "clientKey"=:key'), {"key": key}
+            )
+            == "ACCEPTED"
+        )
+        assert check.scalar(text("SELECT count(*) FROM dms.payment_event")) == 0
+    with Session(engine) as session:
+        result = native_use(session, actor, adapter).reconcile(int(pending.body["id"]), key)
+        assert result.status == "PENDING" and result.checkoutUrl
+        assert result.id == pending.body["id"]
+        assert result.expiresAt == datetime.fromisoformat(pending.body["expiresAt"])
+        adapter.client.post.assert_not_called()
+    with engine.connect() as check:
+        assert check.scalar(text("SELECT count(*) FROM dms.online_payment")) == 1
+        assert (
+            check.scalar(
+                text('SELECT state FROM dms.api_idempotency WHERE "clientKey"=:key'), {"key": key}
+            )
+            == "ACCEPTED"
+        )
