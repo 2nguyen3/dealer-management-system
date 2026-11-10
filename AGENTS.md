@@ -1,5 +1,14 @@
 # Agentra project instructions
 
+## Database move / performance checkpoint - 2026-11-10
+
+Production database moved from Supabase Sydney to Neon Singapore (PG18, pooled host);
+Vercel functions pinned to `sin1`. Full dms copy: 30-table counts identical, verify
+seeded+regression pass, 412documents/31agencies preserved; Sydney kept as rollback.
+Read-only (GET/HEAD) requests and the dashboard snapshot reuse one auth/permission
+lookup per request (AuthService memoize); writers stay live. /documents 31→4 SQL.
+API ~0.25s vs 2.3–7.4s. Backend offline 1128 pass. See README Vercel section.
+
 ## Source review checkpoint - 2026-10-30
 
 1088offline pass; reports/dashboard/API/responses717stmt140branches exact100%.
@@ -302,7 +311,7 @@ plans and agent guidance aligned with actual implementation progress.
 
 ## Runtime context
 
-Supabase PostgreSQL is external. The backend reads separate `DB_HOST`, `DB_PORT`,
+Neon PostgreSQL (Singapore) is external. The backend reads separate `DB_HOST`, `DB_PORT`,
 `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and `DB_SSLMODE` fields from `backend/.env`.
 Passwords are raw values, not URL-encoded connection strings.
 

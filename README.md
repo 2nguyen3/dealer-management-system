@@ -56,7 +56,7 @@ seed is historical, not a reset target.
 | Component | Stack | Documentation |
 |---|---|---|
 | API | Python 3.12, FastAPI, SQLAlchemy, Alembic | [Backend setup](backend/README.md) |
-| Database | Supabase-hosted PostgreSQL | [Connection configuration](backend/README.md#supabase-connection) |
+| Database | Neon PostgreSQL 18 (Singapore, `aws-ap-southeast-1`) | [Connection configuration](backend/README.md#supabase-connection) |
 | Frontend | React, Vite, TypeScript | [Frontend setup](ui/README.md) |
 | Deployment | Docker Compose, unprivileged Nginx | See below |
 
@@ -65,8 +65,18 @@ seed is historical, not a reset target.
 Deploy from the repository root. `vercel.json` builds the Vite frontend and FastAPI
 backend as two Vercel Services in one project. `/api` and `/api/*` reach FastAPI
 without stripping the prefix; other paths reach the frontend, including SPA deep
-links. The existing Supabase PostgreSQL database remains external and unchanged.
-Vercel does not host PostgreSQL itself; new databases require a Marketplace provider.
+links. Vercel does not host PostgreSQL itself; the database is Neon (Vercel Marketplace)
+in Singapore, and `vercel.json` pins functions to `sin1` next to it. Keep the function
+region and database region together: every SQL statement is a network round trip.
+
+Database move 2026-11-10: the former Supabase Sydney database (`ap-southeast-2`) was
+copied with `pg_dump -n dms -e pg_trgm --no-owner --no-privileges` into Neon, the four
+`REVOKE ... FROM PUBLIC` statements of 0001/0004 were reapplied, `public.alembic_version`
+was stamped `0009`, all 30 table row counts matched, and `app.db.verify --seeded
+--regression` passed through the pooled host. Production `DB_*` were replaced with
+`deploy_vercel_env.py --env-file .env.neon --database-only --update-existing`. The
+Sydney project is retained untouched as a rollback source (`backend/.env.supabase-sydney`).
+Measured API latency dropped from 2.3–7.4 s to about 0.25 s per request.
 
 ```powershell
 npx --yes vercel@65.12.1 login
