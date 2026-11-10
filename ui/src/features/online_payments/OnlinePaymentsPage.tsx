@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
+import { useSearchParams } from 'react-router'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -65,7 +72,10 @@ function checkoutUrl(value: unknown): string | null {
 export function OnlinePaymentsPage() {
   const { hasPermission } = useAuth()
   const canManage = hasPermission('payments.online')
-  const [reference, setReference] = useState('')
+  const [searchParams] = useSearchParams()
+  const requestedPaymentId = searchParams.get('paymentId')
+  const requestedReference = searchParams.get('merchantReference')
+  const [reference, setReference] = useState(requestedReference ?? '')
   const [agencyFilter, setAgencyFilter] = useState('')
   const [status, setStatus] = useState('')
   const list = useSourcePage(
@@ -84,7 +94,62 @@ export function OnlinePaymentsPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [pendingSetupId, setPendingSetupId] = useState<string | null>(null)
   const intent = useRef(new Intent())
+  const reloadList = useEffectEvent(() => {
+    invalidateCache('/online-payments')
+    list.reload()
+  })
+
+  useEffect(() => {
+    if (requestedPaymentId === null && requestedReference === null) return
+    const controller = new AbortController()
+    let current = true
+    const locate = async () => {
+      if (requestedPaymentId === null && !requestedReference)
+        throw new Error('Mã tham chiếu không hợp lệ.')
+      const response = await apiFetch<unknown>(
+        requestedPaymentId !== null
+          ? `/online-payments/${id(requestedPaymentId)}`
+          : `/online-payments?merchantReference=${encodeURIComponent(requestedReference!)}&limit=25`,
+        { signal: controller.signal },
+      )
+      const item =
+        requestedPaymentId !== null
+          ? payment(response.data)
+          : page(response.data, payment).items.find(
+              (item) => item.merchantReference === requestedReference,
+            )
+      if (!item)
+        throw new Error('Không tìm thấy giao dịch với mã tham chiếu này.')
+      if (current) {
+        setSelected(id(item.id))
+        setDetail(item)
+        setEvents([])
+        setEventsMore(false)
+        setError('')
+        if (requestedReference) setReference(requestedReference)
+      }
+    }
+    void locate().catch((failure: unknown) => {
+      if (current) {
+        setSelected(null)
+        setDetail(null)
+        setError(message(failure))
+      }
+    })
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [requestedPaymentId, requestedReference])
+
+  useEffect(() => {
+    if (!selected) return
+    const refresh = () => setVersion((value) => value + 1)
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [selected])
 
   useEffect(() => {
     if (!selected) return
@@ -95,7 +160,10 @@ export function OnlinePaymentsPage() {
     })
       .then((response) => {
         const item = payment(response.data)
-        if (current) setDetail(item)
+        if (current) {
+          setDetail(item)
+          reloadList()
+        }
       })
       .catch((failure: unknown) => {
         if (current) setError(message(failure))
@@ -135,14 +203,16 @@ export function OnlinePaymentsPage() {
       const response = await intent.current.send<unknown>('/online-payments', {
         method: 'POST',
         body,
+        retainAccepted: true,
       })
       const item = payment(response.data)
-      setOpen(false)
+      setOpen(response.status === 202)
+      setPendingSetupId(response.status === 202 ? id(item.id) : null)
       setSelected(id(item.id))
       setDetail(item)
       setNotice(
         response.status === 202
-          ? 'Đang khởi tạo checkout. Theo dõi giao dịch hiện tại, không tạo lại.'
+          ? 'Đang khởi tạo checkout. Giữ nguyên nội dung và tiếp tục khởi tạo để khôi phục cùng giao dịch, không tạo giao dịch mới.'
           : 'Đã khởi tạo giao dịch, chưa xác nhận nhận tiền.',
       )
       invalidateCache('/online-payments')
@@ -275,6 +345,7 @@ export function OnlinePaymentsPage() {
       >
         <form onSubmit={create}>
           {error && <Alert type="error">{error}</Alert>}
+          {notice && <Alert type="info">{notice}</Alert>}
           <Input
             label="ID đại lý thanh toán"
             value={agencyId}
@@ -294,14 +365,18 @@ export function OnlinePaymentsPage() {
           </p>
           <div className="modal-actions">
             <Button type="submit" isLoading={busy}>
-              Khởi tạo thanh toán
+              {pendingSetupId
+                ? 'Tiếp tục khởi tạo checkout'
+                : 'Khởi tạo thanh toán'}
             </Button>
-            <Button onClick={() => setOpen(false)}>Đóng</Button>
+            <Button type="button" onClick={() => setOpen(false)}>
+              Đóng
+            </Button>
           </div>
         </form>
       </Modal>
       <Modal
-        isOpen={!!selected}
+        isOpen={!!selected && !open}
         onClose={() => {
           setSelected(null)
           setDetail(null)
@@ -333,6 +408,11 @@ export function OnlinePaymentsPage() {
               <a href={url} target="_blank" rel="noreferrer">
                 Mở trang thanh toán
               </a>
+            )}
+            {canManage && selected === pendingSetupId && (
+              <Button disabled={busy} onClick={() => setOpen(true)}>
+                Tiếp tục khởi tạo checkout
+              </Button>
             )}
             {canManage && detail.status !== 'SUCCESS' && (
               <Button disabled={busy} onClick={reconcile}>
