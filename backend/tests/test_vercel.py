@@ -69,3 +69,29 @@ def test_vercel_entrypoint_uses_environment_and_preserves_api(monkeypatch):
         assert client.get("/api/v1/not-found").status_code == 404
     session.execute.assert_called_once()
 
+
+@pytest.mark.parametrize("environment", ["preview", "production"])
+def test_env_upload_uses_stdin_and_never_overwrites(monkeypatch, capsys, environment):
+    settings = deployment_settings()
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py", "--environment", environment])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=settings))
+    runner = Mock(return_value=Mock(returncode=0))
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 0
+    assert runner.call_count == 10
+    supplied = {}
+    for call in runner.call_args_list:
+        command = call.args[0]
+        supplied[command[5]] = call.kwargs["input"]
+        assert command[6:] == ["--environment", environment, "--sensitive", "--yes"]
+        assert "--force" not in command
+        assert settings.db_password.get_secret_value() not in command
+        assert call.kwargs["cwd"] == BACKEND.parent
+    assert supplied["DB_PASSWORD"] == settings.db_password.get_secret_value()
+    assert supplied["CORS_ORIGINS"] == "[]"
+    assert not any(name.startswith(("VITE_", "PAYMENT_", "VNPAY_", "SMTP_")) for name in supplied)
+    output = capsys.readouterr().out
+    assert settings.db_password.get_secret_value() not in output
+    assert settings.auth_signing_key.get_secret_value() not in output
+
