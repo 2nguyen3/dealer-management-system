@@ -95,3 +95,26 @@ def test_env_upload_uses_stdin_and_never_overwrites(monkeypatch, capsys, environ
     assert settings.db_password.get_secret_value() not in output
     assert settings.auth_signing_key.get_secret_value() not in output
 
+
+def test_env_upload_hides_cli_errors_and_stops(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py"])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=deployment_settings()))
+    runner = Mock(return_value=Mock(returncode=1, stderr="secret-cli-error", stdout="secret"))
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 1
+    runner.assert_called_once()
+    assert "secret" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("missing_cli", [True, False])
+def test_env_upload_rejects_missing_prerequisites(monkeypatch, capsys, missing_cli):
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py"])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: None if missing_cli else "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(side_effect=ValueError("secret")))
+    runner = Mock()
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 1
+    runner.assert_not_called()
+    assert "secret" not in capsys.readouterr().out
+
