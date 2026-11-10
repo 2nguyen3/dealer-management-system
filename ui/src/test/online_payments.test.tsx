@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -65,6 +71,53 @@ describe('OnlinePaymentsPage Component', () => {
       updatedAt: '2026-10-11T14:00:00Z',
     },
   ]
+
+  const renderPage = (query = '', auth = mockAuthContext) =>
+    render(
+      <MemoryRouter initialEntries={[`/online-payments${query}`]}>
+        <AuthContext.Provider value={auth}>
+          <OnlinePaymentsPage />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+
+  const fillCreate = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo thanh toán mới' }))
+    fireEvent.change(screen.getByLabelText(/ID đại lý thanh toán/), {
+      target: { value: '102' },
+    })
+    fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '300000' },
+    })
+  }
+
+  const mockServer = (
+    current: () => Record<string, unknown> = () => samplePayments[1]!,
+    create?: (
+      options: apiModule.RequestOptions,
+    ) => Promise<apiModule.ApiResponse<unknown>>,
+  ) =>
+    vi
+      .spyOn(apiModule, 'apiFetch')
+      .mockImplementation(async (path, options = {}) => {
+        if (path === '/online-payments' && options.method === 'POST' && create)
+          return create(options)
+        if (path === '/online-payments/1002')
+          return { data: current(), status: 200, etag: null }
+        if (
+          path.startsWith('/online-payments?') ||
+          path === '/online-payments/1002/events?limit=25'
+        )
+          return {
+            data: {
+              items: path.includes('/events?') ? [] : [current()],
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: null,
+          }
+        throw new Error(`Unexpected request: ${path}`)
+      })
 
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -175,4 +228,44 @@ describe('OnlinePaymentsPage Component', () => {
       expect(screen.queryByLabelText(/ID đại lý thanh toán/i)).toBeNull()
     })
   })
+
+  it('retries COMMAND_OUTCOME_UNKNOWN with the same body/key and blocks changed input', async () => {
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new apiModule.ApiError(
+          409,
+          'COMMAND_OUTCOME_UNKNOWN',
+          'Outcome unknown',
+        ),
+      )
+      .mockResolvedValue({ data: samplePayments[1], status: 200, etag: null })
+    mockServer(undefined, create)
+    renderPage()
+    fillCreate()
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    expect(
+      await within(screen.getByRole('dialog')).findByText('Outcome unknown'),
+    ).toBeDefined()
+    fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    await within(screen.getByRole('dialog')).findByText(/Giữ nguyên nội dung/)
+    expect(create).toHaveBeenCalledTimes(1)
+    fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '300000' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    expect(
+      await screen.findByRole('link', { name: 'Mở trang thanh toán' }),
+    ).toBeDefined()
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create.mock.calls[1]).toEqual(create.mock.calls[0])
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      body: { agencyId: '102', provider: 'VNPAY', amount: '300000' },
+      idempotencyKey: expect.any(String),
+    })
+  })
+
 })
