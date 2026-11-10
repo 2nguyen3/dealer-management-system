@@ -1,8 +1,29 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReportsPage } from '../features/reports/ReportsPage'
-import { reports, type ReportKind } from '../features/reports/contracts'
+import {
+  reports,
+  vietnamMonth,
+  type ReportKind,
+} from '../features/reports/contracts'
+import { presetPeriod } from '../features/reports/periods'
+import {
+  displayValue,
+  exportHint,
+  isNumeric,
+  periodLabel,
+  sortLabel,
+  visibleColumns,
+} from '../features/reports/display'
 import * as api from '../lib/api'
+import { formatVND } from '../lib/formatters'
 import * as exports from '../features/reports/export'
 import { huge, reportFixture } from './reportFixtures'
 
@@ -17,8 +38,44 @@ const auth = vi.hoisted(() => ({
 }))
 vi.mock('../features/authentication/useAuth', () => ({ useAuth: () => auth }))
 
+const pickerLabels: Record<string, string> = {
+  agencyId: 'Đại lý',
+  typeId: 'Loại đại lý',
+  productId: 'Mặt hàng',
+}
+let pickerRows: Record<string, unknown>[] = []
+
+const tabNames: Record<ReportKind, string> = {
+  sales: 'Doanh số đại lý',
+  debt: 'Công nợ',
+  inventory: 'Xuất nhập tồn',
+  'product-sales': 'Doanh số mặt hàng',
+  'cash-and-credit': 'Thu chi & dư có',
+}
+
 function apply() {
-  fireEvent.click(screen.getByRole('button', { name: 'Xem báo cáo' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+}
+/** Radix tabs activate on primary mouse down. */
+function openTab(kind: ReportKind) {
+  fireEvent.mouseDown(screen.getByRole('tab', { name: tabNames[kind] }))
+}
+function exportTrigger() {
+  return screen.getByRole('button', {
+    name: /Xuất báo cáo/,
+  }) as HTMLButtonElement
+}
+async function exportAs(format: 'pdf' | 'xlsx') {
+  fireEvent.keyDown(exportTrigger(), { key: 'Enter' })
+  fireEvent.click(
+    await screen.findByRole('menuitem', {
+      name: `Xuất ${format.toUpperCase()}`,
+    }),
+  )
+}
+/** Waits for the detailed table to show the fixture source row. */
+function sourceRow() {
+  return screen.findByRole('cell', { name: 'Đại lý nguồn' })
 }
 function response(path: string) {
   const url = new URL(path, 'http://test')
@@ -33,10 +90,41 @@ function response(path: string) {
     etag: null,
   }
 }
+/** Non-report reads: picker searches and the district list. */
+function lookup(path: string) {
+  const items = path.startsWith('/districts')
+    ? [{ id: 1, code: 'Q1', name: 'Quận 1' }]
+    : pickerRows
+  return {
+    data: {
+      items,
+      pagination: { limit: 20, hasMore: false, nextCursor: null },
+    },
+    status: 200,
+    etag: null,
+  }
+}
+function route(path: string) {
+  return path.startsWith('/reports/') ? response(path) : lookup(path)
+}
+function reportCalls() {
+  return vi
+    .mocked(api.apiFetch)
+    .mock.calls.filter(([path]) => String(path).startsWith('/reports/'))
+}
+/** Picks a record through the searchable picker instead of typing an ID. */
+async function choose(label: string, id: string) {
+  pickerRows = [{ id, code: `PK-${id}`, name: 'Bản ghi chọn' }]
+  const input = screen.getByRole('combobox', { name: label })
+  fireEvent.focus(input)
+  fireEvent.click(await screen.findByText(`PK-${id} — Bản ghi chọn`))
+  expect((input as HTMLInputElement).value).toBe(`PK-${id} — Bản ghi chọn`)
+}
 
 describe('authoritative reports', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    pickerRows = []
     auth.user = { id: '1' }
     auth.allowedFunctions = [
       'reports.read',
@@ -45,44 +133,235 @@ describe('authoritative reports', () => {
       'inventory.read',
     ]
     vi.spyOn(api, 'apiFetch').mockImplementation(
-      async (path) => response(path) as never,
+      async (path) => route(path) as never,
     )
   })
 
   it.each(Object.keys(reports) as ReportKind[])(
-    'reads only selected %s on explicit apply with authoritative totals',
+    'reads only selected %s on explicit apply with KPIs, charts and table',
     async (kind) => {
       render(<ReportsPage />)
       expect(api.apiFetch).not.toHaveBeenCalled()
-      fireEvent.change(screen.getByLabelText('Loại báo cáo'), {
-        target: { value: kind },
-      })
-      if (reports[kind].filters.includes('agencyId'))
-        fireEvent.change(screen.getByLabelText('ID'), {
-          target: { value: '9223372036854775807' },
-        })
-      expect(api.apiFetch).not.toHaveBeenCalled()
+      if (kind !== 'sales') openTab(kind)
+      expect(
+        screen
+          .getByRole('tab', { name: tabNames[kind] })
+          .getAttribute('aria-selected'),
+      ).toBe('true')
+      const filter = reports[kind].filters[0]!
+      await choose(pickerLabels[filter]!, '9223372036854775807')
+      expect(reportCalls()).toHaveLength(0)
       apply()
-      await screen.findByRole('region', { name: reports[kind].label })
-      expect(api.apiFetch).toHaveBeenCalledTimes(1)
-      expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toContain(
-        `/reports/${kind}?`,
-      )
-      expect(vi.mocked(api.apiFetch).mock.calls[0]![1]?.headers).toEqual({
-        Accept: 'application/json',
+      const region = await screen.findByRole('region', {
+        name: reports[kind].label,
       })
-      expect(screen.getAllByText('9223372036854775807').length).toBe(1)
+      expect(reportCalls()).toHaveLength(1)
+      const [path, options] = reportCalls()[0]!
+      expect(path).toContain(`/reports/${kind}?`)
+      expect(path).toContain(`${filter}=9223372036854775807`)
+      expect(path).toContain(
+        'sort=' + encodeURIComponent(reports[kind].sorts[0]!),
+      )
+      expect(path).toContain('limit=25')
+      expect(options?.headers).toEqual({ Accept: 'application/json' })
+      // Database IDs are request values only; the table shows codes/names.
+      expect(screen.queryByText('9223372036854775807')).toBeNull()
+      const product = kind === 'inventory' || kind === 'product-sales'
+      expect(
+        within(region).getByRole('cell', {
+          name: product ? 'MH-01' : 'DL-101',
+        }),
+      ).toBeTruthy()
+      expect(screen.queryByRole('columnheader', { name: 'ID' })).toBeNull()
+      expect(
+        screen.getByText(/^Kỳ báo cáo: \d{2}\/\d{2}\/\d{4} – /),
+      ).toBeTruthy()
+      const generated = document.querySelector('time')!
+      expect(generated.getAttribute('dateTime')).toBe(
+        '2026-10-30T00:39:22.123456+00:00',
+      )
+      expect(generated.textContent).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/)
+      // KPI strip and two chart cards with a table view each.
+      const kpis = within(region).getByRole('group', { name: 'Chỉ số chính' })
+      expect(kpis.children).toHaveLength(4)
+      expect(
+        within(region).getAllByRole('radio', { name: 'Bảng số liệu' }),
+      ).toHaveLength(2)
+      const footer = region.querySelector('tfoot')
+      if (kind === 'inventory') expect(footer).toBeNull()
+      else expect(footer!.textContent).toContain('Tổng toàn bộ kết quả đã lọc')
       if (kind === 'sales') {
-        expect(screen.getByText('999')).toBeDefined()
-        expect(screen.getByText('0.0001')).toBeDefined()
-        expect(screen.getByText(huge + '00')).toBeDefined()
-      }
-      if (kind === 'inventory')
+        expect(within(kpis).getByText('Số phiếu xuất')).toBeTruthy()
+        expect(within(kpis).getByText('999')).toBeTruthy()
+        expect(within(footer as HTMLElement).getByText('999')).toBeTruthy()
+        const rate = screen.getByText('0,0001 %')
+        expect(rate.className).toContain('cell-number')
         expect(
-          screen.queryByRole('region', { name: 'Tổng toàn bộ kết quả đã lọc' }),
-        ).toBeNull()
+          screen.getByText(`Toàn công ty: ${formatVND(huge + '00')}`),
+        ).toBeTruthy()
+        expect(screen.getAllByText('-1 ₫').length).toBeGreaterThan(1)
+        expect(screen.queryByText(huge)).toBeNull()
+        // Compact KPI values keep the exact amount for assistive technology.
+        expect(kpis.textContent).toContain(`(${formatVND(huge)})`)
+      }
+      if (kind === 'debt') {
+        expect(within(kpis).getByText('Nợ cuối kỳ')).toBeTruthy()
+        expect(screen.getByText('Biến động công nợ trong kỳ')).toBeTruthy()
+      }
+      if (kind === 'inventory') {
+        expect(screen.getByText('0,001').className).toContain('cell-number')
+        expect(screen.getByText('-0,001')).toBeTruthy()
+        expect(within(kpis).getByText('Hết tồn cuối kỳ')).toBeTruthy()
+        // Every closing stock is zero: the ranked chart explains the blank.
+        expect(
+          screen.getByText('Không có giá trị khác 0 để vẽ biểu đồ.'),
+        ).toBeTruthy()
+      }
+      if (kind === 'product-sales') {
+        expect(
+          screen.getByText('Mặt hàng bán nhiều nhất (số lượng)'),
+        ).toBeTruthy()
+        expect(
+          screen.getByText('Mặt hàng doanh số thuần cao nhất'),
+        ).toBeTruthy()
+      }
+      if (kind === 'cash-and-credit') {
+        expect(within(kpis).getByText('Tiền đã thu')).toBeTruthy()
+        expect(screen.getByText('Biến động dư có trong kỳ')).toBeTruthy()
+      }
     },
   )
+
+  it('switches chart cards to an exact-value table view', async () => {
+    render(<ReportsPage />)
+    apply()
+    await sourceRow()
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Bảng số liệu' })[0]!)
+    const header = screen.getByRole('rowheader', {
+      name: 'DL-101 — Đại lý nguồn',
+    })
+    expect(header.closest('tr')!.textContent).toContain('-1 ₫')
+  })
+
+  it('keeps each tab independent and only reads the active report', async () => {
+    render(<ReportsPage />)
+    apply()
+    await sourceRow()
+    openTab('debt')
+    expect(screen.queryByRole('cell', { name: 'Đại lý nguồn' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain(
+      'Chưa có dữ liệu báo cáo',
+    )
+    expect(exportTrigger().disabled).toBe(true)
+    expect(reportCalls()).toHaveLength(1)
+    apply()
+    await screen.findByRole('region', { name: reports.debt.label })
+    expect(reportCalls()[1]![0]).toContain('/reports/debt?')
+    expect(reportCalls()[1]![0]).toContain('sort=agencyId')
+    openTab('sales')
+    await screen.findByRole('region', { name: reports.sales.label })
+    expect(reportCalls()[2]![0]).toContain('/reports/sales?')
+  })
+
+  it('applies period presets and resets filters to the current month', async () => {
+    const month = vietnamMonth()
+    const previous = presetPeriod('lastMonth', month)
+    const current = presetPeriod('thisMonth', month)
+    render(<ReportsPage />)
+    const clear = screen.getByRole('button', { name: 'Xóa bộ lọc' })
+    expect((clear as HTMLButtonElement).disabled).toBe(true)
+    const [year, mon] = current.fromDate.split('-')
+    expect(
+      screen.getByRole('button', { name: `Từ ngày: 01/${mon}/${year}` }),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole('radio', { name: 'Tháng này' })
+        .getAttribute('aria-checked'),
+    ).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Tháng trước' }))
+    await choose('Đại lý', '5')
+    apply()
+    await sourceRow()
+    const first = reportCalls()[0]![0]
+    expect(first).toContain(`fromDate=${previous.fromDate}`)
+    expect(first).toContain(`toDate=${previous.toDate}`)
+    expect(first).toContain('agencyId=5')
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+    expect(
+      (screen.getByRole('combobox', { name: 'Đại lý' }) as HTMLInputElement)
+        .value,
+    ).toBe('')
+    apply()
+    await waitFor(() => expect(reportCalls()).toHaveLength(2))
+    const second = reportCalls()[1]![0]
+    expect(second).toContain(`fromDate=${current.fromDate}`)
+    expect(second).toContain(`toDate=${current.toDate}`)
+    expect(second).not.toContain('agencyId=')
+  })
+
+  it('filters by agency type and district through readable choices', async () => {
+    render(<ReportsPage />)
+    await choose('Loại đại lý', '3')
+    apply()
+    await sourceRow()
+    expect(reportCalls()[0]![0]).toContain('typeId=3')
+    openTab('debt')
+    const district = (await screen.findByRole('option', {
+      name: 'Q1 — Quận 1',
+    })) as HTMLOptionElement
+    expect(district.value).toBe('1')
+    fireEvent.change(screen.getByLabelText('Quận'), { target: { value: '1' } })
+    apply()
+    await waitFor(() => expect(reportCalls()).toHaveLength(2))
+    expect(reportCalls()[1]![0]).toContain('districtId=1')
+  })
+
+  it('offers readable sort and page-size choices with unchanged values', async () => {
+    render(<ReportsPage />)
+    const sort = screen.getByLabelText('Sắp xếp') as HTMLSelectElement
+    const labels = Array.from(sort.options).map((o) => o.textContent)
+    expect(labels).toEqual([
+      'Đại lý: cũ trước',
+      'Đại lý: mới thêm trước',
+      'Doanh số gộp: thấp đến cao',
+      'Doanh số gộp: cao đến thấp',
+      'Doanh số thuần: thấp đến cao',
+      'Doanh số thuần: cao đến thấp',
+    ])
+    expect(Array.from(sort.options).map((o) => o.value)).toEqual(
+      reports.sales.sorts,
+    )
+    expect(labels.join(' ')).not.toMatch(/ID|Tăng:|Giảm:/)
+    const limit = screen.getByLabelText(
+      'Số dòng mỗi trang',
+    ) as HTMLSelectElement
+    expect(limit.value).toBe('25')
+    fireEvent.change(sort, { target: { value: '-netSalesAmount' } })
+    fireEvent.change(limit, { target: { value: '100' } })
+    apply()
+    await sourceRow()
+    expect(reportCalls()[0]![0]).toContain('sort=-netSalesAmount')
+    expect(reportCalls()[0]![0]).toContain('limit=100')
+  })
+
+  it('shows an empty state and explains why export is disabled', () => {
+    render(<ReportsPage />)
+    const status = screen.getByRole('status')
+    expect(status.textContent).toContain('Chưa có dữ liệu báo cáo')
+    expect(status.textContent).toContain(
+      'Chọn bộ lọc và nhấn Áp dụng để tải dữ liệu.',
+    )
+    const trigger = exportTrigger()
+    expect(trigger.disabled).toBe(true)
+    expect(trigger.getAttribute('title')).toBe(
+      'Xem báo cáo trước để có thể xuất tệp.',
+    )
+    expect(
+      document.getElementById(trigger.getAttribute('aria-describedby')!)!
+        .textContent,
+    ).toBe('Xem báo cáo trước để có thể xuất tệp.')
+  })
 
   it.each(
     [
@@ -94,18 +373,43 @@ describe('authoritative reports', () => {
   )('does not request with missing allOf grants $grants', ({ grants }) => {
     auth.allowedFunctions = grants
     render(<ReportsPage />)
-    expect(screen.getByText(/Bạn không có quyền xem báo cáo/)).toBeDefined()
+    expect(screen.getByText(/Bạn không có quyền xem báo cáo/)).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Xuất báo cáo/ })).toBeNull()
     expect(api.apiFetch).not.toHaveBeenCalled()
   })
 
   it('uses inventory defaults for an inventory-only reader', async () => {
     auth.allowedFunctions = ['reports.read', 'inventory.read']
     render(<ReportsPage />)
+    expect(screen.getAllByRole('tab')).toHaveLength(1)
     apply()
     await screen.findByRole('region', { name: 'Xuất nhập tồn' })
     expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toContain(
       'sort=productId',
     )
+  })
+
+  it('shows loading skeletons until the report arrives', async () => {
+    let resolve!: () => void
+    vi.mocked(api.apiFetch).mockImplementationOnce(
+      (path) =>
+        new Promise((done) => {
+          resolve = () => done(route(path) as never)
+        }) as never,
+    )
+    render(<ReportsPage />)
+    apply()
+    expect(screen.getByText('Đang tải báo cáo...')).toBeTruthy()
+    expect(
+      (screen.getByRole('button', { name: 'Áp dụng' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true)
+    await act(async () => {
+      resolve()
+    })
+    await sourceRow()
+    expect(screen.queryByText('Đang tải báo cáo...')).toBeNull()
   })
 
   it('preserves empty as empty and exposes invalid-response/network errors with retry', async () => {
@@ -116,6 +420,9 @@ describe('authoritative reports', () => {
     render(<ReportsPage />)
     apply()
     await screen.findByText(/Dữ liệu máy chủ không đúng hợp đồng/)
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Không thể tải báo cáo',
+    )
     vi.mocked(api.apiFetch).mockRejectedValueOnce(
       new Error('HTTP 429: thử lại sau'),
     )
@@ -129,23 +436,23 @@ describe('authoritative reports', () => {
     fireEvent.click(screen.getByText('Thử lại'))
     await screen.findByText('Không có dữ liệu trong kỳ và bộ lọc đã chọn.')
     expect(screen.queryByText('Đại lý nguồn')).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Chỉ số chính' })).toBeNull()
+    expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('validates exact ID filters before issuing any request', async () => {
+  it('validates exact ID filters before issuing any report request', async () => {
     render(<ReportsPage />)
-    fireEvent.change(screen.getByLabelText('ID'), {
-      target: { value: '9223372036854775808' },
-    })
+    await choose('Đại lý', '9223372036854775808')
     apply()
     await screen.findByText('ID đại lý không hợp lệ.')
-    expect(api.apiFetch).not.toHaveBeenCalled()
+    expect(reportCalls()).toHaveLength(0)
   })
 
   it('uses opaque cursors, resets on apply, and does not refetch while editing filters', async () => {
     vi.mocked(api.apiFetch).mockImplementation(async (path) => {
-      const result = response(path)
-      if (!path.includes('cursor='))
-        result.data.pagination = {
+      const result = route(path)
+      if (path.startsWith('/reports/') && !path.includes('cursor='))
+        (result.data as { pagination: unknown }).pagination = {
           limit: 25,
           hasMore: true,
           nextCursor: 'opaque+cursor/=',
@@ -154,27 +461,24 @@ describe('authoritative reports', () => {
     })
     render(<ReportsPage />)
     apply()
-    await screen.findByText('Đại lý nguồn')
+    await sourceRow()
     fireEvent.click(screen.getByText('Trang tiếp'))
-    await waitFor(() => expect(api.apiFetch).toHaveBeenCalledTimes(2))
-    await screen.findByText('Đại lý nguồn')
-    expect(vi.mocked(api.apiFetch).mock.calls[1]![0]).toContain(
-      'cursor=opaque%2Bcursor%2F%3D',
-    )
+    await waitFor(() => expect(reportCalls()).toHaveLength(2))
+    await sourceRow()
+    expect(reportCalls()[1]![0]).toContain('cursor=opaque%2Bcursor%2F%3D')
     fireEvent.click(screen.getByText('Trang trước'))
-    await screen.findByText('Đại lý nguồn')
-    expect(vi.mocked(api.apiFetch).mock.calls[2]![0]).not.toContain('cursor=')
-    fireEvent.change(screen.getByLabelText('ID'), {
-      target: { value: '2' },
-    })
-    expect(api.apiFetch).toHaveBeenCalledTimes(3)
-    expect(
-      screen.getByText('Xuất PDF').closest('button')!.disabled,
-    ).toBe(true)
+    await sourceRow()
+    expect(reportCalls()[2]![0]).not.toContain('cursor=')
+    await choose('Đại lý', '2')
+    expect(reportCalls()).toHaveLength(3)
+    expect(exportTrigger().disabled).toBe(true)
+    expect(exportTrigger().getAttribute('title')).toContain(
+      'Bộ lọc đã thay đổi',
+    )
     apply()
-    await screen.findByText('Đại lý nguồn')
-    expect(vi.mocked(api.apiFetch).mock.calls[3]![0]).toContain('agencyId=2')
-    expect(vi.mocked(api.apiFetch).mock.calls[3]![0]).not.toContain('cursor=')
+    await sourceRow()
+    expect(reportCalls()[3]![0]).toContain('agencyId=2')
+    expect(reportCalls()[3]![0]).not.toContain('cursor=')
   })
 
   it('aborts stale reads on apply/unmount and never paints a late response', async () => {
@@ -187,27 +491,23 @@ describe('authoritative reports', () => {
     )
     const view = render(<ReportsPage />)
     apply()
-    const first = vi.mocked(api.apiFetch).mock.calls[0]!
-    fireEvent.change(screen.getByLabelText('ID'), {
-      target: { value: '2' },
-    })
+    const first = reportCalls()[0]!
+    await choose('Đại lý', '2')
     apply()
-    await screen.findByText('Đại lý nguồn')
+    await sourceRow()
     expect(first[1]!.signal!.aborted).toBe(true)
     await act(async () => {
       resolve({ data: [], status: 200, etag: null })
     })
     expect(screen.queryByText(/Dữ liệu máy chủ không đúng hợp đồng/)).toBeNull()
     view.unmount()
-    expect(vi.mocked(api.apiFetch).mock.calls[1]![1]!.signal!.aborted).toBe(
-      true,
-    )
+    expect(reportCalls()[1]![1]!.signal!.aborted).toBe(true)
   })
 
   it('clears sensitive results immediately and aborts on identity/grant changes', async () => {
     const view = render(<ReportsPage />)
     apply()
-    await screen.findByText('Đại lý nguồn')
+    await sourceRow()
     auth.allowedFunctions = ['reports.read', 'inventory.read']
     view.rerender(<ReportsPage />)
     expect(screen.queryByText('Đại lý nguồn')).toBeNull()
@@ -218,7 +518,7 @@ describe('authoritative reports', () => {
   })
 
   it.each(['pdf', 'xlsx'] as const)(
-    'exports %s once with applied filters, handles errors, and prevents duplicate export',
+    'exports %s once from the menu with applied filters and handles errors',
     async (format) => {
       let finish!: () => void
       const download = vi
@@ -230,24 +530,28 @@ describe('authoritative reports', () => {
             }),
         )
       render(<ReportsPage />)
-      fireEvent.change(screen.getByLabelText('ID'), {
-        target: { value: '7' },
-      })
+      await choose('Đại lý', '7')
       apply()
-      await screen.findByText('Đại lý nguồn')
-      const button = screen.getByText(`Xuất ${format.toUpperCase()}`)
-      fireEvent.click(button)
-      fireEvent.click(button)
+      await sourceRow()
+      expect(exportTrigger().getAttribute('title')).toBe(
+        'Xuất toàn bộ kết quả đã lọc',
+      )
+      await exportAs(format)
       expect(download).toHaveBeenCalledTimes(1)
       expect(download.mock.calls[0]![0].filters).toEqual({ agencyId: '7' })
-      expect(api.apiFetch).toHaveBeenCalledTimes(1)
+      expect(download.mock.calls[0]![1]).toBe(format)
+      // While exporting the menu is locked, preventing a duplicate export.
+      expect(exportTrigger().disabled).toBe(true)
+      expect(exportTrigger().getAttribute('title')).toContain('Đang xuất')
+      expect(reportCalls()).toHaveLength(1)
       await act(async () => {
         finish()
       })
       await screen.findByText('Đã tải tệp báo cáo toàn bộ kết quả đã lọc.')
       download.mockRejectedValueOnce(new Error('HTTP 406'))
-      fireEvent.click(button)
+      await exportAs(format)
       await screen.findByText('HTTP 406')
+      expect(download).toHaveBeenCalledTimes(2)
     },
   )
 
@@ -257,12 +561,47 @@ describe('authoritative reports', () => {
       .mockReturnValue(new Promise(() => {}))
     const view = render(<ReportsPage />)
     apply()
-    await screen.findByText('Đại lý nguồn')
-    fireEvent.click(screen.getByText('Xuất PDF'))
+    await sourceRow()
+    await exportAs('pdf')
     const signal = download.mock.calls[0]![2]
     auth.allowedFunctions = []
     view.rerender(<ReportsPage />)
     expect(signal.aborted).toBe(true)
     expect(screen.queryByText('Đại lý nguồn')).toBeNull()
+  })
+})
+
+describe('report display helpers', () => {
+  it('formats exact strings by column kind without numeric coercion', () => {
+    expect(displayValue('salesAmount', huge)).toBe(formatVND(huge))
+    expect(displayValue('netSalesAmount', '-1500000')).toBe('-1.500.000 ₫')
+    expect(displayValue('closingStock', '1234.500')).toBe('1.234,5')
+    expect(displayValue('numberOfIssues', 1200)).toBe('1.200')
+    expect(displayValue('salesRate', '12.5')).toBe('12,5 %')
+    expect(displayValue('agencyCode', 'DL-1')).toBe('DL-1')
+    expect(displayValue('agencyName', '')).toBe('—')
+    expect(isNumeric('cashReceived')).toBe(true)
+    expect(isNumeric('productName')).toBe(false)
+  })
+
+  it('hides database ids, labels sorts and periods for people', () => {
+    expect(visibleColumns('inventory')).not.toContain('productId')
+    expect(visibleColumns('inventory')).not.toContain('unitId')
+    expect(visibleColumns('sales')[0]).toBe('agencyCode')
+    expect(sortLabel('-closingDebt')).toBe('Nợ cuối kỳ: cao đến thấp')
+    expect(sortLabel('productId')).toBe('Mặt hàng: cũ trước')
+    expect(periodLabel('2026-10-01', '2026-11-01')).toBe(
+      '01/10/2026 – 31/10/2026',
+    )
+    expect(periodLabel('2026-12-01', '2027-01-01')).toBe(
+      '01/12/2026 – 31/12/2026',
+    )
+  })
+
+  it('explains each disabled export reason and none when ready', () => {
+    expect(exportHint(false, false, false)).toContain('Xem báo cáo trước')
+    expect(exportHint(true, true, false)).toContain('Nhấn Áp dụng')
+    expect(exportHint(true, false, true)).toContain('Đang xuất')
+    expect(exportHint(true, false, false)).toBeNull()
   })
 })

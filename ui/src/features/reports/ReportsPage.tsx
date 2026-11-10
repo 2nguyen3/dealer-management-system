@@ -1,25 +1,75 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { FileBarChart2, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { PageHeader } from '../../components/blocks/PageHeader'
+import { Skeleton } from '@/components/shadcn/skeleton'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/shadcn/tabs'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
-import { FileTextIcon, TableIcon } from '../../components/ui/Icons'
-import { Select } from '../../components/ui/Select'
-import { Spinner } from '../../components/ui/Spinner'
-import { Table } from '../../components/ui/Table'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { apiFetch } from '../../lib/api'
+import { formatDateTime } from '../../lib/formatters'
 import { useAuth } from '../authentication/useAuth'
 import {
-  labels,
   parseReport,
   reportPath,
   reports,
-  rowRules,
   vietnamMonth,
   type ReportKind,
   type ReportPage,
   type ReportQuery,
 } from './contracts'
+import { exportHint, periodLabel } from './display'
 import { downloadReport, type reportMedia } from './export'
+import { ExportMenu } from './ExportMenu'
+import { defaultQuery } from './periods'
+import { ReportFilters } from './ReportFilters'
+import { ReportTable } from './ReportTable'
+import { ReportCharts, ReportKpis } from './ReportVisuals'
+
+/** Applied state of one report tab. */
+interface Applied {
+  query: ReportQuery
+  cursor: string | null
+  history: (string | null)[]
+  reload: number
+}
+
+const tabLabels: Record<ReportKind, string> = {
+  sales: 'Doanh số đại lý',
+  debt: 'Công nợ',
+  inventory: 'Xuất nhập tồn',
+  'product-sales': 'Doanh số mặt hàng',
+  'cash-and-credit': 'Thu chi & dư có',
+}
+
+const notes: Partial<Record<ReportKind, string>> = {
+  'cash-and-credit':
+    'Dư có cuối kỳ tính tại thời điểm cuối kỳ; dư có đang giữ và khả dụng là số dư hiện tại.',
+  inventory: 'Số lượng tính theo đơn vị của từng mặt hàng.',
+}
+
+function LoadingReport() {
+  return (
+    <div role="status" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Đang tải báo cáo...</span>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Skeleton className="h-72 rounded-xl" />
+        <Skeleton className="h-72 rounded-xl" />
+      </div>
+      <Skeleton className="h-64 rounded-xl" />
+    </div>
+  )
+}
 
 export function ReportsPage() {
   const { user, allowedFunctions } = useAuth()
@@ -31,21 +81,20 @@ export function ReportsPage() {
       grants.has('reports.read') &&
       grants.has(reports[kind].permission),
   )
-  const initialMonth = vietnamMonth()
-  const [draft, setDraft] = useState<ReportQuery>({
-    kind: available[0] || 'sales',
-    fromDate: `${initialMonth}-01`,
-    toDate: initialMonth.endsWith('-12')
-      ? `${Number(initialMonth.slice(0, 4)) + 1}-01-01`
-      : `${initialMonth.slice(0, 5)}${String(Number(initialMonth.slice(5)) + 1).padStart(2, '0')}-01`,
-    filters: {},
-    sort: reports[available[0] || 'sales'].sorts[0]!,
-    limit: '25',
-  })
-  const [query, setQuery] = useState<ReportQuery | null>(null)
-  const [cursor, setCursor] = useState<string | null>(null)
-  const [history, setHistory] = useState<(string | null)[]>([])
-  const [reload, setReload] = useState(0)
+  const [month] = useState(() => vietnamMonth())
+  const [active, setActive] = useState<ReportKind>(available[0] || 'sales')
+  const kind = available.includes(active) ? active : available[0] || 'sales'
+  const [drafts, setDrafts] = useState<
+    Partial<Record<ReportKind, ReportQuery>>
+  >({})
+  const [applied, setApplied] = useState<Partial<Record<ReportKind, Applied>>>(
+    {},
+  )
+  const [resets, setResets] = useState(0)
+  const draft = drafts[kind] ?? defaultQuery(kind, month)
+  const current = applied[kind] ?? null
+  const query = current?.query ?? null
+  const cursor = current?.cursor ?? null
   const [result, setResult] = useState<{
     key: string
     page: ReportPage
@@ -54,7 +103,10 @@ export function ReportsPage() {
     key: string
     message: string
   } | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<{
+    kind: ReportKind
+    message: string
+  } | null>(null)
   const [exportStatus, setExportStatus] = useState<{
     key: string
     message: string
@@ -62,11 +114,21 @@ export function ReportsPage() {
   } | null>(null)
   const exportController = useRef<AbortController | null>(null)
   const permitted = !!query && available.includes(query.kind)
-  const key = JSON.stringify([user?.id, grantKey, query, cursor, reload])
+  const key = JSON.stringify([
+    user?.id,
+    grantKey,
+    query,
+    cursor,
+    current?.reload,
+  ])
   const page = result?.key === key && permitted ? result.page : null
   const error = failure?.key === key ? failure.message : null
   const loading = !!query && permitted && !page && !error
   const dirty = JSON.stringify(draft) !== JSON.stringify(query)
+  const exporting =
+    exportStatus?.key === key && exportStatus.phase === 'loading'
+  const exportReason = exportHint(!!page, dirty, exporting)
+  const defaults = defaultQuery(kind, month)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -102,21 +164,39 @@ export function ReportsPage() {
     [key],
   )
 
-  function apply(event: FormEvent) {
-    event.preventDefault()
+  function update(next: Partial<Applied>) {
+    if (!current) return
+    setApplied({ ...applied, [kind]: { ...current, ...next } })
+  }
+
+  function apply() {
     try {
       reportPath(draft)
       if (!available.includes(draft.kind))
         throw new Error('Bạn không có quyền đọc báo cáo này.')
       exportController.current?.abort()
       setFormError(null)
-      setCursor(null)
-      setHistory([])
-      setQuery(draft)
-      setReload((n) => n + 1)
+      setApplied({
+        ...applied,
+        [kind]: {
+          query: draft,
+          cursor: null,
+          history: [],
+          reload: (current?.reload ?? 0) + 1,
+        },
+      })
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Bộ lọc không hợp lệ.')
+      setFormError({
+        kind,
+        message: err instanceof Error ? err.message : 'Bộ lọc không hợp lệ.',
+      })
     }
+  }
+
+  function reset() {
+    setDrafts({ ...drafts, [kind]: defaults })
+    setFormError(null)
+    setResets((n) => n + 1)
   }
 
   async function exportFile(format: keyof typeof reportMedia) {
@@ -150,255 +230,177 @@ export function ReportsPage() {
     }
   }
 
-  const columns = query ? Object.keys(rowRules[query.kind]) : []
-  return (
-    <div className="page-container">
-      <div className="page-header reports-header">
-        <div>
-          <h1 className="page-title">Báo cáo kinh doanh</h1>
-          <p className="page-desc">
-            Tra cứu số liệu bán hàng, công nợ, tồn kho và thu tiền theo kỳ; xuất
-            toàn bộ kết quả ra PDF hoặc XLSX.
-          </p>
+  const panel = (
+    <div className="space-y-6">
+      <ReportFilters
+        key={`${kind}-${resets}`}
+        draft={draft}
+        month={month}
+        onChange={(next) => setDrafts({ ...drafts, [kind]: next })}
+        onApply={apply}
+        onReset={reset}
+        canReset={JSON.stringify(draft) !== JSON.stringify(defaults)}
+        applyDisabled={loading && !dirty}
+      />
+      {formError?.kind === kind && (
+        <Alert type="error">{formError.message}</Alert>
+      )}
+      {exportStatus?.key === key && (
+        <Alert
+          type={
+            exportStatus.phase === 'error'
+              ? 'error'
+              : exportStatus.phase === 'success'
+                ? 'success'
+                : 'info'
+          }
+        >
+          {exportStatus.message}
+        </Alert>
+      )}
+      {!query && (
+        <div role="status">
+          <EmptyState
+            icon={<FileBarChart2 className="size-6" />}
+            title="Chưa có dữ liệu báo cáo"
+            description="Chọn bộ lọc và nhấn Áp dụng để tải dữ liệu."
+          />
         </div>
-        {!!available.length && (
-          <div className="reports-export">
+      )}
+      {loading && <LoadingReport />}
+      {error && (
+        <Alert type="error" title="Không thể tải báo cáo">
+          <span className="flex flex-wrap items-center gap-3">
+            <span>{error}</span>
             <Button
-              type="button"
-              variant="primary"
-              icon={<FileTextIcon size={16} />}
-              disabled={
-                !page ||
-                dirty ||
-                (exportStatus?.key === key && exportStatus.phase === 'loading')
-              }
-              onClick={() => void exportFile('pdf')}
+              variant="outline"
+              size="sm"
+              icon={<RefreshCw className="size-3.5" />}
+              onClick={() => update({ reload: (current?.reload ?? 0) + 1 })}
             >
-              Xuất PDF
+              Thử lại
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              icon={<TableIcon size={16} />}
-              disabled={
-                !page ||
-                dirty ||
-                (exportStatus?.key === key && exportStatus.phase === 'loading')
-              }
-              onClick={() => void exportFile('xlsx')}
-            >
-              Xuất XLSX
-            </Button>
+          </span>
+        </Alert>
+      )}
+      {page && query && (
+        <section className="space-y-6" aria-label={reports[query.kind].label}>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight">
+                {reports[query.kind].label}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Kỳ báo cáo: {periodLabel(page.fromDate, page.toDate)}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Lập lúc{' '}
+              <time dateTime={page.generatedAt}>
+                {formatDateTime(page.generatedAt)}
+              </time>
+            </p>
           </div>
-        )}
-      </div>
+          {notes[query.kind] && (
+            <p className="text-sm text-muted-foreground">{notes[query.kind]}</p>
+          )}
+          {!page.items.length ? (
+            <div role="status">
+              <EmptyState
+                title="Không có dữ liệu"
+                description="Không có dữ liệu trong kỳ và bộ lọc đã chọn."
+              />
+            </div>
+          ) : (
+            <>
+              <ReportKpis kind={query.kind} page={page} />
+              <ReportCharts kind={query.kind} page={page} />
+              <div className="space-y-3 rounded-xl border bg-card p-4 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Chi tiết</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {page.items.length} dòng trên trang
+                  </span>
+                </div>
+                <ReportTable kind={query.kind} page={page} />
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!current?.history.length}
+                    onClick={() => {
+                      const history = current?.history ?? []
+                      update({
+                        cursor: history[history.length - 1]!,
+                        history: history.slice(0, -1),
+                      })
+                    }}
+                  >
+                    Trang trước
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!page.pagination.hasMore}
+                    onClick={() =>
+                      update({
+                        history: [...(current?.history ?? []), cursor],
+                        cursor: page.pagination.nextCursor,
+                      })
+                    }
+                  >
+                    Trang tiếp
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Phân tích"
+        title="Báo cáo kinh doanh"
+        description="Xem doanh số, công nợ, tồn kho và thu tiền theo kỳ; xuất toàn bộ kết quả ra PDF hoặc Excel."
+        actions={
+          available.length ? (
+            <ExportMenu
+              reason={exportReason}
+              onExport={(format) => void exportFile(format)}
+            />
+          ) : undefined
+        }
+      />
       {!available.length ? (
         <Alert type="info">
-          Bạn không có quyền xem báo cáo. Cần reports.read và quyền đọc nghiệp
-          vụ tương ứng.
+          Bạn không có quyền xem báo cáo. Liên hệ quản trị viên để được cấp
+          quyền.
         </Alert>
       ) : (
-        <>
-          <form className="card reports-filter" onSubmit={apply}>
-            <div className="form-grid reports-grid">
-              <Select
-                id="report-kind"
-                label="Loại báo cáo"
-                value={draft.kind}
-                onChange={(e) => {
-                  const kind = e.target.value as ReportKind
-                  setDraft({
-                    ...draft,
-                    kind,
-                    filters: {},
-                    sort: reports[kind].sorts[0]!,
-                  })
-                }}
-                options={available.map((kind) => ({
-                  value: kind,
-                  label: reports[kind].label,
-                }))}
-              />
-              <Input
-                id="report-from"
-                label="Từ ngày"
-                type="date"
-                required
-                value={draft.fromDate}
-                onChange={(e) =>
-                  setDraft({ ...draft, fromDate: e.target.value })
-                }
-              />
-              <Input
-                id="report-to"
-                label="Đến ngày (không gồm)"
-                type="date"
-                required
-                value={draft.toDate}
-                onChange={(e) => setDraft({ ...draft, toDate: e.target.value })}
-              />
-              {reports[draft.kind].filters.map((filter) => (
-                <Input
-                  key={filter}
-                  id={`report-${filter}`}
-                  label={labels[filter]}
-                  inputMode="numeric"
-                  value={draft.filters[filter] || ''}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      filters: { ...draft.filters, [filter]: e.target.value },
-                    })
-                  }
-                />
+        <Tabs
+          value={kind}
+          onValueChange={(value) => setActive(value as ReportKind)}
+          className="gap-4"
+        >
+          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <TabsList aria-label="Loại báo cáo">
+              {available.map((item) => (
+                <TabsTrigger key={item} value={item} className="px-3">
+                  {tabLabels[item]}
+                </TabsTrigger>
               ))}
-              <Select
-                id="report-sort"
-                label="Sắp xếp"
-                value={draft.sort}
-                onChange={(e) => setDraft({ ...draft, sort: e.target.value })}
-                options={reports[draft.kind].sorts.map((sort) => ({
-                  value: sort,
-                  label: `${sort.startsWith('-') ? 'Giảm: ' : 'Tăng: '}${labels[sort.replace(/^-/, '')]}`,
-                }))}
-              />
-              <Input
-                id="report-limit"
-                label="Số dòng mỗi trang (1-100)"
-                type="number"
-                min="1"
-                max="100"
-                value={draft.limit}
-                onChange={(e) => setDraft({ ...draft, limit: e.target.value })}
-              />
-            </div>
-            <div className="reports-actions">
-              <Button
-                type="submit"
-                disabled={loading && !dirty}
-              >
-                Xem báo cáo
-              </Button>
-            </div>
-          </form>
-          {formError && <Alert type="error">{formError}</Alert>}
-          {exportStatus?.key === key && (
-            <Alert type={exportStatus.phase === 'error' ? 'error' : 'info'}>
-              {exportStatus.message}
-            </Alert>
-          )}
-          {!query && (
-            <p role="status">
-              Chọn báo cáo và nhấn Xem báo cáo để tải dữ liệu.
-            </p>
-          )}
-          {query && !permitted && (
-            <Alert type="error">
-              Quyền đọc báo cáo đã thay đổi. Chọn lại báo cáo được cấp quyền.
-            </Alert>
-          )}
-          {loading && <Spinner label="Đang tải báo cáo..." />}
-          {error && (
-            <Alert type="error">
-              {error}{' '}
-              <Button variant="outline" onClick={() => setReload((n) => n + 1)}>
-                Thử lại
-              </Button>
-            </Alert>
-          )}
-          {page && query && (
-            <section
-              className="card reports-result"
-              aria-label={reports[query.kind].label}
-            >
-              <h2>{reports[query.kind].label}</h2>
-              <p>
-                Kỳ [{page.fromDate}, {page.toDate})
-              </p>
-              <p className="text-muted">
-                Máy chủ tạo lúc:{' '}
-                <time dateTime={page.generatedAt}>{page.generatedAt}</time>
-              </p>
-              {query.kind === 'cash-and-credit' && (
-                <p>
-                  Dư có cuối kỳ là lịch sử tại cuối kỳ; phần đang dành và khả
-                  dụng là số dư hiện tại. Tiền xác minh chưa ghi phiếu thu được
-                  trình bày riêng.
-                </p>
-              )}
-              {query.kind === 'inventory' && (
-                <p>
-                  Số lượng theo từng đơn vị mặt hàng; không cộng tổng khác đơn
-                  vị.
-                </p>
-              )}
-              {!page.items.length ? (
-                <p role="status">
-                  Không có dữ liệu trong kỳ và bộ lọc đã chọn.
-                </p>
-              ) : (
-                <Table caption={reports[query.kind].label}>
-                  <thead>
-                    <tr>
-                      {columns.map((col) => (
-                        <th scope="col" key={col}>
-                          {labels[col]}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {page.items.map((row) => (
-                      <tr key={String(row.agencyId ?? row.productId)}>
-                        {columns.map((col) => (
-                          <td key={col}>
-                            {row[col]}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              )}
-              <div className="page-actions">
-                <span>{page.items.length} dòng trên trang</span>
-                <Button
-                  variant="outline"
-                  disabled={!history.length}
-                  onClick={() => {
-                    setCursor(history[history.length - 1]!)
-                    setHistory(history.slice(0, -1))
-                  }}
-                >
-                  Trang trước
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!page.pagination.hasMore}
-                  onClick={() => {
-                    setHistory([...history, cursor])
-                    setCursor(page.pagination.nextCursor)
-                  }}
-                >
-                  Trang tiếp
-                </Button>
-              </div>
-              {page.totals && (
-                <section aria-label="Tổng toàn bộ kết quả đã lọc">
-                  <h3>Tổng toàn bộ kết quả đã lọc</h3>
-                  <dl className="form-grid">
-                    {Object.entries(page.totals).map(([name, value]) => (
-                      <div key={name}>
-                        <dt>{labels[name]}</dt>
-                        <dd>{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              )}
-            </section>
-          )}
-        </>
+            </TabsList>
+          </div>
+          {available.map((item) => (
+            <TabsContent key={item} value={item}>
+              {item === kind && panel}
+            </TabsContent>
+          ))}
+        </Tabs>
       )}
     </div>
   )
