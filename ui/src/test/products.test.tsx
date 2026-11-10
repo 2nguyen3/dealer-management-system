@@ -132,6 +132,15 @@ describe('ProductsPage Component', () => {
 
     expect(screen.getByText('SP-201')).toBeDefined()
     expect(screen.getByText('SP-202')).toBeDefined()
+    expect(screen.getByText('85.000 ₫').className).toContain('cell-number')
+    expect(screen.getByText('70.000 ₫')).toBeDefined()
+    expect(
+      screen.getAllByText('Đang hoạt động', { selector: '[data-status]' }),
+    ).toHaveLength(2)
+    expect(screen.queryByText('ACTIVE')).toBeNull()
+    expect(screen.queryByLabelText(/ID đơn vị/)).toBeNull()
+    const unit = screen.getByLabelText('Đơn vị tính', { selector: 'select' })
+    expect(unit.tagName).toBe('SELECT')
   })
 
   it('filters product list by search keyword', async () => {

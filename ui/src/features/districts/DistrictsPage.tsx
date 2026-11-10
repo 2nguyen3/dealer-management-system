@@ -4,6 +4,7 @@ import { master } from './masterContracts'
 const config: MasterConfig = {
   path: '/districts',
   title: 'Danh sách quận',
+  description: 'Quận và số đại lý còn có thể tiếp nhận trong từng quận.',
   manage: 'district.manage',
   decode: master,
   statuses: ['ACTIVE', 'INACTIVE'],
@@ -15,10 +16,10 @@ const config: MasterConfig = {
   columns: [
     ['code', 'Mã'],
     ['name', 'Tên quận'],
-    ['activeAgencyCount', 'Đại lý hoạt động'],
-    ['maxAgencies', 'Sức chứa'],
-    ['remainingSlots', 'Chỗ còn lại'],
-    ['status', 'Trạng thái'],
+    ['activeAgencyCount', 'Đại lý hoạt động', 'count'],
+    ['maxAgencies', 'Tối đa', 'count'],
+    ['remainingSlots', 'Còn nhận', 'count'],
+    ['status', 'Trạng thái', 'status'],
   ],
 }
 export function DistrictsPage() {

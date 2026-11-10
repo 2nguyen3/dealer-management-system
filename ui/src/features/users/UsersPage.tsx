@@ -4,16 +4,22 @@ import { user } from '../districts/masterContracts'
 const config: MasterConfig = {
   path: '/users',
   title: 'Quản lý tài khoản',
+  description: 'Tạo tài khoản, gán nhóm quyền, khóa và đặt lại mật khẩu.',
   manage: 'users.manage',
   decode: user,
   noDelete: true,
   passwordReset: true,
   statuses: ['ACTIVE', 'LOCKED'],
-  filters: [['groupId', 'ID nhóm']],
+  filters: [['groupId', 'Nhóm người dùng', { picker: 'user-groups' }]],
   fields: [
     { key: 'fullName', label: 'Họ tên' },
     { key: 'email', label: 'Email', type: 'email' },
-    { key: 'groupId', label: 'ID nhóm', type: 'catalog' },
+    {
+      key: 'groupId',
+      label: 'Nhóm người dùng',
+      type: 'catalog',
+      lookup: { picker: 'user-groups' },
+    },
     { key: 'password', label: 'Mật khẩu', type: 'password', createOnly: true },
     {
       key: 'status',
@@ -26,7 +32,7 @@ const config: MasterConfig = {
     ['fullName', 'Họ tên'],
     ['email', 'Email'],
     ['groupName', 'Nhóm'],
-    ['status', 'Trạng thái'],
+    ['status', 'Trạng thái', 'status'],
   ],
 }
 export function UsersPage() {
