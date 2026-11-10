@@ -1,5 +1,22 @@
 # M26 tests
 
+## Vercel staging transport and recovery register - 2026-11-09
+
+- `dependencies.payment_client_ip`: `tests/online_payments/test_vercel_transport.py`
+  covers direct client addresses, Vercel-only single overwritten forwarding header,
+  IPv4/IPv6, non-Vercel spoofing, malformed/duplicate/list/scoped-IP headers and safe
+  local fallbacks. Checkout assertions exercise actual authenticated service composition.
+- Changed `adapter_for/get_online_payment_service/get_webhook_service` and
+  `vnpay_router.vnpay_return`: retained native HTTP tests plus the new transport
+  cases cover signed customer IP and encoded same-origin Return handoff. Return
+  remains read-only; invalid signatures never complete money.
+- `deploy_vercel_env.main`: `tests/test_vercel.py` covers core/native selection,
+  optional explicit overwrite, secret stdin/non-disclosure, callback replacement
+  without local mutation, missing/conflicting credentials and check-only behavior.
+- Native missing-checkout reconciliation adds real isolated-PostgreSQL witnesses in
+  `tests/integration/online_payments/test_vnpay_recovery.py`; deployed provider
+  acceptance is recorded separately from synthetic callback and setup regressions.
+
 ## Native actual-symbol register — implemented 2026-10-25
 
 | Actual symbols | Success/failure/boundary evidence |

@@ -1,15 +1,31 @@
+import {
+  BadgeCheck,
+  FileCheck2,
+  PencilLine,
+  RefreshCw,
+  Undo2,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Alert } from '../../components/ui/Alert'
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
-import { Pagination } from '../../components/ui/Pagination'
-import { Select } from '../../components/ui/Select'
-import { Table } from '../../components/ui/Table'
-import { apiFetch } from '../../lib/api'
-import { invalidateCache } from '../../lib/cache'
-import { formatVND } from '../../lib/formatters'
+import { DateField } from '@/components/blocks/DateField'
+import { PageHeader } from '@/components/blocks/PageHeader'
+import { Skeleton } from '@/components/shadcn/skeleton'
+import { Alert } from '@/components/ui/Alert'
+import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { EntityPicker } from '@/components/ui/EntityPicker'
+import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
+import { Pagination } from '@/components/ui/Pagination'
+import { Select } from '@/components/ui/Select'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { Table } from '@/components/ui/Table'
+import { apiFetch } from '@/lib/api'
+import { invalidateCache } from '@/lib/cache'
+import { formatDateTime, formatVND } from '@/lib/formatters'
+import { enumOptions, methodLabel, statusLabel } from '@/lib/labels'
 import { useAuth } from '../authentication/useAuth'
 import {
+  dateRangeParams,
   decimal,
   id,
   Intent,
@@ -17,9 +33,27 @@ import {
   positiveMoney,
   record,
   text,
+  vietnamInstant,
   type Row,
 } from '../payment_receipts/contracts'
+import { DetailList } from '../payment_receipts/DetailList'
+import {
+  ActionBar,
+  ConfirmDialog,
+  DetailHeader,
+  FilterBar,
+  FormActions,
+  TableCard,
+  TableSkeleton,
+} from '../payment_receipts/financeUi'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
+import { readyIssue, type ReadyIssue } from './readyIssue'
+
+const UPFRONT_STATES = ['VERIFIED', 'CONSUMED', 'RECEIVED_SEPARATELY'] as const
+
+function dateTime(value: unknown): string {
+  return typeof value === 'string' && value ? formatDateTime(value) : '—'
+}
 
 function confirmation(value: unknown): Row {
   const data = record(value)
@@ -34,23 +68,66 @@ function confirmation(value: unknown): Row {
   return data
 }
 
+/** Loads the picked stock issue and derives the READY revision to verify. */
+function useReadyIssue(issueId: string) {
+  const [state, setState] = useState<{
+    issue: string
+    data?: ReadyIssue
+    error?: string
+  }>({ issue: '' })
+  useEffect(() => {
+    if (!issueId) return
+    const controller = new AbortController()
+    let current = true
+    apiFetch<unknown>(`/stock-issues/${id(issueId)}`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        const data = readyIssue(response.data)
+        if (current) setState({ issue: issueId, data })
+      })
+      .catch((failure: unknown) => {
+        if (current) setState({ issue: issueId, error: message(failure) })
+      })
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [issueId])
+  if (!issueId) return undefined
+  return state.issue === issueId ? state : { issue: issueId }
+}
+
 export function UpfrontPaymentsPage() {
   const { hasPermission } = useAuth()
   const canVerify = hasPermission('cash.upfront.verify')
   const canSeparate = hasPermission('cash.receipt.post')
   const [state, setState] = useState('')
   const [issueFilter, setIssueFilter] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const range = dateRangeParams(
+    fromDate,
+    toDate,
+    ['createdFrom', 'createdTo'],
+    true,
+  )
   const list = useSourcePage(
     '/upfront-confirmations',
-    { state, issueDocumentId: issueFilter },
+    { state, issueDocumentId: issueFilter, ...range.params },
     confirmation,
   )
-  const [revisionId, setRevisionId] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
+  const [issueId, setIssueId] = useState('')
+  const [manual, setManual] = useState(false)
+  const [manualRevision, setManualRevision] = useState('')
   const [amount, setAmount] = useState('')
+  const [autoAmount, setAutoAmount] = useState(true)
   const [method, setMethod] = useState('CASH')
   const [receivedAt, setReceivedAt] = useState('')
   const [evidence, setEvidence] = useState('')
   const [reason, setReason] = useState('')
+  const [confirmSeparate, setConfirmSeparate] = useState(false)
   const [selected, setSelected] = useState('')
   const [detail, setDetail] = useState<{
     item: Row
@@ -60,6 +137,19 @@ export function UpfrontPaymentsPage() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const intent = useRef(new Intent())
+  const picked = useReadyIssue(manual ? '' : issueId)
+  const pickedIssue = picked?.data
+  const revisionId = manual
+    ? manualRevision
+    : pickedIssue?.problem
+      ? ''
+      : (pickedIssue?.revisionId ?? '')
+  // Until the user edits the amount, it follows the picked issue's upfront part.
+  const effectiveAmount =
+    autoAmount && !manual && pickedIssue && !pickedIssue.problem
+      ? pickedIssue.immediatePayment
+      : amount
+
   useEffect(() => {
     if (!selected) return
     const controller = new AbortController()
@@ -79,34 +169,44 @@ export function UpfrontPaymentsPage() {
       controller.abort()
     }
   }, [selected])
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (busy || !canVerify) return
     setError('')
     try {
-      const body = {
-        issueRevisionId: id(revisionId),
-        amount: positiveMoney(amount),
-        method,
-        receivedAt,
-        evidenceReference: evidence.trim(),
-      }
-      if (
-        !/T.*(Z|[+-]\d\d:\d\d)$/.test(receivedAt) ||
-        Number.isNaN(Date.parse(receivedAt)) ||
-        !evidence.trim()
-      )
+      if (!revisionId)
+        throw new Error(
+          manual
+            ? 'Vui lòng nhập mã phiên bản phiếu xuất.'
+            : 'Vui lòng chọn phiếu xuất đang ở trạng thái Sẵn sàng.',
+        )
+      if (!evidence.trim())
         throw new Error(
           'Cần thời điểm thực nhận có múi giờ và tham chiếu bằng chứng.',
         )
+      const body = {
+        issueRevisionId: id(revisionId),
+        amount: positiveMoney(effectiveAmount),
+        method,
+        receivedAt: vietnamInstant(receivedAt),
+        evidenceReference: evidence.trim(),
+      }
       setBusy(true)
       await intent.current.send('/upfront-confirmations', {
         method: 'POST',
         body,
       })
       setNotice(
-        'Đã xác minh tiền thực nhận. VERIFIED chưa phải phiếu thu đã ghi sổ.',
+        'Đã xác minh khoản tiền. Phiếu thu sẽ được lập khi phiếu xuất được ghi sổ.',
       )
+      setFormOpen(false)
+      setIssueId('')
+      setManualRevision('')
+      setAmount('')
+      setAutoAmount(true)
+      setReceivedAt('')
+      setEvidence('')
       invalidateCache('/upfront-confirmations')
       list.reload()
     } catch (failure) {
@@ -136,7 +236,7 @@ export function UpfrontPaymentsPage() {
         },
       )
       setNotice(
-        'Đã ghi nhận tiền riêng. Không đồng nghĩa phiếu xuất đã ghi sổ.',
+        'Đã lập phiếu thu riêng cho khoản tiền này. Trạng thái phiếu xuất không thay đổi.',
       )
       setDetail(null)
       setSelected('')
@@ -153,140 +253,358 @@ export function UpfrontPaymentsPage() {
       setError(message(failure))
     } finally {
       setBusy(false)
+      setConfirmSeparate(false)
     }
   }
+  const item = detail?.item
   return (
-    <div className="page-container">
-      <h1 className="page-title">Xác nhận thanh toán trả ngay</h1>
-      <p>
-        Tiền gắn với đúng revision READY. VERIFIED chưa phải phiếu thu; xuất kho
-        thất bại không làm mất tiền đã nhận.
-      </p>
+    <div className="page-container space-y-6">
+      <PageHeader
+        eyebrow="Tài chính"
+        title="Xác nhận thanh toán trả ngay"
+        description="Ghi nhận tiền đại lý trả ngay khi xuất hàng. Khoản tiền đã xác minh được chuyển thành phiếu thu khi phiếu xuất được ghi sổ, và không bị mất nếu việc xuất kho không thành công."
+        className="mb-0"
+        actions={
+          canVerify && (
+            <Button
+              icon={<BadgeCheck className="size-4" />}
+              onClick={() => {
+                setError('')
+                setFormOpen(true)
+              }}
+            >
+              Ghi nhận tiền thực nhận
+            </Button>
+          )
+        }
+      />
       {error && <Alert type="error">{error}</Alert>}
       {notice && <Alert type="info">{notice}</Alert>}
-      {list.error && <Alert type="error">{list.error}</Alert>}
-      <div className="filter-bar">
-        <Input
-          label="ID phiếu xuất"
+      <FilterBar>
+        <EntityPicker
+          resource="stock-issues"
+          label="Phiếu xuất"
           value={issueFilter}
-          onChange={(event) => setIssueFilter(event.target.value)}
+          onChange={(value) => setIssueFilter(value)}
+          placeholder="Tất cả phiếu xuất"
         />
         <Select
           label="Trạng thái"
           value={state}
           onChange={(event) => setState(event.target.value)}
-          options={['', 'VERIFIED', 'CONSUMED', 'RECEIVED_SEPARATELY'].map(
-            (value) => ({ value, label: value || 'Tất cả' }),
-          )}
+          options={enumOptions(UPFRONT_STATES, statusLabel, 'Tất cả')}
         />
-      </div>
-      <Table caption="Các khoản thực nhận">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Phiếu xuất / Revision</th>
-            <th>Số tiền</th>
-            <th>Trạng thái</th>
-            <th>Phiếu thu</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.items.map((item) => (
-            <tr key={String(item.id)}>
-              <td>{String(item.id)}</td>
-              <td>
-                #{String(item.issueDocumentId)} / #
-                {String(item.issueRevisionId)}
-              </td>
-              <td>{formatVND(String(item.amount))}</td>
-              <td>{String(item.state)}</td>
-              <td>{String(item.receiptDocumentId ?? '-')}</td>
-              <td>
-                <Button
-                  onClick={() => {
-                    setDetail(null)
-                    setSelected(String(item.id))
-                  }}
-                >
-                  Chi tiết
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <Pagination
-        hasNext={list.hasMore}
-        hasPrevious={list.hasPrevious}
-        onNext={list.next}
-        onPrevious={list.previous}
-        isLoading={list.loading}
-      />
+        <DateField
+          label="Xác minh từ ngày"
+          value={fromDate}
+          onChange={setFromDate}
+          max={toDate || undefined}
+        />
+        <DateField
+          label="Đến ngày"
+          value={toDate}
+          onChange={setToDate}
+          min={fromDate || undefined}
+          error={range.error || undefined}
+        />
+        <Button
+          variant="outline"
+          icon={<RefreshCw className="size-4" />}
+          onClick={list.reload}
+        >
+          Tải lại
+        </Button>
+      </FilterBar>
+      {list.error && <Alert type="error">{list.error}</Alert>}
+      <TableCard
+        title="Các khoản thực nhận"
+        description="Mới xác minh nhất trước."
+      >
+        {list.loading ? (
+          <TableSkeleton label="Đang tải khoản thực nhận..." />
+        ) : !list.error && !list.items.length ? (
+          <div className="p-4">
+            <EmptyState title="Chưa có khoản thực nhận phù hợp." />
+          </div>
+        ) : (
+          <Table caption="Danh sách khoản thực nhận">
+            <thead>
+              <tr>
+                <th scope="col">Thời điểm nhận</th>
+                <th scope="col">Phiếu xuất</th>
+                <th scope="col">Hình thức</th>
+                <th scope="col" className="cell-number">
+                  Số tiền
+                </th>
+                <th scope="col">Trạng thái</th>
+                <th scope="col">Phiếu thu</th>
+                <th scope="col" className="cell-actions">
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.items.map((row) => (
+                <tr key={String(row.id)}>
+                  <td className="tabular-nums">{dateTime(row.receivedAt)}</td>
+                  <td>
+                    <span className="font-medium">
+                      #{String(row.issueDocumentId)}
+                    </span>
+                    <div className="text-xs text-muted-foreground">
+                      Phiên bản #{String(row.issueRevisionId)}
+                    </div>
+                  </td>
+                  <td>{methodLabel(row.method)}</td>
+                  <td className="cell-number font-medium">
+                    {formatVND(String(row.amount))}
+                  </td>
+                  <td>
+                    <StatusBadge status={String(row.state)} />
+                  </td>
+                  <td>
+                    {row.receiptDocumentId
+                      ? `#${String(row.receiptDocumentId)}`
+                      : '—'}
+                  </td>
+                  <td className="cell-actions">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Chi tiết khoản thực nhận phiếu xuất #${String(row.issueDocumentId)}`}
+                      onClick={() => {
+                        setDetail(null)
+                        setReason('')
+                        setSelected(String(row.id))
+                      }}
+                    >
+                      Chi tiết
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        <Pagination
+          hasNext={list.hasMore}
+          hasPrevious={list.hasPrevious}
+          onNext={list.next}
+          onPrevious={list.previous}
+          isLoading={list.loading}
+          totalShowing={list.loading ? undefined : list.items.length}
+        />
+      </TableCard>
       {canVerify && (
-        <form onSubmit={submit} className="card">
-          <h2>Ghi nhận bằng chứng thực nhận</h2>
-          <Input
-            label="ID revision phiếu xuất READY"
-            value={revisionId}
-            onChange={(event) => setRevisionId(event.target.value)}
-            required
-          />
-          <Input
-            label="Số tiền (VND nguyên)"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            required
-          />
-          <Select
-            label="Phương thức"
-            value={method}
-            onChange={(event) => setMethod(event.target.value)}
-            options={['CASH', 'BANK_TRANSFER'].map((value) => ({
-              value,
-              label: value,
-            }))}
-          />
-          <Input
-            label="Thời điểm thực nhận (ISO có múi giờ)"
-            value={receivedAt}
-            onChange={(event) => setReceivedAt(event.target.value)}
-            required
-          />
-          <Input
-            label="Tham chiếu bằng chứng"
-            value={evidence}
-            onChange={(event) => setEvidence(event.target.value)}
-            required
-          />
-          <Button type="submit" isLoading={busy}>
-            Xác minh tiền thực nhận
-          </Button>
-        </form>
-      )}
-      {detail && (
-        <section className="card">
-          <h2>Xác nhận #{String(detail.item.id)}</h2>
-          <p>
-            {String(detail.item.state)}. Bằng chứng:{' '}
-            {String(detail.item.evidenceReference ?? '-')}
-          </p>
-          {canSeparate && detail.item.state === 'VERIFIED' && (
-            <>
+        <Modal
+          isOpen={formOpen}
+          onClose={() => setFormOpen(false)}
+          title="Ghi nhận tiền thực nhận"
+          maxWidth="lg"
+        >
+          <form onSubmit={submit} className="space-y-4">
+            {error && <Alert type="error">{error}</Alert>}
+            {!manual ? (
+              <div className="space-y-3">
+                <EntityPicker
+                  resource="stock-issues"
+                  label="Chọn phiếu xuất chờ ghi sổ"
+                  value={issueId}
+                  onChange={(value) => {
+                    setIssueId(value)
+                    setAutoAmount(true)
+                  }}
+                  params={{ status: 'PENDING' }}
+                  placeholder="Tìm theo số phiếu hoặc đại lý"
+                  required
+                />
+                {picked && !pickedIssue && !picked.error && (
+                  <Skeleton className="h-16 w-full" />
+                )}
+                {picked?.error && <Alert type="error">{picked.error}</Alert>}
+                {pickedIssue && <IssueSummary issue={pickedIssue} />}
+              </div>
+            ) : (
               <Input
-                label="Lý do ghi nhận tiền riêng"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
+                label="Mã phiên bản phiếu xuất (Sẵn sàng)"
+                helperText="Số mã phiên bản của phiếu xuất đang ở trạng thái Sẵn sàng, xem trong chi tiết phiếu xuất."
+                inputMode="numeric"
+                value={manualRevision}
+                onChange={(event) => setManualRevision(event.target.value)}
+                required
               />
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              icon={<PencilLine className="size-4" />}
+              onClick={() => setManual((value) => !value)}
+            >
+              {manual
+                ? 'Chọn từ danh sách phiếu xuất'
+                : 'Nhập mã phiên bản thủ công'}
+            </Button>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Số tiền (VND nguyên)"
+                inputMode="numeric"
+                className="text-right tabular-nums"
+                value={effectiveAmount}
+                onChange={(event) => {
+                  setAutoAmount(false)
+                  setAmount(event.target.value)
+                }}
+                helperText="Phải bằng khoản trả ngay của phiếu xuất."
+                required
+              />
+              <Select
+                label="Phương thức"
+                value={method}
+                onChange={(event) => setMethod(event.target.value)}
+                options={enumOptions(['CASH', 'BANK_TRANSFER'], methodLabel)}
+              />
+              <Input
+                label="Thời điểm thực nhận"
+                type="datetime-local"
+                helperText="Giờ Việt Nam (GMT+7)"
+                value={receivedAt}
+                onChange={(event) => setReceivedAt(event.target.value)}
+                required
+              />
+              <Input
+                label="Tham chiếu bằng chứng"
+                placeholder="Số biên lai, mã chuyển khoản…"
+                value={evidence}
+                onChange={(event) => setEvidence(event.target.value)}
+                required
+              />
+            </div>
+            <FormActions>
               <Button
-                disabled={busy || !detail.etag || !reason.trim()}
-                onClick={separate}
+                type="button"
+                variant="outline"
+                onClick={() => setFormOpen(false)}
               >
-                Ghi nhận tiền riêng
+                Đóng
               </Button>
-            </>
-          )}
-        </section>
+              <Button type="submit" isLoading={busy}>
+                Xác minh tiền thực nhận
+              </Button>
+            </FormActions>
+          </form>
+        </Modal>
+      )}
+      <Modal
+        isOpen={!!selected}
+        onClose={() => {
+          setSelected('')
+          setDetail(null)
+        }}
+        title="Chi tiết khoản thực nhận"
+        maxWidth="lg"
+      >
+        {!item ? (
+          <div role="status" className="space-y-3">
+            <span className="sr-only">Đang tải chi tiết...</span>
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <DetailHeader
+              icon={<FileCheck2 />}
+              code={`Phiếu xuất #${String(item.issueDocumentId)}`}
+              badge={<StatusBadge status={String(item.state)} />}
+              amount={formatVND(String(item.amount))}
+              amountLabel="Số tiền thực nhận"
+              meta={`Phiên bản #${String(item.issueRevisionId)}`}
+              tone={item.state === 'VERIFIED' ? 'neutral' : 'success'}
+            />
+            <DetailList
+              entries={[
+                ['Hình thức', methodLabel(item.method)],
+                ['Thời điểm nhận', dateTime(item.receivedAt)],
+                ['Xác minh lúc', dateTime(item.verifiedAt)],
+                [
+                  'Phiếu thu',
+                  item.receiptDocumentId
+                    ? `#${String(item.receiptDocumentId)}`
+                    : 'Chưa có',
+                ],
+                [
+                  'Bằng chứng',
+                  typeof item.evidenceReference === 'string'
+                    ? item.evidenceReference
+                    : '—',
+                ],
+              ]}
+            />
+            {canSeparate && item.state === 'VERIFIED' && (
+              <ActionBar>
+                <Button
+                  variant="outline"
+                  icon={<Undo2 className="size-4" />}
+                  disabled={busy || !detail?.etag}
+                  onClick={() => setConfirmSeparate(true)}
+                >
+                  Ghi nhận tiền riêng
+                </Button>
+              </ActionBar>
+            )}
+          </div>
+        )}
+      </Modal>
+      <ConfirmDialog
+        isOpen={confirmSeparate}
+        onClose={() => setConfirmSeparate(false)}
+        title="Ghi nhận tiền riêng"
+        description="Lập phiếu thu riêng cho khoản tiền này thay vì dùng cho phiếu xuất. Trạng thái phiếu xuất không thay đổi."
+        confirmLabel="Ghi nhận tiền riêng"
+        busy={busy}
+        disabled={busy || !detail?.etag || !reason.trim()}
+        onConfirm={() => void separate()}
+      >
+        <Input
+          label="Lý do ghi nhận tiền riêng"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          required
+        />
+      </ConfirmDialog>
+    </div>
+  )
+}
+
+function IssueSummary({ issue }: { issue: ReadyIssue }) {
+  return (
+    <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-semibold">
+            {issue.code}
+            {issue.agencyName ? ` · ${issue.agencyName}` : ''}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Phiên bản {issue.revisionNo} ({statusLabel(issue.revisionState)}) ·
+            mã #{issue.revisionId}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">Khoản trả ngay</p>
+          <p className="font-semibold tabular-nums">
+            {formatVND(issue.immediatePayment)}
+          </p>
+        </div>
+      </div>
+      {issue.problem ? (
+        <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+          {issue.problem}
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sẽ xác minh cho phiên bản này; số tiền được điền theo khoản trả ngay.
+        </p>
       )}
     </div>
   )

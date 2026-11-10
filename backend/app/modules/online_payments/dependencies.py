@@ -1,3 +1,6 @@
+import os
+from ipaddress import ip_address
+
 from fastapi import Request
 
 from app.common.catalogue_http import (
@@ -12,9 +15,27 @@ from app.modules.online_payments.service import OnlinePaymentService
 from app.modules.online_payments.vnpay import VnpayAdapter
 
 
-def adapter_for(settings):
+def payment_client_ip(request: Request) -> str:
+    candidates = []
+    # Vercel overwrites X-Forwarded-For at ingress; local/Docker callers are not trusted.
+    if os.environ.get("VERCEL") == "1":
+        forwarded = request.headers.getlist("x-forwarded-for")
+        if len(forwarded) == 1:
+            candidates.append(forwarded[0])
+    if request.client:
+        candidates.append(request.client.host)
+    for candidate in candidates:
+        try:
+            if "%" not in candidate:
+                return str(ip_address(candidate.strip()))
+        except ValueError:
+            pass
+    return "127.0.0.1"
+
+
+def adapter_for(settings, *, ip_address="127.0.0.1"):
     if not settings.payment_provider:
-        return VnpayAdapter(settings) if settings.vnpay_tmn_code else None
+        return VnpayAdapter(settings, ip_address=ip_address) if settings.vnpay_tmn_code else None
     return SandboxAdapter(
         settings.payment_base_url,
         settings.payment_credential,
@@ -41,7 +62,7 @@ def get_online_payment_service(
         request.state.request_id,
         base.authorize,
         settings,
-        adapter_for(settings),
+        adapter_for(settings, ip_address=payment_client_ip(request)),
     )
 
 
@@ -54,5 +75,5 @@ def get_webhook_service(request: Request, session: SessionDependency):
         request.state.request_id,
         lambda _: None,
         settings,
-        adapter_for(settings),
+        adapter_for(settings, ip_address=payment_client_ip(request)),
     )

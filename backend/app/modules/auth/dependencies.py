@@ -16,7 +16,13 @@ bearer = HTTPBearer(auto_error=False, scheme_name="BearerAuth", bearerFormat="JW
 def get_auth_service(
     request: Request, session: Annotated[Session, Depends(get_session)]
 ) -> AuthService:
-    return AuthService(session, request.app.state.settings, request.app.state.reset_delivery)
+    # One read-only request gets one authentication/permission snapshot; writers stay live.
+    return AuthService(
+        session,
+        request.app.state.settings,
+        request.app.state.reset_delivery,
+        memoize=request.method in ("GET", "HEAD"),
+    )
 
 
 def get_current_principal(

@@ -4,6 +4,7 @@ import { master } from '../districts/masterContracts'
 const config: MasterConfig = {
   path: '/units',
   title: 'Đơn vị tính',
+  description: 'Đơn vị dùng cho mặt hàng và cho phép nhập số lẻ hay không.',
   manage: 'unit.manage',
   decode: master,
   statuses: ['ACTIVE', 'INACTIVE'],
@@ -15,10 +16,10 @@ const config: MasterConfig = {
   ],
   columns: [
     ['code', 'Mã'],
-    ['name', 'Tên'],
-    ['allowsFraction', 'Cho phép số lẻ'],
-    ['productCount', 'Số mặt hàng'],
-    ['status', 'Trạng thái'],
+    ['name', 'Tên đơn vị'],
+    ['allowsFraction', 'Cho phép số lẻ', 'boolean'],
+    ['productCount', 'Số mặt hàng', 'count'],
+    ['status', 'Trạng thái', 'status'],
   ],
 }
 export function UnitsPage() {

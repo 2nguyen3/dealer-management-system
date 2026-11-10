@@ -63,7 +63,7 @@ class DashboardService:
             )
             with connection.begin(), Session(bind=connection) as session:
                 as_of = session.scalar(text("SELECT clock_timestamp()"))
-                auth = AuthService(session, self.settings, self.delivery)
+                auth = AuthService(session, self.settings, self.delivery, memoize=True)
                 principal = auth.authenticate(token)
                 allowed = frozenset(auth.get_current_user(principal).allowedFunctions)
                 if not allowed.intersection(ADMISSION):

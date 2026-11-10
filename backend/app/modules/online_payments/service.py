@@ -489,6 +489,25 @@ class OnlinePaymentService:
             return self.finish_reconcile(command_id, result)
         if self.adapter is None or row["provider"] != provider_for(self.settings):
             raise ApiError(503, "PROVIDER_UNAVAILABLE", "Payment provider unavailable")
+        if (
+            isinstance(self.adapter, VnpayAdapter)
+            and row["status"] == "PENDING"
+            and row["checkoutUrl"] is None
+        ):
+            command = self.session.scalar(
+                select(ApiCommand).where(
+                    ApiCommand.operation_id == "createOnlinePayment",
+                    ApiCommand.result["body"]["id"].astext == str(identifier),
+                )
+            )
+            setup_command_id = None if command is None else command.id
+            self.session.rollback()
+            if setup_command_id is not None:
+                # Native setup only signs locally; an unopened checkout has no
+                # provider transaction to query yet. Keep reconciliation recoverable.
+                self.setup(identifier, setup_command_id, report_errors=True)
+                result = self.project(self.repo.get(identifier))
+                return self.finish_reconcile(command_id, result)
         evidence = bind_adapter(self.adapter, row).query_payment(row["merchantReference"])
         if evidence.merchantReference != row["merchantReference"]:
             raise ApiError(502, "INVALID_PROVIDER_RESPONSE", "Provider reference differs")

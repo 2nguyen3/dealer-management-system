@@ -1,23 +1,27 @@
+import { ArrowLeft, Mail, MailCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { MailIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { apiFetch } from '../../lib/api'
+import { AuthLayout } from './AuthLayout'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
+    setEmailError(null)
 
     if (!email) {
-      setErrorMessage('Vui lòng nhập địa chỉ email.')
+      setEmailError('Vui lòng nhập địa chỉ email.')
       return
     }
 
@@ -50,71 +54,64 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-header">
-          <div className="auth-brand">
-            <span className="brand-wordmark">Agentra</span>
-            <span className="brand-subtitle">Hệ thống Quản lý Đại lý</span>
+    <AuthLayout
+      title="Quên mật khẩu"
+      description="Nhập email tài khoản để nhận liên kết đặt lại mật khẩu"
+    >
+      {isSubmitted ? (
+        <div className="space-y-5">
+          <div className="flex justify-center" aria-hidden="true">
+            <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <MailCheck className="size-6" />
+            </span>
           </div>
-          <h1 className="auth-title">Quên mật khẩu</h1>
-          <p className="auth-desc">
-            Nhập email tài khoản để nhận liên kết đặt lại mật khẩu
-          </p>
-        </div>
-
-        {errorMessage && (
-          <Alert type="error" className="auth-alert">
-            {errorMessage}
+          <Alert type="success" title="Đã ghi nhận yêu cầu">
+            Nếu địa chỉ email tồn tại trên hệ thống, hướng dẫn đặt lại mật khẩu
+            đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra hộp thư đến.
           </Alert>
-        )}
-
-        {isSubmitted ? (
-          <div className="auth-success-box">
-            <Alert type="success" title="Đã ghi nhận yêu cầu">
-              Nếu địa chỉ email tồn tại trên hệ thống, hướng dẫn đặt lại mật
-              khẩu đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra hộp thư
-              đến.
-            </Alert>
-            <div className="auth-actions-centered">
-              <Link to="/login" className="btn btn--primary">
-                Quay lại Đăng nhập
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="auth-form" noValidate>
-            <Input
-              id="reset-email"
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              autoComplete="email"
-              required
-              autoFocus
-            />
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="auth-submit-btn"
-              isLoading={isLoading}
-              icon={<MailIcon size={18} />}
+          <ShadcnButton asChild size="lg" className="w-full">
+            <Link to="/login">Quay lại Đăng nhập</Link>
+          </ShadcnButton>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {errorMessage && <Alert type="error">{errorMessage}</Alert>}
+          <Input
+            id="reset-email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setEmailError(null)
+            }}
+            placeholder="name@company.com"
+            autoComplete="email"
+            error={emailError ?? undefined}
+            required
+            autoFocus
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            isLoading={isLoading}
+            icon={<Mail className="size-4" />}
+          >
+            Gửi yêu cầu đặt lại
+          </Button>
+          <div className="text-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              Gửi yêu cầu đặt lại
-            </Button>
-
-            <div className="auth-footer-link">
-              <Link to="/login" className="back-link">
-                ← Quay lại Đăng nhập
-              </Link>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Quay lại Đăng nhập
+            </Link>
+          </div>
+        </form>
+      )}
+    </AuthLayout>
   )
 }

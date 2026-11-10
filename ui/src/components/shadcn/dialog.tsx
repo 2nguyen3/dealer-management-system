@@ -1,11 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { XIcon } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 
-import { Button } from './button'
+import { Button } from '@/components/shadcn/button'
 
 function Dialog({
   ...props

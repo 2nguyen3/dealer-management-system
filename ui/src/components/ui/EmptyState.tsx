@@ -1,5 +1,5 @@
+import { Inbox } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { PackageIcon } from './Icons'
 
 export interface EmptyStateProps {
   icon?: ReactNode
@@ -9,19 +9,24 @@ export interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = <PackageIcon size={40} />,
+  icon = <Inbox className="size-6" />,
   title,
   description,
   action,
 }: EmptyStateProps) {
   return (
-    <div className="empty-state">
-      <div className="empty-state-icon" aria-hidden="true">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-card/50 px-6 py-12 text-center">
+      <div
+        className="mb-1 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground"
+        aria-hidden="true"
+      >
         {icon}
       </div>
-      <h3 className="empty-state-title">{title}</h3>
-      {description && <p className="empty-state-desc">{description}</p>}
-      {action && <div className="empty-state-action">{action}</div>}
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {description && (
+        <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      )}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   )
 }

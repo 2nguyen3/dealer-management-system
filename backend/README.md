@@ -51,6 +51,12 @@ is distinct from historical period closing credit. Exports have safe attachment,
 no-store/nosniff/Vary/request-ID/CORS headers and finish before any200response.
 One response uses one statement snapshot; separate JSON page requests do not freeze
 the dataset. Materialization/rendering uses O(full-result) memory with no hidden cap.
+PDF exports start with a KPI band and two top-10 bar charts before the exact table;
+XLSX exports append an active `Tổng quan` sheet (KPI cells plus native bar charts)
+after the unchanged Metadata/Rows/Totals sheets. Both carry the Agentra logo, a
+Vietnamese headline, the inclusive period (dd/MM/yyyy; API `toDate` is exclusive) and
+section headings; PDF pages 2+ have a running header and a "Trang X/Y" footer. Logo
+files are in `app/modules/reports/assets/` and are listed in `vercel.json` `includeFiles`.
 
 ## Native VNPAY and M26–M28 publication — 2026-10-25
 

@@ -1,5 +1,38 @@
 # M30 Reports Verification
 
+## Export Branding - 2026-11-11
+
+Logo/headline/headings added to PDF and XLSX exports (see DESIGN). Run from `backend/`:
+`uv run ruff check .`/`uv run ruff format --check .` pass; `uv run --frozen --no-sync
+pytest tests/reports --cov=app.modules.reports --cov-branch`: 245 passed, all eight
+reports files exact 100% (exporting.py 525 statements/140 branches); full offline
+`uv run --frozen --no-sync pytest -q`: **1182 passed, 644 deselected**. Samples were
+rasterized with poppler and inspected (page 1 and a running-header page); a scratch
+copy of the word-box/raster-margin geometry check passed for all samples. Integration
+report asserts now check totals as key plus exact value (not run: need PostgreSQL).
+The integration geometry node's `len(pages) >= 15` remains stale (fixture now 9 pages).
+
+## Export Visual Summary - 2026-11-11
+
+PDF exports add a KPI band and two ReportLab bar charts per report before the exact
+table; XLSX exports append an active `Tổng quan` sheet (banded KPI cells, two native
+bar charts over a numeric chart-data block). Metadata/Rows/Totals sheets and exact
+text cells are unchanged; no formulas are written. Run from `backend/`:
+
+- `uv run ruff check .` and `uv run ruff format --check .`: pass.
+- `uv run --frozen --no-sync pytest tests/reports -q --cov=app.modules.reports.exporting
+  --cov-branch --cov-report=term-missing`: exporting.py 444 statements/134 branches
+  exact 100% (new `tests/reports/test_export_visuals.py`: 43 cases).
+- `uv run --frozen --no-sync pytest -q`: **1171 passed, 644 deselected**.
+- Rendered samples for all five kinds plus empty data were rasterized with poppler
+  `pdftoppm` and inspected; a scratch copy of the pdftotext word-box non-overlap and
+  raster-margin checks passed for those samples and the 105-row cash fixture.
+- Not rerun: the integration `tests/reports/test_pdf_geometry.py` node. Its
+  `len(pages) >= 15` assertion no longer holds for the fixture before or after this
+  change (HEAD renderer 11 pages, current 12 pages), and the Git-bundled xpdf
+  `pdftotext` lacks `-bbox-layout` (poppler from MiKTeX works). Integration/PG,
+  deployment and browser checks were not run; nothing was rebuilt or deployed.
+
 ## Pre-Push Review Fixes - 2026-10-30
 
 Resource and rendered-PDF tests now share a pytest-temporary artifact fixture;

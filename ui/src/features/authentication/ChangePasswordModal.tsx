@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { EyeIcon, EyeOffIcon } from '../../components/ui/Icons'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { apiFetch } from '../../lib/api'
+import { PasswordToggle } from './PasswordToggle'
 import { useAuth } from './useAuth'
 
 export interface ChangePasswordModalProps {
@@ -103,7 +103,7 @@ export function ChangePasswordModal({
           nhập...
         </Alert>
       ) : (
-        <form onSubmit={handleSubmit} className="modal-form" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           {errorMessage && <Alert type="error">{errorMessage}</Alert>}
 
           <Input
@@ -116,14 +116,10 @@ export function ChangePasswordModal({
             required
             autoFocus
             endAdornment={
-              <button
-                type="button"
-                className="password-toggle-btn"
-                onClick={() => setShowCurrent((p) => !p)}
-                aria-label={showCurrent ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-              >
-                {showCurrent ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-              </button>
+              <PasswordToggle
+                visible={showCurrent}
+                onToggle={() => setShowCurrent((p) => !p)}
+              />
             }
           />
 
@@ -136,14 +132,10 @@ export function ChangePasswordModal({
             autoComplete="new-password"
             required
             endAdornment={
-              <button
-                type="button"
-                className="password-toggle-btn"
-                onClick={() => setShowNew((p) => !p)}
-                aria-label={showNew ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-              >
-                {showNew ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-              </button>
+              <PasswordToggle
+                visible={showNew}
+                onToggle={() => setShowNew((p) => !p)}
+              />
             }
           />
 
@@ -157,7 +149,7 @@ export function ChangePasswordModal({
             required
           />
 
-          <div className="modal-actions">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button
               type="button"
               variant="outline"

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -106,9 +112,20 @@ describe('CreditApplicationsPage Component', () => {
       expect(screen.getByText('BT-601')).toBeDefined()
       expect(screen.getByText('BT-602')).toBeDefined()
       expect(screen.getByText('Đại lý Minh Phát')).toBeDefined()
-      expect(screen.getAllByText('POSTED').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('DRAFT').length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText('Đã ghi sổ', { ignore: 'option' }).length,
+      ).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText('Nháp', { ignore: 'option' }).length,
+      ).toBeGreaterThan(0)
     })
+    expect(screen.queryByText('POSTED')).toBeNull()
+    expect(screen.queryByRole('columnheader', { name: 'Hình thức' })).toBeNull()
+    const row = screen.getByText('BT-601').closest('tr')!
+    expect(within(row).getByText('06/10/2026')).toBeDefined()
+    expect(within(row).getByText('200.000 ₫').className).toContain(
+      'cell-number',
+    )
   })
 
   it('filters applications by search query and reloads', async () => {
@@ -158,9 +175,19 @@ describe('CreditApplicationsPage Component', () => {
     const createBtn = screen.getByRole('button', { name: 'Lập phiếu bù trừ' })
     fireEvent.click(createBtn)
 
-    expect(
-      screen.getByLabelText(/ID đại lý/i, { selector: 'input' }),
-    ).toBeDefined()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByLabelText(/ID đại lý/i)).toBeNull()
+    const agency = within(dialog).getByRole('combobox', { name: /Đại lý/ })
+    expect(agency.getAttribute('aria-required')).toBe('true')
+    fireEvent.focus(agency)
+    await waitFor(() =>
+      expect(apiModule.apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/agencies\?limit=20/),
+        expect.anything(),
+      ),
+    )
+    expect(within(dialog).queryByLabelText('Phương thức')).toBeNull()
+
     expect(
       screen.getByLabelText(/Số tiền \(VND nguyên\)/i, { selector: 'input' }),
     ).toBeDefined()

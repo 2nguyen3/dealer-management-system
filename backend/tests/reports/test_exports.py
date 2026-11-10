@@ -170,12 +170,14 @@ def test_every_report_all_rows_exact_values_and_security_headers(kind, media):
         assert source["rows"][-1][identity] in text
         assert source["rows"][0]["salesAmount"] in text.replace("\n", "")
         assert source["totals"]["salesAmount"] in text.replace("\n", "")
-        assert "2026-02-01T01:00:00+00:00" in text
-        assert "Filter agencyId" in text
-        assert "historical period" in text
+        # Readable Vietnamese header: exclusive toDate shown as the previous day, UTC+7.
+        assert "Kỳ báo cáo: 01/01/2026 – 31/01/2026" in text
+        assert "Lập lúc 08:00 01/02/2026 (giờ Việt Nam)" in text
+        assert "Bộ lọc: Đại lý (ID) = 9223372036854775807" in text
+        assert "Tín dụng đầu kỳ/cuối kỳ tính theo kỳ báo cáo" in text
         assert sum(source["columns"][0][1] in page for page in texts) > 1
         for index, page in enumerate(reader.pages, 1):
-            assert f"Page {index}" in page.extract_text()
+            assert f"Agentra · Trang {index}/{len(texts)}" in page.extract_text()
             assert float(page.mediabox.width) == pytest.approx(landscape(A4)[0], abs=0.001)
 
 
@@ -186,10 +188,14 @@ def test_empty_inventory_without_totals_is_valid(media):
     content, _, _ = exports.render_report(source, media)
     if media == XLSX:
         sheets = workbook_rows(content)
-        assert len(sheets) == 2
+        # Metadata, Rows and the appended visual summary sheet.
+        assert len(sheets) == 3
         assert len(sheets[1]) == 1
+        assert ("s", exports.EMPTY_NOTE) in [cell for row in sheets[2] for cell in row]
     else:
-        assert "Full-filter totals" not in PdfReader(BytesIO(content)).pages[0].extract_text()
+        text = PdfReader(BytesIO(content)).pages[0].extract_text()
+        assert "Tổng cộng" not in text
+        assert text.count(exports.EMPTY_NOTE) == 2
 
 
 def test_xlsx_injection_and_exact_numeric_policy_without_apostrophes():
@@ -245,7 +251,8 @@ def test_xlsx_long_text_continuations_sheet_rollover_and_reconstruction(monkeypa
     source["totals"] = {"salesAmount": "9" * 33000}
     content = exports.render_xlsx(source)
     sheets = workbook_rows(content)
-    row_sheets = [sheet for sheet in sheets if sheet[0][2][1] == "Agency ID"]
+    tables = [sheet for sheet in sheets if len(sheet[0]) > 2]
+    row_sheets = [sheet for sheet in tables if sheet[0][2][1] == "Agency ID"]
     physical = [row for sheet in row_sheets for row in sheet[1:]]
     assert len(row_sheets) >= 2
     first = [row for row in physical if row[0][1] == source["rows"][0]["agencyId"]]
@@ -255,7 +262,7 @@ def test_xlsx_long_text_continuations_sheet_rollover_and_reconstruction(monkeypa
     assert all(row[3][1].count("\n") <= 250 for row in first)
     assert all(row[5] == ("s", "") for row in first[1:])
     assert {row[0][1] for row in physical} == {row["agencyId"] for row in source["rows"]}
-    total_sheets = [sheet for sheet in sheets if sheet[0][2][1] == "salesAmount"]
+    total_sheets = [sheet for sheet in tables if sheet[0][2][1] == "salesAmount"]
     assert "".join(row[2][1] for sheet in total_sheets for row in sheet[1:]) == "9" * 33000
 
 
@@ -340,10 +347,24 @@ def test_exact_scalar_formatting_and_float_rejection():
 
 
 def test_landscape_footer_uses_actual_page_width_and_restores_canvas():
+    canvas = Mock(_pagesize=landscape(A4))
+    canvas.getPageNumber.return_value = 7
+    exports.page_footer(canvas, "Báo cáo", 9)
+    canvas.drawRightString.assert_called_once_with(landscape(A4)[0] - 36, 20, "Agentra · Trang 7/9")
+    canvas.drawString.assert_called_once_with(36, 20, "Báo cáo")
+    canvas.saveState.assert_called_once()
+    canvas.restoreState.assert_called_once()
+
+
+def test_running_header_draws_icon_and_clipped_title_inside_top_margin():
     canvas = Mock()
-    document = Mock(pagesize=landscape(A4), rightMargin=36, page=7)
-    exports.report_page_footer(canvas, document)
-    canvas.drawRightString.assert_called_once_with(landscape(A4)[0] - 36, 20, "Page 7")
+    document = Mock(pagesize=landscape(A4), leftMargin=36, rightMargin=36)
+    exports.running_header(canvas, document, "T" * 300)
+    image, x, y, width, height = canvas.drawImage.call_args.args
+    assert image == str(exports.ICON_PATH) and (x, width, height) == (36, 13, 13)
+    assert y + height <= landscape(A4)[1] - 20
+    text = canvas.drawString.call_args.args[2]
+    assert text.startswith("Agentra · T") and text.endswith("…") and len(text) == 110
     canvas.saveState.assert_called_once()
     canvas.restoreState.assert_called_once()
 

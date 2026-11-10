@@ -1,4 +1,4 @@
-import { apiFetch, type RequestOptions } from '../../lib/api'
+import { ApiError, apiFetch, type RequestOptions } from '../../lib/api'
 
 export type Row = Record<string, unknown>
 export interface Page<T> {
@@ -143,12 +143,17 @@ export class Intent {
   private pending = new Map<string, { fingerprint: string; key: string }>()
   private busy = false
 
-  async send<T>(path: string, options: RequestOptions = {}, keyed = true) {
+  async send<T>(
+    path: string,
+    options: RequestOptions & { retainAccepted?: boolean } = {},
+    keyed = true,
+  ) {
+    const { retainAccepted = false, ...requestOptions } = options
     if (this.busy) throw new Error('Một yêu cầu đang được xử lý.')
     const fingerprint = JSON.stringify([
-      options.method,
-      options.body,
-      options.ifMatch,
+      requestOptions.method,
+      requestOptions.body,
+      requestOptions.ifMatch,
     ])
     const previous = this.pending.get(path)
     if (previous && !keyed)
@@ -165,15 +170,20 @@ export class Intent {
     this.busy = true
     try {
       const result = await apiFetch<T>(path, {
-        ...options,
+        ...requestOptions,
         ...(keyed ? { idempotencyKey: intent.key } : {}),
       })
-      this.pending.delete(path)
+      if (!(retainAccepted && result.status === 202)) this.pending.delete(path)
       return result
     } catch (error) {
-      // Explicit client rejections did not commit; network/5xx responses remain uncertain.
+      // Unknown command outcomes may have committed, even when transported as 409.
       const status = recordErrorStatus(error)
-      if (status >= 400 && status < 500 && status !== 408)
+      if (
+        status >= 400 &&
+        status < 500 &&
+        status !== 408 &&
+        !(error instanceof ApiError && error.code === 'COMMAND_OUTCOME_UNKNOWN')
+      )
         this.pending.delete(path)
       throw error
     } finally {
@@ -248,4 +258,50 @@ export function documentSummary(value: unknown): Row {
   businessDate(data.businessDate)
   decimal(data.totalAmount)
   return data
+}
+
+/** The calendar day after a `YYYY-MM-DD` business date (exclusive upper bound). */
+export function nextDay(value: string): string {
+  const date = new Date(`${businessDate(value)}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+/**
+ * Inclusive date-range filter → API params. The upper bound is sent as the
+ * exclusive next day; an inverted range is reported and not sent.
+ */
+export function dateRangeParams(
+  from: string,
+  to: string,
+  keys: [string, string] = ['fromDate', 'toDate'],
+  instant = false,
+): { params: Record<string, string>; error: string } {
+  if (from && to && from > to)
+    return {
+      params: {},
+      error: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.',
+    }
+  const bound = (date: string) => (instant ? `${date}T00:00:00+07:00` : date)
+  return {
+    params: {
+      [keys[0]]: from ? bound(from) : '',
+      [keys[1]]: to ? bound(nextDay(to)) : '',
+    },
+    error: '',
+  }
+}
+
+/**
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm[:ss]`, Vietnam wall time) as an
+ * ISO instant with the +07:00 offset. Throws for incomplete values.
+ */
+export function vietnamInstant(local: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local)
+  if (!match) throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+  const [, day, hour, minute, second = '00'] = match
+  businessDate(day)
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59)
+    throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+  return `${day}T${hour}:${minute}:${second}+07:00`
 }

@@ -22,6 +22,7 @@ from app.modules.auth.tokens import (
     encode_access_token,
     generate_opaque_token,
 )
+from app.modules.user_groups.models import UserGroup
 from app.modules.users.models import AppUser
 
 
@@ -52,6 +53,7 @@ class AuthService:
         clock: Callable[[], datetime] = utc_now,
         monotonic: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
+        memoize: bool = False,
     ) -> None:
         self.session = session
         self.settings = settings
@@ -60,6 +62,15 @@ class AuthService:
         self.monotonic = monotonic
         self.sleeper = sleeper
         self.repo = AuthRepository(session)
+        # Read-only requests may reuse one successful authentication/permission snapshot.
+        # Writers keep memoize=False so callbacks inside their transactions stay live.
+        self.memoize = memoize
+        self._authenticated: dict[tuple, tuple[Principal, tuple[AppUser, UserGroup]]] = {}
+        self._current_users: dict[tuple, CurrentUser] = {}
+
+    @staticmethod
+    def _claims_key(claims: dict) -> tuple:
+        return (claims["jti"], claims["sub"], claims["sid"], claims["ver"], claims["exp"])
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -155,7 +166,13 @@ class AuthService:
                         self.repo.revoke_session(owner, token.session_id, self.clock())
 
     def authenticate_claims(self, claims: dict, *, lock: bool = False) -> Principal:
+        memo = self.memoize and not lock
+        if memo and (hit := self._authenticated.get(self._claims_key(claims))) is not None:
+            if self.clock().timestamp() >= claims["exp"]:
+                raise AuthError(401, "INVALID_OR_EXPIRED_TOKEN", "Invalid or expired token")
+            return hit[0]
         user_id, sid = int(claims["sub"]), UUID(claims["sid"])
+        pair = None
         if lock:
             user = self.repo.lock_user(user_id)
         else:
@@ -169,20 +186,32 @@ class AuthService:
         self.validate_token(user, token, now)
         if claims["ver"] != user.auth_version or now.timestamp() >= claims["exp"]:
             raise AuthError(401, "INVALID_OR_EXPIRED_TOKEN", "Invalid or expired token")
-        return Principal(user_id, sid, claims["ver"], claims)
+        principal = Principal(user_id, sid, claims["ver"], claims)
+        if memo and pair is not None:
+            self._authenticated[self._claims_key(claims)] = (principal, pair)
+        return principal
 
     def authenticate(self, raw: str) -> Principal:
         return self.authenticate_claims(decode_access_token(self.settings, raw, self.clock()))
 
     def get_current_user(self, principal: Principal) -> CurrentUser:
+        key = self._claims_key(principal.claims) if self.memoize else None
+        if key is not None and key in self._current_users:
+            self.authenticate_claims(principal.claims)
+            return self._current_users[key].model_copy(deep=True)
         self.authenticate_claims(principal.claims)
-        pair = self.repo.get_user_with_group(principal.user_id)
+        cached = self._authenticated.get(key) if key is not None else None
+        pair = cached[1] if cached is not None else self.repo.get_user_with_group(principal.user_id)
         if pair is None:
             raise AuthError(401, "INVALID_OR_EXPIRED_TOKEN", "Invalid or expired token")
-        return CurrentUser(
+        current = CurrentUser(
             user=to_user_response(*pair),
             allowedFunctions=self.repo.get_allowed_function_codes(pair[0].group_id),
         )
+        if key is not None:
+            self._current_users[key] = current
+            return current.model_copy(deep=True)
+        return current
 
     def change_password(
         self, principal: Principal, current: str, new: str, request_id: str

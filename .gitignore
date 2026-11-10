@@ -17,6 +17,7 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .idea/
+.vercel/
 
 # Host bind-mounted Docker runtime data and request buffers.
 /data/

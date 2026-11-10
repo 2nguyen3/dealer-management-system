@@ -4,6 +4,7 @@ import { master } from '../districts/masterContracts'
 const config: MasterConfig = {
   path: '/user-groups',
   title: 'Nhóm người dùng',
+  description: 'Các nhóm tài khoản dùng để phân quyền chức năng.',
   manage: 'groups.manage',
   deletePermission: 'permissions.manage',
   decode: master,
@@ -14,7 +15,7 @@ const config: MasterConfig = {
   columns: [
     ['code', 'Mã nhóm'],
     ['name', 'Tên nhóm'],
-    ['userCount', 'Số người dùng'],
+    ['userCount', 'Số người dùng', 'count'],
   ],
 }
 export function UserGroupsPage() {

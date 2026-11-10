@@ -2,6 +2,7 @@
 
 from html import escape
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -61,11 +62,14 @@ def vnpay_return(request: Request):
             status_code=503 if error.status == 503 else 400,
             headers=HEADERS,
         )
+    workbench = "/online-payments?" + urlencode({"merchantReference": reference})
     return HTMLResponse(
         "<!doctype html><html lang='vi'><head><meta charset='utf-8'>"
         "<title>Kết quả VNPAY</title></head><body><h1>Đã trở về từ VNPAY</h1>"
         f"<p>Mã tham chiếu: {escape(reference)}</p>"
         "<p>Vui lòng kiểm tra trạng thái thanh toán trong Agentra. "
-        "Kết quả được ghi nhận qua IPN hoặc đối soát từ máy chủ.</p></body></html>",
+        "Kết quả được ghi nhận qua IPN hoặc đối soát từ máy chủ.</p>"
+        f'<p><a href="{escape(workbench, quote=True)}">Agentra: thanh toán / payment status</a></p>'
+        "</body></html>",
         headers=HEADERS,
     )

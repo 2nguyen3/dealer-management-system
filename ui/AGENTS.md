@@ -29,16 +29,17 @@ Business screens, business HTTP endpoints and frontend authentication are future
 | UI               | React 19 and React DOM 19; function components and built-in hooks.                          |
 | Language         | TypeScript 5.9 with strict checking; ECMAScript modules.                                    |
 | Build/dev server | Vite 7 with `@vitejs/plugin-react` 5.                                                       |
-| Styling          | Plain global CSS in `src/styles.css`; no CSS framework or component library is installed.   |
+| Styling/UI       | Tailwind CSS v4 + shadcn/ui (Radix) in `src/components/shadcn/`; lucide icons; tokens in `src/styles.css`. |
+| Charts           | Recharts 3 via shadcn `chart`; palette/formatters in `src/lib/chart.ts`.                    |
+| Routing/tests    | React Router; Vitest + Testing Library (no jest-dom matchers).                              |
 | HTTP             | Browser `fetch`, `AbortController`, and `AbortSignal`; no API client library is installed.  |
 | Quality          | ESLint 9, typescript-eslint, React Hooks/Refresh rules, and Prettier 3.                     |
 | Backend          | Python 3.12, FastAPI, Pydantic Settings, synchronous SQLAlchemy 2, psycopg 3, and Alembic.  |
-| Database         | Supabase-hosted PostgreSQL, accessed by the backend.                                        |
+| Database         | Neon PostgreSQL (Singapore), accessed only by the backend.                                  |
 | Deployment       | Docker Compose and unprivileged Nginx 1.28 serving static assets.                           |
 
-There is currently no client-side router, global state library, frontend test
-runner, or end-to-end test framework configured. Exact dependency resolutions
-are recorded in the lockfiles.
+There is no global state library or end-to-end test framework configured. Exact
+dependency resolutions are recorded in the lockfiles.
 
 ## Repository structure
 
@@ -148,14 +149,18 @@ URL does not change that link. Account for this when using a separate API host.
 
 ## Styling and accessibility
 
-The current UI uses plain CSS with a light background, dark text, muted secondary
-text, and green/red connection indicators. The root font stack prefers Inter and
-then system fonts; no font file or web-font import is currently provided.
+Screens use shadcn/ui primitives and Tailwind utilities. App-level wrappers in
+`src/components/ui/` (Button, Badge, Alert, Modal, Input, Select, Table,
+Pagination, EntityPicker, StatusBadge…) keep stable APIs/test markers; page-level
+blocks live in `src/components/blocks/` (PageHeader, KpiCard with delta+sparkline,
+ChartCard with chart⇄table toggle, DateField showing dd/MM/yyyy while keeping ISO
+business dates). The shell is the shadcn Sidebar (`src/app/ShellLayout.tsx`).
 
-The layout has a centered `1080px` maximum-width main area, a `320px` minimum body
-width, fluid heading/section sizes using `clamp()`, and visible keyboard link focus.
-Many selectors target HTML elements globally, so consider their effect on all
-screens when adding styles.
+Charts follow the validated categorical palette `--chart-1..8` in fixed entity
+order (never cycled or rank-coloured), single-hue magnitude, no dual axes, a legend
+for two or more series, tooltips and a table view. Legacy global CSS still in
+`src/styles.css` is unlayered and overrides Tailwind utilities; prefer removing it
+over adding new global selectors.
 
 Preserve semantic HTML, heading relationships, readable status text, effect cleanup,
 and keyboard focus visibility when extending the interface. Keep new layouts usable

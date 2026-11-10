@@ -22,9 +22,20 @@ const config: MasterConfig = {
   columns: [
     ['code', 'Mã'],
     ['name', 'Tên quận'],
-    ['activeAgencyCount', 'Đại lý hoạt động'],
-    ['status', 'Trạng thái'],
+    ['activeAgencyCount', 'Đại lý hoạt động', 'count'],
+    ['status', 'Trạng thái', 'status'],
   ],
+}
+
+function listResponse(items: unknown[]) {
+  return {
+    data: {
+      items,
+      pagination: { limit: 25, nextCursor: null, hasMore: false },
+    },
+    etag: null,
+    status: 200,
+  }
 }
 
 const district = {
@@ -59,7 +70,7 @@ describe('MasterPage', () => {
 
     expect(await screen.findByText('Đại lý hoạt động')).toBeDefined()
     expect(
-      screen.getAllByRole('option', { name: 'Hoạt động' }).length,
+      screen.getAllByRole('option', { name: 'Đang hoạt động' }).length,
     ).toBeGreaterThan(0)
     expect(screen.getAllByText('Quận 1')).toHaveLength(1)
     const save = screen.getByRole('button', { name: 'Lưu thay đổi' })
@@ -145,5 +156,102 @@ describe('MasterPage', () => {
     expect(
       fetch.mock.calls.filter(([path]) => String(path).includes('q=')),
     ).toHaveLength(1)
+  })
+
+  it('formats money, quantities, booleans and statuses instead of raw values', async () => {
+    const formatted: MasterConfig = {
+      ...config,
+      path: '/products',
+      columns: [
+        ['code', 'Mã hàng'],
+        ['currentStock', 'Tồn', 'quantity'],
+        ['currentSellingPrice', 'Giá bán', 'money'],
+        ['allowsFraction', 'Số lẻ', 'boolean'],
+        ['status', 'Trạng thái', 'status'],
+      ],
+    }
+    vi.spyOn(api, 'apiFetch').mockResolvedValue(
+      listResponse([
+        {
+          id: 7,
+          code: 'SP-7',
+          name: 'Bút',
+          currentStock: '1500.250',
+          currentSellingPrice: '12345678901234567890',
+          allowsFraction: true,
+          status: 'INACTIVE',
+        },
+      ]),
+    )
+    render(<MasterPage config={formatted} />)
+    const price = await screen.findByText('12.345.678.901.234.567.890 ₫')
+    expect(price.className).toContain('cell-number')
+    expect(screen.getByText('1.500,25').className).toContain('cell-number')
+    expect(screen.getByText('Có')).toBeDefined()
+    const badge = screen.getByText('Ngừng hoạt động')
+    expect(badge.getAttribute('data-status')).toBe('INACTIVE')
+    expect(screen.queryByText('INACTIVE')).toBeNull()
+    expect(
+      screen.getByRole('columnheader', { name: 'Giá bán' }).className,
+    ).toContain('cell-number')
+  })
+
+  it('chooses catalogue references by name and filters without raw IDs', async () => {
+    const products: MasterConfig = {
+      ...config,
+      path: '/products',
+      statuses: undefined,
+      filters: [
+        ['unitId', 'Đơn vị tính', { options: '/units' }],
+        ['isLowStock', 'Tồn kho', { boolean: ['Dưới ngưỡng', 'Đủ hàng'] }],
+        ['groupId', 'Nhóm người dùng', { picker: 'user-groups' }],
+      ],
+      fields: [
+        {
+          key: 'unitId',
+          label: 'Đơn vị',
+          type: 'catalog',
+          lookup: { options: '/units' },
+        },
+      ],
+    }
+    const fetch = vi.spyOn(api, 'apiFetch').mockImplementation(async (path) => {
+      if (path.startsWith('/units'))
+        return listResponse([
+          { id: 1, code: 'CAI', name: 'Cái' },
+          { id: 2, code: 'HOP', name: 'Hộp' },
+        ])
+      if (path.startsWith('/user-groups'))
+        return listResponse([{ id: 4, code: 'KHO', name: 'Quản lý kho' }])
+      return listResponse([])
+    })
+    render(<MasterPage config={products} />)
+    const unit = screen.getByLabelText('Đơn vị tính') as HTMLSelectElement
+    await screen.findAllByRole('option', { name: 'HOP — Hộp' })
+    expect(fetch).toHaveBeenCalledWith('/units?limit=100', expect.any(Object))
+    fireEvent.change(unit, { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Tồn kho'), {
+      target: { value: 'true' },
+    })
+    const group = screen.getByRole('combobox', { name: 'Nhóm người dùng' })
+    fireEvent.focus(group)
+    fireEvent.click(await screen.findByText('KHO — Quản lý kho'))
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\/products\?(?=.*unitId=2)(?=.*isLowStock=true)(?=.*groupId=4)/,
+        ),
+        expect.any(Object),
+      )
+    })
+    expect(screen.queryByLabelText(/ID/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm mới' }))
+    const field = (await screen.findByLabelText(/^Đơn vị/, {
+      selector: '#master-field-unitId',
+    })) as HTMLSelectElement
+    expect(field.tagName).toBe('SELECT')
+    expect(
+      Array.from(field.options).map((option) => option.textContent),
+    ).toContain('CAI — Cái')
   })
 })

@@ -25,8 +25,15 @@ describe('Authentication Components', () => {
         </BrowserRouter>,
       )
 
-      expect(screen.getByText('Agentra')).toBeDefined()
-      expect(screen.getByText('Hệ thống Quản lý Đại lý')).toBeDefined()
+      const logos = screen.getAllByAltText('Agentra')
+      expect(logos).toHaveLength(2)
+      expect(logos.map((logo) => logo.getAttribute('src'))).toEqual([
+        '/assets/brand/agentra-dark.png',
+        '/assets/brand/agentra-dark.png',
+      ])
+      expect(
+        screen.getByTitle(/nhà máy sản xuất, xe giao hàng và đại lý/),
+      ).toBeDefined()
       expect(
         screen.getByLabelText(/Email/i, { selector: 'input' }),
       ).toBeDefined()

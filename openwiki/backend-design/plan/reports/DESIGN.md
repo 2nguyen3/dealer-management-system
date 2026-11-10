@@ -28,6 +28,23 @@ and publication pass. Historical inspection findings are retained for traceabili
   and nonzero historical/period/current components for cash-credit. Grouping is by ID.
   Real population/current-label fixtures pass, including 101+ matched identities.
 - RD06 uses the already locked XlsxWriter dependency. This worker changes no locks.
+- 2026-11-11 visual summary: PDF adds a KPI band (exact grouped totals or inventory
+  row counts) and two ReportLab horizontal bar charts (top 10 by the main measure in
+  one hue; a two-measure comparison with legend) between the header and the table.
+  XLSX appends an active `Tổng quan` sheet after Metadata/Rows/Totals (existing sheet
+  positions unchanged) with banded KPI cells and two native bar charts over a numeric
+  chart-data block on that sheet; data sheets stay exact text. Reports have no time
+  dimension, so no trend chart. Empty data shows `Không có dữ liệu`; chart labels are
+  truncated, full values stay in the tables. Palette #2a78d6/#eb6834, grid #e1e0d9,
+  axis text #898781; no formulas are written.
+- 2026-11-11 branding: PDF page 1 opens with the Agentra logo, brand line, headline
+  (Vietnamese report title), period sub-headline (API `toDate` is exclusive, so the
+  last included day is shown, dd/MM/yyyy), filters and generation time in UTC+7.
+  Section headings: Chỉ số chính, Biểu đồ, Chi tiết số liệu, Tổng cộng, Ghi chú.
+  Later pages carry a running header (icon + title); every footer reads
+  "Agentra · Trang X/Y". The XLSX summary sheet embeds the logo, headline,
+  sub-headlines and section heading rows. Logos live in `app/modules/reports/assets/`
+  (Docker copies `app/`; `vercel.json` `includeFiles` lists them with the font).
 
 The historical decision table below explains the original choices; its OPEN/future
 wording describes preparation, not the current source. VERIFICATION is authoritative

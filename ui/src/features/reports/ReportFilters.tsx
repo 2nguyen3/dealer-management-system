@@ -1,0 +1,168 @@
+import { RotateCcw, SlidersHorizontal } from 'lucide-react'
+import type { FormEvent } from 'react'
+import { DateField } from '../../components/blocks/DateField'
+import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group'
+import { Button } from '../../components/ui/Button'
+import { EntityPicker } from '../../components/ui/EntityPicker'
+import { Select } from '../../components/ui/Select'
+import { CatalogSelect } from '../districts/CatalogSelect'
+import { reports, type ReportQuery } from './contracts'
+import { filterLabels, sortLabel } from './display'
+import {
+  matchingPreset,
+  periodPresets,
+  presetPeriod,
+  shiftDate,
+  type PeriodPreset,
+} from './periods'
+
+const pickerResource = {
+  agencyId: 'agencies',
+  typeId: 'agency-types',
+  productId: 'products',
+} as const
+const limitOptions = ['10', '25', '50', '100']
+
+export interface ReportFiltersProps {
+  draft: ReportQuery
+  /** Vietnam business month used by the period presets. */
+  month: string
+  onChange: (draft: ReportQuery) => void
+  onApply: () => void
+  onReset: () => void
+  canReset: boolean
+  applyDisabled: boolean
+}
+
+/** Slicer bar of one report: period, entity filters, sort and page size. */
+export function ReportFilters({
+  draft,
+  month,
+  onChange,
+  onApply,
+  onReset,
+  canReset,
+  applyDisabled,
+}: ReportFiltersProps) {
+  const kind = draft.kind
+  const setFilter = (filter: string, value: string) =>
+    onChange({ ...draft, filters: { ...draft.filters, [filter]: value } })
+  const preset = matchingPreset(draft, month)
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    onApply()
+  }
+  return (
+    <form
+      className="space-y-4 rounded-xl border bg-card p-4 shadow-xs"
+      onSubmit={submit}
+      aria-label="Bộ lọc báo cáo"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-sm font-semibold">
+          <SlidersHorizontal
+            className="size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+          Bộ lọc
+        </p>
+        <ToggleGroup
+          type="single"
+          size="sm"
+          variant="outline"
+          value={preset}
+          onValueChange={(value) =>
+            value &&
+            onChange({
+              ...draft,
+              ...presetPeriod(value as PeriodPreset, month),
+            })
+          }
+          aria-label="Kỳ báo cáo nhanh"
+          className="flex-wrap"
+        >
+          {periodPresets.map(({ value, label }) => (
+            <ToggleGroupItem key={value} value={value} className="px-3">
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <DateField
+          id="report-from"
+          label="Từ ngày"
+          required
+          value={draft.fromDate}
+          max={draft.toDate ? shiftDate(draft.toDate, -1) : undefined}
+          onChange={(fromDate) => onChange({ ...draft, fromDate })}
+        />
+        <DateField
+          id="report-to"
+          label="Đến trước ngày"
+          required
+          value={draft.toDate}
+          min={draft.fromDate ? shiftDate(draft.fromDate, 1) : undefined}
+          onChange={(toDate) => onChange({ ...draft, toDate })}
+        />
+        {reports[kind].filters.map((filter) =>
+          filter === 'districtId' ? (
+            <CatalogSelect
+              key={filter}
+              id={`report-${filter}`}
+              label={filterLabels[filter] ?? filter}
+              path="/districts"
+              emptyLabel="Tất cả quận"
+              value={draft.filters[filter] || ''}
+              onChange={(value) => setFilter(filter, value)}
+            />
+          ) : (
+            <EntityPicker
+              key={`${kind}-${filter}`}
+              id={`report-${filter}`}
+              resource={pickerResource[filter as keyof typeof pickerResource]}
+              label={filterLabels[filter] ?? filter}
+              placeholder="Tất cả — gõ mã hoặc tên để lọc"
+              value={draft.filters[filter] || ''}
+              onChange={(value) => setFilter(filter, value)}
+            />
+          ),
+        )}
+        <Select
+          id="report-sort"
+          label="Sắp xếp"
+          value={draft.sort}
+          onChange={(e) => onChange({ ...draft, sort: e.target.value })}
+          options={reports[kind].sorts.map((sort) => ({
+            value: sort,
+            label: sortLabel(sort),
+          }))}
+        />
+        <Select
+          id="report-limit"
+          label="Số dòng mỗi trang"
+          value={draft.limit}
+          onChange={(e) => onChange({ ...draft, limit: e.target.value })}
+          options={limitOptions.map((value) => ({
+            value,
+            label: `${value} dòng`,
+          }))}
+        />
+      </div>
+      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          icon={<RotateCcw className="size-4" />}
+          disabled={!canReset}
+          onClick={onReset}
+        >
+          Xóa bộ lọc
+        </Button>
+        <Button type="submit" disabled={applyDisabled}>
+          Áp dụng
+        </Button>
+      </div>
+    </form>
+  )
+}

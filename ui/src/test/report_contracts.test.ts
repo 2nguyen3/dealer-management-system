@@ -184,6 +184,12 @@ describe('exact source report validation', () => {
     ]
     for (const patch of patches)
       expect(() => reportPath({ ...reportQuery(), ...patch })).toThrow()
+    expect(() =>
+      reportPath({
+        ...reportQuery(),
+        filters: { agencyId: '9223372036854775808' },
+      }),
+    ).toThrow('ID đại lý không hợp lệ.')
   })
 })
 
