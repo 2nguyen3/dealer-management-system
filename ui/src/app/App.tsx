@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
+import { Skeleton } from '../components/shadcn/skeleton'
 import { AuthProvider } from '../features/authentication/AuthContext'
 import { LoginPage } from '../features/authentication/LoginPage'
 import { NotFoundPage } from './NotFoundPage'
@@ -158,10 +159,17 @@ const ResetPasswordPage = lazy(() =>
 
 export function RouteLoading() {
   return (
-    <div className="route-loading" role="status" aria-label="Đang mở màn hình">
-      <div />
-      <div />
-      <div />
+    <div className="space-y-6" role="status" aria-label="Đang mở màn hình">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-56 max-w-[60%]" />
+        <Skeleton className="h-4 w-80 max-w-[80%]" />
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-20 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="h-72 rounded-xl" />
       <span className="sr-only">Đang mở màn hình…</span>
     </div>
   )
@@ -178,16 +186,28 @@ export class PageErrorBoundary extends Component<
   render() {
     if (this.state.failed)
       return (
-        <div className="state-page">
-          <section className="state-card" role="alert">
-            <h1>Không thể mở màn hình</h1>
-            <p>
-              Giao diện gặp lỗi tải. Dữ liệu chưa gửi sẽ không tự động được ghi
-              nhận.
-            </p>
+        <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-10">
+          <section
+            className="w-full max-w-md space-y-4 rounded-xl border bg-card p-6 text-center shadow-xs"
+            role="alert"
+          >
+            <img
+              src="/assets/brand/agentra-icon.png"
+              alt=""
+              className="mx-auto size-12 rounded-lg"
+            />
+            <div className="space-y-1.5">
+              <h1 className="text-lg font-semibold tracking-tight">
+                Không thể mở màn hình
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Giao diện gặp lỗi tải. Dữ liệu chưa gửi sẽ không tự động được
+                ghi nhận.
+              </p>
+            </div>
             <button
               type="button"
-              className="btn btn--primary btn--md"
+              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
               onClick={() => window.location.reload()}
             >
               Tải lại giao diện

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProtectedRoute } from '../app/ProtectedRoute'
@@ -217,9 +217,18 @@ describe('Shell Layout & Protected Routes', () => {
       </MemoryRouter>,
     )
 
-    const logoutBtn = screen.getByRole('button', { name: /Đăng xuất/i })
-    fireEvent.click(logoutBtn)
+    // Logout lives in the account menu at the bottom of the sidebar.
+    const account = screen.getByRole('button', { name: /Tài khoản/ })
+    fireEvent.keyDown(account, { key: 'Enter' })
+    const logoutItem = await screen.findByRole('menuitem', {
+      name: /Đăng xuất/i,
+    })
+    expect(
+      screen.getByRole('menuitem', { name: /Đổi mật khẩu/i }),
+    ).toBeDefined()
+    fireEvent.click(logoutItem)
 
-    expect(logoutMock).toHaveBeenCalled()
+    await waitFor(() => expect(logoutMock).toHaveBeenCalled())
+    expect(await screen.findByText('Đã đăng xuất')).toBeDefined()
   })
 })
