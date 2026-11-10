@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { ChevronDown, Undo2, XCircle } from 'lucide-react'
+import { useId, useState } from 'react'
+import { DateField } from '../../components/blocks/DateField'
+import { Label } from '../../components/shadcn/label'
+import { Textarea } from '../../components/shadcn/textarea'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -15,14 +19,20 @@ import {
   type GoodsKind,
   type LineInput,
 } from '../document_history/documentContracts'
+import { SectionCard } from '../document_history/DocumentParts'
 import {
   errorMessage,
   useDocumentMutation,
 } from '../document_history/useDocumentRequests'
-import {
-  DocumentSnapshot,
-  GoodsLineEditor,
-} from '../stock_receipts/GoodsDocumentsPage'
+import { DocumentSnapshot } from '../stock_receipts/DocumentSnapshot'
+import { GoodsLineEditor } from '../stock_receipts/GoodsLineEditor'
+
+const goodsKinds = [
+  'STOCK_RECEIPT',
+  'STOCK_ISSUE',
+  'STOCK_ADJUSTMENT',
+  'SALES_RETURN',
+]
 
 export function CorrectionDialog({
   doc,
@@ -38,6 +48,8 @@ export function CorrectionDialog({
   onSaved: () => void
 }) {
   const { hasPermission } = useAuth()
+  const formId = useId()
+  const reasonId = useId()
   const revision = doc.currentRevision
   const [date, setDate] = useState(revision.businessDate)
   const [note, setNote] = useState(revision.note ?? '')
@@ -59,25 +71,26 @@ export function CorrectionDialog({
   const [stale, setStale] = useState(false)
   const mutation = useDocumentMutation()
   const allowed = canChange(doc, mode, hasPermission)
+  const cancel = mode === 'cancel'
+  const locked = mutation.busy || !allowed || stale
   async function submit() {
     if (!allowed || mutation.busy || stale) return
     setError(null)
     try {
       if (!etag) throw new Error('Cần tải lại phiên bản và ETag hiện hành.')
       if (!reason.trim()) throw new Error('Cần lý do bắt buộc.')
-      const body =
-        mode === 'cancel'
-          ? { reason: reason.trim() }
-          : replacementBody(doc, {
-              businessDate: date,
-              note,
-              reason,
-              amount,
-              paymentMethod,
-              lines,
-            })
+      const body = cancel
+        ? { reason: reason.trim() }
+        : replacementBody(doc, {
+            businessDate: date,
+            note,
+            reason,
+            amount,
+            paymentMethod,
+            lines,
+          })
       await mutation.run(
-        `${documentKinds[doc.kind].path}/${doc.id}/${mode === 'cancel' ? 'cancel' : 'corrections'}`,
+        `${documentKinds[doc.kind].path}/${doc.id}/${cancel ? 'cancel' : 'corrections'}`,
         { body, ifMatch: etag },
       )
       invalidateCache(documentKinds[doc.kind].path)
@@ -93,109 +106,14 @@ export function CorrectionDialog({
     <Modal
       isOpen
       title={
-        mode === 'cancel'
-          ? `Hủy chứng từ ${doc.code}`
-          : `Thay thế toàn bộ ${doc.code}`
+        cancel ? `Hủy chứng từ ${doc.code}` : `Thay thế toàn bộ ${doc.code}`
       }
-      maxWidth="lg"
+      maxWidth="xl"
       onClose={() => {
         if (!mutation.busy) onClose()
       }}
-    >
-      {!allowed && (
-        <Alert type="error">
-          Không đủ quyền hoặc chứng từ được bảo vệ. Hủy phiếu xuất có bằng chứng
-          trả ngay cần thêm cash.receipt.post. Máy chủ vẫn kiểm tra trạng thái
-          tiền hiện hành.
-        </Alert>
-      )}
-      <details>
-        <summary>Bản gốc chỉ đọc, không bị ghi đè</summary>
-        <DocumentSnapshot doc={doc} />
-      </details>
-      <p>
-        Không phải bản xem trước tác động. Máy chủ quyết định số tiền, tồn kho,
-        công nợ và các ràng buộc lịch sử; không xóa bằng chứng tiền thực nhận.
-      </p>
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault()
-          void submit()
-        }}
-      >
-        {error && <Alert type="error">{error}</Alert>}
-        {stale && (
-          <Alert type="error">
-            Phiên bản đã đổi. Đóng biểu mẫu, tải lại và xem xét dữ liệu trước
-            khi gửi lại; không tự động ghi đè.
-          </Alert>
-        )}
-        <fieldset disabled={mutation.busy || !allowed || stale}>
-          {mode === 'correct' && (
-            <>
-              <Input
-                label="Ngày nghiệp vụ mới"
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-              />
-              <Input
-                label="Ghi chú thay thế"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-              />
-              {(doc.kind === 'PAYMENT_RECEIPT' ||
-                doc.kind === 'CREDIT_APPLICATION') && (
-                <Input
-                  label="Số tiền thay thế (VNĐ)"
-                  value={amount}
-                  inputMode="numeric"
-                  onChange={(event) => setAmount(event.target.value)}
-                />
-              )}
-              {doc.kind === 'PAYMENT_RECEIPT' && (
-                <Select
-                  label="Phương thức thu"
-                  value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value)}
-                  options={[
-                    { value: 'CASH', label: 'Tiền mặt' },
-                    { value: 'BANK_TRANSFER', label: 'Chuyển khoản' },
-                  ]}
-                />
-              )}
-            </>
-          )}
-          <Input
-            label="Lý do bắt buộc"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-        </fieldset>
-        {mode === 'correct' &&
-          [
-            'STOCK_RECEIPT',
-            'STOCK_ISSUE',
-            'STOCK_ADJUSTMENT',
-            'SALES_RETURN',
-          ].includes(doc.kind) && (
-            <GoodsLineEditor
-              kind={doc.kind as GoodsKind}
-              lines={lines}
-              onChange={setLines}
-              disabled={mutation.busy || !allowed || stale}
-            />
-          )}
-        <div className="modal-actions">
-          <Button
-            type="submit"
-            variant={mode === 'cancel' ? 'danger' : 'primary'}
-            disabled={!allowed || !etag || stale}
-            isLoading={mutation.busy}
-          >
-            Xác nhận {mode === 'cancel' ? 'hủy' : 'thay thế'}
-          </Button>
+      footer={
+        <>
           <Button
             type="button"
             variant="outline"
@@ -204,8 +122,161 @@ export function CorrectionDialog({
           >
             Đóng
           </Button>
-        </div>
-      </form>
+          <Button
+            type="submit"
+            form={formId}
+            variant={cancel ? 'danger' : 'primary'}
+            icon={
+              cancel ? (
+                <XCircle className="size-4" />
+              ) : (
+                <Undo2 className="size-4" />
+              )
+            }
+            disabled={!allowed || !etag || stale}
+            isLoading={mutation.busy}
+          >
+            Xác nhận {cancel ? 'hủy' : 'thay thế'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {!allowed && (
+          <Alert type="error">
+            Bạn không có quyền thực hiện thao tác này, hoặc chứng từ không được
+            phép sửa/hủy. Hủy phiếu xuất đã thu tiền ngay cần thêm quyền ghi sổ
+            phiếu thu.
+          </Alert>
+        )}
+        <Alert
+          type={cancel ? 'warning' : 'info'}
+          title={
+            cancel
+              ? 'Hủy là thao tác không hoàn tác'
+              : 'Sửa sai bằng phiên bản mới'
+          }
+        >
+          {cancel
+            ? 'Hệ thống kiểm tra lại tồn kho và công nợ trước khi hủy. Khoản tiền đã thực thu không bị xóa.'
+            : 'Bản thay thế được lưu thành phiên bản mới. Hệ thống kiểm tra lại tồn kho, công nợ và số tiền trước khi lưu.'}
+        </Alert>
+        <details className="group rounded-xl border bg-muted/30">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-medium text-foreground [&::-webkit-details-marker]:hidden">
+            Xem chứng từ hiện tại (giữ nguyên trong lịch sử)
+            <ChevronDown
+              className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="border-t p-4">
+            <DocumentSnapshot doc={doc} />
+          </div>
+        </details>
+        <form
+          id={formId}
+          noValidate
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submit()
+          }}
+        >
+          {error && <Alert type="error">{error}</Alert>}
+          {stale && (
+            <Alert type="error">
+              Chứng từ vừa được người khác thay đổi. Đóng biểu mẫu, tải lại và
+              kiểm tra trước khi thực hiện lại.
+            </Alert>
+          )}
+          <SectionCard
+            title={cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
+            description={
+              cancel
+                ? 'Lý do được lưu cùng lịch sử chứng từ.'
+                : 'Ngày, ghi chú và dòng hàng mới thay thế toàn bộ phiên bản hiện hành.'
+            }
+          >
+            <fieldset
+              disabled={locked}
+              className="grid min-w-0 gap-4 sm:grid-cols-2"
+            >
+              <legend className="sr-only">
+                {cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
+              </legend>
+              {!cancel && (
+                <>
+                  <DateField
+                    label="Ngày nghiệp vụ mới"
+                    disabled={locked}
+                    clearable={false}
+                    value={date}
+                    onChange={setDate}
+                  />
+                  <Input
+                    label="Ghi chú thay thế"
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                  {(doc.kind === 'PAYMENT_RECEIPT' ||
+                    doc.kind === 'CREDIT_APPLICATION') && (
+                    <Input
+                      label="Số tiền thay thế (VNĐ)"
+                      value={amount}
+                      inputMode="numeric"
+                      className="tabular-nums"
+                      onChange={(event) => setAmount(event.target.value)}
+                    />
+                  )}
+                  {doc.kind === 'PAYMENT_RECEIPT' && (
+                    <Select
+                      label="Phương thức thu"
+                      value={paymentMethod}
+                      onChange={(event) => setPaymentMethod(event.target.value)}
+                      options={[
+                        { value: 'CASH', label: 'Tiền mặt' },
+                        { value: 'BANK_TRANSFER', label: 'Chuyển khoản' },
+                      ]}
+                    />
+                  )}
+                </>
+              )}
+              <div className="form-field grid gap-1.5 sm:col-span-2">
+                <Label
+                  htmlFor={reasonId}
+                  className="text-[13px] text-foreground/85"
+                >
+                  Lý do bắt buộc{' '}
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Textarea
+                  id={reasonId}
+                  required
+                  rows={2}
+                  className="bg-card"
+                  placeholder={
+                    cancel
+                      ? 'Ví dụ: Lập nhầm phiếu, đại lý hủy đơn…'
+                      : 'Ví dụ: Nhập sai số lượng dòng 2…'
+                  }
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+              </div>
+            </fieldset>
+          </SectionCard>
+          {!cancel && goodsKinds.includes(doc.kind) && (
+            <GoodsLineEditor
+              kind={doc.kind as GoodsKind}
+              lines={lines}
+              onChange={setLines}
+              disabled={locked}
+            />
+          )}
+        </form>
+      </div>
     </Modal>
   )
 }
