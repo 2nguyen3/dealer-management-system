@@ -1,0 +1,102 @@
+.entity-picker {
+  position: relative;
+}
+
+.entity-picker__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.entity-picker__input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-main);
+  font: inherit;
+  font-size: 14px;
+}
+
+.entity-picker__input:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+}
+
+.entity-picker__input:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.entity-picker__input:disabled {
+  background: var(--color-bg-muted);
+  cursor: not-allowed;
+}
+
+.form-field--error .entity-picker__input {
+  border-color: var(--color-danger);
+}
+
+.entity-picker__clear {
+  position: absolute;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.entity-picker__clear:hover {
+  background: var(--color-bg-muted);
+}
+
+.entity-picker__list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: 0 8px 24px rgb(32 42 36 / 0.12);
+}
+
+.entity-picker__option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.entity-picker__option.is-active,
+.entity-picker__option[aria-selected='true'] {
+  background: var(--color-primary-light);
+}
+
+.entity-picker__detail {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.entity-picker__hint {
+  padding: 8px 10px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
