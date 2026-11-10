@@ -60,6 +60,118 @@ seed is historical, not a reset target.
 | Frontend | React, Vite, TypeScript | [Frontend setup](ui/README.md) |
 | Deployment | Docker Compose, unprivileged Nginx | See below |
 
+### Vercel deployment
+
+Deploy from the repository root. `vercel.json` builds the Vite frontend and FastAPI
+backend as two Vercel Services in one project. `/api` and `/api/*` reach FastAPI
+without stripping the prefix; other paths reach the frontend, including SPA deep
+links. The existing Supabase PostgreSQL database remains external and unchanged.
+Vercel does not host PostgreSQL itself; new databases require a Marketplace provider.
+
+```powershell
+npx --yes vercel@65.12.1 login
+npx --yes vercel@65.12.1 link
+```
+
+After linking the intended project, run from `backend/`:
+
+```powershell
+uv sync --frozen
+uv run python deploy_vercel_env.py --environment preview
+```
+
+The helper uploads the existing `DB_*`, authentication signing key/issuer/audience,
+and same-origin CORS configuration from local backend settings through stdin.
+Values are stored as Vercel Secrets, never printed or passed as command arguments.
+By default it refuses to overwrite existing variables; `--update-existing` explicitly
+allows replacing only the selected keys. Use `vercel env ls` to inspect variable names.
+The default mode does not upload mail/payment/provider credentials or local callback
+URLs. Native VNPAY Sandbox has a separate, explicit mode below. `VITE_API_BASE_URL`
+should remain unset (defaults to same-origin `/api/v1`); never expose backend secrets
+through `VITE_*` variables. Do not change existing local provider callbacks.
+
+Then deploy a preview from the repository root:
+
+```powershell
+npx --yes vercel@65.12.1 deploy --environment preview
+```
+
+Vercel requires a new project's first deployment to target Production. In that
+case, first approve the production release and upload production variables as
+described below; do not expect preview-only variables to apply to Production.
+
+Verify `/`, a frontend deep link, `/api/v1/health`, `/api/v1/health/ready`, and
+`/api/docs` on the returned URL. Readiness checks connectivity only, not migration
+revision. Neither builds nor startup run migrations or seed commands. Preserve the
+live database and its historical/accepted payment records.
+
+For an explicitly approved production release, upload production variables using
+`uv run python deploy_vercel_env.py --environment production` from `backend/`, then
+run `npx --yes vercel@65.12.1 deploy --prod` from the repository root.
+
+To configure native VNPAY Sandbox, run from `backend/`:
+
+```powershell
+uv run python deploy_vercel_env.py --vnpay --check
+uv run python deploy_vercel_env.py --vnpay --environment production --update-existing
+```
+
+This mode uploads only `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_IPN_URL`,
+`VNPAY_RETURN_URL`, `VNPAY_PAYMENT_URL` and `VNPAY_API_URL`. Existing local merchant
+credentials are preserved; callback values for the cloud are the stable
+`https://agentra-dms.vercel.app/api/v1/integrations/vnpay/ipn` and `/return` URLs.
+Local `.env` files and ngrok settings are not modified. The merchant-side IPN URL
+is already registered by the owner; no portal change is part of this deployment.
+Keep the separate controlled `PAYMENT_*` integration unset. The Settings contract
+permits only VNPAY Sandbox checkout/query hosts, never live-bank endpoints.
+Redeploy after uploading variables. Provider Return is read-only and links to the
+authenticated payment workbench; verified IPN/query evidence remains the authority.
+
+Deployment caveats: the existing application limiter is process-local, not shared
+across autoscaled instances. A shared limiter is required for deployment-wide
+enforcement; this configuration does not claim production security acceptance.
+Budget database pool connections for scaling, and validate SMTP/provider callbacks
+and large PDF/XLSX exports against Vercel function limits before release. Secrets,
+local runtime data, virtual environments, tests and tool caches are excluded from
+CLI uploads by `.vercelignore`. PDF fonts remain included in the backend bundle.
+
+Initial read-only deployment verified 2026-11-09: [Agentra](https://agentra-dms.vercel.app),
+[API docs](https://agentra-dms.vercel.app/api/docs), and
+[database readiness](https://agentra-dms.vercel.app/api/v1/health/ready).
+Root/login/dashboard routes and API health/docs return 200; unknown API routes and
+missing assets return 404. Desktop and mobile Chrome load the login screen without
+failed requests, JavaScript exceptions or horizontal overflow. These smoke checks
+do not submit forms or mutate business data. Supabase remains the existing database;
+no migrations, seed, reset or data transfer was performed. GitHub linking was not
+available, so this deployment uses CLI uploads rather than automatic push deployments.
+
+Full staging acceptance on 2026-11-09 UTC uses production deployment
+`dpl_33kXQAE3R68ADFrz7D5gjtHGzJva` at the same alias. Native sandbox credentials
+and both Vercel callback URLs are configured. Actual frontend-created sandbox
+payment **41 / 10,000 VND** completed through NCB test-card/OTP checkout. Automatic
+IPN recorded **SUCCESS / posted receipt 775 / one provider event** before any manual
+callback replay or reconciliation. The real signed Return validated and linked to
+the correct authenticated frontend detail. Replaying that actual signed callback
+returns `RspCode=02`, with one event, unchanged document count and exactly
+`-10000` VND receivable allocation. No real-money credentials/endpoints were enabled.
+
+Three earlier incomplete sandbox attempts (38-40) remain as pending test records;
+they have no receipt/financial posting. Existing business rows were fingerprinted
+before testing: no original document/revision/line/ledger/event changed or disappeared.
+Original payment37/receipt774/10,200VND remains intact. Current live integrity passes
+30 tables, 412documents/31agencies/24products at schema0009; the one new receipt is
+the authorized sandbox settlement, not a reseed or migration.
+
+Current checks: 1,118 offline backend tests pass; eight selected isolated PostgreSQL
+recovery cases pass; 243 frontend tests pass; TypeScript/Vite build, ESLint and Ruff
+lint/format checks pass. Changed VNPAY dependency/Return transport scope is exact
+100% (80 statements/20 branches), not whole-backend coverage. Public liveness,
+readiness/docs, authenticated reads, dashboard, all five reports, PDF/XLSX exports,
+login/refresh/logout and mobile smoke pass. The whole PostgreSQL suite, exhaustive
+business mutation workflows, load/concurrency scale and largest-export limits are
+not newly accepted by this staging checkpoint. Shared multi-instance rate limiting,
+SMTP delivery and automatic GitHub push deployments remain separate work.
+
 ### Run locally
 
 Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
