@@ -311,4 +311,46 @@ describe('OnlinePaymentsPage Component', () => {
     )
   })
 
+  it.each(['button', 'focus'])(
+    'synchronizes authoritative detail and list on %s refresh',
+    async (refresh) => {
+      let current = samplePayments[1]!
+      const fetch = mockServer(() => current)
+      renderPage('?paymentId=1002&status=SUCCESS&receiptDocumentId=999')
+      const dialog = await screen.findByRole('dialog')
+      await within(dialog).findByText('REF-2026-002: PENDING')
+      expect(within(dialog).getByText(/Chưa có/)).toBeDefined()
+      current = {
+        ...current,
+        status: 'SUCCESS',
+        receiptDocumentId: '502',
+        paymentTime: '2026-10-11T14:05:00Z',
+        providerTransactionId: 'TXN-002',
+      }
+      if (refresh === 'button')
+        fireEvent.click(
+          within(dialog).getByRole('button', { name: 'Kiểm tra trạng thái' }),
+        )
+      else fireEvent.focus(window)
+      await within(dialog).findByText('REF-2026-002: SUCCESS')
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('table', { hidden: true })).getByText(
+            'SUCCESS',
+          ),
+        ).toBeDefined(),
+      )
+      expect(within(dialog).getByText(/#502/)).toBeDefined()
+      expect(
+        within(dialog).queryByRole('link', { name: 'Mở trang thanh toán' }),
+      ).toBeNull()
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Đóng hộp thoại' }),
+      )
+      const count = fetch.mock.calls.length
+      fireEvent.focus(window)
+      expect(fetch).toHaveBeenCalledTimes(count)
+    },
+  )
+
 })
