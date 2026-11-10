@@ -259,3 +259,49 @@ export function documentSummary(value: unknown): Row {
   decimal(data.totalAmount)
   return data
 }
+
+/** The calendar day after a `YYYY-MM-DD` business date (exclusive upper bound). */
+export function nextDay(value: string): string {
+  const date = new Date(`${businessDate(value)}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+/**
+ * Inclusive date-range filter → API params. The upper bound is sent as the
+ * exclusive next day; an inverted range is reported and not sent.
+ */
+export function dateRangeParams(
+  from: string,
+  to: string,
+  keys: [string, string] = ['fromDate', 'toDate'],
+  instant = false,
+): { params: Record<string, string>; error: string } {
+  if (from && to && from > to)
+    return {
+      params: {},
+      error: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.',
+    }
+  const bound = (date: string) => (instant ? `${date}T00:00:00+07:00` : date)
+  return {
+    params: {
+      [keys[0]]: from ? bound(from) : '',
+      [keys[1]]: to ? bound(nextDay(to)) : '',
+    },
+    error: '',
+  }
+}
+
+/**
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm[:ss]`, Vietnam wall time) as an
+ * ISO instant with the +07:00 offset. Throws for incomplete values.
+ */
+export function vietnamInstant(local: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local)
+  if (!match) throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+  const [, day, hour, minute, second = '00'] = match
+  businessDate(day)
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59)
+    throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+  return `${day}T${hour}:${minute}:${second}+07:00`
+}
