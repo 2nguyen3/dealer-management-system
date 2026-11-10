@@ -1,5 +1,104 @@
 # M26 verification
 
+## Vercel staging acceptance - 2026-11-09 UTC
+
+Existing project `agentra-dms`, alias `https://agentra-dms.vercel.app`, production
+target operated as staging; deployment `dpl_33kXQAE3R68ADFrz7D5gjtHGzJva` is READY.
+Frontend and FastAPI are two Vercel Services; existing Supabase remains external.
+No migration was needed: `uv run alembic current` reports0009. No local `.env`,
+merchant portal setting, live SQL snapshot, seed or existing provider credential
+was changed. Owner had already registered the Vercel IPN URL.
+
+### Changes and checks
+
+- Explicit native environment-upload mode sends six selected `VNPAY_*` keys as
+  secret stdin values, with stable Vercel IPN/Return URLs and sandbox-only hosts.
+  Default upload remains core-only; explicit overwrite is opt-in. Core ten keys
+  were retained; no `VITE_*`, `PAYMENT_PROVIDER` or controlled `PAYMENT_*` key added.
+- `payment_client_ip` accepts only a single valid Vercel-overwritten
+  `X-Forwarded-For` when platform `VERCEL=1`, otherwise validates the direct peer;
+  duplicate/list/malformed/scoped/spoofed headers have regression coverage.
+- Return remains read-only and provides an encoded same-origin workbench link.
+  Frontend uses authoritative server reads after normal login, never Return status.
+- Native missing-checkout reconciliation now recovers local signed checkout before
+  requiring a provider query. Frontend retains keys on unknown409/accepted202,
+  resumes setup, and refreshes detail/list on status checks and focus. Corrected
+  an unrelated exact agency-ID report validation message exposed by the full suite.
+
+Commands actually run from backend:
+
+`uv run pytest -q`:1118passed/644deselected, six retained dependency deprecations.
+
+`uv run pytest tests/online_payments tests/test_vercel.py
+--cov=app.modules.online_payments.dependencies
+--cov=app.modules.online_payments.vnpay_router --cov-branch
+--cov-report=term-missing -q`:203passed; exact80statements/20branches,100% per file.
+This excludes the service's whole owning coverage gate.
+
+`uv run ruff check .` and `uv run ruff format --check .`:pass,552formatted files.
+
+Four new UUID-isolated PG recovery nodes pass across
+`data/backend/vnpay-recovery-green.xml` (first3) and
+`vnpay-recovery-retry-green.xml` (fourth). Four retained controlled-recovery nodes
+also pass in `vnpay-recovery-retained.xml`. Its intermediate fourth-native-node
+failure was only UTC text formatting (Z versus+00:00), corrected with datetime
+equality and superseded by retry-green. The captured real red witness is
+`vnpay-recovery-red.xml`:503/providerCode91 before local native setup recovery.
+No live-schema fixtures, resets or reseeding were used.
+
+From ui: `npm test -- --reporter=dot`:27files/243passed; `npm run build` passes
+TypeScript and Vite. `npm run lint` passes. `npm audit --omit=dev` reports zero
+production vulnerabilities; non-blocking dev dependency/test warnings remain.
+
+`npx --yes vercel@65.12.1 deploy --prod --yes --logs` builds both locked services,
+Python3.12 and PDF resources, then publishes the existing alias. Public checks
+cover root/deep links, health/readiness/docs,401guard, login/me/refresh/logout,
+six database read products, dashboard, five report reads, valid PDF/XLSX reports
+and preserved receipt774 PDF. All31 baseline HTTP checks pass. Runtime error query
+`npx --yes vercel@65.12.1 logs --environment production --query "level:error" --limit 10 --since 30m`
+reports zero records. Browser mobile smoke has zero JS exceptions/overflow.
+An authenticated local-settings comparison against48public HTML/JS/CSS responses
+finds no database password, signing key, merchant code or VNPAY hash secret; all48
+assets return200. No secret value or full callback/checkout URL was printed.
+
+### Actual provider and persisted-state evidence
+
+Actual deployed frontend payment41,10,000VND, used only published NCB Sandbox card
+and OTP data. Generated checkout signature, sandbox host, amount scaling, exact
+Return URL and non-loopback customer IP were validated without outputting secrets.
+The provider checkout and OTP were completed in a retained browser context; early
+test browser restarts abandoned38-40 at card confirmation (no receipts/postings).
+Those pending test records are intentionally preserved, not deleted.
+
+Before manual proof replay or reconcile, authenticated GET and read-only SQL
+confirmed automatic IPN had recorded SUCCESS, posted receipt775 and one provider
+event. Actual signed browser Return was observed and independently verified with
+the local merchant secret. The link preserves merchantReference through normal
+login in the new tab and shows SUCCESS/receipt775. Original tab focus refresh also
+shows the new authoritative state. Frontend logout returns204 and navigates/login
+in both sessions. No manual payment interaction remains necessary for this case.
+
+Replaying the actual signed provider proof to public IPN returns200/RspCode02.
+Before/after SQL confirms one event, same775posted receipt, documents412unchanged
+and total receipt receivable allocation exactly-10000VND. Repeated duplicate proof
+does not create another receipt, event or allocation.
+
+Fingerprints of all pre-test411documents,412revisions,766lines,753inventory entries,
+487receivable entries,403posting batches,5credit entries and20provider events show
+zero changed/missing original rows. Protected payment37/receipt774/10200VND remains
+SUCCESS and intact. `uv run python -m app.db.verify` passes live30table integrity
+after testing:412documents/413revisions/31agencies/24products/21provider events.
+The new receipt/ledger rows are the authorized sandbox financial effect only.
+
+Private signed URLs, callbacks and cookie artifacts remain under ignored `.vercel/`
+or the pre-approved local temporary directory, never in tracked evidence. Provider
+browser retries are not represented as independent successful transactions.
+
+Scope limits: this is staging deployment acceptance, not a whole M26/R5/R6 release
+closure or fresh whole-PG/concurrency/maximum-export acceptance. Shared deployment-
+wide rate limiting and SMTP remain unconfigured. Real-money VNPAY is deliberately
+not enabled or tested. GitHub auto-link was unavailable; CLI redeploy remains valid.
+
 ## Native VNPAY/publication checkpoint — 2026-10-25
 
 All6M26,12M27 and9M28canonical operations are mounted:135target+2health. Native GET
