@@ -1,4 +1,16 @@
 import {
+  Ban,
+  CircleDashed,
+  Eye,
+  MapPin,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Store,
+  Tags,
+} from 'lucide-react'
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -6,26 +18,38 @@ import {
   useState,
   type FormEvent,
 } from 'react'
+import { DateField } from '../../components/blocks/DateField'
+import { PageHeader } from '../../components/blocks/PageHeader'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/shadcn/dropdown-menu'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import {
-  EditIcon,
-  PlusIcon,
-  SearchIcon,
-  TrashIcon,
-} from '../../components/ui/Icons'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Pagination } from '../../components/ui/Pagination'
 import { Select } from '../../components/ui/Select'
-import { Spinner } from '../../components/ui/Spinner'
 import { Table } from '../../components/ui/Table'
 import { apiFetch } from '../../lib/api'
 import { cachedApiFetch, invalidateCache } from '../../lib/cache'
 import { formatDate, formatVND } from '../../lib/formatters'
 import type { Agency, AgencyType, District } from '../../lib/types'
 import { useAuth } from '../authentication/useAuth'
+import {
+  DetailGrid,
+  ListCard,
+  ResultCount,
+  SearchField,
+  TableSkeleton,
+  type DetailEntry,
+} from '../districts/listParts'
 
 export function AgenciesPage() {
   const { hasPermission } = useAuth()
@@ -426,100 +450,224 @@ export function AgenciesPage() {
     }
   }
 
+  const typeLabel = (agency: Agency) =>
+    agency.typeName ||
+    agency.agencyTypeName ||
+    `Loại ${agency.typeId ?? agency.agencyTypeId}`
+  const statusBadge = (status: string) =>
+    status === 'ACTIVE' ? (
+      <Badge variant="success" data-status={status}>
+        Đang hoạt động
+      </Badge>
+    ) : (
+      <Badge variant="danger" data-status={status}>
+        Ngừng hợp tác
+      </Badge>
+    )
+  const districtOptions = districts.map((d) => ({
+    value: String(d.id),
+    label: d.name,
+  }))
+  const typeOptions = agencyTypes.map((t) => ({
+    value: String(t.id),
+    label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
+  }))
+  const kpis = agencyKpis(districts, agencyTypes)
+  const contactFields = (
+    <>
+      <Input
+        id="agency-form-phone"
+        label="Số điện thoại"
+        value={formPhone}
+        onChange={(e) => setFormPhone(e.target.value)}
+        placeholder="Ví dụ: 0901234567"
+        inputMode="tel"
+        required
+      />
+      <Input
+        id="agency-form-email"
+        label="Email"
+        type="email"
+        value={formEmail}
+        onChange={(e) => setFormEmail(e.target.value)}
+        placeholder="daily@example.com"
+      />
+      <div className="sm:col-span-2">
+        <Input
+          id="agency-form-address"
+          label="Địa chỉ"
+          value={formAddress}
+          onChange={(e) => setFormAddress(e.target.value)}
+          placeholder="Số nhà, tên đường..."
+        />
+      </div>
+      <Select
+        id="agency-form-district"
+        label="Quận"
+        value={formDistrictId}
+        onChange={(e) => setFormDistrictId(e.target.value)}
+        options={districtOptions}
+        required
+      />
+      <Select
+        id="agency-form-type"
+        label="Loại đại lý"
+        value={formTypeId}
+        onChange={(e) => setFormTypeId(e.target.value)}
+        options={typeOptions}
+        required
+      />
+    </>
+  )
+
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Hồ sơ đại lý</h1>
-          <p className="page-desc">
-            Quản lý thông tin tiếp nhận đại lý, phân loại, quận và theo dõi dư
-            nợ
-          </p>
-        </div>
-        {canManage && (
-          <Button
-            variant="primary"
-            onClick={openCreateModal}
-            icon={<PlusIcon size={18} />}
-          >
-            Tiếp nhận đại lý mới
-          </Button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        className="mb-0"
+        title="Hồ sơ đại lý"
+        description="Quản lý thông tin tiếp nhận đại lý, phân loại, quận và theo dõi dư nợ"
+        actions={
+          canManage && (
+            <Button
+              variant="primary"
+              onClick={openCreateModal}
+              icon={<Plus className="size-4" />}
+            >
+              Tiếp nhận đại lý mới
+            </Button>
+          )
+        }
+      />
 
-      {successNotice && <Alert type="success">{successNotice}</Alert>}
-
-      {error && <Alert type="error">{error}</Alert>}
-
-      {/* Filter bar */}
-      <div className="filter-bar">
-        <div className="filter-search">
-          <Input
-            placeholder="Tìm theo tên hoặc số điện thoại..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            endAdornment={<SearchIcon size={18} />}
-          />
-        </div>
-
-        <div className="filter-select">
-          <Select
-            value={filterDistrict}
-            onChange={(e) => setFilterDistrict(e.target.value)}
-            options={[
-              { value: '', label: 'Tất cả quận' },
-              ...districts.map((d) => ({ value: String(d.id), label: d.name })),
-            ]}
-          />
-        </div>
-
-        <div className="filter-select">
-          <Select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            options={[
-              { value: '', label: 'Tất cả loại đại lý' },
-              ...agencyTypes.map((t) => ({
-                value: String(t.id),
-                label: t.name,
-              })),
-            ]}
-          />
-        </div>
-
-        <div className="filter-select">
-          <Select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as never)}
-            options={[
-              { value: '', label: 'Tất cả trạng thái' },
-              { value: 'ACTIVE', label: 'Đang hoạt động' },
-              { value: 'TERMINATED', label: 'Ngừng hợp tác' },
-            ]}
-          />
-        </div>
-
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void loadAgencies()}
+      {kpis.length > 0 && (
+        <ul
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+          aria-label="Tổng quan đại lý"
         >
-          Tải lại
-        </Button>
-      </div>
+          {kpis.map((kpi) => (
+            <li
+              key={kpi.label}
+              className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
+            >
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                aria-hidden="true"
+              >
+                <kpi.icon className="size-4" />
+              </span>
+              <span className="grid min-w-0">
+                <span className="truncate text-xs text-muted-foreground">
+                  {kpi.label}
+                </span>
+                <span className="text-lg leading-tight font-semibold tabular-nums">
+                  {kpi.value}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {/* Data Table */}
-      {isLoading && agencies.length === 0 ? (
-        <div className="page-loading">
-          <Spinner label="Đang tải danh sách đại lý..." />
+      {(successNotice || error) && (
+        <div className="space-y-3">
+          {successNotice && <Alert type="success">{successNotice}</Alert>}
+          {error && <Alert type="error">{error}</Alert>}
         </div>
-      ) : filteredAgencies.length === 0 ? (
-        <div className="card empty-card">
-          <p>Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm.</p>
-        </div>
-      ) : (
-        <div className="card">
-          <Table caption="Danh sách đại lý">
+      )}
+
+      <ListCard
+        toolbar={
+          <>
+            <SearchField
+              id="agency-filter-search"
+              value={search}
+              onChange={setSearch}
+              placeholder="Tìm theo tên hoặc số điện thoại..."
+            />
+            <div className="lg:w-44">
+              <Select
+                id="agency-filter-district"
+                label="Quận"
+                value={filterDistrict}
+                onChange={(e) => setFilterDistrict(e.target.value)}
+                options={[
+                  { value: '', label: 'Tất cả quận' },
+                  ...districtOptions,
+                ]}
+              />
+            </div>
+            <div className="lg:w-48">
+              <Select
+                id="agency-filter-type"
+                label="Loại đại lý"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                options={[
+                  { value: '', label: 'Tất cả loại đại lý' },
+                  ...agencyTypes.map((t) => ({
+                    value: String(t.id),
+                    label: t.name,
+                  })),
+                ]}
+              />
+            </div>
+            <div className="lg:w-44">
+              <Select
+                id="agency-filter-status"
+                label="Trạng thái"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as never)}
+                options={[
+                  { value: '', label: 'Tất cả trạng thái' },
+                  { value: 'ACTIVE', label: 'Đang hoạt động' },
+                  { value: 'TERMINATED', label: 'Ngừng hợp tác' },
+                ]}
+              />
+            </div>
+            <ResultCount
+              count={filteredAgencies.length}
+              loading={isLoading && agencies.length === 0}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loadAgencies()}
+              icon={<RefreshCw className="size-4" />}
+            >
+              Tải lại
+            </Button>
+          </>
+        }
+        footer={
+          filteredAgencies.length > 0 && (
+            <Pagination
+              onNext={handleNextPage}
+              onPrevious={handlePrevPage}
+              hasNext={!!nextCursor}
+              hasPrevious={cursorHistory.length > 0}
+              isLoading={isLoading}
+              limit={pageSize}
+              onLimitChange={(newLimit) => {
+                setPageSize(newLimit)
+                setCurrentCursor(undefined)
+                setCursorHistory([])
+              }}
+            />
+          )
+        }
+      >
+        {isLoading && agencies.length === 0 ? (
+          <TableSkeleton columns={8} label="Đang tải danh sách đại lý..." />
+        ) : filteredAgencies.length === 0 ? (
+          <div className="p-4">
+            <EmptyState
+              icon={<Store className="size-6" />}
+              title="Không tìm thấy đại lý"
+              description="Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm."
+            />
+          </div>
+        ) : (
+          <Table caption="Danh sách đại lý" aria-busy={isLoading || undefined}>
             <thead>
               <tr>
                 <th scope="col">Mã đại lý</th>
@@ -527,13 +675,13 @@ export function AgenciesPage() {
                 <th scope="col">Điện thoại</th>
                 <th scope="col">Quận</th>
                 <th scope="col">Loại</th>
-                <th scope="col" style={{ textAlign: 'right' }}>
+                <th scope="col" className="cell-number text-right">
                   Dư nợ
                 </th>
                 <th scope="col">Ngày tiếp nhận</th>
                 <th scope="col">Trạng thái</th>
-                <th scope="col" style={{ textAlign: 'center' }}>
-                  Thao tác
+                <th scope="col" className="cell-actions w-14 text-right">
+                  <span className="sr-only">Thao tác</span>
                 </th>
               </tr>
             </thead>
@@ -543,155 +691,116 @@ export function AgenciesPage() {
                   <td>
                     <button
                       type="button"
-                      className="link-button"
+                      className="cursor-pointer rounded-sm font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                       onClick={() => setDetailAgency(agency)}
                     >
                       {agency.code}
                     </button>
                   </td>
-                  <td>
-                    <strong>{agency.name}</strong>
+                  <td className="max-w-64">
+                    <div className="truncate font-medium text-foreground">
+                      {agency.name}
+                    </div>
                     {agency.address && (
-                      <div className="cell-subtext">{agency.address}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {agency.address}
+                      </div>
                     )}
                   </td>
-                  <td>{agency.phone || '—'}</td>
-                  <td>{agency.districtName || `Quận ${agency.districtId}`}</td>
-                  <td>
-                    {agency.typeName ||
-                      agency.agencyTypeName ||
-                      `Loại ${agency.typeId ?? agency.agencyTypeId}`}
+                  <td className="whitespace-nowrap tabular-nums">
+                    {agency.phone || '—'}
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                  <td className="whitespace-nowrap">
+                    {agency.districtName || `Quận ${agency.districtId}`}
+                  </td>
+                  <td className="whitespace-nowrap">{typeLabel(agency)}</td>
+                  <td className="cell-number text-right font-semibold whitespace-nowrap tabular-nums">
                     {formatVND(agency.currentDebt)}
                   </td>
-                  <td>
+                  <td className="whitespace-nowrap tabular-nums">
                     {formatDate(agency.acceptedDate || agency.receptionDate)}
                   </td>
-                  <td>
-                    {agency.status === 'ACTIVE' ? (
-                      <Badge variant="success">Đang hoạt động</Badge>
-                    ) : (
-                      <Badge variant="danger">Ngừng hợp tác</Badge>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <div className="action-buttons-cell">
-                      {canManage && agency.status === 'ACTIVE' && (
-                        <>
-                          <button
-                            type="button"
-                            className="icon-action-btn"
-                            title="Sửa hồ sơ"
-                            aria-label={`Sửa hồ sơ ${agency.code} - ${agency.name}`}
-                            onClick={() => void openEditModal(agency)}
-                          >
-                            <EditIcon size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-action-btn icon-action-btn--danger"
-                            title="Ngừng hợp tác"
-                            aria-label={`Ngừng hợp tác ${agency.code} - ${agency.name}`}
-                            onClick={() => void openTerminateModal(agency)}
-                          >
-                            <TrashIcon size={16} />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                  <td>{statusBadge(agency.status)}</td>
+                  <td className="cell-actions text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <ShadcnButton
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="cursor-pointer text-muted-foreground"
+                          aria-label={`Thao tác ${agency.code} - ${agency.name}`}
+                        >
+                          <MoreHorizontal
+                            className="size-4"
+                            aria-hidden="true"
+                          />
+                        </ShadcnButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem
+                          onSelect={() => setDetailAgency(agency)}
+                        >
+                          <Eye aria-hidden="true" />
+                          Xem chi tiết
+                        </DropdownMenuItem>
+                        {canManage && agency.status === 'ACTIVE' && (
+                          <>
+                            <DropdownMenuItem
+                              onSelect={() => void openEditModal(agency)}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Sửa hồ sơ
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => void openTerminateModal(agency)}
+                            >
+                              <Ban aria-hidden="true" />
+                              Ngừng hợp tác
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
             </tbody>
           </Table>
-
-          <Pagination
-            onNext={handleNextPage}
-            onPrevious={handlePrevPage}
-            hasNext={!!nextCursor}
-            hasPrevious={cursorHistory.length > 0}
-            isLoading={isLoading}
-            limit={pageSize}
-            onLimitChange={(newLimit) => {
-              setPageSize(newLimit)
-              setCurrentCursor(undefined)
-              setCursorHistory([])
-            }}
-            totalShowing={filteredAgencies.length}
-          />
-        </div>
-      )}
+        )}
+      </ListCard>
 
       {/* Create Modal */}
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         title="Tiếp nhận đại lý mới"
-        maxWidth="md"
+        maxWidth="lg"
       >
-        <form onSubmit={handleCreateSubmit} className="modal-form" noValidate>
+        <form onSubmit={handleCreateSubmit} className="space-y-4" noValidate>
           {formError && <Alert type="error">{formError}</Alert>}
-          <Input
-            label="Tên đại lý"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            placeholder="Ví dụ: Đại lý Minh Phát"
-            required
-            autoFocus
-          />
-          <div className="grid-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="Số điện thoại"
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-              placeholder="Ví dụ: 0901234567"
+              id="agency-form-name"
+              label="Tên đại lý"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="Ví dụ: Đại lý Minh Phát"
+              required
+              autoFocus
+            />
+            <DateField
+              id="agency-form-accepted-date"
+              label="Ngày tiếp nhận"
+              value={formAcceptedDate}
+              onChange={setFormAcceptedDate}
               required
             />
-            <Input
-              label="Email"
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-              placeholder="daily@example.com"
-            />
+            {contactFields}
           </div>
-          <Input
-            label="Địa chỉ"
-            value={formAddress}
-            onChange={(e) => setFormAddress(e.target.value)}
-            placeholder="Số nhà, tên đường..."
-          />
-          <div className="grid-2">
-            <Select
-              label="Quận"
-              value={formDistrictId}
-              onChange={(e) => setFormDistrictId(e.target.value)}
-              options={districts.map((d) => ({
-                value: String(d.id),
-                label: d.name,
-              }))}
-              required
-            />
-            <Select
-              label="Loại đại lý"
-              value={formTypeId}
-              onChange={(e) => setFormTypeId(e.target.value)}
-              options={agencyTypes.map((t) => ({
-                value: String(t.id),
-                label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
-              }))}
-              required
-            />
-          </div>
-          <Input
-            label="Ngày tiếp nhận"
-            type="date"
-            value={formAcceptedDate}
-            onChange={(e) => setFormAcceptedDate(e.target.value)}
-            required
-          />
-          <div className="modal-actions">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -712,59 +821,24 @@ export function AgenciesPage() {
         isOpen={!!editAgency}
         onClose={() => setEditAgency(null)}
         title={`Chỉnh sửa hồ sơ: ${editAgency?.agency.code || ''}`}
-        maxWidth="md"
+        maxWidth="lg"
       >
-        <form onSubmit={handleEditSubmit} className="modal-form" noValidate>
+        <form onSubmit={handleEditSubmit} className="space-y-4" noValidate>
           {formError && <Alert type="error">{formError}</Alert>}
-          <Input
-            label="Tên đại lý"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            required
-            autoFocus
-          />
-          <div className="grid-2">
-            <Input
-              label="Số điện thoại"
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-              required
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Input
+                id="agency-form-name"
+                label="Tên đại lý"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            {contactFields}
           </div>
-          <Input
-            label="Địa chỉ"
-            value={formAddress}
-            onChange={(e) => setFormAddress(e.target.value)}
-          />
-          <div className="grid-2">
-            <Select
-              label="Quận"
-              value={formDistrictId}
-              onChange={(e) => setFormDistrictId(e.target.value)}
-              options={districts.map((d) => ({
-                value: String(d.id),
-                label: d.name,
-              }))}
-              required
-            />
-            <Select
-              label="Loại đại lý"
-              value={formTypeId}
-              onChange={(e) => setFormTypeId(e.target.value)}
-              options={agencyTypes.map((t) => ({
-                value: String(t.id),
-                label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
-              }))}
-              required
-            />
-          </div>
-          <div className="modal-actions">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -785,19 +859,16 @@ export function AgenciesPage() {
         isOpen={!!terminateAgency}
         onClose={() => setTerminateAgency(null)}
         title={`Ngừng hợp tác đại lý: ${terminateAgency?.agency.name || ''}`}
-        maxWidth="sm"
+        maxWidth="md"
       >
-        <form
-          onSubmit={handleTerminateSubmit}
-          className="modal-form"
-          noValidate
-        >
+        <form onSubmit={handleTerminateSubmit} className="space-y-4" noValidate>
           {formError && <Alert type="error">{formError}</Alert>}
-          <p className="modal-warning-text">
-            Lưu ý: Sau khi ngừng hợp tác, đại lý sẽ không thể tiếp tục nhận
-            hàng. Hành động này không thể hoàn tác trực tiếp.
-          </p>
+          <Alert type="warning">
+            Sau khi ngừng hợp tác, đại lý sẽ không thể tiếp tục nhận hàng. Hành
+            động này không thể hoàn tác trực tiếp.
+          </Alert>
           <Input
+            id="agency-terminate-reason"
             label="Lý do ngừng hợp tác"
             value={terminateReason}
             onChange={(e) => setTerminateReason(e.target.value)}
@@ -805,7 +876,7 @@ export function AgenciesPage() {
             required
             autoFocus
           />
-          <div className="modal-actions">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -826,91 +897,119 @@ export function AgenciesPage() {
         isOpen={!!detailAgency}
         onClose={() => setDetailAgency(null)}
         title={`Chi tiết đại lý: ${detailAgency?.name || ''}`}
-        maxWidth="md"
+        maxWidth="lg"
       >
         {detailAgency && (
-          <div className="detail-grid">
-            <div className="detail-item">
-              <span className="detail-label">Mã đại lý:</span>
-              <span className="detail-value font-mono">
-                {detailAgency.code}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Tên đại lý:</span>
-              <span className="detail-value font-bold">
-                {detailAgency.name}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Điện thoại:</span>
-              <span className="detail-value">{detailAgency.phone || '—'}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Email:</span>
-              <span className="detail-value">{detailAgency.email || '—'}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Địa chỉ:</span>
-              <span className="detail-value">
-                {detailAgency.address || '—'}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Quận:</span>
-              <span className="detail-value">
-                {detailAgency.districtName || `Quận ${detailAgency.districtId}`}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Loại đại lý:</span>
-              <span className="detail-value">
-                {detailAgency.typeName ||
-                  detailAgency.agencyTypeName ||
-                  `Loại ${detailAgency.typeId ?? detailAgency.agencyTypeId}`}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Ngày tiếp nhận:</span>
-              <span className="detail-value">
-                {formatDate(
+          <DetailGrid
+            entries={[
+              [
+                'Mã đại lý',
+                <span key="code" className="font-mono">
+                  {detailAgency.code}
+                </span>,
+              ],
+              [
+                'Tên đại lý',
+                <span key="name" className="font-semibold">
+                  {detailAgency.name}
+                </span>,
+              ],
+              ['Điện thoại', detailAgency.phone || '—'],
+              ['Email', detailAgency.email || '—'],
+              ['Địa chỉ', detailAgency.address || '—', true],
+              [
+                'Quận',
+                detailAgency.districtName || `Quận ${detailAgency.districtId}`,
+              ],
+              ['Loại đại lý', typeLabel(detailAgency)],
+              [
+                'Ngày tiếp nhận',
+                formatDate(
                   detailAgency.acceptedDate || detailAgency.receptionDate,
-                )}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Dư nợ hiện tại:</span>
-              <span className="detail-value font-bold text-danger">
-                {formatVND(detailAgency.currentDebt)}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Dư có hiện tại:</span>
-              <span className="detail-value font-bold text-success">
-                {formatVND(detailAgency.currentCredit)}
-              </span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Trạng thái:</span>
-              <span className="detail-value">
-                {detailAgency.status === 'ACTIVE' ? (
-                  <Badge variant="success">Đang hoạt động</Badge>
-                ) : (
-                  <Badge variant="danger">Ngừng hợp tác</Badge>
-                )}
-              </span>
-            </div>
-            {detailAgency.terminationReason && (
-              <div className="detail-item detail-item--full">
-                <span className="detail-label">Lý do ngừng hợp tác:</span>
-                <span className="detail-value text-muted">
-                  {detailAgency.terminationReason}
-                </span>
-              </div>
-            )}
-          </div>
+                ),
+              ],
+              ['Trạng thái', statusBadge(detailAgency.status)],
+              [
+                'Dư nợ hiện tại',
+                <span
+                  key="debt"
+                  className="font-semibold text-destructive tabular-nums"
+                >
+                  {formatVND(detailAgency.currentDebt)}
+                </span>,
+              ],
+              [
+                'Dư có hiện tại',
+                <span
+                  key="credit"
+                  className="font-semibold text-success tabular-nums"
+                >
+                  {formatVND(detailAgency.currentCredit)}
+                </span>,
+              ],
+              ...(detailAgency.terminationReason
+                ? ([
+                    [
+                      'Lý do ngừng hợp tác',
+                      detailAgency.terminationReason,
+                      true,
+                    ],
+                  ] as DetailEntry[])
+                : []),
+            ]}
+          />
         )}
       </Modal>
     </div>
   )
+}
+
+/** Count of a numeric field summed over rows; null when any row lacks it. */
+function sumField(rows: object[], keys: string[]): number | null {
+  if (!rows.length) return null
+  let total = 0
+  for (const row of rows) {
+    const record = row as Record<string, unknown>
+    const raw = keys.map((key) => record[key]).find((v) => v !== undefined)
+    const value = typeof raw === 'string' ? Number(raw) : raw
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null
+    total += value
+  }
+  return total
+}
+
+/** Overview chips derived from the already-loaded district/type catalogues. */
+function agencyKpis(districts: District[], agencyTypes: AgencyType[]) {
+  const number = new Intl.NumberFormat('vi-VN')
+  const active = sumField(districts, [
+    'activeAgencyCount',
+    'activeAgenciesCount',
+  ])
+  const remaining = sumField(districts, ['remainingSlots'])
+  const items: { label: string; value: string; icon: typeof Store }[] = []
+  if (active !== null)
+    items.push({
+      label: 'Đại lý đang hoạt động',
+      value: number.format(active),
+      icon: Store,
+    })
+  if (districts.length)
+    items.push({
+      label: 'Quận',
+      value: number.format(districts.length),
+      icon: MapPin,
+    })
+  if (agencyTypes.length)
+    items.push({
+      label: 'Loại đại lý',
+      value: number.format(agencyTypes.length),
+      icon: Tags,
+    })
+  if (remaining !== null)
+    items.push({
+      label: 'Chỗ còn nhận',
+      value: number.format(remaining),
+      icon: CircleDashed,
+    })
+  return items
 }
