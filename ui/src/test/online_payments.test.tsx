@@ -353,4 +353,49 @@ describe('OnlinePaymentsPage Component', () => {
     },
   )
 
+  it('selects an exact merchantReference from the Return link using server data only', async () => {
+    const fetch = mockServer()
+    renderPage(
+      '?merchantReference=REF-2026-002&status=SUCCESS&vnp_ResponseCode=00',
+    )
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('REF-2026-002: PENDING')
+    expect(within(dialog).getByText(/Chưa có/)).toBeDefined()
+    expect(fetch).toHaveBeenCalledWith(
+      '/online-payments/1002',
+      expect.any(Object),
+    )
+    expect(
+      fetch.mock.calls.every(
+        ([, options]) => !options?.method || options.method === 'GET',
+      ),
+    ).toBe(true)
+  })
+
+  it('does not select a partial merchantReference match', async () => {
+    mockServer()
+    renderPage('?merchantReference=REF-2026')
+    await screen.findByText('Không tìm thấy giao dịch với mã tham chiếu này.')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it.each([
+    '?paymentId=0',
+    '?paymentId=9223372036854775808',
+    '?paymentId=1002%2Fevents',
+    '?merchantReference=',
+  ])('rejects invalid direct selectors: %s', async (query) => {
+    const fetch = mockServer()
+    renderPage(query)
+    await screen.findByText(
+      query.includes('paymentId')
+        ? 'Invalid identifier'
+        : 'Mã tham chiếu không hợp lệ.',
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(
+      fetch.mock.calls.some(([path]) => /^\/online-payments\//.test(path)),
+    ).toBe(false)
+  })
+
 })
