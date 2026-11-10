@@ -118,3 +118,42 @@ def test_env_upload_rejects_missing_prerequisites(monkeypatch, capsys, missing_c
     runner.assert_not_called()
     assert "secret" not in capsys.readouterr().out
 
+
+@pytest.mark.parametrize("update", [False, True])
+def test_native_sandbox_upload_preserves_credentials_and_replaces_only_callback_hosts(
+    monkeypatch, capsys, update
+):
+    settings = deployment_settings(
+        vnpay_tmn_code="TEST1234",
+        vnpay_hash_secret="synthetic-vnpay-secret",
+        vnpay_ipn_url="https://old-host.example/api/v1/integrations/vnpay/ipn",
+        vnpay_return_url="https://old-host.example/api/v1/integrations/vnpay/return",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["deploy_vercel_env.py", "--vnpay", *(["--update-existing"] if update else [])],
+    )
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=settings))
+    runner = Mock(return_value=Mock(returncode=0))
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 0
+    supplied = {call.args[0][5]: call.kwargs["input"] for call in runner.call_args_list}
+    assert len(supplied) == 6
+    assert supplied["VNPAY_HASH_SECRET"] == "synthetic-vnpay-secret"
+    assert supplied["VNPAY_TMN_CODE"] == "TEST1234"
+    assert supplied["VNPAY_IPN_URL"] == (
+        "https://agentra-dms.vercel.app/api/v1/integrations/vnpay/ipn"
+    )
+    assert supplied["VNPAY_RETURN_URL"] == (
+        "https://agentra-dms.vercel.app/api/v1/integrations/vnpay/return"
+    )
+    assert all(
+        "sandbox.vnpayment.vn/" in supplied[key] for key in ("VNPAY_PAYMENT_URL", "VNPAY_API_URL")
+    )
+    assert all(("--force" in call.args[0]) == update for call in runner.call_args_list)
+    assert settings.vnpay_ipn_url.startswith("https://old-host.example/")
+    output = capsys.readouterr().out
+    assert "synthetic-vnpay-secret" not in output
+    assert "TEST1234" not in output
+
