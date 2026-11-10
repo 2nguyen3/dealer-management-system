@@ -124,7 +124,8 @@ def test_snapshot_boundary_fresh_auth_and_next_request_revocation(environment):
     env.connection.execution_options.assert_called_once_with(
         isolation_level="REPEATABLE READ", postgresql_readonly=True
     )
-    env.auth_factory.assert_called_once_with(env.session, "settings", "delivery")
+    # Read-only snapshot: one authentication/grant snapshot is reused within the request.
+    env.auth_factory.assert_called_once_with(env.session, "settings", "delivery", memoize=True)
     env.repo_factory.assert_called_once_with(env.session)
     env.session.commit.assert_not_called()
     env.auth.get_current_user.side_effect = None
