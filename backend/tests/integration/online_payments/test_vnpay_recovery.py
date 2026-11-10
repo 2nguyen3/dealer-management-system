@@ -118,3 +118,82 @@ def test_native_reconcile_recovers_unopened_checkout_before_query_and_replays(
             == "COMPLETED"
         )
 
+
+def test_native_reconcile_setup_returns_authoritative_success_if_callback_wins(
+    engine, actor, trading
+):
+    adapter = VnpayAdapter(config(), client=Mock())
+    body = OnlinePaymentCreate(agencyId=trading["agency"], provider="VNPAY", amount="102")
+    with Session(engine) as session:
+        issue(session, actor, (int(trading["agency"]), int(trading["product"])), day=4)
+        commit(session)
+        with patch.object(
+            VnpayAdapter,
+            "create_checkout",
+            side_effect=ApiError(503, "PROVIDER_UNAVAILABLE", "interrupted local setup"),
+        ):
+            pending = native_use(session, actor, adapter).create(body, uuid4())
+        assert pending.status == 202
+    original_checkout = VnpayAdapter.create_checkout
+
+    def callback(bound, reference, amount):
+        with Session(engine) as callback_session:
+            native_use(callback_session, actor).complete(
+                "VNPAY",
+                VerifiedPayment(
+                    eventKey="native-during-recovery",
+                    merchantReference=reference,
+                    providerTransactionId="123456",
+                    amount="102",
+                    status="SUCCESS",
+                    paymentTime="2026-01-05T03:00:00Z",
+                ),
+            )
+        return original_checkout(bound, reference, amount)
+
+    key = uuid4()
+    with Session(engine) as session, patch.object(VnpayAdapter, "create_checkout", new=callback):
+        online = native_use(session, actor, adapter)
+        recovered = online.reconcile(int(pending.body["id"]), key)
+        assert recovered.status == "SUCCESS" and recovered.checkoutUrl is None
+        assert online.reconcile(int(pending.body["id"]), key) == recovered
+        adapter.client.post.assert_not_called()
+    with engine.connect() as check:
+        assert check.scalar(text("SELECT count(*) FROM dms.payment_event")) == 1
+        assert (
+            check.scalar(text("SELECT count(*) FROM dms.document WHERE kind='PAYMENT_RECEIPT'"))
+            == 1
+        )
+        assert check.scalar(text("SELECT count(*) FROM dms.online_payment")) == 1
+
+
+def test_native_historical_pending_without_create_command_still_queries_provider(
+    engine, actor, trading
+):
+    adapter = VnpayAdapter(config(), client=Mock())
+    with Session(engine) as session:
+        issue(session, actor, (int(trading["agency"]), int(trading["product"])), day=4)
+        commit(session)
+        online = native_use(session, actor, adapter)
+        identifier = online.repo.create(
+            int(trading["agency"]), "VNPAY", Decimal(102), actor, uuid4(), 1800
+        )
+        row = online.repo.get(identifier)
+        commit(session)
+        adapter.client.post.return_value = httpx.Response(
+            200,
+            json=signed(
+                proof(
+                    vnp_TxnRef=row["merchantReference"],
+                    vnp_Amount="10200",
+                    vnp_TransactionStatus="01",
+                    vnp_TransactionNo="0",
+                )
+            ),
+        )
+        with patch.object(VnpayAdapter, "create_checkout") as checkout:
+            result = online.reconcile(identifier, uuid4())
+        assert result.status == "PENDING" and result.checkoutUrl is None
+        adapter.client.post.assert_called_once()
+        checkout.assert_not_called()
+
