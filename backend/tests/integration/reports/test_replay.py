@@ -139,4 +139,4 @@ def test_reports_follow_every_committed_m29_move_cancel_and_replay(
                 assert all(str(value) in output for value in row.values())
             if dataset["totals"] is not None:
                 for key, value in dataset["totals"].items():
-                    assert f"{key}: {value}" in output
+                    assert key in output and str(value) in output

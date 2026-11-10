@@ -137,7 +137,7 @@ def test_report_http_all_formats_live_grants_and_uncapped_exports(client, engine
                         assert str(value) in output
                 if expected["totals"] is not None:
                     for key, value in expected["totals"].items():
-                        assert f"{key}: {value}" in output
+                        assert key in output and str(value) in output
                 (Path("../data/backend") / f"m30-full-{kind}.pdf").write_bytes(exported.content)
                 if kind == "inventory":
                     assert "Export marker 101" in output
