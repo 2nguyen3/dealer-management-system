@@ -398,4 +398,58 @@ describe('OnlinePaymentsPage Component', () => {
     ).toBe(false)
   })
 
+  it('keeps failed status reads actionable without trusting Return success', async () => {
+    const fetch = mockServer()
+    fetch.mockImplementation(async (path) => {
+      if (path === '/online-payments/1002')
+        throw new apiModule.ApiError(503, 'HTTP_503', 'Status unavailable')
+      return {
+        status: 200,
+        data: {
+          items: [],
+          pagination: { limit: 25, nextCursor: null, hasMore: false },
+        },
+        etag: null,
+      }
+    })
+    renderPage('?paymentId=1002&status=SUCCESS')
+    await screen.findByText('Status unavailable')
+    expect(screen.queryByText(/REF-2026-002: SUCCESS/)).toBeNull()
+    expect(
+      screen.queryByRole('link', { name: 'Mở trang thanh toán' }),
+    ).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it.each([
+    'http://sandbox.vnpay.vn/pay',
+    'https://user:secret@sandbox.vnpay.vn/pay',
+    'javascript:alert(1)',
+    'not-a-url',
+  ])('does not expose an unsafe checkout URL: %s', async (checkoutUrl) => {
+    mockServer(() => ({ ...samplePayments[1]!, checkoutUrl }))
+    renderPage('?paymentId=1002')
+    await screen.findByText('REF-2026-002: PENDING')
+    expect(
+      screen.queryByRole('link', { name: 'Mở trang thanh toán' }),
+    ).toBeNull()
+  })
+
+  it('allows read-only direct selection without requesting protected events or offering writes', async () => {
+    const fetch = mockServer()
+    renderPage('?paymentId=1002', {
+      ...mockAuthContext,
+      hasPermission: (permission) => permission === 'debt.read',
+    })
+    await screen.findByText('REF-2026-002: PENDING')
+    expect(fetch.mock.calls.some(([path]) => path.includes('/events'))).toBe(
+      false,
+    )
+    expect(
+      screen.queryByRole('button', { name: 'Tạo thanh toán mới' }),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Đối soát giao dịch hiện tại' }),
+    ).toBeNull()
+  })
 })
