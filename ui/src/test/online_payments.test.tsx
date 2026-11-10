@@ -13,6 +13,7 @@ import {
 } from '../features/authentication/useAuth'
 import { OnlinePaymentsPage } from '../features/online_payments/OnlinePaymentsPage'
 import * as apiModule from '../lib/api'
+import { formatDateTime } from '../lib/formatters'
 import type { UserResponse } from '../lib/types'
 
 describe('OnlinePaymentsPage Component', () => {
@@ -81,11 +82,38 @@ describe('OnlinePaymentsPage Component', () => {
       </MemoryRouter>,
     )
 
-  const fillCreate = () => {
+  const agencies = [
+    { id: '101', code: 'DL-101', name: 'Đại lý Minh Phát', currentDebt: '0' },
+    { id: '102', code: 'DL-102', name: 'Đại lý Toàn Thắng', currentDebt: '0' },
+  ]
+
+  const agencyResponse = (path: string) =>
+    path.startsWith('/agencies?')
+      ? {
+          data: {
+            items: agencies,
+            pagination: { limit: 20, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: null,
+        }
+      : path === '/agencies/102'
+        ? { data: agencies[1], status: 200, etag: null }
+        : null
+
+  const detailValue = (scope: HTMLElement, label: string) =>
+    within(scope).getByText(label).nextElementSibling?.textContent
+
+  const fillCreate = async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tạo thanh toán mới' }))
-    fireEvent.change(screen.getByLabelText(/ID đại lý thanh toán/), {
-      target: { value: '102' },
+    const dialog = screen.getByRole('dialog')
+    const agency = within(dialog).getByRole('combobox', {
+      name: /Đại lý thanh toán/,
     })
+    fireEvent.focus(agency)
+    fireEvent.click(
+      await within(dialog).findByText('DL-102 — Đại lý Toàn Thắng'),
+    )
     fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
       target: { value: '300000' },
     })
@@ -100,6 +128,8 @@ describe('OnlinePaymentsPage Component', () => {
     vi
       .spyOn(apiModule, 'apiFetch')
       .mockImplementation(async (path, options = {}) => {
+        const agency = agencyResponse(path)
+        if (agency) return agency
         if (path === '/online-payments' && options.method === 'POST' && create)
           return create(options)
         if (path === '/online-payments/1002')
@@ -122,6 +152,8 @@ describe('OnlinePaymentsPage Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      const agency = agencyResponse(path)
+      if (agency) return agency
       if (path.startsWith('/online-payments')) {
         return {
           data: {
@@ -158,9 +190,94 @@ describe('OnlinePaymentsPage Component', () => {
       expect(screen.getByText('REF-2026-001')).toBeDefined()
       expect(screen.getByText('REF-2026-002')).toBeDefined()
       expect(screen.getByText('#101')).toBeDefined()
-      expect(screen.getAllByText('SUCCESS').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('PENDING').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Thành công').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Chờ xử lý').length).toBeGreaterThan(0)
     })
+    expect(screen.queryByText('SUCCESS')).toBeNull()
+    const row = screen.getByText('REF-2026-001').closest('tr')!
+    expect(within(row).getByText('500.000 ₫').className).toContain(
+      'cell-number',
+    )
+    expect(
+      within(row).getByText(formatDateTime('2026-10-10T10:05:00Z')),
+    ).toBeDefined()
+    expect(
+      within(row)
+        .getByRole('button', { name: 'Chi tiết REF-2026-001' })
+        .textContent?.trim(),
+    ).toBe('Chi tiết')
+    const status = screen.getByLabelText('Trạng thái', {
+      selector: 'select',
+    }) as HTMLSelectElement
+    expect(Array.from(status.options).map((o) => [o.value, o.text])).toEqual([
+      ['', 'Tất cả'],
+      ['PENDING', 'Chờ xử lý'],
+      ['SUCCESS', 'Thành công'],
+      ['FAILED', 'Thất bại'],
+      ['EXPIRED', 'Hết hạn'],
+    ])
+  })
+
+  it('filters by agency picker using the exact agency id', async () => {
+    const fetchSpy = vi.spyOn(apiModule, 'apiFetch')
+    renderPage()
+    await screen.findByText('REF-2026-001')
+    expect(screen.queryByLabelText(/ID đại lý/)).toBeNull()
+    const filter = screen.getByRole('combobox', { name: /^Đại lý/ })
+    fireEvent.focus(filter)
+    fireEvent.click(await screen.findByText('DL-101 — Đại lý Minh Phát'))
+    await waitFor(() =>
+      expect(
+        fetchSpy.mock.calls.some(
+          ([path]) =>
+            path.startsWith('/online-payments?') &&
+            path.includes('agencyId=101'),
+        ),
+      ).toBe(true),
+    )
+  })
+
+  it('shows provider events with formatted time, amount and status', async () => {
+    const fetch = mockServer()
+    const base = fetch.getMockImplementation()!
+    fetch.mockImplementation(async (path, options) =>
+      path === '/online-payments/1002/events?limit=25'
+        ? {
+            data: {
+              items: [
+                {
+                  id: '7',
+                  paymentId: '1002',
+                  eventKey: 'vnpay:ipn:1',
+                  providerStatus: 'FAILED',
+                  verifiedData: {
+                    merchantReference: 'REF-2026-002',
+                    amount: '300000',
+                    providerTransactionId: 'TXN-777',
+                  },
+                  createdAt: '2026-10-11T14:03:00Z',
+                },
+              ],
+              pagination: { limit: 25, nextCursor: null, hasMore: false },
+            },
+            status: 200,
+            etag: null,
+          }
+        : base(path, options),
+    )
+    renderPage('?paymentId=1002')
+    const dialog = await screen.findByRole('dialog')
+    const event = (await within(dialog).findByText('TXN-777')).closest('tr')!
+    expect(
+      within(event).getByText(formatDateTime('2026-10-11T14:03:00Z')),
+    ).toBeDefined()
+    expect(within(event).getByText('300.000 ₫').className).toContain(
+      'cell-number',
+    )
+    expect(
+      within(event).getByText('Thất bại').getAttribute('data-status'),
+    ).toBe('FAILED')
+    expect(within(dialog).queryByText(/vnpay:ipn:1/)).toBeNull()
   })
 
   it('filters payments by search text and reloads', async () => {
@@ -213,8 +330,9 @@ describe('OnlinePaymentsPage Component', () => {
     fireEvent.click(createBtn)
 
     expect(
-      screen.getByLabelText(/ID đại lý thanh toán/i, { selector: 'input' }),
+      screen.getByRole('combobox', { name: /Đại lý thanh toán/ }),
     ).toBeDefined()
+    expect(screen.queryByLabelText(/ID đại lý/)).toBeNull()
     expect(
       screen.getByLabelText(/Số tiền thanh toán \(VND nguyên\)/i, {
         selector: 'input',
@@ -225,7 +343,9 @@ describe('OnlinePaymentsPage Component', () => {
     fireEvent.click(closeBtn)
 
     await waitFor(() => {
-      expect(screen.queryByLabelText(/ID đại lý thanh toán/i)).toBeNull()
+      expect(
+        screen.queryByRole('combobox', { name: /Đại lý thanh toán/ }),
+      ).toBeNull()
     })
   })
 
@@ -242,7 +362,7 @@ describe('OnlinePaymentsPage Component', () => {
       .mockResolvedValue({ data: samplePayments[1], status: 200, etag: null })
     mockServer(undefined, create)
     renderPage()
-    fillCreate()
+    await fillCreate()
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
     expect(
       await within(screen.getByRole('dialog')).findByText('Outcome unknown'),
@@ -279,9 +399,9 @@ describe('OnlinePaymentsPage Component', () => {
       .mockResolvedValue({ data: samplePayments[1], status: 200, etag: null })
     mockServer(() => ({ ...samplePayments[1]!, checkoutUrl: null }), create)
     renderPage()
-    fillCreate()
+    await fillCreate()
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
-    await screen.findByRole('button', { name: 'Tiếp tục khởi tạo checkout' })
+    await screen.findByRole('button', { name: 'Tiếp tục khởi tạo thanh toán' })
     expect(screen.getByLabelText(/Số tiền thanh toán/)).toHaveProperty(
       'value',
       '300000',
@@ -289,10 +409,12 @@ describe('OnlinePaymentsPage Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Đóng' }))
     expect(create).toHaveBeenCalledTimes(1)
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Tiếp tục khởi tạo checkout' }),
+      await screen.findByRole('button', {
+        name: 'Tiếp tục khởi tạo thanh toán',
+      }),
     )
     fireEvent.click(
-      screen.getByRole('button', { name: 'Tiếp tục khởi tạo checkout' }),
+      screen.getByRole('button', { name: 'Tiếp tục khởi tạo thanh toán' }),
     )
     const link = await screen.findByRole('link', {
       name: 'Mở trang thanh toán',
@@ -302,7 +424,7 @@ describe('OnlinePaymentsPage Component', () => {
     expect(link.getAttribute('rel')).toBe('noreferrer')
     expect(create.mock.calls[1]).toEqual(create.mock.calls[0])
     fireEvent.click(screen.getByRole('button', { name: 'Đóng hộp thoại' }))
-    fillCreate()
+    await fillCreate()
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
     await screen.findByRole('link', { name: 'Mở trang thanh toán' })
     expect(create).toHaveBeenCalledTimes(3)
@@ -318,8 +440,8 @@ describe('OnlinePaymentsPage Component', () => {
       const fetch = mockServer(() => current)
       renderPage('?paymentId=1002&status=SUCCESS&receiptDocumentId=999')
       const dialog = await screen.findByRole('dialog')
-      await within(dialog).findByText('REF-2026-002: PENDING')
-      expect(within(dialog).getByText(/Chưa có/)).toBeDefined()
+      await within(dialog).findByText('Chờ xử lý')
+      expect(detailValue(dialog, 'Phiếu thu')).toBe('Chưa có')
       current = {
         ...current,
         status: 'SUCCESS',
@@ -332,11 +454,11 @@ describe('OnlinePaymentsPage Component', () => {
           within(dialog).getByRole('button', { name: 'Kiểm tra trạng thái' }),
         )
       else fireEvent.focus(window)
-      await within(dialog).findByText('REF-2026-002: SUCCESS')
+      await within(dialog).findByText('Thành công')
       await waitFor(() =>
         expect(
-          within(screen.getByRole('table', { hidden: true })).getByText(
-            'SUCCESS',
+          within(screen.getAllByRole('table', { hidden: true })[0]!).getByText(
+            'Thành công',
           ),
         ).toBeDefined(),
       )
@@ -359,8 +481,10 @@ describe('OnlinePaymentsPage Component', () => {
       '?merchantReference=REF-2026-002&status=SUCCESS&vnp_ResponseCode=00',
     )
     const dialog = await screen.findByRole('dialog')
-    await within(dialog).findByText('REF-2026-002: PENDING')
-    expect(within(dialog).getByText(/Chưa có/)).toBeDefined()
+    await within(dialog).findByText('Chờ xử lý')
+    expect(detailValue(dialog, 'Mã tham chiếu')).toBe('REF-2026-002')
+    expect(detailValue(dialog, 'Phiếu thu')).toBe('Chưa có')
+    expect(detailValue(dialog, 'Thời điểm thanh toán')).toBe('Chưa xác nhận')
     expect(fetch).toHaveBeenCalledWith(
       '/online-payments/1002',
       expect.any(Object),
@@ -414,7 +538,10 @@ describe('OnlinePaymentsPage Component', () => {
     })
     renderPage('?paymentId=1002&status=SUCCESS')
     await screen.findByText('Status unavailable')
-    expect(screen.queryByText(/REF-2026-002: SUCCESS/)).toBeNull()
+    expect(
+      screen.queryByText('Thành công', { ignore: 'option, script, style' }),
+    ).toBeNull()
+
     expect(
       screen.queryByRole('link', { name: 'Mở trang thanh toán' }),
     ).toBeNull()
@@ -429,7 +556,7 @@ describe('OnlinePaymentsPage Component', () => {
   ])('does not expose an unsafe checkout URL: %s', async (checkoutUrl) => {
     mockServer(() => ({ ...samplePayments[1]!, checkoutUrl }))
     renderPage('?paymentId=1002')
-    await screen.findByText('REF-2026-002: PENDING')
+    await within(await screen.findByRole('dialog')).findByText('Chờ xử lý')
     expect(
       screen.queryByRole('link', { name: 'Mở trang thanh toán' }),
     ).toBeNull()
@@ -441,7 +568,7 @@ describe('OnlinePaymentsPage Component', () => {
       ...mockAuthContext,
       hasPermission: (permission) => permission === 'debt.read',
     })
-    await screen.findByText('REF-2026-002: PENDING')
+    await within(await screen.findByRole('dialog')).findByText('Chờ xử lý')
     expect(fetch.mock.calls.some(([path]) => path.includes('/events'))).toBe(
       false,
     )
