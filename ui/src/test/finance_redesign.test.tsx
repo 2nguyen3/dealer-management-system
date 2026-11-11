@@ -459,11 +459,11 @@ describe('Receivables balance and statement', () => {
     expect(within(dialog).getByText('Số dư có khả dụng')).toBeDefined()
     expect(await within(dialog).findByText('05/10/2026 · PT-501')).toBeDefined()
     expect(within(dialog).getByText('30% hạn mức')).toBeDefined()
-    expect(
-      within(dialog).getByRole('progressbar', {
-        name: 'Mức sử dụng hạn mức nợ',
-      }),
-    ).toBeDefined()
+    const meter = within(dialog).getByRole('meter', {
+      name: 'Mức sử dụng hạn mức nợ',
+    })
+    expect(meter.getAttribute('aria-valuenow')).toBe('30')
+    expect(within(dialog).getByText('Cơ cấu dư có')).toBeDefined()
     expect(
       await within(dialog).findByText(/Tuổi nợ \(tính trên 1 hóa đơn/),
     ).toBeDefined()
@@ -526,5 +526,81 @@ describe('Receivables balance and statement', () => {
     expect(
       api.mock.calls.some(([path]) => path.startsWith('/payment-receipts')),
     ).toBe(false)
+  })
+})
+
+describe('Lifecycle trackers and server sorting', () => {
+  it('shows the receipt lifecycle at the posting step and a page summary', async () => {
+    api.mockImplementation(async (path) => {
+      if (path === '/payment-receipts/501')
+        return { data: receiptDetail('DRAFT'), status: 200, etag: '"e7"' }
+      if (path.startsWith('/payment-receipts?')) return pageOf([receiptRow])
+      return pageOf([])
+    })
+    renderWith(<PaymentReceiptsPage />, ['cash.receipt.post'])
+    const summary = await screen.findByRole('region', {
+      name: 'Tổng quan chứng từ',
+    })
+    expect(within(summary).getByText('Nháp chờ xử lý')).toBeDefined()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chi tiết PT-501' }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    const tracker = await within(dialog).findByRole('region', {
+      name: 'Vòng đời chứng từ',
+    })
+    expect(
+      tracker.querySelector('[aria-current="step"]')?.textContent,
+    ).toContain('Ghi sổ')
+  })
+
+  it('sends only contract sort values for receipts', async () => {
+    renderWith(<PaymentReceiptsPage />, ['debt.read'])
+    await screen.findByText('Không có chứng từ phù hợp.')
+    expect(
+      api.mock.calls.some(([path]) => path.includes('sort=-businessDate')),
+    ).toBe(true)
+    api.mockResolvedValue(pageOf([receiptRow]))
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Số tiền' }))
+    await waitFor(() =>
+      expect(
+        api.mock.calls.some(([path]) => path.includes('sort=-totalAmount')),
+      ).toBe(true),
+    )
+    const header = screen.getByRole('columnheader', { name: 'Số tiền' })
+    expect(header.getAttribute('aria-sort')).toBe('descending')
+  })
+
+  it('sorts receivables by remaining limit on the server', async () => {
+    api.mockImplementation(async (path) =>
+      path.startsWith('/receivables')
+        ? pageOf([
+            {
+              agencyId: '101',
+              agencyCode: 'DL-101',
+              agencyName: 'Đại lý Minh Phát',
+              currentDebt: '15000000',
+              maxDebt: '50000000',
+              remainingCreditLimit: '35000000',
+            },
+          ])
+        : pageOf([]),
+    )
+    renderWith(<ReceivablesPage />, ['debt.read'])
+    const header = await screen.findByRole('columnheader', { name: 'Dư nợ' })
+    expect(header.getAttribute('aria-sort')).toBe('descending')
+    expect(
+      api.mock.calls.some(([path]) => path.includes('sort=-currentDebt')),
+    ).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Hạn mức còn lại' }))
+    await waitFor(() =>
+      expect(
+        api.mock.calls.some(([path]) =>
+          path.includes('sort=-remainingCreditLimit'),
+        ),
+      ).toBe(true),
+    )
+    expect(screen.getByText('Mức dùng hạn mức')).toBeDefined()
   })
 })

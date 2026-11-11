@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   Banknote,
   ClipboardList,
+  Crosshair,
   Landmark,
   PackageX,
   RotateCw,
@@ -12,6 +13,13 @@ import {
 import { useState, type ReactNode } from 'react'
 import { KpiCard } from '../../components/blocks/KpiCard'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import {
+  DonutChart,
+  GradientAreaChart,
+  LegendList,
+  SegmentedMeter,
+} from '../../components/charts/MebiusCharts'
+import { CountUp, Stagger, StaggerItem } from '../../components/motion/Motion'
 import { Card } from '../../components/shadcn/card'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
@@ -33,13 +41,7 @@ import {
   type ReportRow,
 } from '../reports/contracts'
 import { AgencyMatrix } from './AgencyMatrix'
-import {
-  RankedBarChart,
-  SalesTrendChart,
-  SegmentedBar,
-  type BarDatum,
-  type TrendDatum,
-} from './charts'
+import { InfoTip, RankedBarChart, type BarDatum } from './charts'
 import { dashboardAdmission, sectionGrants } from './contracts'
 import {
   agencyLabel,
@@ -75,17 +77,22 @@ const sectionLabels: Record<Section, string> = {
 const VS_PREVIOUS = 'so với tháng trước'
 const TOP = 10
 
+/** Compact animated money value; the exact amount stays for screen readers. */
 function money(value: string) {
   return {
-    value: formatCompactVND(toNumber(value)),
+    value: <CountUp value={toNumber(value)} format={formatCompactVND} />,
     exactValue: formatVND(value),
   }
+}
+
+function count(value: number) {
+  return <CountUp value={value} format={formatPlain} />
 }
 
 /** KPI delta props; without a comparable previous month show a plain hint. */
 function delta(ratio: number | null, upIsGood: boolean) {
   return ratio === null
-    ? { hint: 'Chưa đủ dữ liệu tháng trước để so sánh' }
+    ? { hint: 'Chưa có tháng trước' }
     : { delta: { ratio, upIsGood, label: VS_PREVIOUS } }
 }
 
@@ -228,93 +235,121 @@ export function DashboardPage() {
 
   // ---------------------------------------------------------------- KPIs
   const trend = sales?.monthlyTrend ?? []
-  const kpis: ReactNode[] = []
+  const kpis: { key: string; node: ReactNode }[] = []
   if (sales) {
     kpis.push(
-      <KpiCard
-        key="net"
-        label="Doanh số thuần"
-        {...money(sales.net)}
-        icon={<TrendingUp />}
-        {...delta(trendDelta(trend, selectedMonth, 'net'), true)}
-        trend={trend.map((point) => toNumber(point.net))}
-      />,
-      <KpiCard
-        key="returns"
-        label="Hàng trả lại"
-        {...money(sales.returns)}
-        icon={<Undo2 />}
-        {...delta(trendDelta(trend, selectedMonth, 'returns'), false)}
-        trend={trend.map((point) => toNumber(point.returns))}
-        trendColor="var(--chart-3)"
-      />,
+      {
+        key: 'net',
+        node: (
+          <KpiCard
+            label="Doanh số thuần"
+            {...money(sales.net)}
+            icon={<TrendingUp />}
+            {...delta(trendDelta(trend, selectedMonth, 'net'), true)}
+            trend={trend.map((point) => toNumber(point.net))}
+          />
+        ),
+      },
+      {
+        key: 'returns',
+        node: (
+          <KpiCard
+            label="Hàng trả lại"
+            {...money(sales.returns)}
+            icon={<Undo2 />}
+            {...delta(trendDelta(trend, selectedMonth, 'returns'), false)}
+            trend={trend.map((point) => toNumber(point.returns))}
+            trendColor="var(--chart-3)"
+          />
+        ),
+      },
     )
   }
   if (receivables) {
     kpis.push(
-      <KpiCard
-        key="debt"
-        label="Công nợ hiện tại"
-        {...money(receivables.currentDebt)}
-        icon={<Landmark />}
-        hint={`Dư có hiện tại ${formatVND(receivables.currentCredit)}`}
-      />,
-      <KpiCard
-        key="cash"
-        label="Tiền thực thu"
-        {...money(receivables.cashReceived)}
-        icon={<Banknote />}
-        hint={`Đã hoàn ${formatVND(receivables.cashRefunded)} trong tháng`}
-      />,
+      {
+        key: 'debt',
+        node: (
+          <KpiCard
+            label="Công nợ hiện tại"
+            {...money(receivables.currentDebt)}
+            icon={<Landmark />}
+            hint={`Dư có ${formatVND(receivables.currentCredit)}`}
+          />
+        ),
+      },
+      {
+        key: 'cash',
+        node: (
+          <KpiCard
+            label="Tiền thực thu"
+            {...money(receivables.cashReceived)}
+            icon={<Banknote />}
+            hint={`Đã hoàn ${formatVND(receivables.cashRefunded)}`}
+          />
+        ),
+      },
     )
   }
   if (agencies) {
-    kpis.push(
-      <KpiCard
-        key="agencies"
-        label="Đại lý hoạt động"
-        value={`${formatQuantity(agencies.active)} / ${formatQuantity(agencies.total)}`}
-        icon={<Store />}
-        hint={
-          agencies.total
-            ? `${formatPercent(agencies.active / agencies.total)} tổng số đại lý`
-            : 'Chưa có đại lý'
-        }
-      />,
-    )
+    kpis.push({
+      key: 'agencies',
+      node: (
+        <KpiCard
+          label="Đại lý hoạt động"
+          value={
+            <>
+              {count(agencies.active)} / {count(agencies.total)}
+            </>
+          }
+          icon={<Store />}
+          hint={
+            agencies.total
+              ? `${formatPercent(agencies.active / agencies.total)} tổng số`
+              : 'Chưa có đại lý'
+          }
+        />
+      ),
+    })
   }
   if (inventory) {
-    kpis.push(
-      <KpiCard
-        key="low-stock"
-        label="Mặt hàng tồn thấp"
-        value={formatQuantity(inventory.lowStockProductCount)}
-        icon={<PackageX />}
-        hint={`Trên ${formatQuantity(inventory.productCount)} mặt hàng · nhập ${formatCompactVND(toNumber(inventory.receivedAmount))}`}
-      />,
-    )
+    kpis.push({
+      key: 'low-stock',
+      node: (
+        <KpiCard
+          label="Mặt hàng tồn thấp"
+          value={count(inventory.lowStockProductCount)}
+          icon={<PackageX />}
+          hint={`/ ${formatQuantity(inventory.productCount)} mặt hàng · nhập ${formatCompactVND(toNumber(inventory.receivedAmount))}`}
+        />
+      ),
+    })
   }
   if (pendingIssues !== undefined) {
-    kpis.push(
-      <KpiCard
-        key="pending"
-        label="Phiếu xuất đang chờ"
-        value={formatQuantity(pendingIssues)}
-        icon={<ClipboardList />}
-        hint="Phiếu chưa ghi sổ"
-      />,
-    )
+    kpis.push({
+      key: 'pending',
+      node: (
+        <KpiCard
+          label="Phiếu xuất đang chờ"
+          value={count(pendingIssues)}
+          icon={<ClipboardList />}
+          hint="Chưa ghi sổ"
+        />
+      ),
+    })
   }
   if (verifiedUnreceipted !== undefined) {
-    kpis.push(
-      <KpiCard
-        key="verified"
-        label="Đã xác minh, chưa ghi phiếu thu"
-        {...money(verifiedUnreceipted)}
-        icon={<BadgeCheck />}
-        hint="Chưa tính vào thực thu"
-      />,
-    )
+    kpis.push({
+      key: 'verified',
+      node: (
+        <KpiCard
+          label="Đã xác minh, chưa ghi phiếu thu"
+          {...money(verifiedUnreceipted)}
+          icon={<BadgeCheck />}
+          hint="Chưa tính vào thực thu"
+        />
+      ),
+    })
   }
   const expectedKpis =
     (can('sales') ? 2 : 0) +
@@ -325,18 +360,31 @@ export function DashboardPage() {
     (can('verifiedUnreceiptedAmount') ? 1 : 0)
 
   // ---------------------------------------------------------------- visuals
-  const trendData: TrendDatum[] = trend.map((point) => ({
-    month: point.month,
+  const trendData = trend.map((point) => ({
     label: shortMonthLabel(point.month),
-    net: toNumber(point.net),
     gross: toNumber(point.gross),
+    net: toNumber(point.net),
     returns: toNumber(point.returns),
-    display: {
-      net: formatVND(point.net),
-      gross: formatVND(point.gross),
-      returns: formatVND(point.returns),
-    },
   }))
+  const salesMix = sales
+    ? [
+        {
+          key: 'net',
+          label: 'Doanh số thuần',
+          raw: sales.net,
+          value: Math.max(0, toNumber(sales.net)),
+          color: 'var(--chart-1)',
+        },
+        {
+          key: 'returns',
+          label: 'Hàng trả lại',
+          raw: sales.returns,
+          value: Math.max(0, toNumber(sales.returns)),
+          color: 'var(--chart-3)',
+        },
+      ]
+    : []
+  const salesMixTotal = salesMix.reduce((sum, part) => sum + part.value, 0)
 
   const productSource = reportAllowed('product-sales')
     ? {
@@ -551,13 +599,20 @@ export function DashboardPage() {
       (state) => state.loading,
     )
 
+  const retry = () => setReload((n) => n + 1)
+  const inStock = inventory
+    ? Math.max(0, inventory.productCount - inventory.lowStockProductCount)
+    : 0
+  const inStockRatio =
+    inventory && inventory.productCount ? inStock / inventory.productCount : 0
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         className="mb-0"
         eyebrow="Tổng quan điều hành"
         title="Bảng điều khiển"
-        description="Doanh số, công nợ, dòng tiền và tồn kho theo tháng — nhấn vào một đại lý hoặc mặt hàng để lọc chéo các biểu đồ."
+        description="Nhấn một đại lý hoặc mặt hàng để lọc chéo."
         actions={
           admitted && (
             <>
@@ -581,12 +636,16 @@ export function DashboardPage() {
                   periodLabel
                 )}
               </p>
+              <InfoTip label="Phạm vi số liệu">
+                Chỉ số tính cho toàn công ty. Công nợ, đại lý và tồn kho là số
+                hiện tại; doanh số, nhập hàng và thu tiền theo tháng đã chọn.
+              </InfoTip>
               <Button
                 variant="outline"
                 size="sm"
                 icon={<RotateCw className="size-4" aria-hidden="true" />}
                 isLoading={refreshing}
-                onClick={() => setReload((n) => n + 1)}
+                onClick={retry}
               >
                 Làm mới
               </Button>
@@ -620,14 +679,14 @@ export function DashboardPage() {
                   variant="outline"
                   size="sm"
                   className="mt-2"
-                  onClick={() => setReload((n) => n + 1)}
+                  onClick={retry}
                 >
                   Thử lại
                 </Button>
               </Alert>
             ) : snapshot.loading ? (
               <div
-                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
                 aria-busy="true"
               >
                 <span className="sr-only">Đang tải bảng điều khiển...</span>
@@ -635,7 +694,7 @@ export function DashboardPage() {
                   <Card key={i} className="gap-3 p-4 shadow-xs">
                     <Skeleton className="h-4 w-1/2" />
                     <Skeleton className="h-7 w-3/4" />
-                    <Skeleton className="h-3 w-2/3" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
                   </Card>
                 ))}
               </div>
@@ -651,16 +710,11 @@ export function DashboardPage() {
                   </Alert>
                 )}
                 {kpis.length > 0 && (
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {kpis}
-                  </div>
-                )}
-                {kpis.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Chỉ số tính cho toàn công ty. Công nợ, đại lý và tồn kho là
-                    số liệu hiện tại; doanh số, nhập hàng và thu tiền tính theo
-                    tháng đã chọn.
-                  </p>
+                  <Stagger className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {kpis.map((kpi) => (
+                      <StaggerItem key={kpi.key}>{kpi.node}</StaggerItem>
+                    ))}
+                  </Stagger>
                 )}
               </>
             )}
@@ -669,17 +723,20 @@ export function DashboardPage() {
           {focusItems.length > 0 && (
             <section
               aria-label="Đối tượng đang chọn"
-              className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+              className="bg-water animate-in rounded-xl border border-primary/20 p-4 duration-300 fade-in-0 slide-in-from-top-1"
             >
-              <h2 className="text-sm font-semibold">
-                Đang xem:{' '}
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Crosshair className="size-4 text-primary" aria-hidden="true" />
                 {[filters.agencyId?.label, filters.productId?.label]
                   .filter(Boolean)
                   .join(' · ')}
               </h2>
-              <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {focusItems.map((item) => (
-                  <div key={item.label}>
+                  <div
+                    key={item.label}
+                    className="rounded-lg border bg-card/80 px-3 py-2 shadow-xs"
+                  >
                     <dt className="text-xs text-muted-foreground">
                       {item.label}
                     </dt>
@@ -692,360 +749,499 @@ export function DashboardPage() {
             </section>
           )}
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+          <Stagger
+            className="grid grid-cols-1 gap-4 md:grid-cols-12"
+            delay={0.1}
+            step={0.06}
+          >
             {can('sales') && (
-              <VisualCard
-                className="md:col-span-12 xl:col-span-8"
-                title="Xu hướng doanh số"
-                description="Doanh số gộp, thuần và hàng trả lại — tối đa 12 tháng đến tháng đã chọn, toàn công ty"
-                loading={snapshot.loading}
-                error={snapshot.error}
-                onRetry={() => setReload((n) => n + 1)}
-                isEmpty={!trendData.length}
-                empty={
-                  <EmptyState
-                    title="Chưa có dữ liệu xu hướng"
-                    description="Không có doanh số trong 12 tháng gần nhất."
-                  />
-                }
-                table={
-                  <MiniTable
-                    caption="Xu hướng doanh số"
-                    headers={[
-                      'Tháng',
-                      'Doanh số gộp',
-                      'Trả hàng',
-                      'Doanh số thuần',
+              <StaggerItem className="md:col-span-12 xl:col-span-8">
+                <VisualCard
+                  title="Xu hướng doanh số"
+                  description="12 tháng gần nhất · toàn công ty"
+                  loading={snapshot.loading}
+                  error={snapshot.error}
+                  onRetry={retry}
+                  isEmpty={!trendData.length}
+                  empty={
+                    <EmptyState
+                      title="Chưa có dữ liệu xu hướng"
+                      description="Không có doanh số trong 12 tháng gần nhất."
+                    />
+                  }
+                  table={
+                    <MiniTable
+                      caption="Xu hướng doanh số"
+                      headers={[
+                        'Tháng',
+                        'Doanh số gộp',
+                        'Trả hàng',
+                        'Doanh số thuần',
+                      ]}
+                      rows={trend.map((point) => ({
+                        key: point.month,
+                        label: monthLabel(point.month),
+                        cells: [
+                          formatVND(point.gross),
+                          formatVND(point.returns),
+                          formatVND(point.net),
+                        ],
+                        values: [
+                          toNumber(point.gross),
+                          toNumber(point.returns),
+                          toNumber(point.net),
+                        ],
+                      }))}
+                    />
+                  }
+                >
+                  <GradientAreaChart
+                    data={trendData}
+                    xKey="label"
+                    series={[
+                      {
+                        key: 'gross',
+                        label: 'Doanh số gộp',
+                        color: 'var(--chart-2)',
+                      },
+                      {
+                        key: 'net',
+                        label: 'Doanh số thuần',
+                        color: 'var(--chart-1)',
+                      },
                     ]}
-                    rows={trend.map((point) => ({
-                      key: point.month,
-                      label: monthLabel(point.month),
-                      cells: [
-                        formatVND(point.gross),
-                        formatVND(point.returns),
-                        formatVND(point.net),
-                      ],
-                    }))}
+                    dashedKey="returns"
+                    dashedLabel="Hàng trả lại"
+                    tooltipFormatter={(value) => formatVND(value)}
+                    height={280}
                   />
-                }
-              >
-                <SalesTrendChart data={trendData} />
-              </VisualCard>
+                </VisualCard>
+              </StaggerItem>
+            )}
+
+            {can('sales') && (
+              <StaggerItem className="md:col-span-6 xl:col-span-4">
+                <VisualCard
+                  title="Cơ cấu doanh số"
+                  description={`${periodLabel} · toàn công ty`}
+                  loading={snapshot.loading}
+                  error={snapshot.error}
+                  onRetry={retry}
+                  isEmpty={!sales || salesMixTotal === 0}
+                  empty={
+                    <EmptyState
+                      title="Chưa có doanh số trong tháng"
+                      description="Thử chọn tháng khác."
+                    />
+                  }
+                  table={
+                    sales && (
+                      <MiniTable
+                        caption="Cơ cấu doanh số"
+                        headers={['Chỉ tiêu', 'Số tiền']}
+                        rows={[
+                          ...salesMix.map((part) => ({
+                            key: part.key,
+                            label: part.label,
+                            cells: [formatVND(part.raw)],
+                          })),
+                          {
+                            key: 'gross',
+                            label: 'Doanh số gộp',
+                            cells: [formatVND(sales.gross)],
+                          },
+                        ]}
+                      />
+                    )
+                  }
+                >
+                  {sales && (
+                    <div className="grid items-center gap-4">
+                      <DonutChart
+                        data={salesMix}
+                        centerLabel="Doanh số gộp"
+                        centerValue={formatCompactVND(toNumber(sales.gross))}
+                        valueFormatter={formatCompactVND}
+                        height={200}
+                      />
+                      <LegendList
+                        items={salesMix.map((part) => ({
+                          key: part.key,
+                          label: part.label,
+                          color: part.color,
+                          value: (
+                            <span title={formatVND(part.raw)}>
+                              {formatCompactVND(toNumber(part.raw))}
+                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                {formatPercent(
+                                  salesMixTotal
+                                    ? part.value / salesMixTotal
+                                    : 0,
+                                )}
+                              </span>
+                            </span>
+                          ),
+                        }))}
+                      />
+                    </div>
+                  )}
+                </VisualCard>
+              </StaggerItem>
             )}
 
             {productSource && (
-              <VisualCard
-                className="md:col-span-6 xl:col-span-4"
-                title="Mặt hàng bán chạy"
-                description={`Top ${TOP} theo doanh số gộp · ${periodLabel}${productSource.note ? ` · ${productSource.note}` : ''}`}
-                loading={productSource.loading}
-                error={productSource.error}
-                onRetry={productSource.retry}
-                isEmpty={!productBars.length}
-                empty={
-                  <EmptyState
-                    title="Không có mặt hàng bán trong kỳ"
-                    description="Thử chọn tháng khác hoặc bỏ bộ lọc."
-                  />
-                }
-                table={
-                  <MiniTable
-                    caption="Top mặt hàng"
-                    headers={[
-                      'Mặt hàng',
-                      'Đã bán',
-                      'Doanh số gộp',
-                      'Doanh số thuần',
-                    ]}
-                    rows={productSource.rows.slice(0, TOP).map((row) => ({
-                      key: String(row.productId),
-                      label: String(row.productName),
-                      detail: String(row.productCode),
-                      selected: String(row.productId) === selectedProduct,
-                      onSelect: () => pickProduct(row),
-                      selectLabel: `Lọc theo mặt hàng ${productLabel(row)}`,
-                      cells: [
-                        `${formatQuantity(String(row.soldQuantity))} ${String(row.unitName)}`,
-                        formatVND(String(row.salesAmount)),
-                        formatVND(String(row.netSalesAmount)),
-                      ],
-                    }))}
-                  />
-                }
-              >
-                <RankedBarChart
-                  data={productBars}
-                  seriesLabel="Doanh số gộp"
-                  selectedId={selectedProduct}
-                  onSelect={(datum) => {
-                    const row = productSource.rows.find(
-                      (item) => String(item.productId) === datum.id,
-                    )
-                    if (row) pickProduct(row)
-                  }}
-                />
-              </VisualCard>
-            )}
-
-            {reportAllowed('sales') && (
-              <VisualCard
-                className="md:col-span-6 xl:col-span-4"
-                title="Doanh số thuần theo đại lý"
-                description={`Top ${TOP} · ${periodLabel}${filterNote('sales', filters) ? ` · ${filterNote('sales', filters)}` : ''}`}
-                loading={salesReport.loading}
-                error={salesReport.error}
-                onRetry={salesReport.retry}
-                isEmpty={!salesBars.length}
-                empty={
-                  <EmptyState
-                    title="Chưa có doanh số đại lý"
-                    description="Không có phiếu xuất trong kỳ đã chọn."
-                  />
-                }
-                table={
-                  <MiniTable
-                    caption="Doanh số theo đại lý"
-                    headers={['Đại lý', 'Số phiếu', 'Doanh số thuần', 'Tỷ lệ']}
-                    rows={salesRows.slice(0, TOP).map((row) => ({
-                      key: String(row.agencyId),
-                      label: String(row.agencyName),
-                      detail: String(row.agencyCode),
-                      selected: String(row.agencyId) === selectedAgency,
-                      onSelect: () => pickAgency(row),
-                      selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
-                      cells: [
-                        formatQuantity(String(row.numberOfIssues)),
-                        formatVND(String(row.netSalesAmount)),
-                        `${formatQuantity(String(row.salesRate))} %`,
-                      ],
-                    }))}
-                  />
-                }
-              >
-                <RankedBarChart
-                  data={salesBars}
-                  seriesLabel="Doanh số thuần"
-                  selectedId={selectedAgency}
-                  onSelect={(datum) => pickAgencyBar(salesRows, datum)}
-                />
-              </VisualCard>
-            )}
-
-            {debtSource && (
-              <VisualCard
-                className="md:col-span-6 xl:col-span-4"
-                title="Đại lý nợ nhiều nhất"
-                description={
-                  debtFromReport
-                    ? `Top ${TOP} theo nợ cuối kỳ · ${periodLabel}${debtSource.note ? ` · ${debtSource.note}` : ''}`
-                    : `Top ${TOP} · ${debtSource.note}`
-                }
-                loading={debtSource.loading}
-                error={debtSource.error}
-                onRetry={debtSource.retry}
-                isEmpty={!debtBars.length}
-                empty={
-                  <EmptyState
-                    title="Không có đại lý nào đang nợ"
-                    description="Tất cả đại lý đã tất toán công nợ."
-                  />
-                }
-                table={
-                  <MiniTable
-                    caption="Top đại lý có dư nợ"
-                    headers={[
-                      'Đại lý',
-                      debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại',
-                    ]}
-                    rows={debtSource.rows.slice(0, TOP).map((row) => ({
-                      key: String(row.agencyId),
-                      label: String(row.agencyName),
-                      detail: String(row.agencyCode),
-                      selected: String(row.agencyId) === selectedAgency,
-                      onSelect: () => pickAgency(row),
-                      selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
-                      cells: [formatVND(String(row[debtSource.amountKey]))],
-                    }))}
-                  />
-                }
-              >
-                <RankedBarChart
-                  data={debtBars}
-                  seriesLabel={debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại'}
-                  selectedId={selectedAgency}
-                  onSelect={(datum) => pickAgencyBar(debtSource.rows, datum)}
-                />
-              </VisualCard>
-            )}
-
-            {cashSource && (
-              <VisualCard
-                className="md:col-span-6 xl:col-span-4"
-                title="Dòng tiền và dư có"
-                description={`${periodLabel}${cashSource.note ? ` · ${cashSource.note}` : ''}`}
-                loading={cashSource.loading}
-                error={cashSource.error}
-                onRetry={cashSource.retry}
-                isEmpty={!cashBars.length}
-                table={
-                  <MiniTable
-                    caption="Dòng tiền và dư có"
-                    headers={['Chỉ tiêu', 'Số tiền']}
-                    rows={cashSource.items.map((item) => ({
-                      key: item.key,
-                      label: item.label,
-                      cells: [formatVND(item.value)],
-                    }))}
-                  />
-                }
-              >
-                <RankedBarChart data={cashBars} seriesLabel="Số tiền" />
-              </VisualCard>
-            )}
-
-            {showInventory && (
-              <VisualCard
-                className="md:col-span-6 xl:col-span-4"
-                title="Sức khỏe tồn kho"
-                description={
-                  reportAllowed('inventory')
-                    ? `Mặt hàng tồn thấp nhất cuối ${periodLabel.toLowerCase()}`
-                    : 'Tình trạng tồn kho hiện tại'
-                }
-                loading={
-                  reportAllowed('inventory')
-                    ? inventoryReport.loading
-                    : snapshot.loading
-                }
-                error={
-                  reportAllowed('inventory')
-                    ? inventoryReport.error
-                    : snapshot.error
-                }
-                onRetry={
-                  reportAllowed('inventory')
-                    ? inventoryReport.retry
-                    : () => setReload((n) => n + 1)
-                }
-                isEmpty={!inventory && !stockBars.length}
-                table={
-                  stockRows.length ? (
+              <StaggerItem className="md:col-span-6 xl:col-span-4">
+                <VisualCard
+                  title="Mặt hàng bán chạy"
+                  description={`Top ${TOP} · doanh số gộp${productSource.note ? ` · ${productSource.note}` : ''}`}
+                  loading={productSource.loading}
+                  error={productSource.error}
+                  onRetry={productSource.retry}
+                  isEmpty={!productBars.length}
+                  empty={
+                    <EmptyState
+                      title="Không có mặt hàng bán trong kỳ"
+                      description="Thử chọn tháng khác hoặc bỏ bộ lọc."
+                    />
+                  }
+                  table={
                     <MiniTable
-                      caption="Mặt hàng tồn thấp nhất"
+                      caption="Top mặt hàng"
                       headers={[
                         'Mặt hàng',
-                        'Tồn đầu',
-                        'Nhập',
-                        'Xuất',
-                        'Tồn cuối',
+                        'Đã bán',
+                        'Doanh số gộp',
+                        'Doanh số thuần',
                       ]}
-                      rows={stockRows.map((row) => ({
+                      rows={productSource.rows.slice(0, TOP).map((row) => ({
                         key: String(row.productId),
                         label: String(row.productName),
-                        detail: `${String(row.productCode)} · ${String(row.unitName)}`,
+                        detail: String(row.productCode),
                         selected: String(row.productId) === selectedProduct,
                         onSelect: () => pickProduct(row),
                         selectLabel: `Lọc theo mặt hàng ${productLabel(row)}`,
                         cells: [
-                          formatQuantity(String(row.openingStock)),
-                          formatQuantity(String(row.receiptQuantity)),
-                          formatQuantity(String(row.issueQuantity)),
-                          formatQuantity(String(row.closingStock)),
+                          `${formatQuantity(String(row.soldQuantity))} ${String(row.unitName)}`,
+                          formatVND(String(row.salesAmount)),
+                          formatVND(String(row.netSalesAmount)),
+                        ],
+                        values: [
+                          toNumber(row.soldQuantity),
+                          toNumber(row.salesAmount),
+                          toNumber(row.netSalesAmount),
                         ],
                       }))}
                     />
-                  ) : undefined
-                }
-              >
-                <div className="space-y-4">
-                  {inventory && (
-                    <SegmentedBar
-                      label="Tỷ lệ mặt hàng tồn thấp"
-                      segments={[
-                        {
-                          key: 'low',
-                          label: 'Tồn thấp',
-                          value: inventory.lowStockProductCount,
-                          display: formatPlain(inventory.lowStockProductCount),
-                          color: 'var(--warning)',
-                        },
-                        {
-                          key: 'ok',
-                          label: 'Đủ hàng',
-                          value: Math.max(
-                            0,
-                            inventory.productCount -
-                              inventory.lowStockProductCount,
-                          ),
-                          display: formatPlain(
-                            Math.max(
-                              0,
-                              inventory.productCount -
-                                inventory.lowStockProductCount,
-                            ),
-                          ),
-                          color: 'var(--success)',
-                        },
+                  }
+                >
+                  <RankedBarChart
+                    data={productBars}
+                    seriesLabel="Doanh số gộp"
+                    selectedId={selectedProduct}
+                    onSelect={(datum) => {
+                      const row = productSource.rows.find(
+                        (item) => String(item.productId) === datum.id,
+                      )
+                      if (row) pickProduct(row)
+                    }}
+                  />
+                </VisualCard>
+              </StaggerItem>
+            )}
+
+            {reportAllowed('sales') && (
+              <StaggerItem className="md:col-span-6 xl:col-span-4">
+                <VisualCard
+                  title="Doanh số thuần theo đại lý"
+                  description={`Top ${TOP}${filterNote('sales', filters) ? ` · ${filterNote('sales', filters)}` : ''}`}
+                  loading={salesReport.loading}
+                  error={salesReport.error}
+                  onRetry={salesReport.retry}
+                  isEmpty={!salesBars.length}
+                  empty={
+                    <EmptyState
+                      title="Chưa có doanh số đại lý"
+                      description="Không có phiếu xuất trong kỳ đã chọn."
+                    />
+                  }
+                  table={
+                    <MiniTable
+                      caption="Doanh số theo đại lý"
+                      headers={[
+                        'Đại lý',
+                        'Số phiếu',
+                        'Doanh số thuần',
+                        'Tỷ lệ',
                       ]}
+                      rows={salesRows.slice(0, TOP).map((row) => ({
+                        key: String(row.agencyId),
+                        label: String(row.agencyName),
+                        detail: String(row.agencyCode),
+                        selected: String(row.agencyId) === selectedAgency,
+                        onSelect: () => pickAgency(row),
+                        selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
+                        cells: [
+                          formatQuantity(String(row.numberOfIssues)),
+                          formatVND(String(row.netSalesAmount)),
+                          `${formatQuantity(String(row.salesRate))} %`,
+                        ],
+                        values: [
+                          toNumber(row.numberOfIssues),
+                          toNumber(row.netSalesAmount),
+                          toNumber(row.salesRate),
+                        ],
+                      }))}
                     />
-                  )}
-                  {stockBars.length > 0 && (
-                    <RankedBarChart
-                      data={stockBars}
-                      seriesLabel="Tồn cuối kỳ"
-                      color="var(--chart-1)"
-                      selectedId={selectedProduct}
-                      onSelect={(datum) => {
-                        const row = stockRows.find(
-                          (item) => String(item.productId) === datum.id,
-                        )
-                        if (row) pickProduct(row)
-                      }}
+                  }
+                >
+                  <RankedBarChart
+                    data={salesBars}
+                    seriesLabel="Doanh số thuần"
+                    selectedId={selectedAgency}
+                    onSelect={(datum) => pickAgencyBar(salesRows, datum)}
+                  />
+                </VisualCard>
+              </StaggerItem>
+            )}
+
+            {debtSource && (
+              <StaggerItem className="md:col-span-6 xl:col-span-4">
+                <VisualCard
+                  title="Đại lý nợ nhiều nhất"
+                  description={
+                    debtFromReport
+                      ? `Top ${TOP} · nợ cuối kỳ${debtSource.note ? ` · ${debtSource.note}` : ''}`
+                      : `Top ${TOP} · ${debtSource.note}`
+                  }
+                  loading={debtSource.loading}
+                  error={debtSource.error}
+                  onRetry={debtSource.retry}
+                  isEmpty={!debtBars.length}
+                  empty={
+                    <EmptyState
+                      title="Không có đại lý nào đang nợ"
+                      description="Tất cả đại lý đã tất toán công nợ."
                     />
-                  )}
-                </div>
-              </VisualCard>
+                  }
+                  table={
+                    <MiniTable
+                      caption="Top đại lý có dư nợ"
+                      headers={[
+                        'Đại lý',
+                        debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại',
+                      ]}
+                      rows={debtSource.rows.slice(0, TOP).map((row) => ({
+                        key: String(row.agencyId),
+                        label: String(row.agencyName),
+                        detail: String(row.agencyCode),
+                        selected: String(row.agencyId) === selectedAgency,
+                        onSelect: () => pickAgency(row),
+                        selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
+                        cells: [formatVND(String(row[debtSource.amountKey]))],
+                        values: [toNumber(row[debtSource.amountKey])],
+                      }))}
+                    />
+                  }
+                >
+                  <RankedBarChart
+                    data={debtBars}
+                    seriesLabel={
+                      debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại'
+                    }
+                    color="var(--chart-3)"
+                    selectedId={selectedAgency}
+                    onSelect={(datum) => pickAgencyBar(debtSource.rows, datum)}
+                  />
+                </VisualCard>
+              </StaggerItem>
+            )}
+
+            {cashSource && (
+              <StaggerItem className="md:col-span-6">
+                <VisualCard
+                  title="Dòng tiền và dư có"
+                  description={cashSource.note ?? periodLabel}
+                  loading={cashSource.loading}
+                  error={cashSource.error}
+                  onRetry={cashSource.retry}
+                  isEmpty={!cashBars.length}
+                  table={
+                    <MiniTable
+                      caption="Dòng tiền và dư có"
+                      headers={['Chỉ tiêu', 'Số tiền']}
+                      rows={cashSource.items.map((item) => ({
+                        key: item.key,
+                        label: item.label,
+                        cells: [formatVND(item.value)],
+                        values: [toNumber(item.value)],
+                      }))}
+                    />
+                  }
+                >
+                  <RankedBarChart
+                    data={cashBars}
+                    seriesLabel="Số tiền"
+                    color="var(--chart-2)"
+                  />
+                </VisualCard>
+              </StaggerItem>
+            )}
+
+            {showInventory && (
+              <StaggerItem className="md:col-span-6">
+                <VisualCard
+                  title="Sức khỏe tồn kho"
+                  description={
+                    reportAllowed('inventory')
+                      ? 'Tồn thấp nhất cuối kỳ'
+                      : 'Hiện tại'
+                  }
+                  loading={
+                    reportAllowed('inventory')
+                      ? inventoryReport.loading
+                      : snapshot.loading
+                  }
+                  error={
+                    reportAllowed('inventory')
+                      ? inventoryReport.error
+                      : snapshot.error
+                  }
+                  onRetry={
+                    reportAllowed('inventory') ? inventoryReport.retry : retry
+                  }
+                  isEmpty={!inventory && !stockBars.length}
+                  table={
+                    stockRows.length ? (
+                      <MiniTable
+                        caption="Mặt hàng tồn thấp nhất"
+                        headers={[
+                          'Mặt hàng',
+                          'Tồn đầu',
+                          'Nhập',
+                          'Xuất',
+                          'Tồn cuối',
+                        ]}
+                        rows={stockRows.map((row) => ({
+                          key: String(row.productId),
+                          label: String(row.productName),
+                          detail: `${String(row.productCode)} · ${String(row.unitName)}`,
+                          selected: String(row.productId) === selectedProduct,
+                          onSelect: () => pickProduct(row),
+                          selectLabel: `Lọc theo mặt hàng ${productLabel(row)}`,
+                          cells: [
+                            formatQuantity(String(row.openingStock)),
+                            formatQuantity(String(row.receiptQuantity)),
+                            formatQuantity(String(row.issueQuantity)),
+                            formatQuantity(String(row.closingStock)),
+                          ],
+                          values: [
+                            toNumber(row.openingStock),
+                            toNumber(row.receiptQuantity),
+                            toNumber(row.issueQuantity),
+                            toNumber(row.closingStock),
+                          ],
+                        }))}
+                      />
+                    ) : undefined
+                  }
+                >
+                  <div className="space-y-4">
+                    {inventory && (
+                      <div className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-2 text-xs">
+                          <span className="text-muted-foreground">
+                            Mặt hàng đủ hàng
+                          </span>
+                          <span className="text-base font-semibold tabular-nums">
+                            {formatPercent(inStockRatio)}
+                          </span>
+                        </div>
+                        <SegmentedMeter
+                          ratio={inStockRatio}
+                          label="Tỷ lệ mặt hàng đủ hàng"
+                          color="var(--success)"
+                          className="h-7"
+                        />
+                        <LegendList
+                          className="grid-cols-2 gap-x-6 text-xs"
+                          items={[
+                            {
+                              key: 'low',
+                              label: 'Tồn thấp',
+                              value: formatPlain(
+                                inventory.lowStockProductCount,
+                              ),
+                              color: 'var(--warning)',
+                            },
+                            {
+                              key: 'ok',
+                              label: 'Đủ hàng',
+                              value: formatPlain(inStock),
+                              color: 'var(--success)',
+                            },
+                          ]}
+                        />
+                      </div>
+                    )}
+                    {stockBars.length > 0 && (
+                      <RankedBarChart
+                        data={stockBars}
+                        seriesLabel="Tồn cuối kỳ"
+                        color="var(--chart-7)"
+                        selectedId={selectedProduct}
+                        onSelect={(datum) => {
+                          const row = stockRows.find(
+                            (item) => String(item.productId) === datum.id,
+                          )
+                          if (row) pickProduct(row)
+                        }}
+                      />
+                    )}
+                  </div>
+                </VisualCard>
+              </StaggerItem>
             )}
 
             {(matrixSources.sales || matrixSources.debt) && (
-              <VisualCard
-                className="md:col-span-12 xl:col-span-8"
-                title="Ma trận đại lý"
-                description={`Doanh số và công nợ theo đại lý · ${periodLabel} · thanh dữ liệu theo từng cột`}
-                loading={matrixLoading}
-                error={matrixError}
-                onRetry={() => {
-                  if (salesReport.error) salesReport.retry()
-                  if (debtReport.error) debtReport.retry()
-                }}
-                isEmpty={!matrixRows.length}
-                empty={
-                  <EmptyState
-                    title="Không có đại lý phù hợp"
-                    description="Không có số liệu đại lý cho bộ lọc hiện tại."
-                  />
-                }
-              >
-                <div className="max-h-[420px] overflow-auto rounded-md border">
-                  <AgencyMatrix
-                    rows={matrixRows}
-                    sources={matrixSources}
-                    totals={{
-                      sales: salesReport.page?.totals,
-                      debt: debtReport.page?.totals,
-                    }}
-                    selectedId={selectedAgency}
-                    onSelect={(row) =>
-                      toggle('agencyId', {
-                        id: row.agencyId,
-                        label: `${row.agencyCode} — ${row.agencyName}`,
-                      })
-                    }
-                  />
-                </div>
-              </VisualCard>
+              <StaggerItem className="md:col-span-12">
+                <VisualCard
+                  title="Ma trận đại lý"
+                  description={`${periodLabel} · nhấn tiêu đề cột để sắp xếp`}
+                  loading={matrixLoading}
+                  error={matrixError}
+                  onRetry={() => {
+                    if (salesReport.error) salesReport.retry()
+                    if (debtReport.error) debtReport.retry()
+                  }}
+                  isEmpty={!matrixRows.length}
+                  empty={
+                    <EmptyState
+                      title="Không có đại lý phù hợp"
+                      description="Không có số liệu đại lý cho bộ lọc hiện tại."
+                    />
+                  }
+                >
+                  <div className="max-h-[420px] overflow-auto rounded-lg border">
+                    <AgencyMatrix
+                      rows={matrixRows}
+                      sources={matrixSources}
+                      totals={{
+                        sales: salesReport.page?.totals,
+                        debt: debtReport.page?.totals,
+                      }}
+                      selectedId={selectedAgency}
+                      onSelect={(row) =>
+                        toggle('agencyId', {
+                          id: row.agencyId,
+                          label: `${row.agencyCode} — ${row.agencyName}`,
+                        })
+                      }
+                    />
+                  </div>
+                </VisualCard>
+              </StaggerItem>
             )}
-          </div>
+          </Stagger>
         </>
       )}
     </div>

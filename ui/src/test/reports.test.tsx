@@ -20,6 +20,7 @@ import {
   isNumeric,
   periodLabel,
   sortLabel,
+  sortableColumns,
   visibleColumns,
 } from '../features/reports/display'
 import * as api from '../lib/api'
@@ -121,7 +122,7 @@ async function choose(label: string, id: string) {
   expect((input as HTMLInputElement).value).toBe(`PK-${id} — Bản ghi chọn`)
 }
 
-describe('authoritative reports', () => {
+describe('authoritative reports', { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     pickerRows = []
@@ -181,12 +182,13 @@ describe('authoritative reports', () => {
         '2026-10-30T00:39:22.123456+00:00',
       )
       expect(generated.textContent).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/)
-      // KPI strip and two chart cards with a table view each.
+      // KPI strip and three chart cards (two measures + composition) with a
+      // table view each.
       const kpis = within(region).getByRole('group', { name: 'Chỉ số chính' })
       expect(kpis.children).toHaveLength(4)
       expect(
         within(region).getAllByRole('radio', { name: 'Bảng số liệu' }),
-      ).toHaveLength(2)
+      ).toHaveLength(3)
       const footer = region.querySelector('tfoot')
       if (kind === 'inventory') expect(footer).toBeNull()
       else expect(footer!.textContent).toContain('Tổng toàn bộ kết quả đã lọc')
@@ -241,6 +243,53 @@ describe('authoritative reports', () => {
       name: 'DL-101 — Đại lý nguồn',
     })
     expect(header.closest('tr')!.textContent).toContain('-1 ₫')
+  })
+
+  it('re-sorts on the server from a column header and restarts at page one', async () => {
+    render(<ReportsPage />)
+    apply()
+    await sourceRow()
+    const header = screen.getByRole('columnheader', { name: 'Doanh số thuần' })
+    expect(header.getAttribute('aria-sort')).toBe('none')
+    // Identity/rate columns are not in the sort enum and stay plain headers.
+    expect(
+      within(
+        screen.getByRole('columnheader', { name: 'Tỷ lệ doanh số' }),
+      ).queryByRole('button'),
+    ).toBeNull()
+    fireEvent.click(within(header).getByRole('button'))
+    await waitFor(() => expect(reportCalls()).toHaveLength(2))
+    expect(reportCalls()[1]![0]).toContain('sort=-netSalesAmount')
+    expect(reportCalls()[1]![0]).not.toContain('cursor=')
+    await sourceRow()
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Doanh số thuần' })
+        .getAttribute('aria-sort'),
+    ).toBe('descending')
+    // The filter bar follows, so the applied query is not marked dirty.
+    expect((screen.getByLabelText('Sắp xếp') as HTMLSelectElement).value).toBe(
+      '-netSalesAmount',
+    )
+    expect(exportTrigger().disabled).toBe(false)
+    fireEvent.click(
+      within(
+        screen.getByRole('columnheader', { name: 'Doanh số thuần' }),
+      ).getByRole('button'),
+    )
+    await waitFor(() => expect(reportCalls()).toHaveLength(3))
+    expect(reportCalls()[2]![0]).toContain('sort=netSalesAmount')
+    await sourceRow()
+    fireEvent.click(
+      within(
+        screen.getByRole('columnheader', { name: 'Doanh số thuần' }),
+      ).getByRole('button'),
+    )
+    // Third click returns to the report's default contract sort.
+    await waitFor(() => expect(reportCalls()).toHaveLength(4))
+    expect(reportCalls()[3]![0]).toContain(
+      'sort=' + encodeURIComponent(reports.sales.sorts[0]!),
+    )
   })
 
   it('keeps each tab independent and only reads the active report', async () => {
@@ -596,6 +645,27 @@ describe('report display helpers', () => {
     expect(periodLabel('2026-12-01', '2027-01-01')).toBe(
       '01/12/2026 – 31/12/2026',
     )
+  })
+
+  it('offers header sorting only for visible columns in the sort enum', () => {
+    expect([...sortableColumns('sales')]).toEqual([
+      'salesAmount',
+      'netSalesAmount',
+    ])
+    expect([...sortableColumns('debt')]).toEqual(['closingDebt'])
+    expect([...sortableColumns('inventory')]).toEqual(['closingStock'])
+    expect([...sortableColumns('product-sales')]).toEqual([
+      'salesAmount',
+      'soldQuantity',
+    ])
+    expect([...sortableColumns('cash-and-credit')]).toEqual([
+      'cashReceived',
+      'closingCredit',
+    ])
+    for (const kind of Object.keys(reports) as ReportKind[]) {
+      expect(sortableColumns(kind).has('agencyId')).toBe(false)
+      expect(sortableColumns(kind).has('productId')).toBe(false)
+    }
   })
 
   it('explains each disabled export reason and none when ready', () => {

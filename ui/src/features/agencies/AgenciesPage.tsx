@@ -19,8 +19,14 @@ import {
   type FormEvent,
 } from 'react'
 import { DateField } from '../../components/blocks/DateField'
+import { KpiCard } from '../../components/blocks/KpiCard'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import { RoundedBarChart } from '../../components/charts/MebiusCharts'
+import { SortableHeader, SortMenu } from '../../components/data/SortControls'
+import { useSort } from '../../components/data/sorting'
+import { CountUp, Stagger, StaggerItem } from '../../components/motion/Motion'
 import { Button as ShadcnButton } from '../../components/shadcn/button'
+import { Progress } from '../../components/shadcn/progress'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,15 +47,36 @@ import { apiFetch } from '../../lib/api'
 import { cachedApiFetch, invalidateCache } from '../../lib/cache'
 import { formatDate, formatVND } from '../../lib/formatters'
 import type { Agency, AgencyType, District } from '../../lib/types'
+import { formatCompactVND, formatPercent, formatPlain } from '../../lib/chart'
+import { cn } from '../../lib/utils'
 import { useAuth } from '../authentication/useAuth'
 import {
   DetailGrid,
+  FilterReset,
+  InfoHint,
   ListCard,
   ResultCount,
   SearchField,
   TableSkeleton,
+  ToggleFilter,
   type DetailEntry,
 } from '../districts/listParts'
+import { num, partsBy, ratioOf, sumBy } from '../districts/summaryData'
+import {
+  ChartTile,
+  DonutTile,
+  MeterTile,
+  MiniTable,
+  SummaryGrid,
+} from '../districts/summaryParts'
+
+/** Contract sort fields of GET /agencies (prefix "-" = descending). */
+const AGENCY_SORTS = [
+  { field: 'name', label: 'Tên đại lý' },
+  { field: 'currentDebt', label: 'Dư nợ' },
+  { field: 'acceptedDate', label: 'Ngày tiếp nhận' },
+  { field: 'id', label: 'Thứ tự tạo' },
+] as const
 
 export function AgenciesPage() {
   const { hasPermission } = useAuth()
@@ -75,6 +102,18 @@ export function AgenciesPage() {
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(
     undefined,
   )
+  const sort = useSort()
+  /** A new filter or order starts again from the first page. */
+  const restart = () => {
+    setCurrentCursor(undefined)
+    setCursorHistory([])
+  }
+  const activeFilters = [
+    search.trim(),
+    filterDistrict,
+    filterType,
+    filterStatus,
+  ].filter(Boolean).length
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -119,6 +158,7 @@ export function AgenciesPage() {
     if (filterDistrict) params.append('districtId', filterDistrict)
     if (filterType) params.append('typeId', filterType)
     if (filterStatus) params.append('status', filterStatus)
+    if (sort.sort) params.append('sort', sort.sort)
 
     try {
       const res = await apiFetch<
@@ -156,6 +196,7 @@ export function AgenciesPage() {
     filterDistrict,
     filterType,
     filterStatus,
+    sort.sort,
   ])
 
   useEffect(() => {
@@ -450,10 +491,7 @@ export function AgenciesPage() {
     }
   }
 
-  const typeLabel = (agency: Agency) =>
-    agency.typeName ||
-    agency.agencyTypeName ||
-    `Loại ${agency.typeId ?? agency.agencyTypeId}`
+  const typeLabel = agencyTypeLabel
   const statusBadge = (status: string) =>
     status === 'ACTIVE' ? (
       <Badge variant="success" data-status={status}>
@@ -473,6 +511,13 @@ export function AgenciesPage() {
     label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
   }))
   const kpis = agencyKpis(districts, agencyTypes)
+  const limitOf = (agency: Agency) => debtLimit(agency, agencyTypes)
+  // Memoised so menus/dialogs opening on this page do not redraw the charts.
+  const pageSummary = useMemo(
+    () => agencyPageSummary(filteredAgencies, agencyTypes),
+    [filteredAgencies, agencyTypes],
+  )
+  const pagePartial = !!nextCursor || cursorHistory.length > 0
   const contactFields = (
     <>
       <Input
@@ -525,47 +570,42 @@ export function AgenciesPage() {
       <PageHeader
         className="mb-0"
         title="Hồ sơ đại lý"
-        description="Quản lý thông tin tiếp nhận đại lý, phân loại, quận và theo dõi dư nợ"
         actions={
-          canManage && (
-            <Button
-              variant="primary"
-              onClick={openCreateModal}
-              icon={<Plus className="size-4" />}
-            >
-              Tiếp nhận đại lý mới
-            </Button>
-          )
+          <>
+            <InfoHint label="Giới thiệu hồ sơ đại lý">
+              Tiếp nhận đại lý, phân loại, quận và theo dõi dư nợ so với hạn mức
+              của loại đại lý.
+            </InfoHint>
+            {canManage && (
+              <Button
+                variant="primary"
+                onClick={openCreateModal}
+                icon={<Plus className="size-4" />}
+              >
+                Tiếp nhận đại lý mới
+              </Button>
+            )}
+          </>
         }
       />
 
       {kpis.length > 0 && (
-        <ul
-          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+        <Stagger
+          role="list"
           aria-label="Tổng quan đại lý"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
         >
           {kpis.map((kpi) => (
-            <li
-              key={kpi.label}
-              className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
-            >
-              <span
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <kpi.icon className="size-4" />
-              </span>
-              <span className="grid min-w-0">
-                <span className="truncate text-xs text-muted-foreground">
-                  {kpi.label}
-                </span>
-                <span className="text-lg leading-tight font-semibold tabular-nums">
-                  {kpi.value}
-                </span>
-              </span>
-            </li>
+            <StaggerItem key={kpi.label} role="listitem">
+              <KpiCard
+                className="h-full"
+                label={kpi.label}
+                value={<CountUp value={kpi.value} />}
+                icon={<kpi.icon />}
+              />
+            </StaggerItem>
           ))}
-        </ul>
+        </Stagger>
       )}
 
       {(successNotice || error) && (
@@ -575,13 +615,26 @@ export function AgenciesPage() {
         </div>
       )}
 
+      {pageSummary && (
+        <SummaryGrid
+          label="Biểu đồ đại lý trên trang"
+          partial={pagePartial}
+          className="lg:grid-cols-6"
+        >
+          {pageSummary}
+        </SummaryGrid>
+      )}
+
       <ListCard
         toolbar={
           <>
             <SearchField
               id="agency-filter-search"
               value={search}
-              onChange={setSearch}
+              onChange={(next) => {
+                setSearch(next)
+                restart()
+              }}
               placeholder="Tìm theo tên hoặc số điện thoại..."
             />
             <div className="lg:w-44">
@@ -589,7 +642,10 @@ export function AgenciesPage() {
                 id="agency-filter-district"
                 label="Quận"
                 value={filterDistrict}
-                onChange={(e) => setFilterDistrict(e.target.value)}
+                onChange={(e) => {
+                  setFilterDistrict(e.target.value)
+                  restart()
+                }}
                 options={[
                   { value: '', label: 'Tất cả quận' },
                   ...districtOptions,
@@ -601,7 +657,10 @@ export function AgenciesPage() {
                 id="agency-filter-type"
                 label="Loại đại lý"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => {
+                  setFilterType(e.target.value)
+                  restart()
+                }}
                 options={[
                   { value: '', label: 'Tất cả loại đại lý' },
                   ...agencyTypes.map((t) => ({
@@ -611,19 +670,37 @@ export function AgenciesPage() {
                 ]}
               />
             </div>
-            <div className="lg:w-44">
-              <Select
-                id="agency-filter-status"
-                label="Trạng thái"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as never)}
-                options={[
-                  { value: '', label: 'Tất cả trạng thái' },
-                  { value: 'ACTIVE', label: 'Đang hoạt động' },
-                  { value: 'TERMINATED', label: 'Ngừng hợp tác' },
-                ]}
-              />
-            </div>
+            <ToggleFilter
+              label="Trạng thái"
+              value={filterStatus}
+              onChange={(next) => {
+                setFilterStatus(next as typeof filterStatus)
+                restart()
+              }}
+              options={[
+                { value: 'ACTIVE', label: 'Hoạt động' },
+                { value: 'TERMINATED', label: 'Ngừng hợp tác' },
+              ]}
+            />
+            <SortMenu
+              options={AGENCY_SORTS}
+              sort={sort.sort}
+              onChange={(next) => {
+                sort.setSort(next)
+                restart()
+              }}
+              className="h-9 lg:self-end"
+            />
+            <FilterReset
+              count={activeFilters}
+              onReset={() => {
+                setSearch('')
+                setFilterDistrict('')
+                setFilterType('')
+                setFilterStatus('')
+                restart()
+              }}
+            />
             <ResultCount
               count={filteredAgencies.length}
               loading={isLoading && agencies.length === 0}
@@ -671,14 +748,43 @@ export function AgenciesPage() {
             <thead>
               <tr>
                 <th scope="col">Mã đại lý</th>
-                <th scope="col">Tên đại lý</th>
+                <SortableHeader
+                  field="name"
+                  sort={sort.sort}
+                  onSort={(field, first) => {
+                    sort.toggle(field, first)
+                    restart()
+                  }}
+                >
+                  Tên đại lý
+                </SortableHeader>
                 <th scope="col">Điện thoại</th>
                 <th scope="col">Quận</th>
                 <th scope="col">Loại</th>
-                <th scope="col" className="cell-number text-right">
+                <SortableHeader
+                  field="currentDebt"
+                  sort={sort.sort}
+                  onSort={(field, first) => {
+                    sort.toggle(field, first)
+                    restart()
+                  }}
+                  firstDirection="desc"
+                  align="right"
+                  className="text-right"
+                >
                   Dư nợ
-                </th>
-                <th scope="col">Ngày tiếp nhận</th>
+                </SortableHeader>
+                <SortableHeader
+                  field="acceptedDate"
+                  sort={sort.sort}
+                  onSort={(field, first) => {
+                    sort.toggle(field, first)
+                    restart()
+                  }}
+                  firstDirection="desc"
+                >
+                  Ngày tiếp nhận
+                </SortableHeader>
                 <th scope="col">Trạng thái</th>
                 <th scope="col" className="cell-actions w-14 text-right">
                   <span className="sr-only">Thao tác</span>
@@ -716,6 +822,10 @@ export function AgenciesPage() {
                   <td className="whitespace-nowrap">{typeLabel(agency)}</td>
                   <td className="cell-number text-right font-semibold whitespace-nowrap tabular-nums">
                     {formatVND(agency.currentDebt)}
+                    <DebtUsage
+                      debt={num(agency.currentDebt)}
+                      limit={limitOf(agency)}
+                    />
                   </td>
                   <td className="whitespace-nowrap tabular-nums">
                     {formatDate(agency.acceptedDate || agency.receptionDate)}
@@ -978,38 +1088,130 @@ function sumField(rows: object[], keys: string[]): number | null {
   return total
 }
 
-/** Overview chips derived from the already-loaded district/type catalogues. */
+/** Overview tiles derived from the already-loaded district/type catalogues. */
 function agencyKpis(districts: District[], agencyTypes: AgencyType[]) {
-  const number = new Intl.NumberFormat('vi-VN')
   const active = sumField(districts, [
     'activeAgencyCount',
     'activeAgenciesCount',
   ])
   const remaining = sumField(districts, ['remainingSlots'])
-  const items: { label: string; value: string; icon: typeof Store }[] = []
+  const items: { label: string; value: number; icon: typeof Store }[] = []
   if (active !== null)
-    items.push({
-      label: 'Đại lý đang hoạt động',
-      value: number.format(active),
-      icon: Store,
-    })
+    items.push({ label: 'Đại lý đang hoạt động', value: active, icon: Store })
   if (districts.length)
-    items.push({
-      label: 'Quận',
-      value: number.format(districts.length),
-      icon: MapPin,
-    })
+    items.push({ label: 'Quận', value: districts.length, icon: MapPin })
   if (agencyTypes.length)
-    items.push({
-      label: 'Loại đại lý',
-      value: number.format(agencyTypes.length),
-      icon: Tags,
-    })
+    items.push({ label: 'Loại đại lý', value: agencyTypes.length, icon: Tags })
   if (remaining !== null)
-    items.push({
-      label: 'Chỗ còn nhận',
-      value: number.format(remaining),
-      icon: CircleDashed,
-    })
+    items.push({ label: 'Chỗ còn nhận', value: remaining, icon: CircleDashed })
   return items
+}
+
+/** Thin bar under the debt amount: share of the agency type's debt limit used. */
+function DebtUsage({ debt, limit }: { debt: number; limit: number | null }) {
+  if (limit === null) return null
+  const ratio = ratioOf(debt, limit)
+  return (
+    <Progress
+      value={Math.round(ratio * 100)}
+      aria-label={`Đã dùng ${formatPercent(ratio)} hạn mức nợ`}
+      title={`${formatPercent(ratio)} hạn mức ${formatVND(String(limit))}`}
+      className={cn(
+        'mt-1 ml-auto h-1 w-20 bg-muted',
+        ratio >= 0.9
+          ? '[&>*]:bg-destructive'
+          : ratio >= 0.7
+            ? '[&>*]:bg-warning'
+            : '[&>*]:bg-primary',
+      )}
+    />
+  )
+}
+
+/**
+ * Charts for the agencies already loaded on this page: type mix, debt by
+ * district and overall debt-limit usage of active agencies.
+ */
+function agencyTypeLabel(agency: Agency): string {
+  return (
+    agency.typeName ||
+    agency.agencyTypeName ||
+    `Loại ${agency.typeId ?? agency.agencyTypeId}`
+  )
+}
+
+/** Debt limit of the agency's type (display only); null when unknown. */
+function debtLimit(agency: Agency, agencyTypes: AgencyType[]): number | null {
+  const type = agencyTypes.find(
+    (t) => t.id === (agency.typeId ?? agency.agencyTypeId),
+  )
+  const limit = num(agency.maxDebt ?? type?.maxDebt)
+  return limit > 0 ? limit : null
+}
+
+function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
+  if (!agencies.length) return null
+  const typeLabel = agencyTypeLabel
+  const limitOf = (agency: Agency) => debtLimit(agency, agencyTypes)
+  const active = agencies.filter((agency) => agency.status === 'ACTIVE')
+  const limited = active.filter((agency) => limitOf(agency) !== null)
+  const debt = sumBy(limited, (agency) => num(agency.currentDebt))
+  const limit = sumBy(limited, (agency) => limitOf(agency) ?? 0)
+  const byDistrict = partsBy(
+    agencies,
+    (agency) => agency.districtId,
+    (agency) => agency.districtName || `Quận ${agency.districtId}`,
+    (agency) => num(agency.currentDebt),
+  ).map((part) => ({ name: part.label, debt: part.value }))
+  return (
+    <>
+      <DonutTile
+        title="Đại lý theo loại"
+        centerLabel="đại lý"
+        head={['Loại', 'Số đại lý']}
+        data={partsBy(
+          agencies,
+          (agency) => agency.typeId ?? agency.agencyTypeId,
+          typeLabel,
+        )}
+      />
+      <ChartTile
+        title="Dư nợ theo quận"
+        table={
+          <MiniTable
+            caption="Dư nợ theo quận"
+            head={['Quận', 'Dư nợ']}
+            rows={byDistrict.map((row) => [
+              row.name,
+              formatVND(String(row.debt)),
+            ])}
+          />
+        }
+      >
+        <RoundedBarChart
+          data={byDistrict}
+          xKey="name"
+          height={150}
+          valueFormatter={formatCompactVND}
+          series={[{ key: 'debt', label: 'Dư nợ' }]}
+        />
+      </ChartTile>
+      <MeterTile
+        title="Hạn mức nợ đã dùng"
+        ratio={ratioOf(debt, limit)}
+        caption={`${formatPlain(limited.length)} đại lý hoạt động`}
+        color={
+          ratioOf(debt, limit) >= 0.9
+            ? 'var(--destructive)'
+            : ratioOf(debt, limit) >= 0.7
+              ? 'var(--warning)'
+              : 'var(--chart-1)'
+        }
+        legend={[
+          { key: 'debt', label: 'Dư nợ', value: formatCompactVND(debt) },
+          { key: 'limit', label: 'Hạn mức', value: formatCompactVND(limit) },
+        ]}
+      />
+    </>
+  )
 }

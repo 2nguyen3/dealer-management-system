@@ -1,6 +1,8 @@
 import { RotateCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ChartCard } from '../../components/blocks/ChartCard'
+import { SortableHeader } from '../../components/data/SortControls'
+import { sortRows, useSort } from '../../components/data/sorting'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
@@ -41,20 +43,23 @@ export function VisualCard({
     <ChartCard
       title={title}
       description={description}
-      className={cn('h-full', className)}
+      className={cn(
+        'h-full transition-shadow duration-300 hover:shadow-md',
+        className,
+      )}
       table={settled && !isEmpty ? table : undefined}
       isEmpty={settled && isEmpty}
       empty={empty}
       footer={settled ? footer : undefined}
     >
       {loading ? (
-        <div className="space-y-3 py-2" aria-busy="true">
+        <div className="flex h-40 items-end gap-2 py-2" aria-busy="true">
           <span className="sr-only">Đang tải {title.toLowerCase()}…</span>
-          {[0.92, 0.74, 0.6, 0.48, 0.32].map((width) => (
+          {[0.55, 0.8, 0.4, 0.95, 0.65, 0.3, 0.75].map((height, index) => (
             <Skeleton
-              key={width}
-              className="h-5"
-              style={{ width: `${width * 100}%` }}
+              key={index}
+              className="flex-1 rounded-full"
+              style={{ height: `${height * 100}%` }}
             />
           ))}
         </div>
@@ -85,12 +90,17 @@ export interface MiniTableRow {
   label: string
   detail?: string
   cells: string[]
+  /** Raw numbers aligned with `cells`; enables client-side column sorting. */
+  values?: number[]
   selected?: boolean
   onSelect?: () => void
   selectLabel?: string
 }
 
-/** Accessible table view for a chart; entity rows can cross-filter. */
+/**
+ * Accessible table view for a chart; entity rows can cross-filter. The rows
+ * are fully loaded, so headers sort client-side (asc → desc → original order).
+ */
 export function MiniTable({
   caption,
   headers,
@@ -100,23 +110,46 @@ export function MiniTable({
   headers: string[]
   rows: MiniTableRow[]
 }) {
+  const { sort, toggle } = useSort()
+  const sortable = rows.length > 1 && rows.every((row) => row.values)
+  const accessors: Record<string, (row: MiniTableRow) => string | number> = {
+    c0: (row) => row.label,
+  }
+  headers.slice(1).forEach((_, index) => {
+    accessors[`c${index + 1}`] = (row) => row.values?.[index] ?? 0
+  })
+  const ordered = sortable ? sortRows(rows, sort, accessors) : rows
   return (
     <Table caption={caption}>
       <thead className="sticky top-0 z-[1]">
         <tr>
-          {headers.map((header, index) => (
-            <th
-              key={header}
-              scope="col"
-              className={index ? 'cell-number' : 'text-left'}
-            >
-              {header}
-            </th>
-          ))}
+          {headers.map((header, index) =>
+            sortable ? (
+              <SortableHeader
+                key={header}
+                field={`c${index}`}
+                sort={sort}
+                onSort={toggle}
+                align={index ? 'right' : 'left'}
+                firstDirection={index ? 'desc' : 'asc'}
+                className={index ? undefined : 'text-left'}
+              >
+                {header}
+              </SortableHeader>
+            ) : (
+              <th
+                key={header}
+                scope="col"
+                className={index ? 'cell-number' : 'text-left'}
+              >
+                {header}
+              </th>
+            ),
+          )}
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {ordered.map((row) => (
           <tr key={row.key} className={cn(row.selected && 'bg-accent')}>
             <th scope="row" className="px-3 py-2 text-left font-normal">
               {row.onSelect ? (

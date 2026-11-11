@@ -1,6 +1,8 @@
 import {
   ArrowRightLeft,
   Banknote,
+  CircleDollarSign,
+  FileClock,
   FilePlus2,
   RefreshCw,
   RotateCcw,
@@ -9,6 +11,9 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DateField } from '@/components/blocks/DateField'
 import { PageHeader } from '@/components/blocks/PageHeader'
+import { SortableHeader } from '@/components/data/SortControls'
+import { nextSort, useSort } from '@/components/data/sorting'
+import { CountUp } from '@/components/motion/Motion'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -22,6 +27,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Table } from '@/components/ui/Table'
 import { apiFetch } from '@/lib/api'
 import { invalidateCache } from '@/lib/cache'
+import { formatCompactVND } from '@/lib/chart'
 import { formatDate, formatVND } from '@/lib/formatters'
 import {
   enumOptions,
@@ -56,9 +62,20 @@ import {
   TableCard,
   TableSkeleton,
 } from './financeUi'
+import { documentLifecycle, groupTotals } from './flow'
+import { FlowSteps } from './FlowSteps'
+import { PageSummary } from './PageSummary'
 import { useSourcePage } from './useSourcePage'
 
 const DOCUMENT_STATUSES = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
+const STATUS_COLORS: Record<string, string> = {
+  DRAFT: 'var(--chart-4)',
+  PENDING: 'var(--warning)',
+  POSTED: 'var(--success)',
+  CANCELLED: 'var(--destructive)',
+}
+/** Server sort enum: businessDate, totalAmount, createdAt, id (±). */
+const DEFAULT_SORT = '-businessDate'
 const RECEIPT_METHODS = ['CASH', 'BANK_TRANSFER', 'ONLINE'] as const
 
 type Confirm = 'post' | 'paid' | 'online' | 'cancel'
@@ -93,10 +110,10 @@ export function FinancialDocuments({
   )
   const canCancel = hasPermission('documents.cancel') && (!refund || canPost)
   const description = refund
-    ? 'Hoàn lại tiền cho đại lý từ phiếu thu đã ghi sổ.'
+    ? 'Lập yêu cầu → giữ chỗ quỹ → chi tiền → hoàn tất.'
     : credit
-      ? 'Dùng số dư có của đại lý để trừ vào công nợ, không phát sinh tiền mặt.'
-      : 'Lập, ghi sổ và theo dõi các phiếu thu tiền của đại lý.'
+      ? 'Lập nháp → bù trừ dư có → công nợ giảm. Không phát sinh tiền mặt.'
+      : 'Lập nháp → ghi sổ → công nợ cập nhật.'
   const HeaderIcon = refund ? Undo2 : credit ? ArrowRightLeft : Banknote
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
@@ -105,6 +122,9 @@ export function FinancialDocuments({
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const range = dateRangeParams(fromDate, toDate)
+  const sorter = useSort(DEFAULT_SORT)
+  const onSort = (field: string, first?: 'asc' | 'desc') =>
+    sorter.setSort(nextSort(sorter.sort, field, first) || DEFAULT_SORT)
   const list = useSourcePage(
     path,
     {
@@ -113,7 +133,7 @@ export function FinancialDocuments({
       agencyId: agencyFilter,
       ...(kind === 'receipt' ? { paymentMethod: methodFilter } : {}),
       ...range.params,
-      sort: '-businessDate',
+      sort: sorter.sort,
     },
     documentSummary,
   )
@@ -297,6 +317,19 @@ export function FinancialDocuments({
     (!refund || (item.status === 'DRAFT' && !unknown))
   const paidReady =
     !!evidence.trim() && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(paidAt)
+  const groups = groupTotals(
+    list.items,
+    'status',
+    'totalAmount',
+    DOCUMENT_STATUSES,
+  ).map((group) => ({
+    ...group,
+    label: statusLabel(group.key),
+    color: STATUS_COLORS[group.key] ?? 'var(--chart-4)',
+  }))
+  const pageAmount = groups.reduce((sum, group) => sum + group.amount, 0)
+  const postedGroup = groups.find((group) => group.key === 'POSTED')
+  const draftGroup = groups.find((group) => group.key === 'DRAFT')
   const filtered = !!(
     q ||
     status ||
@@ -333,6 +366,38 @@ export function FinancialDocuments({
       />
       {error && <Alert type="error">{error}</Alert>}
       {notice && <Alert type="success">{notice}</Alert>}
+      {!list.loading && list.items.length > 0 && (
+        <PageSummary
+          title="Tổng quan chứng từ"
+          noun="chứng từ"
+          total={list.items.length}
+          groups={groups}
+          kpis={[
+            {
+              label: 'Tổng giá trị',
+              icon: <HeaderIcon />,
+              value: formatCompactVND(pageAmount),
+              hint: `${list.items.length} chứng từ`,
+            },
+            {
+              label: refund
+                ? 'Giá trị đã hoàn'
+                : credit
+                  ? 'Giá trị đã bù trừ'
+                  : 'Giá trị đã ghi sổ',
+              icon: <CircleDollarSign />,
+              value: formatCompactVND(postedGroup?.amount ?? 0),
+              hint: `${postedGroup?.count ?? 0} chứng từ`,
+            },
+            {
+              label: 'Nháp chờ xử lý',
+              icon: <FileClock />,
+              value: <CountUp value={draftGroup?.count ?? 0} />,
+              hint: formatCompactVND(draftGroup?.amount ?? 0),
+            },
+          ]}
+        />
+      )}
       <FilterBar>
         <Input
           label="Tìm chứng từ"
@@ -385,7 +450,7 @@ export function FinancialDocuments({
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
         title={`Danh sách ${title.toLowerCase()}`}
-        description="Sắp xếp theo ngày nghiệp vụ mới nhất."
+        description="Bấm tiêu đề cột để sắp xếp."
       >
         {list.loading ? (
           <TableSkeleton label="Đang tải chứng từ..." />
@@ -406,11 +471,24 @@ export function FinancialDocuments({
               <tr>
                 <th scope="col">Số phiếu</th>
                 <th scope="col">Đại lý</th>
-                <th scope="col">Ngày nghiệp vụ</th>
+                <SortableHeader
+                  field="businessDate"
+                  sort={sorter.sort}
+                  onSort={onSort}
+                  firstDirection="desc"
+                >
+                  Ngày nghiệp vụ
+                </SortableHeader>
                 {!credit && <th scope="col">Hình thức</th>}
-                <th scope="col" className="cell-number">
+                <SortableHeader
+                  field="totalAmount"
+                  sort={sorter.sort}
+                  onSort={onSort}
+                  align="right"
+                  firstDirection="desc"
+                >
                   Số tiền
-                </th>
+                </SortableHeader>
                 <th scope="col">Trạng thái</th>
                 <th scope="col" className="cell-actions">
                   Thao tác
@@ -597,17 +675,19 @@ export function FinancialDocuments({
                     : 'neutral'
               }
             />
+            <FlowSteps
+              label="Vòng đời chứng từ"
+              steps={documentLifecycle(kind, item)}
+            />
             <DetailList entries={detailEntries(item)} />
             {credit && (
               <Alert type="info">
-                Không phát sinh tiền mặt. Hệ thống tự trừ vào các khoản nợ cũ
-                nhất trước.
+                Không phát sinh tiền mặt; trừ vào khoản nợ cũ nhất trước.
               </Alert>
             )}
             {!manualReceipt && (
               <Alert type="info">
-                Phiếu thu tự động hoặc trực tuyến chỉ để xem, không sửa hoặc ghi
-                sổ thủ công.
+                Phiếu thu tự động/trực tuyến: chỉ xem, không ghi sổ thủ công.
               </Alert>
             )}
             {refund && unknown && (

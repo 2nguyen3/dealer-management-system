@@ -1,7 +1,16 @@
 import { BookOpenText, Landmark, PiggyBank, Wallet } from 'lucide-react'
 import { useState } from 'react'
+import { ChartCard } from '@/components/blocks/ChartCard'
 import { KpiCard } from '@/components/blocks/KpiCard'
 import { PageHeader } from '@/components/blocks/PageHeader'
+import {
+  DonutChart,
+  LegendList,
+  RoundedBarChart,
+} from '@/components/charts/MebiusCharts'
+import { SortableHeader } from '@/components/data/SortControls'
+import { nextSort, useSort } from '@/components/data/sorting'
+import { Stagger, StaggerItem } from '@/components/motion/Motion'
 import { Progress } from '@/components/shadcn/progress'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +22,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Table } from '@/components/ui/Table'
 import { formatCompactVND, formatPercent, toNumber } from '@/lib/chart'
 import { formatDate, formatVND } from '@/lib/formatters'
+import { cn } from '@/lib/utils'
 import {
   businessDate,
   decimal,
@@ -31,7 +41,28 @@ import {
 import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { Balance } from './Balance'
 import { SourceStatement } from './SourceStatement'
-import { agingBuckets } from './statementModel'
+import { agingBuckets, limitUsage, usageBuckets } from './statementModel'
+
+/** Server sort enum for GET /receivables (default -currentDebt). */
+const DEFAULT_SORT = '-currentDebt'
+/** Server sort enum for GET /agencies/{id}/invoice-balances. */
+const INVOICE_SORT = 'businessDate'
+const USAGE_COLORS: Record<string, string> = {
+  low: 'var(--success)',
+  mid: 'var(--chart-1)',
+  high: 'var(--warning)',
+  over: 'var(--destructive)',
+  none: 'var(--chart-4)',
+}
+
+/** Progress indicator colour by limit usage (text keeps the exact percent). */
+function usageTone(usage: number): string {
+  return usage >= 1
+    ? '[&_[data-slot=progress-indicator]]:bg-destructive'
+    : usage >= 0.8
+      ? '[&_[data-slot=progress-indicator]]:bg-warning'
+      : '[&_[data-slot=progress-indicator]]:bg-primary'
+}
 
 const totalLabels: Record<string, string> = {
   currentDebt: 'Dư nợ',
@@ -63,13 +94,6 @@ function invoice(value: unknown): Row {
   decimal(data.totalAmount)
   decimal(data.outstandingAmount)
   return data
-}
-
-/** Debt / limit ratio, or null when the limit is missing or zero. */
-function usageOf(item: Row): number | null {
-  if (typeof item.maxDebt !== 'string') return null
-  const limit = toNumber(item.maxDebt)
-  return limit > 0 ? toNumber(String(item.currentDebt)) / limit : null
 }
 
 function Aging({ items }: { items: Row[] }) {
@@ -121,15 +145,18 @@ function Aging({ items }: { items: Row[] }) {
 }
 
 function Invoices({ agencyId }: { agencyId: string }) {
+  const sorter = useSort(INVOICE_SORT)
+  const onSort = (field: string, first?: 'asc' | 'desc') =>
+    sorter.setSort(nextSort(sorter.sort, field, first) || INVOICE_SORT)
   const list = useSourcePage(
     `/agencies/${agencyId}/invoice-balances`,
-    { sort: 'businessDate' },
+    { sort: sorter.sort },
     invoice,
   )
   return (
     <SectionCard
       title="Số dư hóa đơn"
-      description="Các phiếu xuất còn nợ, cũ nhất trước."
+      description="Phiếu xuất còn nợ. Bấm tiêu đề cột để sắp xếp."
     >
       {list.error && <Alert type="error">{list.error}</Alert>}
       {!list.loading && !list.error && <Aging items={list.items} />}
@@ -146,13 +173,25 @@ function Invoices({ agencyId }: { agencyId: string }) {
               <thead>
                 <tr>
                   <th scope="col">Phiếu xuất</th>
-                  <th scope="col">Ngày</th>
+                  <SortableHeader
+                    field="businessDate"
+                    sort={sorter.sort}
+                    onSort={onSort}
+                  >
+                    Ngày
+                  </SortableHeader>
                   <th scope="col" className="cell-number">
                     Tổng tiền
                   </th>
-                  <th scope="col" className="cell-number">
+                  <SortableHeader
+                    field="outstandingAmount"
+                    sort={sorter.sort}
+                    onSort={onSort}
+                    align="right"
+                    firstDirection="desc"
+                  >
                     Còn nợ
-                  </th>
+                  </SortableHeader>
                   <th scope="col">Tình trạng</th>
                 </tr>
               </thead>
@@ -195,17 +234,33 @@ export function ReceivablesPage() {
   const [selected, setSelected] = useState('')
   const [selectedName, setSelectedName] = useState('')
   const [statement, setStatement] = useState(false)
-  const list = useSourcePage('/receivables', { q }, overview)
+  const sorter = useSort(DEFAULT_SORT)
+  const onSort = (field: string, first?: 'asc' | 'desc') =>
+    sorter.setSort(nextSort(sorter.sort, field, first) || DEFAULT_SORT)
+  const list = useSourcePage('/receivables', { q, sort: sorter.sort }, overview)
   const totals =
     list.metadata?.totals !== undefined
       ? Object.entries(record(list.metadata.totals))
       : []
+  const bars = list.items.slice(0, 12).map((item) => ({
+    code: String(item.agencyCode),
+    debt: toNumber(String(item.currentDebt)),
+    remaining: toNumber(String(item.remainingCreditLimit)),
+  }))
+  const buckets = usageBuckets(
+    list.items.map((item) => ({
+      currentDebt: item.currentDebt,
+      maxDebt: item.maxDebt,
+    })),
+  )
+    .filter((bucket) => bucket.count > 0)
+    .map((bucket) => ({ ...bucket, color: USAGE_COLORS[bucket.key]! }))
   return (
     <div className="page-container space-y-6">
       <PageHeader
         eyebrow="Tài chính"
         title="Công nợ đại lý"
-        description="Dư nợ, hạn mức còn lại và sổ công nợ của từng đại lý."
+        description="Dư nợ, hạn mức còn lại, tuổi nợ và sổ công nợ theo đại lý."
         className="mb-0"
       />
       <FilterBar>
@@ -222,26 +277,108 @@ export function ReceivablesPage() {
           <h2 className="text-sm font-semibold text-muted-foreground">
             Tổng theo bộ lọc
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Stagger className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {totals.map(([key, value]) => {
               const raw = decimal(value)
               const Icon = totalIcons[key] ?? Wallet
               return (
-                <KpiCard
-                  key={key}
-                  label={totalLabels[key] ?? key}
-                  icon={<Icon />}
-                  value={formatCompactVND(toNumber(raw))}
-                  exactValue={formatVND(raw)}
-                />
+                <StaggerItem key={key}>
+                  <KpiCard
+                    label={totalLabels[key] ?? key}
+                    icon={<Icon />}
+                    value={formatCompactVND(toNumber(raw))}
+                    exactValue={formatVND(raw)}
+                    className="h-full"
+                  />
+                </StaggerItem>
               )
             })}
-          </div>
+          </Stagger>
         </section>
+      )}
+      {!list.loading && list.items.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <ChartCard
+            title="Dư nợ và hạn mức còn lại"
+            description={`Trang hiện tại · ${bars.length} đại lý đầu theo thứ tự đang sắp xếp`}
+            table={
+              <Table caption="Bảng dư nợ và hạn mức còn lại">
+                <thead>
+                  <tr>
+                    <th scope="col">Đại lý</th>
+                    <th scope="col" className="cell-number">
+                      Dư nợ
+                    </th>
+                    <th scope="col" className="cell-number">
+                      Còn lại
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bars.map((bar) => (
+                    <tr key={bar.code}>
+                      <td>{bar.code}</td>
+                      <td className="cell-number">
+                        {formatCompactVND(bar.debt)}
+                      </td>
+                      <td className="cell-number">
+                        {formatCompactVND(bar.remaining)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            }
+          >
+            <RoundedBarChart
+              data={bars}
+              xKey="code"
+              stacked
+              height={220}
+              series={[
+                { key: 'debt', label: 'Dư nợ', color: 'var(--chart-1)' },
+                {
+                  key: 'remaining',
+                  label: 'Hạn mức còn lại',
+                  color: 'var(--chart-2)',
+                },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard
+            title="Mức dùng hạn mức"
+            description={`Trang hiện tại · ${list.items.length} đại lý`}
+          >
+            <div className="flex items-center gap-3">
+              <DonutChart
+                data={buckets.map((bucket) => ({
+                  key: bucket.key,
+                  label: bucket.label,
+                  value: bucket.count,
+                  color: bucket.color,
+                }))}
+                centerValue={String(list.items.length)}
+                centerLabel="đại lý"
+                valueFormatter={(value) => String(Math.round(value))}
+                height={150}
+                className="max-w-36 shrink-0"
+              />
+              <LegendList
+                className="min-w-0 flex-1 gap-1.5 text-xs"
+                items={buckets.map((bucket) => ({
+                  key: bucket.key,
+                  label: bucket.label,
+                  value: bucket.count,
+                  color: bucket.color,
+                }))}
+              />
+            </div>
+          </ChartCard>
+        </div>
       )}
       <TableCard
         title="Công nợ theo đại lý"
-        description="Bấm “Chi tiết” để xem số dư, hóa đơn còn nợ và sổ công nợ."
+        description="Bấm tiêu đề cột để sắp xếp; “Chi tiết” để xem số dư và sổ."
       >
         {list.loading ? (
           <TableSkeleton label="Đang tải công nợ..." />
@@ -256,14 +393,32 @@ export function ReceivablesPage() {
           <Table caption="Công nợ đại lý">
             <thead>
               <tr>
-                <th scope="col">Mã đại lý</th>
+                <SortableHeader
+                  field="agencyId"
+                  sort={sorter.sort}
+                  onSort={onSort}
+                >
+                  Mã đại lý
+                </SortableHeader>
                 <th scope="col">Tên đại lý</th>
-                <th scope="col" className="cell-number">
+                <SortableHeader
+                  field="currentDebt"
+                  sort={sorter.sort}
+                  onSort={onSort}
+                  align="right"
+                  firstDirection="desc"
+                >
                   Dư nợ
-                </th>
-                <th scope="col" className="cell-number">
+                </SortableHeader>
+                <SortableHeader
+                  field="remainingCreditLimit"
+                  sort={sorter.sort}
+                  onSort={onSort}
+                  align="right"
+                  firstDirection="desc"
+                >
                   Hạn mức còn lại
-                </th>
+                </SortableHeader>
                 <th scope="col" className="min-w-36">
                   Sử dụng hạn mức
                 </th>
@@ -274,7 +429,7 @@ export function ReceivablesPage() {
             </thead>
             <tbody>
               {list.items.map((item) => {
-                const usage = usageOf(item)
+                const usage = limitUsage(item.currentDebt, item.maxDebt)
                 const open = () => {
                   setSelected(String(item.agencyId))
                   setSelectedName(
@@ -299,7 +454,7 @@ export function ReceivablesPage() {
                         <div className="flex items-center gap-2">
                           <Progress
                             value={Math.min(100, usage * 100)}
-                            className="h-1.5 w-20"
+                            className={cn('h-1.5 w-20', usageTone(usage))}
                             aria-label={`Sử dụng hạn mức ${String(item.agencyCode)}`}
                           />
                           <span className="text-xs tabular-nums text-muted-foreground">

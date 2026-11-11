@@ -1,6 +1,8 @@
-import { FileBarChart2, RefreshCw } from 'lucide-react'
+import { CalendarRange, FileBarChart2, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import { nextSort } from '../../components/data/sorting'
+import { Badge } from '@/components/shadcn/badge'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import {
   Tabs,
@@ -14,6 +16,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { apiFetch } from '../../lib/api'
 import { formatDateTime } from '../../lib/formatters'
 import { useAuth } from '../authentication/useAuth'
+import { InfoTip } from '../dashboard/charts'
 import {
   parseReport,
   reportPath,
@@ -57,12 +60,13 @@ function LoadingReport() {
   return (
     <div role="status" aria-live="polite" className="space-y-6">
       <span className="sr-only">Đang tải báo cáo...</span>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <Skeleton className="h-72 rounded-xl" />
         <Skeleton className="h-72 rounded-xl" />
         <Skeleton className="h-72 rounded-xl" />
       </div>
@@ -193,6 +197,25 @@ export function ReportsPage() {
     }
   }
 
+  /** Header click: new server order for the applied query, from page one. */
+  function sortBy(field: string, firstDirection?: 'asc' | 'desc') {
+    if (!current) return
+    const next =
+      nextSort(current.query.sort, field, firstDirection) || defaults.sort
+    if (!reports[kind].sorts.includes(next)) return
+    exportController.current?.abort()
+    setDrafts({ ...drafts, [kind]: { ...draft, sort: next } })
+    setApplied({
+      ...applied,
+      [kind]: {
+        query: { ...current.query, sort: next },
+        cursor: null,
+        history: [],
+        reload: current.reload + 1,
+      },
+    })
+  }
+
   function reset() {
     setDrafts({ ...drafts, [kind]: defaults })
     setFormError(null)
@@ -287,11 +310,17 @@ export function ReportsPage() {
         <section className="space-y-6" aria-label={reports[query.kind].label}>
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold tracking-tight">
+              <h2 className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
                 {reports[query.kind].label}
+                {notes[query.kind] && (
+                  <InfoTip label="Ghi chú báo cáo">{notes[query.kind]}</InfoTip>
+                )}
               </h2>
-              <p className="text-sm text-muted-foreground">
-                Kỳ báo cáo: {periodLabel(page.fromDate, page.toDate)}
+              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarRange className="size-3.5" aria-hidden="true" />
+                <span>
+                  Kỳ báo cáo: {periodLabel(page.fromDate, page.toDate)}
+                </span>
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -301,9 +330,6 @@ export function ReportsPage() {
               </time>
             </p>
           </div>
-          {notes[query.kind] && (
-            <p className="text-sm text-muted-foreground">{notes[query.kind]}</p>
-          )}
           {!page.items.length ? (
             <div role="status">
               <EmptyState
@@ -318,11 +344,16 @@ export function ReportsPage() {
               <div className="space-y-3 rounded-xl border bg-card p-4 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Chi tiết</h3>
-                  <span className="text-xs text-muted-foreground">
-                    {page.items.length} dòng trên trang
-                  </span>
+                  <Badge variant="secondary" className="tabular-nums">
+                    {page.items.length} dòng
+                  </Badge>
                 </div>
-                <ReportTable kind={query.kind} page={page} />
+                <ReportTable
+                  kind={query.kind}
+                  page={page}
+                  sort={query.sort}
+                  onSort={sortBy}
+                />
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     variant="outline"
@@ -365,7 +396,7 @@ export function ReportsPage() {
       <PageHeader
         eyebrow="Phân tích"
         title="Báo cáo kinh doanh"
-        description="Xem doanh số, công nợ, tồn kho và thu tiền theo kỳ; xuất toàn bộ kết quả ra PDF hoặc Excel."
+        description="Doanh số · công nợ · tồn kho · thu chi — xuất PDF/Excel."
         actions={
           available.length ? (
             <ExportMenu

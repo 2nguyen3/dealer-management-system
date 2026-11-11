@@ -6,10 +6,10 @@
 /* shadcn/ui token mapping (Tailwind v4). Components use bg-background, text-muted-foreground, ... */
 @theme inline {
   --font-sans:
-    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
-    monospace;
+    'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
   --font-mono:
-    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -57,6 +57,8 @@
 }
 
 /* ==========================================================================
+   Agentra tokens. Default palette "Thủy" (water); alternative palettes are
+   selected with <html data-palette="…"> (see the palette blocks below).
    Agentra "Thủy" (water) tokens: ocean blue, deep navy, cyan and silver.
    Chart slots 1-8 are categorical: assign in fixed entity order, never by rank,
    never reuse status colours (success/warning/destructive) as series.
@@ -168,13 +170,210 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
+/* Alternative palettes (Ngũ hành + Tím). Neutrals and status colours stay shared. */
+:root[data-palette='moc']:not(.dark) {
+  --background: #f6f7f5;
+  --primary: #24483d;
+  --primary-foreground: #ffffff;
+  --ring: #24483d;
+  --accent: #e6efe9;
+  --accent-foreground: #17201b;
+  --secondary: #eef2ee;
+  --chart-1: #24483d;
+  --sidebar: #15291f;
+  --sidebar-foreground: #c9d7cf;
+  --sidebar-primary: #8fd1ad;
+  --sidebar-primary-foreground: #0f1f17;
+  --sidebar-accent: #20392e;
+  --sidebar-border: #24402f;
+  --sidebar-ring: #8fd1ad;
+}
+:root.dark[data-palette='moc'] {
+  --background: #060d0a;
+  --primary: #6cc59a;
+  --primary-foreground: #06140d;
+  --ring: #6cc59a;
+  --accent: #13261d;
+  --accent-foreground: #e3efe8;
+  --secondary: #122019;
+  --chart-1: #6cc59a;
+  --sidebar: #030806;
+  --sidebar-foreground: #a9c4b5;
+  --sidebar-primary: #6cc59a;
+  --sidebar-primary-foreground: #06140d;
+  --sidebar-accent: #0e1d16;
+  --sidebar-border: #10231a;
+  --sidebar-ring: #6cc59a;
+}
+:root[data-palette='kim']:not(.dark) {
+  --background: #f6f7f9;
+  --primary: #334155;
+  --primary-foreground: #ffffff;
+  --ring: #475569;
+  --accent: #eceef2;
+  --accent-foreground: #0f172a;
+  --secondary: #f0f2f5;
+  --chart-1: #475569;
+  --sidebar: #111318;
+  --sidebar-foreground: #c3c8d1;
+  --sidebar-primary: #e2e8f0;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #1d2129;
+  --sidebar-border: #23272f;
+  --sidebar-ring: #e2e8f0;
+}
+:root.dark[data-palette='kim'] {
+  --background: #08090c;
+  --primary: #cbd5e1;
+  --primary-foreground: #0b0f17;
+  --ring: #cbd5e1;
+  --accent: #1a1e26;
+  --accent-foreground: #e5e9f0;
+  --secondary: #15181e;
+  --chart-1: #cbd5e1;
+  --sidebar: #030405;
+  --sidebar-foreground: #aab2bf;
+  --sidebar-primary: #e2e8f0;
+  --sidebar-primary-foreground: #0b0f17;
+  --sidebar-accent: #14171c;
+  --sidebar-border: #181b21;
+  --sidebar-ring: #e2e8f0;
+}
+:root[data-palette='hoa']:not(.dark) {
+  --background: #fbf8f7;
+  --primary: #d1432b;
+  --primary-foreground: #ffffff;
+  --ring: #d1432b;
+  --accent: #fcebe6;
+  --accent-foreground: #4a140a;
+  --secondary: #fbf0ed;
+  --chart-1: #d1432b;
+  --sidebar: #2a0f0b;
+  --sidebar-foreground: #e3c4bd;
+  --sidebar-primary: #ff8a6b;
+  --sidebar-primary-foreground: #2a0f0b;
+  --sidebar-accent: #3d1912;
+  --sidebar-border: #4a1f17;
+  --sidebar-ring: #ff8a6b;
+}
+:root.dark[data-palette='hoa'] {
+  --background: #0d0706;
+  --primary: #ff7a5c;
+  --primary-foreground: #1f0904;
+  --ring: #ff7a5c;
+  --accent: #2a140f;
+  --accent-foreground: #f6e4df;
+  --secondary: #1d100d;
+  --chart-1: #ff7a5c;
+  --sidebar: #080302;
+  --sidebar-foreground: #c9aaa2;
+  --sidebar-primary: #ff7a5c;
+  --sidebar-primary-foreground: #1f0904;
+  --sidebar-accent: #1c0e0a;
+  --sidebar-border: #24120d;
+  --sidebar-ring: #ff7a5c;
+}
+:root[data-palette='tho']:not(.dark) {
+  --background: #faf8f4;
+  --primary: #a35a07;
+  --primary-foreground: #ffffff;
+  --ring: #a35a07;
+  --accent: #fbf0de;
+  --accent-foreground: #3a2405;
+  --secondary: #f8f1e6;
+  --chart-1: #c27407;
+  --sidebar: #241708;
+  --sidebar-foreground: #dccbb3;
+  --sidebar-primary: #f5b44a;
+  --sidebar-primary-foreground: #241708;
+  --sidebar-accent: #35230e;
+  --sidebar-border: #3f2a12;
+  --sidebar-ring: #f5b44a;
+}
+:root.dark[data-palette='tho'] {
+  --background: #0c0905;
+  --primary: #f2ac3d;
+  --primary-foreground: #1e1203;
+  --ring: #f2ac3d;
+  --accent: #2a1e0d;
+  --accent-foreground: #f3e8d6;
+  --secondary: #1b140a;
+  --chart-1: #f2ac3d;
+  --sidebar: #070502;
+  --sidebar-foreground: #c4b49c;
+  --sidebar-primary: #f2ac3d;
+  --sidebar-primary-foreground: #1e1203;
+  --sidebar-accent: #1a130a;
+  --sidebar-border: #21180c;
+  --sidebar-ring: #f2ac3d;
+}
+:root[data-palette='tim']:not(.dark) {
+  --background: #f8f7fc;
+  --primary: #6a43e8;
+  --primary-foreground: #ffffff;
+  --ring: #6a43e8;
+  --accent: #efe9fd;
+  --accent-foreground: #23104f;
+  --secondary: #f3effc;
+  --chart-1: #6a43e8;
+  --sidebar: #170e33;
+  --sidebar-foreground: #cbc2e6;
+  --sidebar-primary: #a98bff;
+  --sidebar-primary-foreground: #170e33;
+  --sidebar-accent: #241850;
+  --sidebar-border: #2c1e5e;
+  --sidebar-ring: #a98bff;
+}
+:root.dark[data-palette='tim'] {
+  --background: #08060f;
+  --primary: #a78bfa;
+  --primary-foreground: #140a33;
+  --ring: #a78bfa;
+  --accent: #1d1538;
+  --accent-foreground: #ebe5fb;
+  --secondary: #151027;
+  --chart-1: #a78bfa;
+  --sidebar: #040209;
+  --sidebar-foreground: #b1a8cc;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #140a33;
+  --sidebar-accent: #140e28;
+  --sidebar-border: #1a1331;
+  --sidebar-ring: #a78bfa;
+}
+
+/* Non-Thủy palettes: neutral surfaces tinted by their own primary (not navy). */
+:root[data-palette]:not([data-palette='thuy']):not(.dark) {
+  --muted: color-mix(in oklab, var(--primary) 4%, #f2f3f4);
+  --muted-foreground: #5d636c;
+  --border: color-mix(in oklab, var(--primary) 7%, #e3e5e8);
+  --input: color-mix(in oklab, var(--primary) 9%, #d8dbdf);
+  --foreground: #17191d;
+  --card-foreground: #17191d;
+  --popover-foreground: #17191d;
+  --chart-grid: color-mix(in oklab, var(--primary) 6%, #e6e7ea);
+}
+
+:root.dark[data-palette]:not([data-palette='thuy']) {
+  --card: color-mix(in oklab, var(--primary) 5%, #0d0d10);
+  --popover: color-mix(in oklab, var(--primary) 6%, #101013);
+  --muted: color-mix(in oklab, var(--primary) 7%, #141417);
+  --muted-foreground: #9a9ca5;
+  --border: color-mix(in oklab, var(--primary) 12%, #1f1f24);
+  --input: color-mix(in oklab, var(--primary) 16%, #28282e);
+  --foreground: #ebecef;
+  --card-foreground: #ebecef;
+  --popover-foreground: #ebecef;
+  --secondary-foreground: #ebecef;
+  --chart-grid: color-mix(in oklab, var(--primary) 10%, #1c1c20);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
 
   html {
-    font-size: 15px;
     color-scheme: light;
   }
 
@@ -187,12 +386,8 @@
     margin: 0;
     min-height: 100dvh;
     font-family: var(--font-sans);
-    font-size: 0.9rem;
-    line-height: 1.55;
-    letter-spacing: -0.01em;
-    font-feature-settings:
-      'zero' 1,
-      'calt' 1;
+    font-size: 14px;
+    line-height: 1.5;
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
   }

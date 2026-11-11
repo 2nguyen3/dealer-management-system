@@ -1,6 +1,11 @@
 import { ChevronDown, Undo2, XCircle } from 'lucide-react'
 import { useId, useState } from 'react'
 import { DateField } from '../../components/blocks/DateField'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../../components/shadcn/collapsible'
 import { Label } from '../../components/shadcn/label'
 import { Textarea } from '../../components/shadcn/textarea'
 import { Alert } from '../../components/ui/Alert'
@@ -144,9 +149,8 @@ export function CorrectionDialog({
       <div className="space-y-4">
         {!allowed && (
           <Alert type="error">
-            Bạn không có quyền thực hiện thao tác này, hoặc chứng từ không được
-            phép sửa/hủy. Hủy phiếu xuất đã thu tiền ngay cần thêm quyền ghi sổ
-            phiếu thu.
+            Không có quyền hoặc chứng từ không được sửa/hủy. Hủy phiếu xuất đã
+            thu tiền ngay cần thêm quyền ghi sổ phiếu thu.
           </Alert>
         )}
         <Alert
@@ -158,21 +162,21 @@ export function CorrectionDialog({
           }
         >
           {cancel
-            ? 'Hệ thống kiểm tra lại tồn kho và công nợ trước khi hủy. Khoản tiền đã thực thu không bị xóa.'
-            : 'Bản thay thế được lưu thành phiên bản mới. Hệ thống kiểm tra lại tồn kho, công nợ và số tiền trước khi lưu.'}
+            ? 'Tồn kho và công nợ được kiểm tra lại; tiền đã thu không bị xóa.'
+            : 'Lưu thành phiên bản mới sau khi kiểm tra tồn kho, công nợ.'}
         </Alert>
-        <details className="group rounded-xl border bg-muted/30">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-medium text-foreground [&::-webkit-details-marker]:hidden">
-            Xem chứng từ hiện tại (giữ nguyên trong lịch sử)
+        <Collapsible className="group rounded-xl border bg-muted/30">
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-3 text-left text-[13px] font-medium text-foreground">
+            Chứng từ hiện tại
             <ChevronDown
-              className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+              className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
               aria-hidden="true"
             />
-          </summary>
-          <div className="border-t p-4">
+          </CollapsibleTrigger>
+          <CollapsibleContent className="border-t p-4">
             <DocumentSnapshot doc={doc} />
-          </div>
-        </details>
+          </CollapsibleContent>
+        </Collapsible>
         <form
           id={formId}
           noValidate
@@ -192,9 +196,7 @@ export function CorrectionDialog({
           <SectionCard
             title={cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
             description={
-              cancel
-                ? 'Lý do được lưu cùng lịch sử chứng từ.'
-                : 'Ngày, ghi chú và dòng hàng mới thay thế toàn bộ phiên bản hiện hành.'
+              cancel ? 'Lưu cùng lịch sử.' : 'Thay toàn bộ phiên bản hiện hành.'
             }
           >
             <fieldset

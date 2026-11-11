@@ -37,14 +37,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/shadcn/card'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from '@/components/shadcn/item'
 import { Label } from '@/components/shadcn/label'
 import { RadioGroup, RadioGroupItem } from '@/components/shadcn/radio-group'
 import { Separator } from '@/components/shadcn/separator'
@@ -55,6 +47,7 @@ import {
   TabsTrigger,
 } from '@/components/shadcn/tabs'
 import { THEME_OPTIONS } from '@/components/theme/ModeToggle'
+import { isPalette, PALETTES, usePalette } from '@/components/theme/palette'
 import { formatDate, formatDateTime } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import {
@@ -77,6 +70,9 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const { theme = 'system', setTheme } = useTheme()
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [palette, setPalette] = usePalette()
+  const swatch =
+    PALETTES.find((option) => option.value === palette)?.swatch ?? '#1857d1'
   if (!user) return null
 
   const granted = new Set<string>(allowedFunctions)
@@ -418,7 +414,7 @@ export function ProfilePage() {
                     htmlFor={`theme-${value}`}
                     className="cursor-pointer flex-col items-stretch gap-3 rounded-xl border p-3 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
                   >
-                    <ThemePreview mode={value} />
+                    <ThemePreview mode={value} accent={swatch} />
                     <span className="flex items-center gap-2">
                       <RadioGroupItem id={`theme-${value}`} value={value} />
                       <Icon className="size-4" />
@@ -428,26 +424,50 @@ export function ProfilePage() {
                 ))}
               </RadioGroup>
               <Separator className="my-5" />
-              <Item variant="muted" size="sm">
-                <ItemMedia variant="icon">
-                  <Palette />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>Bảng màu Thủy</ItemTitle>
-                  <ItemDescription>
-                    Xanh đại dương · xanh thẫm · bạc
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions className="gap-1">
-                  {[1, 2, 3, 4, 5, 6].map((slot) => (
-                    <span
-                      key={slot}
-                      className="size-5 rounded-full ring-2 ring-card"
-                      style={{ background: `var(--chart-${slot})` }}
-                    />
-                  ))}
-                </ItemActions>
-              </Item>
+              <p className="mb-3 flex items-center gap-2 text-sm font-medium">
+                <Palette className="size-4" /> Màu chủ đạo
+              </p>
+              <RadioGroup
+                value={palette}
+                onValueChange={(value) => isPalette(value) && setPalette(value)}
+                className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+                aria-label="Màu chủ đạo"
+              >
+                {PALETTES.map((option) => (
+                  <Label
+                    key={option.value}
+                    htmlFor={`palette-${option.value}`}
+                    className="cursor-pointer flex-col items-stretch gap-2 rounded-xl border p-3 transition-all hover:-translate-y-0.5 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
+                  >
+                    <span className="flex gap-1" aria-hidden="true">
+                      <span
+                        className="h-8 flex-[2] rounded-md"
+                        style={{ background: option.swatch }}
+                      />
+                      <span
+                        className="h-8 flex-1 rounded-md opacity-45"
+                        style={{ background: option.swatch }}
+                      />
+                      <span
+                        className="h-8 flex-1 rounded-md opacity-15"
+                        style={{ background: option.swatch }}
+                      />
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <RadioGroupItem
+                        id={`palette-${option.value}`}
+                        value={option.value}
+                      />
+                      <span className="grid leading-tight">
+                        <span>{option.label}</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          {option.hint}
+                        </span>
+                      </span>
+                    </span>
+                  </Label>
+                ))}
+              </RadioGroup>
             </CardContent>
           </Card>
         </TabsContent>
@@ -461,7 +481,7 @@ export function ProfilePage() {
 }
 
 /** Miniature workspace drawn in the target theme's own colours. */
-function ThemePreview({ mode }: { mode: string }) {
+function ThemePreview({ mode, accent }: { mode: string; accent: string }) {
   const dark = mode === 'dark'
   const half = mode === 'system'
   const tile = (isDark: boolean) => (
@@ -488,7 +508,7 @@ function ThemePreview({ mode }: { mode: string }) {
               className="flex-1 rounded-full"
               style={{
                 height: `${h}%`,
-                background: isDark ? '#4d9bff' : '#1857d1',
+                background: accent,
               }}
             />
           ))}

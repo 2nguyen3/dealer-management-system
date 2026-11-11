@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ReportRow } from '../features/reports/contracts'
 import {
   allZero,
+  compositionOf,
   debtFlow,
   flowData,
   flowRoles,
@@ -19,6 +20,7 @@ import {
   shiftDate,
   shiftMonth,
 } from '../features/reports/periods'
+import { formatCompactVND, toNumber } from '../lib/chart'
 import { huge, reportFixture } from './reportFixtures'
 
 function agency(id: string, net: string): ReportRow {
@@ -173,5 +175,75 @@ describe('report insights', () => {
     expect(returnRatio({ salesAmount: '200', returnAmount: '50' })).toBe(0.25)
     expect(returnRatio({ salesAmount: '0', returnAmount: '0' })).toBeNull()
     expect(returnRatio(undefined)).toBeNull()
+  })
+
+  it('builds donut compositions from full-filter totals', () => {
+    const sales = compositionOf(
+      'sales',
+      { salesAmount: '1000', returnAmount: '250', netSalesAmount: '750' },
+      [],
+    )
+    expect(sales.shape).toBe('donut')
+    expect(sales.centerValue).toBe(formatCompactVND(1000))
+    expect(
+      sales.parts.map((part) => [part.key, part.value, part.ratio]),
+    ).toEqual([
+      ['netSalesAmount', 750, 0.75],
+      ['returnAmount', 250, 0.25],
+    ])
+    expect(sales.parts[0]!.display).toBe('750 ₫')
+    // Negative net sales never draws a negative slice; exact text is kept.
+    const negative = compositionOf(
+      'product-sales',
+      { salesAmount: huge, returnAmount: '1', netSalesAmount: '-1' },
+      [],
+    )
+    expect(negative.parts[0]!.value).toBe(0)
+    expect(negative.parts[0]!.display).toBe('-1 ₫')
+    expect(negative.parts[1]!.ratio).toBe(1)
+    expect(negative.centerValue).toBe(formatCompactVND(toNumber(huge)))
+    // Cash: the centre is the sum of the plotted parts.
+    const cash = compositionOf(
+      'cash-and-credit',
+      reportFixture('cash-and-credit').totals,
+      [],
+    )
+    expect(cash.centerValue).toBe(formatCompactVND(11))
+    expect(cash.parts.map((part) => part.key)).toEqual([
+      'creditApplied',
+      'creditRefunded',
+    ])
+    // Zero or missing totals: zero ratios, no division by zero.
+    const debt = compositionOf('debt', undefined, [])
+    expect(
+      debt.parts.every((part) => part.value === 0 && part.ratio === 0),
+    ).toBe(true)
+    expect(debt.parts[0]!.display).toBe('—')
+  })
+
+  it('builds inventory rings as shares of the products on the page', () => {
+    const row = (closing: string, receipt: string, adjust: string) =>
+      ({
+        ...reportFixture('inventory').items[0]!,
+        closingStock: closing,
+        receiptQuantity: receipt,
+        issueQuantity: '0',
+        adjustmentQuantity: adjust,
+      }) as ReportRow
+    const rings = compositionOf('inventory', undefined, [
+      row('0', '1', '0'),
+      row('5', '0', '0'),
+      row('0', '0', '-1'),
+      row('2', '3', '0'),
+    ])
+    expect(rings.shape).toBe('rings')
+    expect(rings.centerValue).toBe('4')
+    expect(rings.parts.map((part) => [part.key, part.ratio])).toEqual([
+      ['moving', 0.5],
+      ['outOfStock', 0.5],
+      ['adjusted', 0.25],
+    ])
+    expect(rings.parts[2]!.display).toBe('1 / 4')
+    expect(compositionOf('inventory', undefined, []).parts[0]!.ratio).toBe(0)
   })
 })

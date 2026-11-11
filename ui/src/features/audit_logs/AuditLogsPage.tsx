@@ -3,12 +3,15 @@ import {
   Eye,
   FilePlus2,
   FileX2,
+  History,
   PencilLine,
   RefreshCw,
   UserRound,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import { SortableHeader, SortMenu } from '../../components/data/SortControls'
+import { useSort } from '../../components/data/sorting'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
@@ -24,10 +27,19 @@ import { formatDateTime } from '../../lib/formatters'
 import { auditActionLabel, enumOptions } from '../../lib/labels'
 import {
   DetailGrid,
+  FilterReset,
+  InfoHint,
   ListCard,
   ResultCount,
   TableSkeleton,
 } from '../districts/listParts'
+import { countWhere, partsBy, ratioOf } from '../districts/summaryData'
+import {
+  DonutTile,
+  MeterTile,
+  StatTile,
+  SummaryGrid,
+} from '../districts/summaryParts'
 import {
   id,
   message,
@@ -39,6 +51,17 @@ import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { changedKeys, entityLabel } from './auditLabels'
 
 const AUDIT_ACTIONS = ['INSERT', 'UPDATE', 'DELETE'] as const
+/** Contract sort fields of GET /audit-logs; the server default is -createdAt. */
+const AUDIT_SORTS = [
+  { field: 'createdAt', label: 'Thời điểm' },
+  { field: 'id', label: 'Mã nhật ký' },
+] as const
+const EMPTY_FILTERS = {
+  action: '',
+  entityName: '',
+  actorId: '',
+  requestId: '',
+}
 const ACTION_TONES: Record<string, 'success' | 'info' | 'danger'> = {
   INSERT: 'success',
   UPDATE: 'info',
@@ -102,13 +125,20 @@ function ActionBadge({ action }: { action: unknown }) {
 }
 
 export function AuditLogsPage() {
-  const [filters, setFilters] = useState<Record<string, string>>({
-    action: '',
-    entityName: '',
-    actorId: '',
-    requestId: '',
-  })
-  const list = useSourcePage('/audit-logs', filters, audit)
+  const [filters, setFilters] = useState<Record<string, string>>(EMPTY_FILTERS)
+  const sort = useSort('-createdAt')
+  const list = useSourcePage(
+    '/audit-logs',
+    { ...filters, ...sort.params },
+    audit,
+  )
+  const activeFilters = Object.values(filters).filter(
+    (value) => value.trim() !== '',
+  ).length
+  const systemCount = countWhere(
+    list.items,
+    (item) => item.actorType === 'SYSTEM',
+  )
   const [selected, setSelected] = useState('')
   const [detail, setDetail] = useState<Row | null>(null)
   const [error, setError] = useState('')
@@ -136,9 +166,50 @@ export function AuditLogsPage() {
       <PageHeader
         className="mb-0"
         title="Nhật ký hệ thống"
-        description="Lịch sử thay đổi dữ liệu trong hệ thống. Thông tin nhạy cảm đã được ẩn."
+        actions={
+          <InfoHint label="Giới thiệu nhật ký">
+            Lịch sử thay đổi dữ liệu. Thông tin nhạy cảm đã được ẩn.
+          </InfoHint>
+        }
       />
       {list.error && <Alert type="error">{list.error}</Alert>}
+      {list.items.length > 0 && (
+        <SummaryGrid
+          label="Tổng quan nhật ký"
+          partial={list.hasMore || list.hasPrevious}
+        >
+          <StatTile
+            label="Thay đổi"
+            value={list.items.length}
+            icon={<History />}
+          />
+          <StatTile label="Do hệ thống" value={systemCount} icon={<Bot />} />
+          <DonutTile
+            title="Theo hành động"
+            centerLabel="thay đổi"
+            head={['Hành động', 'Số lần']}
+            data={partsBy(
+              list.items,
+              (item) => AUDIT_ACTIONS.indexOf(item.action as never),
+              (item) => auditActionLabel(item.action),
+            )}
+          />
+          <MeterTile
+            title="Người dùng thực hiện"
+            className="lg:col-span-4"
+            ratio={ratioOf(list.items.length - systemCount, list.items.length)}
+            caption={`${list.items.length - systemCount}/${list.items.length} thay đổi`}
+            legend={[
+              {
+                key: 'user',
+                label: 'Người dùng',
+                value: list.items.length - systemCount,
+              },
+              { key: 'system', label: 'Hệ thống', value: systemCount },
+            ]}
+          />
+        </SummaryGrid>
+      )}
       <ListCard
         toolbar={
           <>
@@ -170,6 +241,17 @@ export function AuditLogsPage() {
                 />
               </div>
             ))}
+            <SortMenu
+              options={AUDIT_SORTS}
+              sort={sort.sort}
+              onChange={sort.setSort}
+              defaultLabel="Mới nhất"
+              className="h-9 lg:self-end"
+            />
+            <FilterReset
+              count={activeFilters}
+              onReset={() => setFilters(EMPTY_FILTERS)}
+            />
             <ResultCount count={list.items.length} loading={list.loading} />
             <Button
               type="button"
@@ -206,7 +288,18 @@ export function AuditLogsPage() {
           <Table caption="Nhật ký">
             <thead>
               <tr>
-                <th scope="col">Thời điểm</th>
+                <SortableHeader
+                  field="createdAt"
+                  sort={sort.sort}
+                  onSort={() =>
+                    sort.setSort(
+                      sort.sort === 'createdAt' ? '-createdAt' : 'createdAt',
+                    )
+                  }
+                >
+                  Thời điểm
+                </SortableHeader>
+
                 <th scope="col">Người thực hiện</th>
                 <th scope="col">Chức năng</th>
                 <th scope="col">Hành động</th>

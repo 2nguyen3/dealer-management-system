@@ -1,5 +1,6 @@
-import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useState } from 'react'
+import { SortableHeader } from '../../components/data/SortControls'
+import { nextSort, type SortValue } from '../../components/data/sorting'
 import { Table } from '../../components/ui/Table'
 import { formatQuantity, formatVND } from '../../lib/formatters'
 import { cn } from '@/lib/utils'
@@ -35,14 +36,16 @@ export function AgencyMatrix({
   onSelect: (row: MatrixRow) => void
 }) {
   const columns = matrixColumns.filter((column) => sources[column.source])
-  const [sort, setSort] = useState<{ key: MatrixColumn; desc: boolean }>({
-    key: columns[0]?.key ?? 'netSalesAmount',
-    desc: true,
-  })
-  const sortKey = columns.some((column) => column.key === sort.key)
-    ? sort.key
-    : (columns[0]?.key ?? 'netSalesAmount')
-  const sorted = sortMatrix(rows, sortKey, sort.desc)
+  const fallback: MatrixColumn = columns[0]?.key ?? 'netSalesAmount'
+  // Client-side order of the fully loaded agency rows; default: first column ↓.
+  const [sort, setSort] = useState<SortValue>(`-${fallback}`)
+  const field = sort.replace(/^-/, '')
+  const sortKey = columns.some((column) => column.key === field)
+    ? (field as MatrixColumn)
+    : fallback
+  const current: SortValue = sortKey === field ? sort : `-${fallback}`
+  const desc = current.startsWith('-')
+  const sorted = sortMatrix(rows, sortKey, desc)
   const scales = Object.fromEntries(
     columns.map((column) => [column.key, columnScale(rows, column.key)]),
   ) as Record<MatrixColumn, (value: string | undefined) => number>
@@ -54,38 +57,20 @@ export function AgencyMatrix({
           <th scope="col" className="text-left">
             Đại lý
           </th>
-          {columns.map((column) => {
-            const active = column.key === sortKey
-            return (
-              <th
-                key={column.key}
-                scope="col"
-                className="cell-number"
-                aria-sort={
-                  active ? (sort.desc ? 'descending' : 'ascending') : 'none'
-                }
-              >
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  onClick={() =>
-                    setSort({
-                      key: column.key,
-                      desc: active ? !sort.desc : true,
-                    })
-                  }
-                >
-                  {column.label}
-                  {active &&
-                    (sort.desc ? (
-                      <ArrowDown className="size-3" aria-hidden="true" />
-                    ) : (
-                      <ArrowUp className="size-3" aria-hidden="true" />
-                    ))}
-                </button>
-              </th>
-            )
-          })}
+          {columns.map((column) => (
+            <SortableHeader
+              key={column.key}
+              field={column.key}
+              sort={current}
+              align="right"
+              firstDirection="desc"
+              onSort={(key, first) =>
+                setSort(nextSort(current, key, first) || `-${fallback}`)
+              }
+            >
+              {column.label}
+            </SortableHeader>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -125,7 +110,7 @@ export function AgencyMatrix({
                 return (
                   <td key={column.key} className="cell-number relative">
                     <span
-                      className="absolute inset-y-1.5 left-1 rounded-sm bg-chart-1/15"
+                      className="absolute inset-y-2 left-1 rounded-full bg-gradient-to-r from-chart-1/25 to-chart-2/20 transition-[width] duration-500"
                       style={{ width: `calc(${ratio * 100}% - 8px)` }}
                       aria-hidden="true"
                     />

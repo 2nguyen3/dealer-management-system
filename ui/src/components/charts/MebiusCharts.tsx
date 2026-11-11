@@ -63,6 +63,7 @@ export function RoundedBarChart({
   series,
   stacked = false,
   valueFormatter = formatCompact,
+  tooltipFormatter,
   height = 260,
   showLegend = series.length > 1,
   className,
@@ -72,6 +73,8 @@ export function RoundedBarChart({
   series: readonly SeriesSpec[]
   stacked?: boolean
   valueFormatter?: (value: number) => string
+  /** Exact value for tooltips; defaults to `valueFormatter`. */
+  tooltipFormatter?: (value: number) => string
   height?: number
   showLegend?: boolean
   className?: string
@@ -133,7 +136,7 @@ export function RoundedBarChart({
                     {config[String(name)]?.label ?? name}
                   </span>
                   <span className="ml-auto pl-3 font-semibold tabular-nums">
-                    {valueFormatter(Number(value))}
+                    {(tooltipFormatter ?? valueFormatter)(Number(value))}
                   </span>
                 </div>
               )}
@@ -177,6 +180,7 @@ export function GradientAreaChart({
   dashedKey,
   dashedLabel,
   valueFormatter = formatCompact,
+  tooltipFormatter,
   height = 260,
   className,
 }: {
@@ -186,6 +190,8 @@ export function GradientAreaChart({
   dashedKey?: string
   dashedLabel?: string
   valueFormatter?: (value: number) => string
+  /** Exact value for tooltips; defaults to `valueFormatter`. */
+  tooltipFormatter?: (value: number) => string
   height?: number
   className?: string
 }) {
@@ -264,7 +270,7 @@ export function GradientAreaChart({
                     {config[String(name)]?.label ?? name}
                   </span>
                   <span className="ml-auto pl-3 font-semibold tabular-nums">
-                    {valueFormatter(Number(value))}
+                    {(tooltipFormatter ?? valueFormatter)(Number(value))}
                   </span>
                 </div>
               )}

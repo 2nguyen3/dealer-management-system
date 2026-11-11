@@ -7,13 +7,21 @@
       name="description"
       content="Agentra - Không gian quản lý đại lý, hàng hóa và công nợ"
     />
-    <meta name="theme-color" content="#08142b" />
+    <meta name="theme-color" content="#233229" />
     <link
       rel="icon"
-      type="image/svg+xml"
-      href="/assets/brand/agentra-mark.svg"
+      type="image/png"
+      sizes="64x64"
+      href="/assets/brand/agentra-icon.png"
     />
     <title>Agentra · Quản lý đại lý</title>
+    <script>
+      try {
+        var p = localStorage.getItem('agentra-palette')
+        if (/^(thuy|moc|kim|hoa|tho|tim)$/.test(p || ''))
+          document.documentElement.dataset.palette = p
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

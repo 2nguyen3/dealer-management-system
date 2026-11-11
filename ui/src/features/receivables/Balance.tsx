@@ -1,7 +1,12 @@
 import { HandCoins, PiggyBank, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { KpiCard } from '@/components/blocks/KpiCard'
-import { Progress } from '@/components/shadcn/progress'
+import {
+  DonutChart,
+  LegendList,
+  SegmentedMeter,
+} from '@/components/charts/MebiusCharts'
+import { Card } from '@/components/shadcn/card'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import { Alert } from '@/components/ui/Alert'
 import { apiFetch } from '@/lib/api'
@@ -120,6 +125,29 @@ export function Balance({ agencyId }: { agencyId: string }) {
   const debt = toNumber(String(data.currentDebt))
   const limit = toNumber(String(data.maxDebt))
   const usage = limit > 0 ? debt / limit : null
+  const credit = toNumber(String(data.currentCredit))
+  const usageColor =
+    usage === null
+      ? 'var(--chart-4)'
+      : usage >= 1
+        ? 'var(--destructive)'
+        : usage >= 0.8
+          ? 'var(--warning)'
+          : 'var(--chart-1)'
+  const creditParts = [
+    {
+      key: 'available',
+      label: 'Khả dụng',
+      value: toNumber(String(data.availableCredit)),
+      color: 'var(--success)',
+    },
+    {
+      key: 'reserved',
+      label: 'Đang giữ chỗ',
+      value: toNumber(String(data.reservedCredit)),
+      color: 'var(--chart-3)',
+    },
+  ]
   const lastRow = last?.row
   const lastPayment = !canReadReceipts
     ? { value: '—', hint: 'Không có quyền xem phiếu thu' }
@@ -165,34 +193,78 @@ export function Balance({ agencyId }: { agencyId: string }) {
           hint={lastPayment.hint}
         />
       </div>
-      {usage !== null && (
-        <div className="rounded-xl border bg-card p-4 shadow-xs">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-medium">Mức sử dụng hạn mức nợ</span>
-            <span
-              className={cn(
-                'font-semibold tabular-nums',
-                usage >= 1
-                  ? 'text-destructive'
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="gap-3 p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="font-medium">Sử dụng hạn mức</span>
+            {usage !== null && (
+              <span
+                className={cn(
+                  'font-semibold tabular-nums',
+                  usage >= 1
+                    ? 'text-destructive'
+                    : usage >= 0.8
+                      ? 'text-warning'
+                      : 'text-foreground',
+                )}
+              >
+                {formatPercent(usage)}
+                {usage >= 1
+                  ? ' · Vượt hạn mức'
                   : usage >= 0.8
-                    ? 'text-warning'
-                    : 'text-foreground',
-              )}
-            >
-              {formatPercent(usage)}
-              {usage >= 1
-                ? ' · Vượt hạn mức'
-                : usage >= 0.8
-                  ? ' · Sắp chạm hạn mức'
-                  : ''}
+                    ? ' · Sắp chạm hạn mức'
+                    : ''}
+              </span>
+            )}
+          </div>
+          {usage === null ? (
+            <p className="flex h-9 items-center text-sm text-muted-foreground">
+              Đại lý không đặt hạn mức nợ.
+            </p>
+          ) : (
+            <SegmentedMeter
+              ratio={usage}
+              color={usageColor}
+              label="Mức sử dụng hạn mức nợ"
+            />
+          )}
+          <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Đã dùng {formatCompactVND(debt)}</span>
+            <span>
+              Còn{' '}
+              {formatCompactVND(toNumber(String(data.remainingCreditLimit)))}
             </span>
           </div>
-          <Progress
-            value={Math.min(100, usage * 100)}
-            aria-label="Mức sử dụng hạn mức nợ"
-          />
-        </div>
-      )}
+        </Card>
+        <Card className="gap-2 p-4 shadow-xs">
+          <span className="text-sm font-medium">Cơ cấu dư có</span>
+          {credit > 0 ? (
+            <div className="flex items-center gap-3">
+              <DonutChart
+                data={creditParts}
+                centerValue={formatCompactVND(credit)}
+                centerLabel="dư có"
+                valueFormatter={formatCompactVND}
+                height={112}
+                className="max-w-28 shrink-0"
+              />
+              <LegendList
+                className="min-w-0 flex-1 gap-1.5 text-xs"
+                items={creditParts.map((part) => ({
+                  key: part.key,
+                  label: part.label,
+                  color: part.color,
+                  value: formatCompactVND(part.value),
+                }))}
+              />
+            </div>
+          ) : (
+            <p className="flex h-28 items-center justify-center text-sm text-muted-foreground">
+              Chưa có dư có.
+            </p>
+          )}
+        </Card>
+      </div>
       <DetailList
         entries={[
           ['currentDebt', 'Dư nợ hiện tại'],

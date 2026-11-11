@@ -61,3 +61,39 @@ export function agingBuckets(
   }
   return buckets
 }
+
+/** Debt / limit ratio, or null when the limit is missing, invalid or zero. */
+export function limitUsage(
+  currentDebt: unknown,
+  maxDebt: unknown,
+): number | null {
+  if (typeof maxDebt !== 'string' || typeof currentDebt !== 'string')
+    return null
+  const limit = toNumber(maxDebt)
+  return limit > 0 ? toNumber(currentDebt) / limit : null
+}
+
+export type UsageBucket = { key: string; label: string; count: number }
+
+/**
+ * Agencies grouped by credit-limit usage: < 50 %, 50–80 %, 80–100 %, ≥ 100 %
+ * (over the limit) and "no limit" when the limit is missing or zero.
+ */
+export function usageBuckets(
+  rows: { currentDebt: unknown; maxDebt: unknown }[],
+): UsageBucket[] {
+  const buckets: UsageBucket[] = [
+    { key: 'low', label: 'Dưới 50%', count: 0 },
+    { key: 'mid', label: '50–80%', count: 0 },
+    { key: 'high', label: '80–100%', count: 0 },
+    { key: 'over', label: 'Vượt hạn mức', count: 0 },
+    { key: 'none', label: 'Không giới hạn', count: 0 },
+  ]
+  for (const row of rows) {
+    const usage = limitUsage(row.currentDebt, row.maxDebt)
+    const index =
+      usage === null ? 4 : usage < 0.5 ? 0 : usage < 0.8 ? 1 : usage < 1 ? 2 : 3
+    buckets[index]!.count += 1
+  }
+  return buckets
+}

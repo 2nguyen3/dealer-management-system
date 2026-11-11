@@ -65,7 +65,7 @@ export function SortableHeader({
         size="sm"
         onClick={() => onSort(field, firstDirection)}
         className={cn(
-          'h-7 gap-1 px-1.5 text-[inherit] font-[inherit] tracking-[inherit] uppercase [&_svg]:size-3.5',
+          'h-7 gap-1 px-1.5 text-[length:inherit] font-semibold tracking-wider uppercase [&_svg]:size-3.5',
           align === 'right' ? '-mr-1.5 ml-auto flex-row-reverse' : '-ml-1.5',
           direction ? 'text-foreground' : 'text-muted-foreground',
         )}

@@ -1,6 +1,5 @@
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
-import { BrandMark } from '../components/brand/BrandMark'
 import { Skeleton } from '../components/shadcn/skeleton'
 import { Toaster } from '../components/shadcn/sonner'
 import { ThemeProvider } from '../components/theme/ThemeProvider'
@@ -199,7 +198,11 @@ export class PageErrorBoundary extends Component<
             className="w-full max-w-md space-y-4 rounded-xl border bg-card p-6 text-center shadow-xs"
             role="alert"
           >
-            <BrandMark className="mx-auto size-12" />
+            <img
+              src="/assets/brand/agentra-icon.png"
+              alt=""
+              className="mx-auto size-12 rounded-lg"
+            />
             <div className="space-y-1.5">
               <h1 className="text-lg font-semibold tracking-tight">
                 Không thể mở màn hình

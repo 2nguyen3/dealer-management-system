@@ -77,15 +77,13 @@ export function GoodsLineEditor({
           </span>
         </span>
         {isAdjustment && (
-          <span className="text-xs text-muted-foreground">
-            Số dương tăng kho, số âm giảm kho
-          </span>
+          <span className="text-xs text-muted-foreground">+ tăng · − giảm</span>
         )}
       </legend>
       <div className="clear-both space-y-3 p-3 md:space-y-0 md:p-0">
         {isReturn && originLines === null && (
           <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-[13px] text-muted-foreground md:m-3">
-            Chọn phiếu xuất gốc để chọn dòng hàng trả.
+            Chọn phiếu xuất gốc trước.
           </p>
         )}
         <div

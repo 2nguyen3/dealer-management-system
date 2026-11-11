@@ -134,9 +134,9 @@ export function DetailHeader({
       className={cn(
         'mb-4 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between',
         tone === 'neutral' && 'bg-muted/40',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50/70',
-        tone === 'warning' && 'border-amber-200 bg-amber-50/70',
-        tone === 'danger' && 'border-red-200 bg-red-50/70',
+        tone === 'success' && 'border-success/30 bg-success/8',
+        tone === 'warning' && 'border-warning/30 bg-warning/8',
+        tone === 'danger' && 'border-destructive/30 bg-destructive/8',
       )}
     >
       <div className="flex min-w-0 items-start gap-3">

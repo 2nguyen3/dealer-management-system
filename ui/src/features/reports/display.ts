@@ -4,6 +4,7 @@ import { formatDate, formatQuantity, formatVND } from '../../lib/formatters'
 import {
   cashAmounts,
   debtAmounts,
+  reports,
   rowRules,
   salesAmounts,
   type ReportKind,
@@ -118,6 +119,20 @@ export function isNumeric(key: string): boolean {
 
 export function visibleColumns(kind: ReportKind): string[] {
   return Object.keys(rowRules[kind]).filter((key) => !hiddenColumns.has(key))
+}
+
+/**
+ * Visible columns the server can order by: the contract `sort` enum holds
+ * both `field` and `-field`. Identity sorts (agencyId/productId) have no
+ * visible column and stay in the filter bar's sort select.
+ */
+export function sortableColumns(kind: ReportKind): Set<string> {
+  const sorts = reports[kind].sorts
+  return new Set(
+    visibleColumns(kind).filter(
+      (col) => sorts.includes(col) && sorts.includes(`-${col}`),
+    ),
+  )
 }
 
 /** Human period for the exclusive `[fromDate, toDate)` interval. */

@@ -1,5 +1,67 @@
+import { Store, Tags } from 'lucide-react'
+import { RoundedBarChart } from '@/components/charts/MebiusCharts'
+import { formatCompactVND } from '@/lib/chart'
+import { formatVND } from '@/lib/formatters'
 import { MasterPage, type MasterConfig } from '../districts/MasterPage'
 import { master } from '../districts/masterContracts'
+import { num, partsBy, sumBy } from '../districts/summaryData'
+import {
+  ChartTile,
+  DonutTile,
+  MiniTable,
+  StatTile,
+} from '../districts/summaryParts'
+import type { Row } from '../payment_receipts/contracts'
+
+function agencyTypeSummary(items: Row[]) {
+  const limits = items.map((item) => ({
+    name: String(item.name),
+    maxDebt: num(item.maxDebt),
+  }))
+  return (
+    <>
+      <StatTile label="Loại đại lý" value={items.length} icon={<Tags />} />
+      <StatTile
+        label="Tổng đại lý"
+        value={sumBy(items, (item) => num(item.agencyCount))}
+        icon={<Store />}
+      />
+      <DonutTile
+        title="Đại lý theo loại"
+        centerLabel="đại lý"
+        head={['Loại', 'Số đại lý']}
+        data={partsBy(
+          items,
+          (item) => num(item.id),
+          (item) => String(item.name),
+          (item) => num(item.agencyCount),
+        )}
+      />
+      <ChartTile
+        title="Giới hạn nợ theo loại"
+        className="lg:col-span-4"
+        table={
+          <MiniTable
+            caption="Giới hạn nợ theo loại"
+            head={['Loại', 'Giới hạn nợ']}
+            rows={items.map((item) => [
+              String(item.name),
+              formatVND(String(item.maxDebt)),
+            ])}
+          />
+        }
+      >
+        <RoundedBarChart
+          data={limits}
+          xKey="name"
+          height={170}
+          valueFormatter={formatCompactVND}
+          series={[{ key: 'maxDebt', label: 'Giới hạn nợ' }]}
+        />
+      </ChartTile>
+    </>
+  )
+}
 
 const config: MasterConfig = {
   path: '/agency-types',
@@ -8,6 +70,12 @@ const config: MasterConfig = {
   manage: 'agency_type.manage',
   decode: master,
   statuses: ['ACTIVE', 'INACTIVE'],
+  sorts: [
+    { field: 'name', label: 'Tên loại' },
+    { field: 'maxDebt', label: 'Giới hạn nợ', firstDirection: 'desc' },
+    { field: 'id', label: 'Thứ tự tạo' },
+  ],
+  summary: agencyTypeSummary,
   fields: [
     { key: 'code', label: 'Mã loại' },
     { key: 'name', label: 'Tên loại đại lý' },

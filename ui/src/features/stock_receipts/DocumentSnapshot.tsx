@@ -5,10 +5,11 @@ import { Table } from '../../components/ui/Table'
 import { formatDate, formatQuantity, formatVND } from '../../lib/formatters'
 import { kindLabel, statusLabel } from '../../lib/labels'
 import type { DocumentDetail } from '../document_history/documentContracts'
+import { DocumentLifecycle } from '../document_history/DocumentLifecycle'
 import {
   Fact,
   FactGrid,
-  Hint,
+  InfoTip,
   SectionCard,
 } from '../document_history/DocumentParts'
 
@@ -47,6 +48,7 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
             </p>
           </div>
         </div>
+        <DocumentLifecycle kind={doc.kind} status={doc.status} />
         <Separator />
         <FactGrid>
           <Fact label="Phiên bản">
@@ -93,8 +95,12 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
                 </span>
               </Fact>
               <Fact label="Ghi có cho đại lý">
-                <span className="tabular-nums">
+                <span className="inline-flex items-center gap-1 tabular-nums">
                   {money(doc.creditCreatedAmount)}
+                  <InfoTip label="Về khoản ghi có">
+                    Phần tiền vượt công nợ được ghi có cho đại lý, không tự động
+                    hoàn tiền.
+                  </InfoTip>
                 </span>
               </Fact>
             </>
@@ -128,12 +134,6 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
           )}
         </FactGrid>
       </Card>
-      {isReturn && (
-        <Hint>
-          Phần tiền vượt công nợ được ghi có cho đại lý, không tự động hoàn
-          tiền.
-        </Hint>
-      )}
       <SectionCard
         title={
           <>

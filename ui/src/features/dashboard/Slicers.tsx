@@ -1,4 +1,6 @@
-import { FilterX, X } from 'lucide-react'
+import { Filter, FilterX, X } from 'lucide-react'
+import { Badge } from '../../components/shadcn/badge'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Select } from '../../components/ui/Select'
@@ -57,7 +59,7 @@ export function Slicers({
   return (
     <section
       aria-label="Bộ lọc bảng điều khiển"
-      className="z-10 rounded-xl border lg:sticky lg:top-14 bg-card/95 p-3 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/85"
+      className="z-10 rounded-xl border bg-card/95 p-3 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:sticky lg:top-14"
     >
       <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] [&_.form-field]:mb-0">
         <Select
@@ -135,30 +137,36 @@ export function Slicers({
         )}
       </div>
       {active.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-          <span className="text-xs font-medium text-muted-foreground">
-            Đang lọc:
-          </span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed pt-3">
+          <Filter
+            className="size-3.5 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <span className="sr-only">Đang lọc:</span>
           <ul className="flex flex-wrap gap-2" aria-label="Bộ lọc đang áp dụng">
             {active.map(([key, value]) => (
-              <li
-                key={key}
-                className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/8 py-0.5 pr-1 pl-2.5 text-xs text-foreground"
-              >
-                <span className="truncate">
-                  <span className="text-muted-foreground">
-                    {filterNames[key]}:
-                  </span>{' '}
-                  {value.label}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onFilter(key, null)}
-                  aria-label={`Bỏ lọc ${filterNames[key]}`}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/15 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              <li key={key} className="max-w-full">
+                <Badge
+                  variant="outline"
+                  className="max-w-full animate-in gap-1 rounded-full border-primary/25 bg-primary/8 py-0.5 pr-0.5 pl-2.5 font-normal text-foreground duration-300 zoom-in-95 fade-in-0"
                 >
-                  <X className="size-3" aria-hidden="true" />
-                </button>
+                  <span className="truncate">
+                    <span className="text-muted-foreground">
+                      {filterNames[key]}:
+                    </span>{' '}
+                    {value.label}
+                  </span>
+                  <ShadcnButton
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => onFilter(key, null)}
+                    aria-label={`Bỏ lọc ${filterNames[key]}`}
+                    className="size-5 rounded-full text-muted-foreground hover:bg-primary/15"
+                  >
+                    <X className="size-3" aria-hidden="true" />
+                  </ShadcnButton>
+                </Badge>
               </li>
             ))}
           </ul>

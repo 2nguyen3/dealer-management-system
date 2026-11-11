@@ -65,7 +65,7 @@ function CorrectionsScreen({
       <PageHeader
         eyebrow="Chứng từ"
         title="Sửa sai và hủy chứng từ"
-        description="Sửa chứng từ đã ghi sổ bị nhập sai, hoặc hủy chứng từ. Hàng trả lại và hoàn tiền dùng phiếu riêng."
+        description="Phiên bản mới có lý do cho chứng từ đã ghi sổ."
         className="mb-0"
       />
       <DocumentList
@@ -141,8 +141,8 @@ function CorrectionsScreen({
               <DocumentSnapshot doc={detail.doc} />
               {!canCorrect && !canCancel && (
                 <Hint>
-                  Chứng từ này không thể sửa hoặc hủy tại đây (ví dụ: điều chỉnh
-                  từ kiểm kê, phiếu thu trực tuyến hoặc thiếu quyền).
+                  Không sửa/hủy được tại đây (từ kiểm kê, thu trực tuyến hoặc
+                  thiếu quyền).
                 </Hint>
               )}
             </>

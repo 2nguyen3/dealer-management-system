@@ -1,4 +1,6 @@
 import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
   BookCheck,
   Download,
   FileClock,
@@ -12,6 +14,10 @@ import { cn } from '@/lib/utils'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { Card } from '../../components/shadcn/card'
 import { Skeleton } from '../../components/shadcn/skeleton'
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '../../components/shadcn/toggle-group'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -33,7 +39,7 @@ import {
   type DocumentSummary,
   type Revision,
 } from './documentContracts'
-import { Fact, FactGrid, Hint } from './DocumentParts'
+import { Fact, FactGrid, InfoTip } from './DocumentParts'
 import { errorMessage, useDocumentPage } from './useDocumentRequests'
 
 export function DocumentHistoryPage() {
@@ -47,7 +53,7 @@ function HistoryScreen() {
       <PageHeader
         eyebrow="Chứng từ"
         title="Lịch sử chứng từ"
-        description="Xem lại các phiên bản của chứng từ, mở bản in hoặc tải PDF."
+        description="Phiên bản, bản in và PDF của mọi chứng từ."
         className="mb-0"
       />
       <DocumentList
@@ -79,8 +85,8 @@ function revisionIcon(item: Revision) {
 }
 
 const iconTone: Record<Revision['state'], string> = {
-  POSTED: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  READY: 'bg-sky-50 text-sky-700 ring-sky-200',
+  POSTED: 'bg-success/12 text-success ring-success/30',
+  READY: 'bg-info/12 text-info ring-info/30',
   DRAFT: 'bg-muted text-muted-foreground ring-border',
 }
 
@@ -109,7 +115,10 @@ export function RevisionHistory({
   onClose: () => void
 }) {
   const [cursors, setCursors] = useState([''])
-  const query = new URLSearchParams({ limit: '25', sort: '-revisionNo' })
+  const [order, setOrder] = useState<'-revisionNo' | 'revisionNo'>(
+    '-revisionNo',
+  )
+  const query = new URLSearchParams({ limit: '25', sort: order })
   if (cursors.at(-1)) query.set('cursor', cursors.at(-1)!)
   const data = useDocumentPage(
     `/documents/${doc.id}/revisions?${query}`,
@@ -177,9 +186,36 @@ export function RevisionHistory({
     <Modal isOpen title={`Lịch sử ${doc.code}`} onClose={onClose} maxWidth="xl">
       <div className="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
         <section aria-label="Dòng thời gian phiên bản" className="min-w-0">
-          <h3 className="mb-3 text-sm font-semibold text-foreground">
-            Dòng thời gian
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1 text-sm font-semibold text-foreground">
+              Dòng thời gian
+              <InfoTip label="Về phiên bản">
+                Mỗi phiên bản giữ nguyên tên hàng, giá và thông tin đại lý tại
+                thời điểm lập.
+              </InfoTip>
+            </h3>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              aria-label="Thứ tự phiên bản"
+              value={order}
+              onValueChange={(next) => {
+                if (next !== '-revisionNo' && next !== 'revisionNo') return
+                setOrder(next)
+                setCursors([''])
+              }}
+            >
+              <ToggleGroupItem value="-revisionNo" className="px-2 text-xs">
+                <ArrowDownWideNarrow aria-hidden="true" />
+                Mới nhất
+              </ToggleGroupItem>
+              <ToggleGroupItem value="revisionNo" className="px-2 text-xs">
+                <ArrowUpNarrowWide aria-hidden="true" />
+                Cũ nhất
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           {data.error && (
             <Alert type="error">
               <span className="flex flex-wrap items-center gap-3">
@@ -389,6 +425,7 @@ export function RevisionHistory({
                   title={`Bản HTML ${doc.code}`}
                   src={htmlUrl}
                   sandbox=""
+                  // Paper preview: the printed snapshot is always a light page.
                   className="h-[60vh] w-full rounded-lg border bg-white"
                 />
               )}
@@ -397,15 +434,11 @@ export function RevisionHistory({
             <EmptyState
               icon={<History className="size-6" />}
               title="Chọn một phiên bản"
-              description="Bấm “Xem” trên dòng thời gian để xem nội dung, bản in hoặc tải PDF của phiên bản đó."
+              description="Bấm “Xem” trên dòng thời gian."
             />
           )}
         </section>
       </div>
-      <Hint className="mt-4">
-        Mỗi phiên bản giữ nguyên tên hàng, giá và thông tin đại lý tại thời điểm
-        lập.
-      </Hint>
     </Modal>
   )
 }

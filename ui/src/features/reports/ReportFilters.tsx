@@ -54,7 +54,7 @@ export function ReportFilters({
   }
   return (
     <form
-      className="space-y-4 rounded-xl border bg-card p-4 shadow-xs"
+      className="space-y-3 rounded-xl border bg-card/95 p-4 shadow-xs"
       onSubmit={submit}
       aria-label="Bộ lọc báo cáo"
     >
@@ -122,7 +122,7 @@ export function ReportFilters({
               id={`report-${filter}`}
               resource={pickerResource[filter as keyof typeof pickerResource]}
               label={filterLabels[filter] ?? filter}
-              placeholder="Tất cả — gõ mã hoặc tên để lọc"
+              placeholder="Tất cả"
               value={draft.filters[filter] || ''}
               onChange={(value) => setFilter(filter, value)}
             />
@@ -149,7 +149,7 @@ export function ReportFilters({
           }))}
         />
       </div>
-      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-2 border-t border-dashed pt-3 sm:flex-row sm:justify-end">
         <Button
           type="button"
           variant="outline"

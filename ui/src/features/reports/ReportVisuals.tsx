@@ -18,8 +18,19 @@ import {
 import type { ReactNode } from 'react'
 import { ChartCard } from '../../components/blocks/ChartCard'
 import { KpiCard } from '../../components/blocks/KpiCard'
-import { formatCompactVND, formatPercent, toNumber } from '../../lib/chart'
-import { formatQuantity, formatVND } from '../../lib/formatters'
+import {
+  DonutChart,
+  LegendList,
+  RadialRings,
+} from '../../components/charts/MebiusCharts'
+import { CountUp, Stagger, StaggerItem } from '../../components/motion/Motion'
+import {
+  formatCompactVND,
+  formatPercent,
+  formatPlain,
+  toNumber,
+} from '../../lib/chart'
+import { formatVND } from '../../lib/formatters'
 import type { ReportKind, ReportPage, ReportRow } from './contracts'
 import {
   ChartDataTable,
@@ -31,6 +42,7 @@ import {
 import { columnLabels } from './display'
 import {
   allZero,
+  compositionOf,
   creditFlow,
   debtFlow,
   flowData,
@@ -38,11 +50,15 @@ import {
   rankRows,
   returnRatio,
   type ChartDatum,
+  type Composition,
 } from './insights'
+
+const FILTERED = 'Tổng đã lọc'
+const THIS_PAGE = 'Trang này'
 
 interface Kpi {
   label: string
-  value: string
+  value: ReactNode
   exactValue?: string
   hint?: string
   icon: ReactNode
@@ -53,12 +69,12 @@ function moneyKpi(
   totals: ReportRow | undefined,
   key: string,
   icon: ReactNode,
-  hint = 'Toàn bộ kết quả đã lọc',
+  hint = FILTERED,
 ): Kpi {
   const raw = totals?.[key] ?? '0'
   return {
     label,
-    value: formatCompactVND(toNumber(raw)),
+    value: <CountUp value={toNumber(raw)} format={formatCompactVND} />,
     exactValue: formatVND(raw),
     hint,
     icon,
@@ -71,7 +87,12 @@ function countKpi(
   icon: ReactNode,
   hint: string,
 ): Kpi {
-  return { label, value: formatQuantity(String(value)), hint, icon }
+  return {
+    label,
+    value: <CountUp value={toNumber(value)} format={formatPlain} />,
+    hint,
+    icon,
+  }
 }
 
 function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
@@ -92,16 +113,14 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
           totals,
           'returnAmount',
           <Undo2 />,
-          ratio === null
-            ? 'Toàn bộ kết quả đã lọc'
-            : `${formatPercent(ratio)} doanh số gộp`,
+          ratio === null ? FILTERED : `${formatPercent(ratio)} doanh số gộp`,
         ),
         moneyKpi('Doanh số thuần', totals, 'netSalesAmount', <Banknote />),
         countKpi(
           'Số phiếu xuất',
           totals?.numberOfIssues ?? 0,
           <FileText />,
-          'Toàn bộ kết quả đã lọc',
+          FILTERED,
         ),
       ]
     }
@@ -114,7 +133,7 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
       ]
     case 'inventory': {
       const counts = inventoryCounts(page.items)
-      const hint = 'Trên trang hiện tại'
+      const hint = THIS_PAGE
       return [
         countKpi('Mặt hàng', counts.products, <Boxes />, hint),
         countKpi('Có nhập/xuất', counts.moving, <PackageCheck />, hint),
@@ -131,16 +150,14 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
           totals,
           'returnAmount',
           <Undo2 />,
-          ratio === null
-            ? 'Toàn bộ kết quả đã lọc'
-            : `${formatPercent(ratio)} doanh số gộp`,
+          ratio === null ? FILTERED : `${formatPercent(ratio)} doanh số gộp`,
         ),
         moneyKpi('Doanh số thuần', totals, 'netSalesAmount', <Banknote />),
         countKpi(
           'Mặt hàng có giao dịch',
           page.items.length,
           <Boxes />,
-          'Trên trang hiện tại',
+          THIS_PAGE,
         ),
       ]
     }
@@ -183,7 +200,7 @@ function ranked(
   const data = rankRows(kind, items, [measure.key])
   return {
     title,
-    description: `Top ${data.length} trên trang hiện tại`,
+    description: `Top ${data.length} · trang này`,
     data,
     keys: [measure.key],
     nameHeader,
@@ -203,7 +220,7 @@ function grouped(
   const data = rankRows(kind, items, keys, { limit: 8, axis: 'code', measure })
   return {
     title,
-    description: `${data.length} dòng lớn nhất trên trang hiện tại`,
+    description: `${data.length} dòng lớn nhất · trang này`,
     data,
     keys,
     nameHeader,
@@ -219,7 +236,7 @@ function flow(
   const data = flowData(totals, steps)
   return {
     title,
-    description: 'Tổng toàn bộ kết quả đã lọc trong kỳ',
+    description: FILTERED,
     data,
     keys: ['value'],
     nameHeader: 'Thành phần',
@@ -318,7 +335,7 @@ function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
   }
 }
 
-/** KPI strip of a loaded report page. */
+/** KPI strip of a loaded report page: staggered tiles with counting values. */
 export function ReportKpis({
   kind,
   page,
@@ -327,21 +344,63 @@ export function ReportKpis({
   page: ReportPage
 }) {
   return (
-    <div
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+    <Stagger
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
       aria-label="Chỉ số chính"
       role="group"
     >
       {kpisOf(kind, page).map((kpi) => (
-        <KpiCard
-          key={kpi.label}
-          label={kpi.label}
-          value={kpi.value}
-          exactValue={kpi.exactValue}
-          hint={kpi.hint}
-          icon={kpi.icon}
-        />
+        <StaggerItem key={kpi.label}>
+          <KpiCard
+            label={kpi.label}
+            value={kpi.value}
+            exactValue={kpi.exactValue}
+            hint={kpi.hint}
+            icon={kpi.icon}
+            className="h-full"
+          />
+        </StaggerItem>
       ))}
+    </Stagger>
+  )
+}
+
+/** Donut (with centre total) or radial rings plus an exact-value legend. */
+function CompositionVisual({ composition }: { composition: Composition }) {
+  const { shape, parts, centerLabel, centerValue } = composition
+  return (
+    <div className="grid items-center gap-4 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+      {shape === 'donut' ? (
+        <DonutChart
+          data={parts}
+          centerLabel={centerLabel}
+          centerValue={centerValue}
+          valueFormatter={formatCompactVND}
+          height={200}
+        />
+      ) : (
+        <RadialRings
+          data={parts}
+          centerLabel={centerLabel}
+          centerValue={centerValue}
+          height={200}
+        />
+      )}
+      <LegendList
+        items={parts.map((part) => ({
+          key: part.key,
+          label: part.label,
+          color: part.color,
+          value: (
+            <>
+              {part.display}
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                {formatPercent(part.ratio)}
+              </span>
+            </>
+          ),
+        }))}
+      />
     </div>
   )
 }
@@ -354,33 +413,74 @@ export function ReportCharts({
   kind: ReportKind
   page: ReportPage
 }) {
+  const composition = compositionOf(kind, page.totals, page.items)
+  const compositionRows: ChartDatum[] = composition.parts.map((part) => ({
+    id: part.key,
+    label: part.label,
+    name: part.label,
+    display: { value: part.display, ratio: formatPercent(part.ratio) },
+  }))
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <Stagger
+      className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3"
+      delay={0.15}
+    >
       {chartsOf(kind, page).map((spec) => (
+        <StaggerItem key={spec.title}>
+          <ChartCard
+            title={spec.title}
+            description={spec.description}
+            className="h-full"
+            isEmpty={!spec.data.length || allZero(spec.data, spec.keys)}
+            empty={
+              <p className="flex h-40 items-center justify-center text-center text-sm text-muted-foreground">
+                Không có giá trị khác 0 để vẽ biểu đồ.
+              </p>
+            }
+            table={
+              <ChartDataTable
+                data={spec.data}
+                nameHeader={spec.nameHeader}
+                columns={spec.keys.map((key) => ({
+                  key,
+                  label:
+                    key === 'value' ? 'Giá trị' : (columnLabels[key] ?? key),
+                }))}
+              />
+            }
+          >
+            {spec.chart}
+          </ChartCard>
+        </StaggerItem>
+      ))}
+      <StaggerItem className="lg:col-span-2 xl:col-span-1">
         <ChartCard
-          key={spec.title}
-          title={spec.title}
-          description={spec.description}
-          isEmpty={!spec.data.length || allZero(spec.data, spec.keys)}
+          title={composition.title}
+          description={composition.shape === 'rings' ? THIS_PAGE : FILTERED}
+          className="h-full"
+          isEmpty={
+            composition.shape === 'donut' &&
+            composition.parts.every((part) => !part.value)
+          }
           empty={
             <p className="flex h-40 items-center justify-center text-center text-sm text-muted-foreground">
-              Không có giá trị khác 0 để vẽ biểu đồ.
+              Chưa có giá trị trong kỳ.
             </p>
           }
           table={
             <ChartDataTable
-              data={spec.data}
-              nameHeader={spec.nameHeader}
-              columns={spec.keys.map((key) => ({
-                key,
-                label: key === 'value' ? 'Giá trị' : (columnLabels[key] ?? key),
-              }))}
+              data={compositionRows}
+              nameHeader="Thành phần"
+              columns={[
+                { key: 'value', label: 'Giá trị' },
+                { key: 'ratio', label: 'Tỷ lệ' },
+              ]}
             />
           }
         >
-          {spec.chart}
+          <CompositionVisual composition={composition} />
         </ChartCard>
-      ))}
-    </div>
+      </StaggerItem>
+    </Stagger>
   )
 }

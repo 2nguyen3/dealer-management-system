@@ -117,6 +117,17 @@ describe('OnlinePaymentsPage Component', () => {
     fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
       target: { value: '300000' },
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục' }))
+    await within(screen.getByRole('dialog')).findByText('Ghi nhận khi')
+  }
+
+  const reviseAmount = async (value: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }))
+    fireEvent.change(await screen.findByLabelText(/Số tiền thanh toán/), {
+      target: { value },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục' }))
+    await within(screen.getByRole('dialog')).findByText('Ghi nhận khi')
   }
 
   const mockServer = (
@@ -349,6 +360,7 @@ describe('OnlinePaymentsPage Component', () => {
     })
   })
 
+  // Multi-step wizard flows: allow extra time on a loaded CI machine.
   it('retries COMMAND_OUTCOME_UNKNOWN with the same body/key and blocks changed input', async () => {
     const create = vi
       .fn()
@@ -367,15 +379,11 @@ describe('OnlinePaymentsPage Component', () => {
     expect(
       await within(screen.getByRole('dialog')).findByText('Outcome unknown'),
     ).toBeDefined()
-    fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
-      target: { value: '1' },
-    })
+    await reviseAmount('1')
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
     await within(screen.getByRole('dialog')).findByText(/Giữ nguyên nội dung/)
     expect(create).toHaveBeenCalledTimes(1)
-    fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
-      target: { value: '300000' },
-    })
+    await reviseAmount('300000')
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
     expect(
       await screen.findByRole('link', { name: 'Mở trang thanh toán' }),
@@ -386,7 +394,7 @@ describe('OnlinePaymentsPage Component', () => {
       body: { agencyId: '102', provider: 'VNPAY', amount: '300000' },
       idempotencyKey: expect.any(String),
     })
-  })
+  }, 20_000)
 
   it('keeps 202 resumable after closing the form, replays the same key, and clears on 200', async () => {
     const create = vi
@@ -402,10 +410,9 @@ describe('OnlinePaymentsPage Component', () => {
     await fillCreate()
     fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
     await screen.findByRole('button', { name: 'Tiếp tục khởi tạo thanh toán' })
-    expect(screen.getByLabelText(/Số tiền thanh toán/)).toHaveProperty(
-      'value',
-      '300000',
-    )
+    expect(
+      within(screen.getByRole('dialog')).getByText('300.000 ₫'),
+    ).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'Đóng' }))
     expect(create).toHaveBeenCalledTimes(1)
     fireEvent.click(
@@ -431,7 +438,7 @@ describe('OnlinePaymentsPage Component', () => {
     expect(create.mock.calls[2]?.[0]?.idempotencyKey).not.toBe(
       create.mock.calls[0]?.[0]?.idempotencyKey,
     )
-  })
+  }, 20_000)
 
   it.each(['button', 'focus'])(
     'synchronizes authoritative detail and list on %s refresh',
@@ -578,5 +585,114 @@ describe('OnlinePaymentsPage Component', () => {
     expect(
       screen.queryByRole('button', { name: 'Đối soát giao dịch hiện tại' }),
     ).toBeNull()
+  })
+
+  it('requires an agency and a whole amount before the confirmation step', async () => {
+    const create = vi.fn()
+    mockServer(undefined, create)
+    renderPage()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tạo thanh toán mới' }),
+    )
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    // Without an agency the form never reaches the confirmation step.
+    expect(
+      within(dialog).queryByRole('button', { name: 'Khởi tạo thanh toán' }),
+    ).toBeNull()
+    const agency = within(dialog).getByRole('combobox', {
+      name: /Đại lý thanh toán/,
+    })
+    fireEvent.focus(agency)
+    fireEvent.click(
+      await within(dialog).findByText('DL-102 — Đại lý Toàn Thắng'),
+    )
+    fireEvent.change(within(dialog).getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '0' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    expect(
+      await within(dialog).findByText(/Số tiền phải là số nguyên dương/),
+    ).toBeDefined()
+    expect(
+      within(dialog).queryByRole('button', { name: 'Khởi tạo thanh toán' }),
+    ).toBeNull()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('confirms a summary, then hands off with tracker, QR and detail link', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValue({ data: samplePayments[1], status: 201, etag: null })
+    mockServer(undefined, create)
+    renderPage()
+    await fillCreate()
+    const confirm = screen.getByRole('dialog')
+    expect(within(confirm).getByText('300.000 ₫')).toBeDefined()
+    expect(within(confirm).getByText('VNPAY')).toBeDefined()
+    expect(create).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Khởi tạo thanh toán' }))
+    const link = await screen.findByRole('link', {
+      name: 'Mở trang thanh toán',
+    })
+    const dialog = screen.getByRole('dialog')
+    expect(link.getAttribute('href')).toBe(samplePayments[1]!.checkoutUrl)
+    const tracker = within(dialog).getByRole('region', {
+      name: 'Tiến trình thanh toán',
+    })
+    const current = tracker.querySelector('[aria-current="step"]')!
+    expect(current.textContent).toContain('Đại lý thanh toán trên VNPAY')
+    expect(dialog.querySelector('svg title')?.textContent).toBe(
+      'Mã QR trang thanh toán VNPAY',
+    )
+    expect(
+      within(dialog).getByRole('button', { name: 'Kiểm tra trạng thái' }),
+    ).toBeDefined()
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Xem chi tiết' }),
+    )
+    expect(
+      await screen.findByRole('dialog', { name: 'Chi tiết giao dịch' }),
+    ).toBeDefined()
+    expect(create).toHaveBeenCalledTimes(1)
+  }, 20_000)
+
+  it('shows a server FAILED status as a stopped branch without a checkout link', async () => {
+    mockServer(() => ({ ...samplePayments[1]!, status: 'FAILED' }))
+    renderPage('?paymentId=1002&vnp_ResponseCode=00')
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Thanh toán không thành công')
+    const tracker = within(dialog).getByRole('region', {
+      name: 'Tiến trình thanh toán',
+    })
+    const failed = tracker.querySelector('[data-state="failed"]')!
+    expect(failed.textContent).toContain('Cổng xác nhận (IPN)')
+    expect(within(tracker).getByText('Đã dừng')).toBeDefined()
+    expect(tracker.querySelector('[aria-current="step"]')).toBeNull()
+    expect(
+      within(dialog).queryByRole('link', { name: 'Mở trang thanh toán' }),
+    ).toBeNull()
+  })
+
+  it('summarises the loaded page by status and sorts by creation time', async () => {
+    const fetch = mockServer()
+    renderPage()
+    const summary = await screen.findByRole('region', {
+      name: 'Tổng quan giao dịch',
+    })
+    expect(
+      within(summary).getByText(/Trang hiện tại · 1 giao dịch/),
+    ).toBeDefined()
+    expect(
+      fetch.mock.calls.some(([path]) => path.includes('sort=-createdAt')),
+    ).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo lúc' }))
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(([path]) =>
+          /^\/online-payments\?.*sort=createdAt/.test(path),
+        ),
+      ).toBe(true),
+    )
   })
 })

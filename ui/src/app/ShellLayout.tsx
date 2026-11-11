@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { BrandLockup, BrandMark } from '@/components/brand/BrandMark'
 import { PageTransition } from '@/components/motion/Motion'
 import { Avatar, AvatarFallback } from '@/components/shadcn/avatar'
 import {
@@ -99,11 +98,17 @@ function WorkspaceSidebar({
           aria-label="Agentra - Bàn làm việc"
           className="flex items-center gap-2 rounded-md px-1 py-1 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <BrandLockup
-            tone="inverse"
-            className="group-data-[collapsible=icon]:hidden"
+          <img
+            src="/assets/brand/agentra-icon.png"
+            alt=""
+            className="size-8 shrink-0 rounded-md bg-white/95 p-0.5"
           />
-          <BrandMark className="hidden size-8 group-data-[collapsible=icon]:block" />
+          <span className="grid leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-base font-semibold text-white">Agentra</span>
+            <span className="text-[11px] tracking-wide text-sidebar-foreground/70">
+              Hệ thống phân phối
+            </span>
+          </span>
         </NavLink>
         <label className="relative group-data-[collapsible=icon]:hidden">
           <span className="sr-only">Tìm chức năng</span>

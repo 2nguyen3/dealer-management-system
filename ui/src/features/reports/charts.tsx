@@ -1,5 +1,8 @@
-// Report chart primitives on shadcn ChartContainer + Recharts. Colours are
-// fixed per measure (never per rank); one value axis; tooltips show exact values.
+// Report chart primitives on shadcn ChartContainer + Recharts in the shared
+// Mebius look: dotted canvas, dashed horizontal grid only, no axis lines,
+// pill bars (on a muted track when horizontal) and hover dimming. Colours are
+// fixed per measure (never per rank); tooltips show exact values.
+import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
 import {
   ChartContainer,
@@ -19,6 +22,8 @@ export interface ChartSeries {
 }
 
 const tick = { fill: CHART_AXIS, fontSize: 11 }
+const ANIMATION = { isAnimationActive: true, animationDuration: 700 } as const
+const TRACK = { fill: 'var(--muted)', radius: 999 }
 
 /** Zero-based nice axis; negative values (e.g. net sales) widen it below 0. */
 function valueDomain(
@@ -35,10 +40,29 @@ function configOf(series: ChartSeries[]): ChartConfig {
   )
 }
 
+/** Index of the hovered category, for dimming the others. */
+function useHover() {
+  const [active, setActive] = useState<number | null>(null)
+  return {
+    active,
+    handlers: {
+      onMouseMove: (state: { activeTooltipIndex?: unknown } | undefined) =>
+        setActive(
+          typeof state?.activeTooltipIndex === 'number'
+            ? state.activeTooltipIndex
+            : null,
+        ),
+      onMouseLeave: () => setActive(null),
+    },
+    opacity: (index: number) =>
+      active === null || active === index ? 1 : 0.32,
+  }
+}
+
 function DatumTooltip({ config }: { config: ChartConfig }) {
   return (
     <ChartTooltip
-      cursor={{ fill: 'var(--muted)', opacity: 0.6 }}
+      cursor={false}
       content={
         <ChartTooltipContent
           labelFormatter={(_label, payload) =>
@@ -51,14 +75,14 @@ function DatumTooltip({ config }: { config: ChartConfig }) {
             return (
               <div className="flex w-full items-center gap-2">
                 <span
-                  className="size-2.5 shrink-0 rounded-[2px]"
+                  className="size-2.5 shrink-0 rounded-full"
                   style={{ background: color }}
                   aria-hidden="true"
                 />
                 <span className="text-muted-foreground">
                   {config[key]?.label ?? key}
                 </span>
-                <span className="ml-auto pl-3 font-medium text-foreground tabular-nums">
+                <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
                   {row.display[key] ?? String(value)}
                 </span>
               </div>
@@ -70,7 +94,7 @@ function DatumTooltip({ config }: { config: ChartConfig }) {
   )
 }
 
-/** Horizontal ranked bars of one measure (magnitude → single hue). */
+/** Horizontal ranked pill bars of one measure (magnitude → single hue). */
 export function RankedBarChart({
   data,
   series,
@@ -79,27 +103,22 @@ export function RankedBarChart({
   series: ChartSeries
 }) {
   const config = configOf([series])
+  const hover = useHover()
   return (
     <ChartContainer
       config={config}
       className="aspect-auto w-full"
-      style={{ height: Math.max(160, data.length * 30 + 32) }}
+      style={{ height: Math.max(150, data.length * 28 + 16) }}
     >
       <BarChart
         data={data}
         layout="vertical"
-        margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+        margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
+        barCategoryGap={7}
         accessibilityLayer
+        {...hover.handlers}
       >
-        <CartesianGrid horizontal={false} stroke={CHART_GRID} />
-        <XAxis
-          type="number"
-          domain={valueDomain(data, [series.key])}
-          tickLine={false}
-          axisLine={false}
-          tick={tick}
-          tickFormatter={(value: number) => formatCompact(value)}
-        />
+        <XAxis type="number" hide domain={valueDomain(data, [series.key])} />
         <YAxis
           type="category"
           dataKey="label"
@@ -113,16 +132,25 @@ export function RankedBarChart({
         <Bar
           dataKey={series.key}
           fill={`var(--color-${series.key})`}
-          radius={4}
-          barSize={14}
-          isAnimationActive={false}
-        />
+          radius={999}
+          maxBarSize={14}
+          background={TRACK}
+          {...ANIMATION}
+        >
+          {data.map((d, index) => (
+            <Cell
+              key={d.id}
+              fillOpacity={hover.opacity(index)}
+              style={{ transition: 'fill-opacity 200ms ease' }}
+            />
+          ))}
+        </Bar>
       </BarChart>
     </ChartContainer>
   )
 }
 
-/** Vertical grouped bars: a few measures side by side per category. */
+/** Vertical grouped pill bars: a few measures side by side per category. */
 export function GroupedBarChart({
   data,
   series,
@@ -131,15 +159,25 @@ export function GroupedBarChart({
   series: ChartSeries[]
 }) {
   const config = configOf(series)
+  const hover = useHover()
   return (
-    <ChartContainer config={config} className="aspect-auto h-72 w-full">
+    <ChartContainer
+      config={config}
+      className="bg-dots aspect-auto h-72 w-full rounded-lg"
+    >
       <BarChart
         data={data}
-        margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-        barGap={2}
+        margin={{ top: 12, right: 8, bottom: 0, left: 0 }}
+        barGap={3}
+        barCategoryGap="24%"
         accessibilityLayer
+        {...hover.handlers}
       >
-        <CartesianGrid vertical={false} stroke={CHART_GRID} />
+        <CartesianGrid
+          vertical={false}
+          stroke={CHART_GRID}
+          strokeDasharray="4 4"
+        />
         <XAxis
           dataKey="label"
           tickLine={false}
@@ -147,7 +185,7 @@ export function GroupedBarChart({
           tick={tick}
           interval="preserveStartEnd"
           minTickGap={4}
-          tickMargin={6}
+          tickMargin={8}
         />
         <YAxis
           domain={valueDomain(
@@ -167,10 +205,18 @@ export function GroupedBarChart({
             key={key}
             dataKey={key}
             fill={`var(--color-${key})`}
-            radius={4}
-            maxBarSize={16}
-            isAnimationActive={false}
-          />
+            radius={999}
+            maxBarSize={14}
+            {...ANIMATION}
+          >
+            {data.map((d, index) => (
+              <Cell
+                key={d.id}
+                fillOpacity={hover.opacity(index)}
+                style={{ transition: 'fill-opacity 200ms ease' }}
+              />
+            ))}
+          </Bar>
         ))}
       </BarChart>
     </ChartContainer>
@@ -181,28 +227,23 @@ export function GroupedBarChart({
 export function FlowChart({ data }: { data: ChartDatum[] }) {
   const config: ChartConfig = { value: { label: 'Giá trị' } }
   const roles = Object.keys(flowRoles) as FlowRole[]
+  const hover = useHover()
   return (
     <div>
       <ChartContainer
         config={config}
         className="aspect-auto w-full"
-        style={{ height: Math.max(160, data.length * 32 + 32) }}
+        style={{ height: Math.max(150, data.length * 30 + 16) }}
       >
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+          margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
+          barCategoryGap={8}
           accessibilityLayer
+          {...hover.handlers}
         >
-          <CartesianGrid horizontal={false} stroke={CHART_GRID} />
-          <XAxis
-            type="number"
-            domain={valueDomain(data, ['value'])}
-            tickLine={false}
-            axisLine={false}
-            tick={tick}
-            tickFormatter={(value: number) => formatCompact(value)}
-          />
+          <XAxis type="number" hide domain={valueDomain(data, ['value'])} />
           <YAxis
             type="category"
             dataKey="label"
@@ -215,21 +256,27 @@ export function FlowChart({ data }: { data: ChartDatum[] }) {
           <DatumTooltip config={config} />
           <Bar
             dataKey="value"
-            radius={4}
-            barSize={16}
-            isAnimationActive={false}
+            radius={999}
+            maxBarSize={14}
+            background={TRACK}
+            {...ANIMATION}
           >
-            {data.map((d) => (
-              <Cell key={d.id} fill={d.fill} />
+            {data.map((d, index) => (
+              <Cell
+                key={d.id}
+                fill={d.fill}
+                fillOpacity={hover.opacity(index)}
+                style={{ transition: 'fill-opacity 200ms ease' }}
+              />
             ))}
           </Bar>
         </BarChart>
       </ChartContainer>
-      <ul className="mt-2 flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
+      <ul className="mt-3 flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
         {roles.map((role) => (
           <li key={role} className="flex items-center gap-1.5">
             <span
-              className="size-2.5 rounded-[2px]"
+              className="size-2.5 rounded-full"
               style={{ background: flowRoles[role].color }}
               aria-hidden="true"
             />
@@ -271,7 +318,10 @@ export function ChartDataTable({
       </thead>
       <tbody>
         {data.map((d) => (
-          <tr key={d.id} className="border-b last:border-0">
+          <tr
+            key={d.id}
+            className="border-b transition-colors last:border-0 hover:bg-muted/50"
+          >
             <th scope="row" className="py-1.5 pr-3 text-left font-normal">
               {d.name}
             </th>

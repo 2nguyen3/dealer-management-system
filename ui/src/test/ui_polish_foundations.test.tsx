@@ -115,3 +115,30 @@ describe('profile model', () => {
     expect(daysSince('not a date', now)).toBeNull()
   })
 })
+
+describe('colour palettes', () => {
+  it('accepts only known palettes and falls back to Thủy', async () => {
+    const palette = await import('@/components/theme/palette')
+    expect(palette.isPalette('moc')).toBe(true)
+    expect(palette.isPalette('neon')).toBe(false)
+    expect(palette.isPalette(null)).toBe(false)
+    localStorage.setItem(palette.PALETTE_STORAGE_KEY, 'neon')
+    expect(palette.readStoredPalette()).toBe('thuy')
+    localStorage.removeItem(palette.PALETTE_STORAGE_KEY)
+    expect(palette.readStoredPalette()).toBe('thuy')
+  })
+
+  it('applies the palette to <html> and persists it', async () => {
+    const palette = await import('@/components/theme/palette')
+    palette.setPalette('tim')
+    expect(document.documentElement.dataset.palette).toBe('tim')
+    expect(localStorage.getItem(palette.PALETTE_STORAGE_KEY)).toBe('tim')
+    palette.resetPaletteCache()
+    expect(palette.readStoredPalette()).toBe('tim')
+    // An invalid value is ignored and leaves the current palette in place.
+    palette.setPalette('neon' as never)
+    expect(document.documentElement.dataset.palette).toBe('tim')
+    localStorage.removeItem(palette.PALETTE_STORAGE_KEY)
+    delete document.documentElement.dataset.palette
+  })
+})
