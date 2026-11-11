@@ -45,7 +45,7 @@ describe('KpiCard', () => {
     )
     expect(screen.getByText('Doanh thu')).toBeTruthy()
     expect(screen.getByText(/1\.200\.000 ₫/)).toBeTruthy()
-    expect(screen.getByText(/\+25/).className).toContain('text-emerald-700')
+    expect(screen.getByText(/\+25/).className).toContain('text-success')
   })
 
   it('marks an increase as bad when upIsGood is false and hides null ratios', () => {
@@ -56,7 +56,7 @@ describe('KpiCard', () => {
         delta={{ ratio: 0.1, upIsGood: false }}
       />,
     )
-    expect(screen.getByText(/\+10/).className).toContain('text-red-700')
+    expect(screen.getByText(/\+10/).className).toContain('text-destructive')
     rerender(
       <KpiCard
         label="Công nợ"

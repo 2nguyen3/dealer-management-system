@@ -19,10 +19,10 @@ export function Table({
   return (
     <ShadcnTable
       className={cn(
-        'table text-[13px]',
-        '[&_thead_th]:h-10 [&_thead_th]:bg-muted/60 [&_thead_th]:px-3 [&_thead_th]:text-xs [&_thead_th]:font-semibold [&_thead_th]:tracking-wide [&_thead_th]:text-muted-foreground [&_thead_th]:uppercase',
+        'table text-[0.82rem]',
+        '[&_thead_th]:h-10 [&_thead_th]:bg-muted/50 [&_thead_th]:px-3 [&_thead_th]:text-[0.68rem] [&_thead_th]:font-semibold [&_thead_th]:tracking-wider [&_thead_th]:text-muted-foreground [&_thead_th]:uppercase',
         '[&_tbody_td]:px-3 [&_tbody_td]:py-2.5 [&_tbody_td]:align-middle',
-        '[&_tbody_tr]:border-b [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-muted/40 [&_tbody_tr:last-child]:border-0',
+        '[&_tbody_tr]:border-b [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-accent/50 [&_tbody_tr:last-child]:border-0',
         className,
       )}
       {...props}

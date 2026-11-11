@@ -162,7 +162,7 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
     expect(
       within(returns)
         .getByText(formatPercent(-0.5), { exact: false })
-        .className.includes('emerald'),
+        .className.includes('text-success'),
     ).toBe(true)
     expect(kpi('Công nợ hiện tại').textContent).toContain(
       `(${formatVND(HUGE)})`,

@@ -48,8 +48,8 @@ function DeltaPill({ delta }: { delta: KpiDelta }) {
         className={cn(
           'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold tabular-nums',
           good === null && 'bg-muted text-muted-foreground',
-          good === true && 'bg-emerald-50 text-emerald-700',
-          good === false && 'bg-red-50 text-red-700',
+          good === true && 'bg-success/12 text-success',
+          good === false && 'bg-destructive/12 text-destructive',
         )}
       >
         <Icon className="size-3" aria-hidden="true" />
@@ -83,7 +83,7 @@ export function KpiCard({
         <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
         {icon && (
           <span
-            className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary [&_svg]:size-4"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-chart-2/15 text-primary ring-1 ring-primary/10 [&_svg]:size-4"
             aria-hidden="true"
           >
             {icon}
@@ -113,7 +113,7 @@ export function KpiCard({
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={trendColor} stopOpacity={0.25} />
+                  <stop offset="0%" stopColor={trendColor} stopOpacity={0.35} />
                   <stop offset="100%" stopColor={trendColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -123,7 +123,8 @@ export function KpiCard({
                 stroke={trendColor}
                 strokeWidth={2}
                 fill={`url(#${gradientId})`}
-                isAnimationActive={false}
+                isAnimationActive
+                animationDuration={800}
                 dot={false}
               />
             </AreaChart>
@@ -134,8 +135,8 @@ export function KpiCard({
   )
 
   const classes = cn(
-    'relative gap-0 overflow-hidden p-4 shadow-xs transition-shadow',
-    onClick && 'cursor-pointer hover:shadow-md',
+    'relative gap-0 overflow-hidden p-4 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md',
+    onClick && 'cursor-pointer',
     active && 'ring-2 ring-primary',
     className,
   )

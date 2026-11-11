@@ -15,11 +15,13 @@ export interface AlertProps {
 }
 
 const STYLES = {
-  error: 'border-red-200 bg-red-50 text-red-800 [&>svg]:text-red-600',
-  warning: 'border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-600',
-  info: 'border-sky-200 bg-sky-50 text-sky-900 [&>svg]:text-sky-600',
+  error:
+    'border-destructive/30 bg-destructive/8 text-foreground [&>svg]:text-destructive',
+  warning:
+    'border-warning/30 bg-warning/8 text-foreground [&>svg]:text-warning',
+  info: 'border-info/30 bg-info/8 text-foreground [&>svg]:text-info',
   success:
-    'border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-600',
+    'border-success/30 bg-success/8 text-foreground [&>svg]:text-success',
 }
 
 const ICONS = {
@@ -38,7 +40,12 @@ export function Alert({
   const Icon = ICONS[type]
   return (
     <ShadcnAlert
-      className={cn('alert', `alert--${type}`, STYLES[type], className)}
+      className={cn(
+        'alert animate-in fade-in-0 slide-in-from-top-1 duration-300',
+        `alert--${type}`,
+        STYLES[type],
+        className,
+      )}
       role={type === 'error' ? 'alert' : 'status'}
     >
       <Icon aria-hidden="true" />

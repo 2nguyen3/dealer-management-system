@@ -6,8 +6,11 @@
 /* shadcn/ui token mapping (Tailwind v4). Components use bg-background, text-muted-foreground, ... */
 @theme inline {
   --font-sans:
-    'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    Roboto, sans-serif;
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+  --font-mono:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -25,6 +28,7 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -48,167 +52,322 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --animate-wave: wave 6s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
 }
 
 /* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs);
-
-/* ==========================================================================
-   Agentra design tokens. Brand: deep green #24483d.
-   Chart slots 1-8 are the validated categorical palette (fixed order, CVD-safe
-   on adjacent pairs); never cycle them and never reuse status colors as series.
+   Agentra "Thủy" (water) tokens: ocean blue, deep navy, cyan and silver.
+   Chart slots 1-8 are categorical: assign in fixed entity order, never by rank,
+   never reuse status colours (success/warning/destructive) as series.
    ========================================================================== */
 
 :root {
   --radius: 0.625rem;
-  --background: #f6f7f5;
-  --foreground: #17201b;
+  --background: #f5f8fc;
+  --foreground: #0e1a2f;
   --card: #ffffff;
-  --card-foreground: #17201b;
+  --card-foreground: #0e1a2f;
   --popover: #ffffff;
-  --popover-foreground: #17201b;
-  --primary: #24483d;
+  --popover-foreground: #0e1a2f;
+  --primary: #1857d1;
   --primary-foreground: #ffffff;
-  --secondary: #eef2ee;
-  --secondary-foreground: #17201b;
-  --muted: #f1f3f0;
-  --muted-foreground: #5b6a61;
-  --accent: #e6efe9;
-  --accent-foreground: #17201b;
-  --destructive: #c62828;
-  --success: #0f7a3a;
-  --warning: #b45309;
-  --border: #e1e6e0;
-  --input: #d7ded6;
-  --ring: #24483d;
+  --secondary: #ecf2fb;
+  --secondary-foreground: #0e1a2f;
+  --muted: #eff3f9;
+  --muted-foreground: #586a86;
+  --accent: #e3edfc;
+  --accent-foreground: #0d2752;
+  --destructive: #d2343f;
+  --success: #0b8f7a;
+  --warning: #b86e0a;
+  --info: #1474c4;
+  --border: #dfe6f0;
+  --input: #d2dceb;
+  --ring: #1857d1;
 
-  --chart-1: #2a78d6;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #eda100;
-  --chart-5: #e87ba4;
-  --chart-6: #008300;
-  --chart-7: #6250d6;
-  --chart-8: #e34948;
-  --chart-grid: #e1e0d9;
-  --chart-axis: #898781;
+  --chart-1: #1857d1;
+  --chart-2: #0fb2c8;
+  --chart-3: #7a5cf5;
+  --chart-4: #8796b0;
+  --chart-5: #0b8f7a;
+  --chart-6: #0b2a63;
+  --chart-7: #74a8ff;
+  --chart-8: #e5484d;
+  --chart-grid: #e3e9f2;
+  --chart-axis: #7d8ba3;
 
-  --sidebar: #15291f;
-  --sidebar-foreground: #c9d7cf;
-  --sidebar-primary: #8fd1ad;
-  --sidebar-primary-foreground: #0f1f17;
-  --sidebar-accent: #20392e;
+  --sidebar: #08142b;
+  --sidebar-foreground: #b4c3dd;
+  --sidebar-primary: #3fa9ff;
+  --sidebar-primary-foreground: #031024;
+  --sidebar-accent: #102347;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #24402f;
-  --sidebar-ring: #8fd1ad;
+  --sidebar-border: #142a52;
+  --sidebar-ring: #3fa9ff;
 
-  /* Legacy aliases used by older page CSS; keep them pointing at the tokens. */
-  --font-sans:
-    'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    Roboto, sans-serif;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    monospace;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-primary: var(--primary);
-  --color-border: var(--border);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
+  /* Legacy aliases still referenced by a few feature styles. */
   --color-bg-app: var(--background);
   --color-bg-surface: var(--card);
   --color-bg-muted: var(--muted);
-  --color-border-hover: #b9c4b9;
+  --color-border-hover: #b6c4d9;
   --color-border-focus: var(--ring);
   --color-text-main: var(--foreground);
   --color-text-muted: var(--muted-foreground);
   --color-text-subtle: var(--muted-foreground);
-  --color-primary-hover: #19382e;
   --color-primary-light: var(--accent);
-  --color-success-bg: #effaf3;
-  --color-success-border: #bfe6cd;
   --color-danger: var(--destructive);
-  --color-danger-bg: #fdf1f1;
-  --color-danger-border: #f5c9c9;
-  --color-warning-bg: #fff8eb;
-  --color-warning-border: #f7dca6;
-  --color-info: #1d64b8;
-  --color-info-bg: #eef5fd;
-  --color-info-border: #c3daf6;
-  --shadow-sm: 0 1px 2px rgba(23, 32, 27, 0.05);
-  --shadow-md:
-    0 4px 10px -2px rgba(23, 32, 27, 0.08),
-    0 2px 4px -2px rgba(23, 32, 27, 0.05);
-  --shadow-lg:
-    0 12px 24px -6px rgba(23, 32, 27, 0.12),
-    0 4px 8px -4px rgba(23, 32, 27, 0.06);
-  --layer-header: 20;
-  --layer-backdrop: 29;
-  --layer-navigation: 30;
-  --layer-dialog: 40;
+  --color-danger-bg: color-mix(in oklab, var(--destructive) 8%, transparent);
+  --shadow-sm: 0 1px 2px rgb(14 26 47 / 0.06);
+}
+
+.dark {
+  --background: #050a14;
+  --foreground: #e2e9f5;
+  --card: #0a1222;
+  --card-foreground: #e2e9f5;
+  --popover: #0c1528;
+  --popover-foreground: #e2e9f5;
+  --primary: #4d9bff;
+  --primary-foreground: #03102a;
+  --secondary: #111c31;
+  --secondary-foreground: #e2e9f5;
+  --muted: #0f192d;
+  --muted-foreground: #8798b6;
+  --accent: #13223e;
+  --accent-foreground: #e2e9f5;
+  --destructive: #f2555e;
+  --success: #2fc9a6;
+  --warning: #f2a93b;
+  --info: #4db3ff;
+  --border: #19263f;
+  --input: #22324f;
+  --ring: #4d9bff;
+
+  --chart-1: #4d9bff;
+  --chart-2: #2fd3e3;
+  --chart-3: #a08bff;
+  --chart-4: #a9b6cc;
+  --chart-5: #2fc9a6;
+  --chart-6: #dbe6fb;
+  --chart-7: #2c63c9;
+  --chart-8: #ff6b6f;
+  --chart-grid: #18243b;
+  --chart-axis: #6f80a0;
+
+  --sidebar: #03070f;
+  --sidebar-foreground: #a9b8d2;
+  --sidebar-primary: #4d9bff;
+  --sidebar-primary-foreground: #03102a;
+  --sidebar-accent: #0d1a31;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #111e36;
+  --sidebar-ring: #4d9bff;
+
+  --color-border-hover: #2d3f62;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    font-size: 15px;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    font-feature-settings:
+      'zero' 1,
+      'calt' 1;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Plain content links only; shadcn-composed anchors (data-slot) style themselves. */
+  a {
+    text-decoration: none;
+  }
+
+  a:where(:not([data-slot], [data-sidebar])) {
+    color: var(--primary);
+  }
+
+  a:where(:not([data-slot], [data-sidebar])):hover {
+    text-decoration: underline;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@layer components {
+  /* Soft "water" wash used behind heroes and the auth screens. */
+  .bg-water {
+    background-image:
+      radial-gradient(
+        60rem 30rem at 110% -10%,
+        color-mix(in oklab, var(--chart-2) 16%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        50rem 28rem at -10% 120%,
+        color-mix(in oklab, var(--primary) 14%, transparent),
+        transparent 60%
+      );
+  }
+
+  /* Dotted canvas behind charts (Mebius-style chart surface). */
+  .bg-dots {
+    background-image: radial-gradient(
+      color-mix(in oklab, var(--chart-axis) 26%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 14px 14px;
+  }
+
+  .page-container {
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .cell-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .cell-actions {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .form-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--foreground);
+  }
+
+  /* Access-denied / not-found state pages. */
+  .state-page {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .state-card {
+    max-width: 480px;
+    text-align: center;
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 40px 32px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .state-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .state-icon--danger {
+    background-color: var(--color-danger-bg);
+    color: var(--destructive);
+  }
+
+  .state-icon--neutral {
+    background-color: var(--muted);
+    color: var(--muted-foreground);
+  }
+
+  .state-title {
+    margin: 0 0 10px 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .state-desc {
+    margin: 0 0 24px 0;
+    color: var(--muted-foreground);
+  }
+
+  .state-actions {
+    display: flex;
+    justify-content: center;
+  }
+
+  .app-loading-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--background);
+  }
+
+  .shell-content {
+    padding: 28px clamp(16px, 3vw, 40px) 64px;
+  }
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--color-bg-app);
-  color: var(--color-text-main);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100dvh;
-  font-variant-numeric: tabular-nums;
+@keyframes wave {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-6%);
+  }
 }
 
-/* Accessibility */
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -221,283 +380,19 @@ body {
   border-width: 0;
 }
 
-/* Element defaults live in the base layer so Tailwind utilities can override them. */
-@layer base {
-  /* Plain content links only; shadcn-composed anchors (data-slot) style themselves. */
-  a {
-    text-decoration: none;
-  }
-
-  a:where(:not([data-slot], [data-sidebar])) {
-    color: var(--color-primary);
-  }
-
-  a:where(:not([data-slot], [data-sidebar])):hover {
-    text-decoration: underline;
-  }
-
-  :focus-visible {
-    outline: 2px solid var(--color-border-focus);
-    outline-offset: 2px;
-  }
-}
-
-/* Typography Helpers */
-/* ==========================================================================
-   Buttons
-   ========================================================================== */
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ==========================================================================
-   Form Controls
-   ========================================================================== */
-
-.form-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-main);
-}
-
-.input,
-.input:focus,
-/* ==========================================================================
-   Badges & Alerts
-   ========================================================================== */
-
-/* ==========================================================================
-   Tables
-   ========================================================================== */
-
-/* ==========================================================================
-   Modals
-   ========================================================================== */
-
-@keyframes modal-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* ==========================================================================
-   Cards & Layouts
-   ========================================================================== */
-
-.page-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-/* Detail Grids */
-
-/* Banner Stats */
-
-/* ==========================================================================
-   Application Shell
-   ========================================================================== */
-
-.shell-content {
-  flex: 1;
-  padding: 36px clamp(20px, 3vw, 48px);
-  min-width: 0;
-}
-
-/* Mobile Shell */
-@media (max-width: 900px) {
-  .shell-content {
-    padding: 16px;
-  }
-}
-
-/* ==========================================================================
-   Home Workspace Hub
-   ========================================================================== */
-
-/* ==========================================================================
-   Authentication Pages
-   ========================================================================== */
-
-/* ==========================================================================
-   State Pages & Loaders
-   ========================================================================== */
-
-.state-page {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.state-card {
-  max-width: 480px;
-  text-align: center;
-  background-color: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: 40px 32px;
-  box-shadow: var(--shadow-sm);
-}
-
-.state-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  margin: 0 auto 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.state-icon--danger {
-  background-color: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.state-icon--neutral {
-  background-color: var(--color-bg-muted);
-  color: var(--color-text-muted);
-}
-
-.state-title {
-  margin: 0 0 10px 0;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.state-desc {
-  margin: 0 0 24px 0;
-  font-size: 14px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.state-actions {
-  display: flex;
-  justify-content: center;
-}
-
-.app-loading-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-bg-app);
-}
-
-/* Workspace identity and responsive navigation. */
-
-/* Overview is navigation, never fabricated business metrics. */
-
-/* Split authentication keeps the form primary;
-
-/* Split authentication keeps the form primary;
-
-/* Split authentication keeps the form primary;
-
-/* Split authentication keeps the form primary; 
-
 @media (max-width: 640px) {
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  .filter-bar {
-    flex-wrap: wrap;
+  .shell-content {
+    padding: 20px 16px 48px;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* Operational workspace: shadcn controls, quiet surfaces, and a single task rail. */
-
-.shell-content {
-  padding: 30px clamp(18px, 3vw, 44px) 64px;
-}
-
-.page-container {
-  max-width: 1280px;
-}
-
-@media (max-width: 640px) {
-  .shell-content {
-    padding: 22px 16px 48px;
-  }
-}
-
-/* Goods document line editor */
-
-/* Source statement card and single-row filters */
-
-/* Dashboard layout */
-
-/* Reports layout */
-
-/* Receivables */
-.cell-number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.cell-actions {
-  text-align: right;
-  white-space: nowrap;
-}
-
-/* Receivables totals mirror the reports totals tiles */
-
-.dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
