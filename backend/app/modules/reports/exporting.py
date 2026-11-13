@@ -63,7 +63,7 @@ FILTER_LABELS = {
     "agencyId": "Đại lý (ID)",
     "productId": "Mặt hàng (ID)",
     "typeId": "Loại đại lý (ID)",
-    "districtId": "Quận/huyện (ID)",
+    "wardId": "Phường/xã (ID)",
 }
 NOTES = (
     "Tín dụng đầu kỳ/cuối kỳ tính theo kỳ báo cáo; các cột tín dụng hiện tại tính tại "

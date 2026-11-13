@@ -42,7 +42,8 @@ def test_populated_upgrade_downgrade_reupgrade(database_factory):
                 )
             )
             connection.execute(
-                text("INSERT INTO dms.district (code,name) VALUES ('LEGACY','Legacy district')")
+                # 0010 must map every legacy district; an unmapped name fails loudly.
+                text("INSERT INTO dms.district (code,name) VALUES ('LEGACY','Quận 1')")
             )
             connection.execute(
                 text("INSERT INTO dms.unit (code,name) VALUES ('LEGACY','Legacy unit')")
@@ -164,7 +165,7 @@ def test_orm_mappings(engine):
         "dms.group_permission",
         "dms.auth_token",
         "dms.api_idempotency",
-        "dms.district",
+        "dms.ward",
         "dms.agency_type",
         "dms.unit",
     }

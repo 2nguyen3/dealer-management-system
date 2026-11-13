@@ -292,7 +292,8 @@ plans and agent guidance aligned with actual implementation progress.
   `0004` (durable scoped API commands), `0005` (recorded-unit policy/first-use locks),
   `0006` (eligible owner deletion/product first-use/agency history-date guards),
   `0007` (same-return successor credit-lot provenance), `0008` (historical receipt
-  goods admission), and `0009` (historical issue goods/agency admission).
+  goods admission), `0009` (historical issue goods/agency admission) and `0010`
+  (read-only HCMC 2025 ward catalogue replaces district; production upgrade is manual).
   `openwiki/database-design/*.sql` are psql entry points, not duplicate DDL copies.
 - From `backend/`: `uv sync --frozen`, `uv run alembic upgrade head`, then
   `uv run python -m app.db.seed` for the complete demo.
@@ -300,7 +301,7 @@ plans and agent guidance aligned with actual implementation progress.
   The 54 regression checks use a separate schema and roll back all fixtures.
 - The demo covers all 29 domain tables, 30 agencies, 24 products, 410 documents and
   June–September 2026 history. Account credentials and exact counts are in README.
-  The command infrastructure table may legitimately have zero rows; source head is0009.
+  The command infrastructure table may legitimately have zero rows; source head is0010.
   Current live includes the authorized extra receipt774 (411documents); never reset it.
 - Seed v1 is atomic and repeatable; it verifies existing demo data on rerun.
   It does not reset a populated database, disable triggers or write balance caches.

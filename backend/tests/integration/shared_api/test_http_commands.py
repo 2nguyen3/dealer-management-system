@@ -40,7 +40,7 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
         )
     app = create_app(settings)
     router = APIRouter(route_class=BusinessRoute)
-    permission = require_permissions(all_of=("district.manage",))
+    permission = require_permissions(all_of=("unit.manage",))
 
     def sessions():
         with Session(engine) as session:
@@ -60,7 +60,7 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
         def authorize():
             service.repo.lock_user(principal.user_id)
             current = service.get_current_user(principal)
-            if "district.manage" not in current.allowedFunctions:
+            if "unit.manage" not in current.allowedFunctions:
                 raise AuthError(403, "FORBIDDEN", "Permission denied")
 
         def project():
@@ -78,10 +78,10 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
                 session,
                 principal.user_id,
                 request.state.request_id,
-                function_code="district.manage",
+                function_code="unit.manage",
             )
             session.execute(
-                text("INSERT INTO dms.district (code,name) VALUES ('HTTP_COMMAND','HTTP command')")
+                text("INSERT INTO dms.unit (code,name) VALUES ('HTTP_COMMAND','HTTP command')")
             )
             session.execute(text("UPDATE dms.probe SET value=value+1 WHERE id=1"))
             return project
@@ -126,7 +126,7 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
                 connection.exec_driver_sql(
                     'UPDATE dms.group_permission SET "isAllowed"=false WHERE "groupId"=1 '
                     'AND "functionId"=(SELECT id FROM dms.app_function '
-                    "WHERE code='district.manage')"
+                    "WHERE code='unit.manage')"
                 )
             denied = client.post("/api/v1/probe-command", headers=headers)
             assert denied.status_code == 403
@@ -134,7 +134,7 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
                 assert connection.scalar(text("SELECT count(*) FROM dms.api_idempotency")) == 1
                 assert (
                     connection.scalar(
-                        text("SELECT count(*) FROM dms.district WHERE code='HTTP_COMMAND'")
+                        text("SELECT count(*) FROM dms.unit WHERE code='HTTP_COMMAND'")
                     )
                     == 1
                 )
@@ -150,5 +150,5 @@ def test_real_http_commands_current_grants_and_aggregate_etag(engine, actor):
             connection.exec_driver_sql(
                 'UPDATE dms.group_permission SET "isAllowed"=true WHERE "groupId"=1 '
                 'AND "functionId"=(SELECT id FROM dms.app_function '
-                "WHERE code='district.manage')"
+                "WHERE code='unit.manage')"
             )

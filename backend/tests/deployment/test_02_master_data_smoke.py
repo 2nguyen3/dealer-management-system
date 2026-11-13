@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from app.db.seed import DEMO_USERS
+from tests.support.wards import open_ward
 
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
@@ -69,13 +70,13 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
             ).status_code
             == 204
         )
-        district = client.post("/api/v1/districts", json={"code": code, "name": code})
+        ward = open_ward(client)
         agency = client.post(
             "/api/v1/agencies",
             json={
                 "name": code,
                 "typeId": 1,
-                "districtId": district.json()["id"],
+                "wardId": ward,
                 "email": "smoke@example.com",
                 "acceptedDate": "2026-10-04",
             },
@@ -95,12 +96,6 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
         assert (
             client.delete(
                 agency.headers["Location"], headers={"If-Match": terminated.headers["ETag"]}
-            ).status_code
-            == 204
-        )
-        assert (
-            client.delete(
-                district.headers["Location"], headers={"If-Match": district.headers["ETag"]}
             ).status_code
             == 204
         )

@@ -5,7 +5,6 @@ FunctionCode = Literal[
     "groups.manage",
     "permissions.manage",
     "rules.manage",
-    "district.manage",
     "agency_type.manage",
     "unit.manage",
     "product.manage",
@@ -36,3 +35,8 @@ FunctionCode = Literal[
     "payments.online",
 ]
 FUNCTION_CODES = frozenset(get_args(FunctionCode))
+# Retired codes stay valid only as historical audit_log references (FK RESTRICT). They are
+# never granted, listed or authorized; 0010 retired district.manage with the district level.
+RetiredFunctionCode = Literal["district.manage"]
+RETIRED_FUNCTION_CODES = frozenset(get_args(RetiredFunctionCode))
+AuditFunctionCode = Literal[(*get_args(FunctionCode), *get_args(RetiredFunctionCode))]

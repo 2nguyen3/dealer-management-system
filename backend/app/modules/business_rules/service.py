@@ -21,14 +21,14 @@ class BusinessRuleService(CatalogueService):
             self.authorize((self.permission,))
             condition.compare(self.etag(self.get()))
             values = body.model_dump(exclude_unset=True)
-            if "maxAgenciesPerDistrict" in values:
-                blockers = self.repo.blockers(values["maxAgenciesPerDistrict"])
+            if "maxAgenciesPerWard" in values:
+                blockers = self.repo.blockers(values["maxAgenciesPerWard"])
                 if blockers:
                     raise ApiError(
                         409,
                         "LIMIT_CONFLICT",
-                        "District capacity would be exceeded",
-                        details={"blockedDistricts": blockers},
+                        "Ward capacity would be exceeded",
+                        details={"blockedWards": blockers},
                     )
             self.repo.update(values)
             return self.get

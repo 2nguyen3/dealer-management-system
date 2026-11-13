@@ -60,7 +60,9 @@ def test_owning_group_deletion_and_grant_write_both_orders(engine, actor, leadin
 
 def test_registry_and_grants_contract(client, engine):
     page = client.get("/api/v1/functions", params={"limit": 100})
-    assert page.status_code == 200 and len(page.json()["items"]) == 33
+    assert (
+        page.status_code == 200 and len(page.json()["items"]) == 32
+    )  # 0010 retired district.manage
     assert_schema(page.json(), "FunctionListResponse")
     function = page.json()["items"][0]
     assert client.get(f"/api/v1/functions/{function['id']}").json() == function

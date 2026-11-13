@@ -10,7 +10,7 @@ class BusinessRuleRepository:
         return dict(
             self.session.execute(
                 text(
-                    'SELECT "maxAgenciesPerDistrict", "sellingPriceRate", "createdAt", "updatedAt" '
+                    'SELECT "maxAgenciesPerWard", "sellingPriceRate", "createdAt", "updatedAt" '
                     "FROM dms.business_rule WHERE id"
                 )
             )
@@ -26,9 +26,9 @@ class BusinessRuleRepository:
             dict(row)
             for row in self.session.execute(
                 text(
-                    'SELECT d.id AS "districtId",d.code,d.name,count(*) AS "activeAgencyCount" '
-                    'FROM dms.district d JOIN dms.agency a ON a."districtId"=d.id '
-                    "WHERE a.status='ACTIVE' GROUP BY d.id HAVING count(*)>:maximum ORDER BY d.id"
+                    'SELECT w.id AS "wardId",w.code,w.name,count(*) AS "activeAgencyCount" '
+                    'FROM dms.ward w JOIN dms.agency a ON a."wardId"=w.id '
+                    "WHERE a.status='ACTIVE' GROUP BY w.id HAVING count(*)>:maximum ORDER BY w.id"
                 ),
                 {"maximum": maximum},
             ).mappings()

@@ -113,8 +113,8 @@ def test_filter_ids(identifier):
 
 
 def test_catalog_filters_and_strict_period():
-    filters = DebtFilters(agencyId="9223372036854775807", typeId="2147483647", districtId=1)
-    assert filters.typeId == 2147483647
+    filters = DebtFilters(agencyId="9223372036854775807", typeId="2147483647", wardId=1)
+    assert filters.typeId == 2147483647 and filters.wardId == 1
     for bad in (True, "01", 0, 2147483648):
         with pytest.raises(ValidationError):
             DebtFilters(typeId=bad)

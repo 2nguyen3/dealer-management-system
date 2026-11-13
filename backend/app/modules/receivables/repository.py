@@ -14,7 +14,7 @@ class ReceivableRepository:
                 text(f'''
             WITH moment AS MATERIALIZED (SELECT clock_timestamp() AS instant), base AS (
               SELECT a.id AS "agencyId",a.code AS "agencyCode",a.name AS "agencyName",
-                a."typeId",a."districtId",a.status,b."currentDebt",b."currentCredit",t."maxDebt",
+                a."typeId",a."wardId",a.status,b."currentDebt",b."currentCredit",t."maxDebt",
                 coalesce(x.reserved,0) AS "reservedCredit",
                 b."currentCredit"-coalesce(x.reserved,0) AS "availableCredit",
                 t."maxDebt"-b."currentDebt" AS "remainingCreditLimit",
@@ -27,7 +27,7 @@ class ReceivableRepository:
                 WHERE l."agencyId"=a.id AND r.state='ACTIVE') x ON true
               WHERE (CAST(:agencyId AS bigint) IS NULL OR a.id=:agencyId)
                 AND (CAST(:typeId AS integer) IS NULL OR a."typeId"=:typeId)
-                AND (CAST(:districtId AS integer) IS NULL OR a."districtId"=:districtId)
+                AND (CAST(:wardId AS integer) IS NULL OR a."wardId"=:wardId)
                 AND (CAST(:status AS text) IS NULL OR a.status=:status)
                 AND (CAST(:debtFrom AS numeric) IS NULL OR b."currentDebt">=:debtFrom)
                 AND (CAST(:debtTo AS numeric) IS NULL OR b."currentDebt"<=:debtTo)

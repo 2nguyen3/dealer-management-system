@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.common.pagination import CursorCodec
 from app.common.preconditions import parse_preconditions
 from app.core.config import Settings
 from app.core.exceptions import ApiError
@@ -30,11 +31,9 @@ pytestmark = pytest.mark.integration
 
 def create_body(use_case, body):
     from app.modules.agency_types.schemas import AgencyTypeCreate
-    from app.modules.districts.schemas import DistrictCreate
     from app.modules.units.schemas import UnitCreate
 
     models = {
-        "listDistricts": DistrictCreate,
         "listAgencyTypes": AgencyTypeCreate,
         "listUnits": UnitCreate,
         "listUsers": UserCreate,
@@ -44,11 +43,9 @@ def create_body(use_case, body):
 
 def update_body(resource, values):
     from app.modules.agency_types.schemas import AgencyTypeUpdate
-    from app.modules.districts.schemas import DistrictUpdate
     from app.modules.units.schemas import UnitUpdate
 
     return {
-        "districts": DistrictUpdate,
         "agency-types": AgencyTypeUpdate,
         "units": UnitUpdate,
         "users": UserUpdate,
@@ -340,19 +337,17 @@ def test_users_group_status_reset_live_effects_and_locked_reset(use_case, client
     use_case.session.rollback()
 
 
-@pytest.mark.parametrize("resource", ["districts", "agency-types"], indirect=True)
+@pytest.mark.parametrize("resource", ["agency-types"], indirect=True)
 def test_master_derived_counts_terminated_references_inactive(use_case, resource, engine, actor):
     item = use_case.create(create_body(use_case, CASES[resource][2]))
     with Session(engine) as session:
         first = agency(
             session,
-            district=item.id if resource == "districts" else 1,
-            type_id=item.id if resource == "agency-types" else 1,
+            type_id=item.id,
         )
         second = agency(
             session,
-            district=item.id if resource == "districts" else 1,
-            type_id=item.id if resource == "agency-types" else 1,
+            type_id=item.id,
         )
         session.execute(
             text(
@@ -364,17 +359,7 @@ def test_master_derived_counts_terminated_references_inactive(use_case, resource
         session.commit()
     current = use_case.get(item.id)
     assert current.activeAgencyCount == 1
-    if resource == "districts":
-        assert current.remainingSlots == current.maxAgencies - 1
-        before = use_case.etag(current)
-        with engine.begin() as connection:
-            connection.exec_driver_sql('UPDATE dms.business_rule SET "maxAgenciesPerDistrict"=5')
-        assert (
-            use_case.get(item.id).maxAgencies == 5
-            and use_case.etag(use_case.get(item.id)) != before
-        )
-    else:
-        assert current.agencyCount == 2
+    assert current.agencyCount == 2
     inactive = use_case.update(
         item.id, update_body(resource, {"status": "INACTIVE"}), precondition(use_case, item.id)
     )
@@ -393,8 +378,7 @@ def test_master_derived_counts_terminated_references_inactive(use_case, resource
         with pytest.raises(DBAPIError):
             agency(
                 session,
-                district=item.id if resource == "districts" else 1,
-                type_id=item.id if resource == "agency-types" else 1,
+                type_id=item.id,
             )
         session.rollback()
 
@@ -521,18 +505,21 @@ def test_unit_historical_only_reference_still_blocks_delete(engine, actor, refer
             service.delete(old.id, precondition(service, old.id))
 
 
-def test_full_district_capacity_is_global_and_fifth_admission_rolls_back(engine, actor):
+def test_full_ward_capacity_is_global_and_fifth_admission_rolls_back(engine, actor):
+    from app.modules.wards.service import WardService
+
     with Session(engine) as session:
-        service = service_for("districts", session, actor)
-        district = service.create(create_body(service, {"code": "FULL", "name": "Full"}))
-        assert district.remainingSlots == district.maxAgencies == 4
+        service = WardService(session, CursorCodec(b"x" * 32), actor, "ward", lambda _: None)
+        ward = service.list(code="26740").items[0]
+        assert ward.remainingSlots == ward.maxAgencies == 4
         for _ in range(4):
-            agency(session, district=district.id)
+            agency(session, ward=ward.id)
         session.commit()
-        full = service.get(district.id)
+        full = service.get(ward.id)
         assert full.activeAgencyCount == 4 and full.remainingSlots == 0
         with pytest.raises(DBAPIError) as error:
-            agency(session, district=district.id)
+            agency(session, ward=ward.id)
         assert error.value.orig.sqlstate == "23514"
+        assert "Ward agency capacity exceeded" in str(error.value.orig)
         session.rollback()
-        assert service.get(district.id).activeAgencyCount == 4
+        assert service.get(ward.id).activeAgencyCount == 4

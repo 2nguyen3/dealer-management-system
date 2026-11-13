@@ -223,7 +223,8 @@ def test_transaction_error_translation():
 
 def test_shared_harness_and_contract(monkeypatch):
     matrix = transport_matrix()
-    assert len(matrix) == 154 and len({item["operationId"] for item in matrix}) == 154
+    # 0010 replaced five district operations with read-only listWards/getWard.
+    assert len(matrix) == 151 and len({item["operationId"] for item in matrix}) == 151
     for item in matrix:
         assert item["responses"] and item["method"] in ("GET", "POST", "PATCH", "PUT", "DELETE")
     assert any(item["bodyRequired"] for item in matrix)

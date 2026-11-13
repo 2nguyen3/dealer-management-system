@@ -10,7 +10,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
 
 @pytest.mark.parametrize("variable", ["AUTH_SMOKE_DIRECT_URL", "AUTH_SMOKE_PROXY_URL"])
-@pytest.mark.parametrize("resource", ["users", "districts", "agency-types", "units"])
+@pytest.mark.parametrize("resource", ["users", "agency-types", "units"])
 def test_users_and_catalogues_direct_and_nginx(variable, resource):
     base = os.environ.get(variable)
     if not base or not base.startswith("http://127.0.0.1:"):
@@ -81,3 +81,25 @@ def test_users_and_catalogues_direct_and_nginx(variable, resource):
             ).status_code
             == 204
         )
+
+
+@pytest.mark.parametrize("variable", ["AUTH_SMOKE_DIRECT_URL", "AUTH_SMOKE_PROXY_URL"])
+def test_read_only_wards_direct_and_nginx(variable):
+    base = os.environ.get(variable)
+    if not base or not base.startswith("http://127.0.0.1:"):
+        pytest.fail("Deployment smoke requires explicit disposable loopback URL")
+    email, _, _, password, _ = DEMO_USERS[0]
+    with httpx.Client(
+        base_url=base, timeout=float(os.getenv("AUTH_SMOKE_TIMEOUT_SECONDS", "10"))
+    ) as client:
+        login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+        assert login.status_code == 200
+        client.headers["Authorization"] = "Bearer " + login.json()["accessToken"]
+        page = client.get("/api/v1/wards", params={"code": "26740"})
+        assert page.status_code == 200
+        (ward,) = page.json()["items"]
+        assert ward["name"] == "Phường Sài Gòn" and ward["kind"] == "WARD"
+        detail = client.get(f"/api/v1/wards/{ward['id']}")
+        assert detail.status_code == 200 and detail.headers["ETag"].startswith('"')
+        assert client.post("/api/v1/wards", json={"code": "1", "name": "x"}).status_code == 405
+        assert client.delete(f"/api/v1/wards/{ward['id']}").status_code == 405

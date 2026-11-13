@@ -6,7 +6,7 @@ AGENCY = table(
     column("code", String),
     column("name", String),
     column("typeId", Integer),
-    column("districtId", Integer),
+    column("wardId", Integer),
     column("phone", String),
     column("address", String),
     column("email", String),

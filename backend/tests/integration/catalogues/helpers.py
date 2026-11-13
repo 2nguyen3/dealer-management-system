@@ -18,13 +18,23 @@ def install_builders(session, actor):
     set_audit_context(session, actor, "fixture", function_code="stock.receipt.post")
 
 
-def agency(session, district=1, type_id=1):
-    if not session.scalar(text("SELECT id FROM dms.district WHERE id=:id"), {"id": district}):
-        assert (
-            session.scalar(
-                text("INSERT INTO dms.district (code,name) VALUES ('BASE','Base') RETURNING id")
-            )
-            == district
+def agency(session, ward=1, type_id=1):
+    # Wards are the read-only 168-row catalogue loaded by revision 0010.
+    return session.scalar(
+        text(
+            'INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate") '
+            "VALUES ('Agency',:type,:ward,'agency@example.com','2026-01-01') RETURNING id"
+        ),
+        {"type": type_id, "ward": ward},
+    )
+
+
+def legacy_agency(session, type_id=1):
+    """Pre-0010 agency in a district that revision 0010 maps (Quận 1 -> Phường Sài Gòn)."""
+    district = session.scalar(text("SELECT id FROM dms.district WHERE name='Quận 1'"))
+    if district is None:
+        district = session.scalar(
+            text("INSERT INTO dms.district (code,name) VALUES ('BASE','Quận 1') RETURNING id")
         )
     return session.scalar(
         text(

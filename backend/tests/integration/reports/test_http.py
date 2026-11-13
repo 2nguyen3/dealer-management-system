@@ -30,10 +30,10 @@ def test_report_http_all_formats_live_grants_and_uncapped_exports(client, engine
         DO $$ DECLARE n integer; a bigint; p bigint; u integer; incoming bigint;
           outgoing bigint; cash bigint;
         BEGIN
-          UPDATE dms.business_rule SET "maxAgenciesPerDistrict"=200 WHERE id;
+          UPDATE dms.business_rule SET "maxAgenciesPerWard"=200 WHERE id;
           SELECT "unitId" INTO u FROM dms.product ORDER BY id LIMIT 1;
           FOR n IN 1..101 LOOP
-            INSERT INTO dms.agency(name,"typeId","districtId","acceptedDate",email)
+            INSERT INTO dms.agency(name,"typeId","wardId","acceptedDate",email)
               VALUES (CASE WHEN n<=2 THEN 'Agency marker shared'
                 ELSE 'Agency marker '||lpad(n::text,3,'0') END,1,1,'2026-01-01',
                 'reports-'||n::text||'@example.test') RETURNING id INTO a;

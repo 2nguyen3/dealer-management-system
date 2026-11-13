@@ -12,8 +12,6 @@ from app.modules.agency_types.schemas import AgencyTypeUpdate
 from app.modules.agency_types.service import AgencyTypeService
 from app.modules.business_rules.schemas import BusinessRuleUpdate
 from app.modules.business_rules.service import BusinessRuleService
-from app.modules.districts.schemas import DistrictUpdate
-from app.modules.districts.service import DistrictService
 from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.products.service import ProductService
 from app.modules.units.schemas import UnitUpdate
@@ -25,37 +23,22 @@ from tests.integration.master_data.test_contract import body_for
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.parametrize("resource", ["unit", "district"])
 @pytest.mark.parametrize("leading", ["inactivate", "assign"])
 def test_actual_assignment_vs_master_inactivation_both_orders(
-    client, engine, actor, masters, resource, leading
+    client, engine, actor, masters, leading
 ):
-    if resource == "unit":
-        current = client.get("/api/v1/units/" + str(masters[1]))
+    # Wards have no status (read-only catalogue), so only unit inactivation can race.
+    current = client.get("/api/v1/units/" + str(masters[1]))
 
-        def inactivate(session):
-            return service(UnitService, session, actor).update(
-                masters[1], UnitUpdate(status="INACTIVE"), Preconditions(current.headers["ETag"])
-            )
+    def inactivate(session):
+        return service(UnitService, session, actor).update(
+            masters[1], UnitUpdate(status="INACTIVE"), Preconditions(current.headers["ETag"])
+        )
 
-        def assign(session):
-            return service(ProductService, session, actor).create(
-                ProductCreate.model_validate(body_for("products", masters))
-            )
-    else:
-        current = client.get("/api/v1/districts/" + str(masters[0]))
-
-        def inactivate(session):
-            return service(DistrictService, session, actor).update(
-                masters[0],
-                DistrictUpdate(status="INACTIVE"),
-                Preconditions(current.headers["ETag"]),
-            )
-
-        def assign(session):
-            return service(AgencyService, session, actor).create(
-                AgencyCreate.model_validate(body_for("agencies", masters))
-            )
+    def assign(session):
+        return service(ProductService, session, actor).create(
+            ProductCreate.model_validate(body_for("products", masters))
+        )
 
     first, second = ordered_race(
         engine,
@@ -77,7 +60,7 @@ def test_last_slot_and_rule_lowering_both_orders(client, engine, actor, masters)
     rules = client.get("/api/v1/business-rules")
     client.patch(
         "/api/v1/business-rules",
-        json={"maxAgenciesPerDistrict": 1},
+        json={"maxAgenciesPerWard": 1},
         headers={"If-Match": rules.headers["ETag"]},
     )
     first, second = ordered_race(
@@ -85,26 +68,26 @@ def test_last_slot_and_rule_lowering_both_orders(client, engine, actor, masters)
         lambda s: service(AgencyService, s, actor).create(body),
         lambda s: service(AgencyService, s, actor).create(body),
     )
-    assert first.status == "ACTIVE" and second == "DISTRICT_CAPACITY_EXCEEDED"
+    assert first.status == "ACTIVE" and second == "WARD_CAPACITY_EXCEEDED"
     rule = client.get("/api/v1/business-rules")
     raised = client.patch(
         "/api/v1/business-rules",
-        json={"maxAgenciesPerDistrict": 2},
+        json={"maxAgenciesPerWard": 2},
         headers={"If-Match": rule.headers["ETag"]},
     )
     match = Preconditions(raised.headers["ETag"])
     first, second = ordered_race(
         engine,
         lambda s: service(BusinessRuleService, s, actor).update(
-            BusinessRuleUpdate(maxAgenciesPerDistrict=1), match
+            BusinessRuleUpdate(maxAgenciesPerWard=1), match
         ),
         lambda s: service(AgencyService, s, actor).create(body),
     )
-    assert first.maxAgenciesPerDistrict == 1 and second == "DISTRICT_CAPACITY_EXCEEDED"
+    assert first.maxAgenciesPerWard == 1 and second == "WARD_CAPACITY_EXCEEDED"
     rule = client.get("/api/v1/business-rules")
     raised = client.patch(
         "/api/v1/business-rules",
-        json={"maxAgenciesPerDistrict": 2},
+        json={"maxAgenciesPerWard": 2},
         headers={"If-Match": rule.headers["ETag"]},
     )
     match = Preconditions(raised.headers["ETag"])
@@ -112,7 +95,7 @@ def test_last_slot_and_rule_lowering_both_orders(client, engine, actor, masters)
         engine,
         lambda s: service(AgencyService, s, actor).create(body),
         lambda s: service(BusinessRuleService, s, actor).update(
-            BusinessRuleUpdate(maxAgenciesPerDistrict=1), match
+            BusinessRuleUpdate(maxAgenciesPerWard=1), match
         ),
     )
     assert first.status == "ACTIVE" and second == "LIMIT_CONFLICT"
@@ -123,26 +106,24 @@ def test_last_slot_and_rule_lowering_both_orders(client, engine, actor, masters)
 
 
 def test_opposing_moves_and_same_key_termination(client, engine, actor, masters):
-    district = client.post(
-        "/api/v1/districts", json={"code": "DEST", "name": "Destination"}
-    ).json()["id"]
+    ward = masters[0] + 1
     body = body_for("agencies", masters)
     one = client.post("/api/v1/agencies", json=body)
-    two = client.post("/api/v1/agencies", json={**body, "districtId": district})
+    two = client.post("/api/v1/agencies", json={**body, "wardId": ward})
     first, second = ordered_race(
         engine,
         lambda s: service(AgencyService, s, actor).update(
             int(one.json()["id"]),
-            AgencyUpdate(districtId=district),
+            AgencyUpdate(wardId=ward),
             Preconditions(one.headers["ETag"]),
         ),
         lambda s: service(AgencyService, s, actor).update(
             int(two.json()["id"]),
-            AgencyUpdate(districtId=masters[0]),
+            AgencyUpdate(wardId=masters[0]),
             Preconditions(two.headers["ETag"]),
         ),
     )
-    assert first.districtId == district and second.districtId == masters[0]
+    assert first.wardId == ward and second.wardId == masters[0]
     key = uuid4()
     match = Preconditions(client.get(one.headers["Location"]).headers["ETag"])
     first, second = ordered_race(

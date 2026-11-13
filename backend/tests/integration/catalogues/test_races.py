@@ -252,7 +252,7 @@ def test_real_administration_vs_auth_both_winners(engine, actor, change, action,
         )
 
 
-@pytest.mark.parametrize("resource", ["districts", "agency-types", "units"], indirect=True)
+@pytest.mark.parametrize("resource", ["agency-types", "units"], indirect=True)
 @pytest.mark.parametrize("first", ["assign", "delete"])
 def test_catalogue_reference_creation_vs_delete(use_case, resource, engine, actor, first):
     body = {
@@ -261,22 +261,12 @@ def test_catalogue_reference_creation_vs_delete(use_case, resource, engine, acto
         **({"maxDebt": "1000"} if resource == "agency-types" else {}),
     }
     item = use_case.create(create_body(use_case, body))
-    # Set up the other master before the race, avoiding fixture locks during admission.
-    if resource == "agency-types":
-        with engine.begin() as connection:
-            connection.exec_driver_sql(
-                "INSERT INTO dms.district (code,name) VALUES ('BASE','Base')"
-            )
 
     def assign(session):
         if resource == "units":
             product(session, item.id)
         else:
-            agency(
-                session,
-                district=item.id if resource == "districts" else 1,
-                type_id=item.id if resource == "agency-types" else 1,
-            )
+            agency(session, type_id=item.id)
         session.commit()
         return "assigned"
 
@@ -293,33 +283,6 @@ def test_catalogue_reference_creation_vs_delete(use_case, resource, engine, acto
         assert outcomes == ("assigned", "PRECONDITION_FAILED")
     else:
         assert outcomes[0] == "deleted" and outcomes[1] in ("23503", "23514", "P0002")
-
-
-@pytest.mark.parametrize("first", ["assign", "inactive"])
-def test_district_admission_vs_inactivation(engine, actor, first):
-    with Session(engine) as session:
-        service = service_for("districts", session, actor)
-        item = service.create(create_body(service, {"code": "TARGET", "name": "Target"}))
-        match = service.etag(item)
-
-    def assign(session):
-        agency(session, district=item.id)
-        session.commit()
-        return "assigned"
-
-    def inactive(session):
-        service = service_for("districts", session, actor)
-        return service.update(
-            item.id, update_body("districts", {"status": "INACTIVE"}), parse_preconditions(match)
-        )
-
-    outcomes = ordered_race(
-        engine, assign if first == "assign" else inactive, inactive if first == "assign" else assign
-    )
-    if first == "assign":
-        assert outcomes == ("assigned", "PRECONDITION_FAILED")
-    else:
-        assert outcomes[0].status == "INACTIVE" and outcomes[1] == "23514"
 
 
 @pytest.mark.parametrize("reference", ["draft", "count", "posting"])

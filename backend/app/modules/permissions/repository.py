@@ -3,6 +3,7 @@ from sqlalchemy import String, cast, select
 from app.common.catalogue import CatalogueRepository
 from app.core.exceptions import ApiError
 from app.modules.auth.models import AppFunction, GroupPermission
+from app.modules.auth.permissions import RETIRED_FUNCTION_CODES
 from app.modules.user_groups.models import UserGroup
 
 
@@ -15,6 +16,10 @@ class FunctionRepository(CatalogueRepository):
         "createdAt": AppFunction.created_at,
         "updatedAt": AppFunction.updated_at,
     }
+
+    def query(self):
+        # Retired codes survive only for historical audit references (revision 0010).
+        return super().query().where(AppFunction.code.not_in(sorted(RETIRED_FUNCTION_CODES)))
 
 
 class PermissionRepository(CatalogueRepository):

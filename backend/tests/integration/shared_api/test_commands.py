@@ -100,10 +100,8 @@ def test_failure_rolls_back_command_domain_and_audit(engine, actor, failure):
     with Session(engine) as session:
 
         def work(command):
-            set_audit_context(session, actor, "probe-request", function_code="district.manage")
-            session.execute(
-                text("INSERT INTO dms.district (code,name) VALUES ('ROLLBACK','Rollback')")
-            )
+            set_audit_context(session, actor, "probe-request", function_code="unit.manage")
+            session.execute(text("INSERT INTO dms.unit (code,name) VALUES ('ROLLBACK','Rollback')"))
             project = increment(session, command)
             if failure == "mid_write":
                 raise RuntimeError("injected")
@@ -124,7 +122,7 @@ def test_failure_rolls_back_command_domain_and_audit(engine, actor, failure):
                 )
         assert session.scalar(text("SELECT value FROM dms.probe WHERE id=1")) == 0
         assert session.scalar(text("SELECT count(*) FROM dms.api_idempotency")) == 0
-        assert session.scalar(text("SELECT count(*) FROM dms.district WHERE code='ROLLBACK'")) == 0
+        assert session.scalar(text("SELECT count(*) FROM dms.unit WHERE code='ROLLBACK'")) == 0
         assert (
             session.scalar(
                 text("SELECT count(*) FROM dms.audit_log WHERE \"requestId\"='probe-request'")
@@ -331,14 +329,14 @@ def test_result_projection_after_deferred_refresh(engine, actor):
 @pytest.mark.parametrize(
     "statement,constraint",
     [
-        ("INSERT INTO dms.district (code,name) VALUES ('TAKEN','Another')", "district_code_key"),
+        ("INSERT INTO dms.unit (code,name) VALUES ('TAKEN','Another')", "unit_code_key"),
         ("UPDATE dms.probe SET value=-1 WHERE id=1", "positive_probe"),
         ("INSERT INTO dms.probe_child VALUES (1,999)", "probe_parent"),
     ],
 )
 def test_operation_constraint_translation_after_rollback(engine, actor, statement, constraint):
     with Session(engine) as session:
-        session.execute(text("INSERT INTO dms.district (code,name) VALUES ('TAKEN','Taken')"))
+        session.execute(text("INSERT INTO dms.unit (code,name) VALUES ('TAKEN','Taken')"))
         session.commit()
         scope = CommandScope(actor, "probeUpdate", "probe:1", uuid4())
 
@@ -346,7 +344,7 @@ def test_operation_constraint_translation_after_rollback(engine, actor, statemen
             session.execute(text(statement))
             return lambda: CommandResult(status=204)
 
-        state = {"district_code_key": "23505", "positive_probe": "23514", "probe_parent": "23503"}[
+        state = {"unit_code_key": "23505", "positive_probe": "23514", "probe_parent": "23503"}[
             constraint
         ]
         with pytest.raises(ApiError, match="BUSINESS_CONFLICT"):

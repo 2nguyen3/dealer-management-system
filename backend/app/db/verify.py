@@ -19,7 +19,7 @@ EXPECTED_TABLES = {
     "group_permission",
     "auth_token",
     "business_rule",
-    "district",
+    "ward",
     "agency_type",
     "unit",
     "agency",
@@ -136,12 +136,11 @@ def check_database(connection, *, seeded: bool = False) -> dict[str, int]:
 def run_regression(connection) -> int:
     # The suite changes global limits and report totals. Execute in an isolated
     # transactional schema so a populated database is never part of its fixtures.
+    # Baseline 0001 plus 0010 (wards replace districts); 0002-0009 add no checked policy.
     schema = f"dms_verify_{uuid4().hex}"
-    ddl_path = Path(__file__).parents[2] / "alembic" / "sql" / "0001_initial.sql"
+    sql = Path(__file__).parents[2] / "alembic" / "sql"
     fixture = """
         SET LOCAL search_path = dms, pg_catalog;
-        INSERT INTO dms.district (code,name)
-          SELECT 'DEMO_DISTRICT_'||n,'Quận mẫu '||n FROM generate_series(1,20) n;
         INSERT INTO dms.unit (code,name,"allowsFraction") VALUES
           ('PIECE','Cái',false), ('KG','Kilôgam',true) ON CONFLICT (code) DO NOTHING;
         INSERT INTO dms.product (name,"unitId","lowStockThreshold")
@@ -151,7 +150,8 @@ def run_regression(connection) -> int:
     """
     with connection.connection.driver_connection.cursor() as cursor:
         for script in (
-            ddl_path.read_text(encoding="utf-8"),
+            (sql / "0001_initial.sql").read_text(encoding="utf-8"),
+            (sql / "0010_hcmc_wards.sql").read_text(encoding="utf-8"),
             fixture,
             (Path(__file__).parent / "sql" / "regression.sql").read_text(encoding="utf-8"),
         ):
@@ -182,7 +182,8 @@ def main() -> None:
                 try:
                     checks = run_regression(connection)
                     print(
-                        f"PASS: {checks} baseline 0001 PostgreSQL regression assertions/rejections"
+                        f"PASS: {checks} baseline 0001+0010 PostgreSQL regression "
+                        "assertions/rejections"
                     )
                 finally:
                     transaction.rollback()

@@ -25,7 +25,7 @@ WITH filtered AS (
   JOIN dms.agency a ON a.id=r."agencyId"
   WHERE (CAST(:agencyId AS bigint) IS NULL OR a.id=:agencyId)
     AND (CAST(:typeId AS integer) IS NULL OR a."typeId"=:typeId)
-    AND (CAST(:districtId AS integer) IS NULL OR a."districtId"=:districtId)
+    AND (CAST(:wardId AS integer) IS NULL OR a."wardId"=:wardId)
 )
 SELECT statement_timestamp() AS "__generatedAt", f.*
 FROM (SELECT 1) moment LEFT JOIN filtered f ON true

@@ -22,14 +22,14 @@ CASES = {
 
 
 def body_for(resource, masters):
-    district, unit = masters
+    ward, unit = masters
     return (
         {"name": "Same", "unitId": unit}
         if resource == "products"
         else {
             "name": "Same",
             "typeId": 1,
-            "districtId": district,
+            "wardId": ward,
             "email": "same@example.com",
             "acceptedDate": "2026-01-01",
         }

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.exceptions import ApiError
+from app.db.manifest import COMPATIBLE_HEAD
 from app.db.seed import main as seed_main
 from app.db.verify import check_database, run_regression
 from tests.integration.catalogues.helpers import (
@@ -97,15 +98,14 @@ def test_exact_debt_equality_one_over_terminated_blocker_and_snapshots(engine, a
 
 def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_factory):
     settings = Settings(_env_file=None, db_host="test", db_user="test", db_password="test")
-    with database_factory("0004") as engine:
-        # Populate at the old reviewed head, then verify additive upgrade preserves everything.
+    with database_factory() as engine:
+        # The seed tracks the source head (0010 wards); populate there, then prove the
+        # reviewed downgrade/upgrade chain below preserves the populated history.
         with (
-            patch("app.db.manifest.COMPATIBLE_HEAD", "0004"),
             patch("app.db.seed.build_engine", return_value=engine),
             patch("app.db.seed.get_settings", return_value=settings),
         ):
             seed_main()
-        migrate(engine.url)
         with engine.connect() as connection:
             first = check_database(connection, seeded=True)
             assert first["document"] == 410 and first["agency"] == 30
@@ -132,7 +132,6 @@ def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_fact
                 transaction.rollback()
         with Session(engine) as session:
             for resource, table in (
-                ("districts", "district"),
                 ("agency-types", "agency_type"),
                 ("units", "unit"),
             ):
@@ -177,7 +176,8 @@ def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_fact
         migrate(engine.url)
         with engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM public.alembic_version")) == "0007"
+                connection.scalar(text("SELECT version_num FROM public.alembic_version"))
+                == COMPATIBLE_HEAD
             )
 
 

@@ -22,7 +22,7 @@ class ReceivableOverview(AgencyBalance):
     agencyCode: str
     agencyName: str
     typeId: CatalogId
-    districtId: CatalogId
+    wardId: CatalogId
     status: Literal["ACTIVE", "TERMINATED"]
     outstandingInvoiceCount: Annotated[int, Field(ge=0)]
 

@@ -9,7 +9,6 @@ from app.modules.business_rules.router import router as business_rules_router
 from app.modules.credit_applications.router import correction_router as credit_corrections_router
 from app.modules.credit_applications.router import router as credit_applications_router
 from app.modules.dashboard.router import router as dashboard_router
-from app.modules.districts.router import router as districts_router
 from app.modules.document_history.router import router as document_history_router
 from app.modules.health.router import router as health_router
 from app.modules.inventory.router import router as inventory_router
@@ -33,13 +32,14 @@ from app.modules.units.router import router as units_router
 from app.modules.upfront_payments.router import router as upfront_router
 from app.modules.user_groups.router import router as user_groups_router
 from app.modules.users.router import router as users_router
+from app.modules.wards.router import router as wards_router
 
 router = APIRouter()
 router.include_router(health_router)
 router.include_router(auth_router)
 router.include_router(user_groups_router)
 router.include_router(users_router)
-router.include_router(districts_router)
+router.include_router(wards_router)
 router.include_router(agency_types_router)
 router.include_router(units_router)
 router.include_router(permissions_router)

@@ -18,7 +18,8 @@ def test_source_packet_preserves_provider_operations_with_owning_corrections():
         for operation in methods.values()
         if isinstance(operation, dict) and "operationId" in operation
     }
-    assert len(business) == 153
+    # 0010: five district operations replaced by read-only listWards/getWard.
+    assert len(business) == 150
     assert canonical - business == {"queryChatbot"}
     assert business <= canonical
     assert {

@@ -225,6 +225,10 @@ và ngày tiếp nhận/lịch sử đại lý. Migration không tự chạy khi
 Revision `0007` giữ credit lot gốc khi tạo successor để tính lại làm tròn cùng phiếu trả,
 bảo toàn reservation/refund đã trả và nguồn phiếu thu.
 Revisions `0008`/`0009` bổ sung chính sách master lịch sử cho sửa phiếu nhập/xuất.
+Revision `0010` (source head) bỏ cấp quận: nạp danh mục chỉ đọc 168 phường/xã/đặc khu
+TP.HCM 2025 (`dms.ward`), chuyển `agency."wardId"` theo ánh xạ 20 quận demo → phường,
+đổi hậu tố địa chỉ, đổi quy định thành `maxAgenciesPerWard`, gỡ quyền `district.manage`.
+Production chỉ lên `0010` sau khi backup và chạy upgrade có kiểm soát.
 
 Backend M01–M14, M15 core và M16 settlement nội bộ đã qua gate cục bộ:
 58/154 operation mục tiêu +2health;247 offline +370 PostgreSQL/TLS,
@@ -267,10 +271,10 @@ seed không tự xóa database đã có dữ liệu khác.
 
 | Nội dung | Số lượng / độ phủ |
 |---|---|
-| Nhóm / chức năng / phân quyền | 4 nhóm, 33 chức năng, 132 phân quyền |
+| Nhóm / chức năng / phân quyền | 4 nhóm, 32 chức năng, 128 phân quyền (seed mới ở `0010`) |
 | Tài khoản / token | 8 tài khoản; 16 token digest đã thu hồi, không có session demo đang sống |
-| Quy định / danh mục | 1 quy định, 2 loại đại lý, 20 quận mẫu, 6 đơn vị |
-| Đại lý | 30; có đại lý mới chưa giao dịch, trùng tên khác quận và ngừng hợp tác |
+| Quy định / danh mục | 1 quy định, 2 loại đại lý, 168 phường/xã (đại lý ở 20 phường), 6 đơn vị |
+| Đại lý | 30; có đại lý mới chưa giao dịch, trùng tên khác phường/xã và ngừng hợp tác |
 | Mặt hàng | 24; có đơn vị lẻ, hàng ngừng bán, tồn thấp và hàng chưa nhập |
 | Chứng từ | 410 chứng từ, 411 phiên bản, 766 dòng; đủ 7 loại chứng từ |
 | Sổ kho / phải thu / dư có | 753 / 486 / 5 bút toán; cache đối chiếu được với ledger |
@@ -279,13 +283,14 @@ seed không tự xóa database đã có dữ liệu khác.
 | Trả hàng / bù / hoàn tiền | Giảm nợ chưa trả, dư có từ hàng đã trả tiền, bù nợ, hoàn cash/online |
 | Hoàn tiền online | 4 attempt: SUCCESS / PENDING / UNKNOWN / FAILED; 5 reservation giữ/tiêu/giải phóng tiền |
 | Kiểm kê | 3 biên bản, 36 dòng; có chênh lệch, không chênh lệch và nháp |
-| Audit | 3.740 bản ghi tự sinh, không chứa password/token hash |
+| Audit | 3.740 bản ghi khi seed ở `0009` (3.723 khi seed mới ở `0010`), không chứa password/token hash |
 
 Lịch sử nghiệp vụ trải từ **01/06/2026 đến 30/09/2026**, đủ dữ liệu xem báo cáo
 tháng và so sánh tồn/công nợ/doanh số nhiều kỳ. Chứng từ có nháp, chờ xác nhận,
 đã ghi nhận, đã hủy; có sửa phiên bản và bút toán đảo. Các callback/refund đều
 là bằng chứng **mô phỏng** có đánh dấu `demo`, không gọi cổng thanh toán thật.
-Các tên quận là danh mục demo theo mô hình quận trong thiết kế.
+Phường/xã là danh mục thật TP.HCM sau 01/7/2025 (NQ 1685/NQ-UBTVQH15, mã GSO); 20 phường
+đại diện thay cho 20 quận demo cũ theo `openwiki/database-design/hcmc_wards_2025.json`.
 
 ### Tài khoản đăng nhập mẫu
 
