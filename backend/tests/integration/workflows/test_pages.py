@@ -66,7 +66,7 @@ def test_all_read_filters_sort_pages_and_cursor_scopes(engine, actor, trading, c
             q="Agency",
             agencyId=trading["agency"],
             typeId=1,
-            districtId=1,
+            wardId=1,
             debtFrom=Decimal(310),
             debtTo=Decimal(310),
             status="ACTIVE",

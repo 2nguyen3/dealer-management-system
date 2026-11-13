@@ -9,7 +9,7 @@ vi.mock('../features/authentication/useAuth', () => ({
 }))
 
 const rules = {
-  data: { maxAgenciesPerDistrict: 4, sellingPriceRate: '1.020000' },
+  data: { maxAgenciesPerWard: 4, sellingPriceRate: '1.020000' },
   etag: '"r1"',
   status: 200,
 }

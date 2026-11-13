@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MasterPage, type MasterConfig } from '../features/districts/MasterPage'
-import { master, user } from '../features/districts/masterContracts'
+import {
+  MasterPage,
+  type MasterConfig,
+} from '../features/master_data/MasterPage'
+import { master, user } from '../features/master_data/masterContracts'
 import * as api from '../lib/api'
 
 const permission = vi.hoisted(() => ({ allow: true }))
@@ -10,19 +13,19 @@ vi.mock('../features/authentication/useAuth', () => ({
 }))
 
 const config: MasterConfig = {
-  path: '/districts',
-  title: 'Danh sách quận',
-  description: 'Quận và số đại lý.',
-  manage: 'district.manage',
+  path: '/agency-types',
+  title: 'Danh sách loại đại lý',
+  description: 'Loại đại lý và hạn mức nợ.',
+  manage: 'agency_type.manage',
   decode: master,
   fields: [
-    { key: 'code', label: 'Mã quận' },
-    { key: 'name', label: 'Tên quận' },
+    { key: 'code', label: 'Mã loại' },
+    { key: 'name', label: 'Tên loại' },
     { key: 'openedOn', label: 'Ngày mở', type: 'date', optional: true },
   ],
   columns: [
     ['code', 'Mã'],
-    ['name', 'Tên quận'],
+    ['name', 'Tên loại'],
   ],
 }
 
@@ -56,8 +59,8 @@ describe('MasterPage layout', () => {
     expect(
       screen.getByRole('status', { name: 'Đang tải danh sách…' }),
     ).toBeTruthy()
-    release(page([{ id: 1, code: 'Q1', name: 'Quận 1' }]))
-    expect(await screen.findByText('Quận 1')).toBeTruthy()
+    release(page([{ id: 1, code: 'L1', name: 'Loại 1' }]))
+    expect(await screen.findByText('Loại 1')).toBeTruthy()
     expect(
       screen.queryByRole('status', { name: 'Đang tải danh sách…' }),
     ).toBeNull()
@@ -65,7 +68,7 @@ describe('MasterPage layout', () => {
       screen.getByText('kết quả trên trang', { exact: false }),
     ).toBeTruthy()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Danh sách quận' }),
+      screen.getByRole('heading', { level: 1, name: 'Danh sách loại đại lý' }),
     ).toBeTruthy()
   })
 
@@ -87,7 +90,7 @@ describe('MasterPage layout', () => {
       },
     )
     vi.spyOn(api, 'apiFetch').mockResolvedValue(
-      page([{ id: 1, code: 'Q1', name: 'Quận 1' }]),
+      page([{ id: 1, code: 'L1', name: 'Loại 1' }]),
     )
     render(<MasterPage config={config} />)
     const view = await screen.findByRole('button', { name: 'Chi tiết' })

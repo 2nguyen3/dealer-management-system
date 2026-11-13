@@ -198,7 +198,7 @@ export const reports: Record<
   debt: {
     label: 'Công nợ (BM6.2)',
     permission: 'debt.read',
-    filters: ['agencyId', 'typeId', 'districtId'],
+    filters: ['agencyId', 'typeId', 'wardId'],
     sorts: ['agencyId', '-agencyId', 'closingDebt', '-closingDebt'],
   },
   inventory: {
@@ -245,7 +245,7 @@ export const labels: Record<string, string> = {
   unitId: 'ID đơn vị',
   unitName: 'Đơn vị',
   typeId: 'ID loại đại lý',
-  districtId: 'ID quận',
+  wardId: 'ID phường/xã',
   numberOfIssues: 'Số phiếu xuất',
   salesAmount: 'Doanh số gộp (VND)',
   returnAmount: 'Trả hàng (VND)',
@@ -308,7 +308,7 @@ export function reportPath(
     const value = query.filters[key]
     if (!value) continue
     const valid =
-      key === 'typeId' || key === 'districtId'
+      key === 'typeId' || key === 'wardId'
         ? /^[1-9][0-9]{0,9}$/.test(value) && BigInt(value) <= 2147483647n
         : id(value)
     if (!valid)

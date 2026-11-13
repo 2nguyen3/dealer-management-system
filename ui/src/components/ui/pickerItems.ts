@@ -1,4 +1,5 @@
 import { formatQuantity, formatVND } from '../../lib/formatters'
+import { wardKindLabel } from '../../lib/labels'
 
 /** List resources the picker can search through `GET /{resource}?q=&limit=`. */
 export type PickerResource =
@@ -8,6 +9,7 @@ export type PickerResource =
   | 'user-groups'
   | 'stock-issues'
   | 'payment-receipts'
+  | 'wards'
 
 export interface PickerItem {
   id: string
@@ -44,6 +46,14 @@ export function describeItem(
   } else if (resource === 'agencies') {
     const debt = text(row.currentDebt)
     if (debt !== undefined) detail = `Dư nợ ${formatVND(debt)}`
+  } else if (resource === 'wards') {
+    // Ward names already carry their kind ("Phường …", "Xã …", "Đặc khu …").
+    label = name ?? code ?? `#${id}`
+    const kind = text(row.kind)
+    detail =
+      [kind && wardKindLabel(kind), code && `Mã ${code}`]
+        .filter(Boolean)
+        .join(' · ') || undefined
   } else if (resource === 'stock-issues' || resource === 'payment-receipts') {
     if (code && agency) label = `${code} — ${agency}`
     const amount = text(row.totalAmount) ?? text(row.amount)

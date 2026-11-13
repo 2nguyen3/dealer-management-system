@@ -24,27 +24,30 @@ DEMO_USERS = [
     ("ketoan2@agentra.demo", "Nguyễn Hà Minh Tuấn", "ACCOUNTING", "AgentraDemo!2026#KT2", "ACTIVE"),
     ("locked@agentra.demo", "Tài khoản đã khóa (mẫu)", "SALES", "AgentraDemo!2026#LOCK", "LOCKED"),
 ]
-DISTRICTS = [
-    "Quận 1",
-    "Quận 3",
-    "Quận 4",
-    "Quận 5",
-    "Quận 6",
-    "Quận 7",
-    "Quận 8",
-    "Quận 10",
-    "Quận 11",
-    "Quận 12",
-    "Bình Thạnh",
-    "Gò Vấp",
-    "Phú Nhuận",
-    "Tân Bình",
-    "Tân Phú",
-    "Bình Tân",
-    "Thủ Đức",
-    "Bình Chánh",
-    "Hóc Môn",
-    "Nhà Bè",
+# Demo agencies use the 20 wards that revision 0010 maps from the former demo districts
+# (openwiki/database-design/hcmc_wards_2025.json legacyDistrictToWard, same order), so a
+# fresh 0010 seed and an upgraded 0009 seed hold identical ward placements and addresses.
+WARDS = [
+    ("26740", "Phường Sài Gòn"),
+    ("27139", "Phường Xuân Hòa"),
+    ("27265", "Phường Khánh Hội"),
+    ("27343", "Phường Chợ Lớn"),
+    ("27364", "Phường Bình Phú"),
+    ("27478", "Phường Tân Thuận"),
+    ("27418", "Phường Chánh Hưng"),
+    ("27169", "Phường Diên Hồng"),
+    ("27238", "Phường Minh Phụng"),
+    ("26791", "Phường Đông Hưng Thuận"),
+    ("26929", "Phường Bình Thạnh"),
+    ("26884", "Phường Gò Vấp"),
+    ("27073", "Phường Phú Nhuận"),
+    ("27004", "Phường Tân Bình"),
+    ("27031", "Phường Tân Phú"),
+    ("27442", "Phường Bình Tân"),
+    ("26824", "Phường Thủ Đức"),
+    ("27637", "Xã Bình Chánh"),
+    ("27559", "Xã Hóc Môn"),
+    ("27655", "Xã Nhà Bè"),
 ]
 UNITS = [
     ("PIECE", "Cái", False),
@@ -143,16 +146,12 @@ class DemoSeed:
                     purpose=purpose,
                     digest=hashlib.sha256(secrets.token_bytes(32)).digest(),
                 )
-        self.actor("MANAGEMENT", "district.manage")
-        district_ids = [
+        # The read-only ward catalogue is loaded by migration 0010, never by the seed.
+        ward_ids = [
             self.query(
-                """
-            INSERT INTO dms.district (code,name) VALUES (:code,:name) RETURNING id
-        """,
-                code=f"DISTRICT_{i + 1:02}",
-                name=name,
+                "SELECT id FROM dms.ward WHERE code=:code AND name=:name", code=c, name=n
             ).scalar_one()
-            for i, name in enumerate(DISTRICTS)
+            for c, n in WARDS
         ]
         self.actor("MANAGEMENT", "unit.manage")
         unit_ids = {
@@ -198,19 +197,19 @@ class DemoSeed:
             "Tân Tiến",
         ]
         for i in range(30):
-            name = f"Đại lý {names[i % len(names)]}"  # Intentional names repeated across districts.
+            name = f"Đại lý {names[i % len(names)]}"  # Intentional names repeated across wards.
             self.agencies.append(
                 self.query(
                     """
-                INSERT INTO dms.agency (name,"typeId","districtId",phone,address,email,
+                INSERT INTO dms.agency (name,"typeId","wardId",phone,address,email,
                   "acceptedDate","createdBy","updatedBy")
-                SELECT :name,id,:district,:phone,:address,:email,'2026-01-05',:actor,:actor
+                SELECT :name,id,:ward,:phone,:address,:email,'2026-01-05',:actor,:actor
                 FROM dms.agency_type WHERE code=:type RETURNING id
             """,
                     name=name,
-                    district=district_ids[i // 3],
+                    ward=ward_ids[i // 3],
                     phone=f"0901{i + 1:06}",
-                    address=f"{20 + i * 7} Đường số {i % 8 + 1}, {DISTRICTS[i // 3]}, TP.HCM (mẫu)",
+                    address=f"{20 + i * 7} Đường số {i % 8 + 1}, {WARDS[i // 3][1]}, TP.HCM (mẫu)",
                     email=f"daily{i + 1:02}@agentra.demo",
                     actor=self.users["SALES"],
                     type="TYPE_1" if i % 2 == 0 else "TYPE_2",
@@ -683,8 +682,6 @@ class DemoSeed:
         self.collect(self.agencies[25], date(2026, 9, 30), 10000, "CASH")
         self.actor("WAREHOUSE", "product.manage")
         self.query("UPDATE dms.product SET status='INACTIVE' WHERE id=:id", id=self.products[21])
-        self.actor("MANAGEMENT", "district.manage")
-        self.query("UPDATE dms.district SET status='INACTIVE' WHERE code='DISTRICT_20'")
         self.flush()
 
     def stock_counts(self):
@@ -758,7 +755,7 @@ def main() -> None:
                 counts = check_database(connection, seeded=True)
                 print("Demo v1 already seeded; verified existing data, no changes.")
             else:
-                for table in ("app_user", "agency", "product", "district", "unit", "document"):
+                for table in ("app_user", "agency", "product", "unit", "document"):
                     if connection.exec_driver_sql(
                         f'SELECT EXISTS (SELECT 1 FROM dms."{table}")'
                     ).scalar_one():

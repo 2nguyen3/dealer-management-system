@@ -20,7 +20,7 @@ export function catalogOption(value: unknown): CatalogOption | null {
 }
 
 /**
- * Loads a small catalogue (units, districts) as select options. Pass `null`
+ * Loads a small catalogue (units, agency types) as select options. Pass `null`
  * to skip loading. Values stay the exact server identifiers.
  */
 export function useCatalogOptions(path: string | null): {

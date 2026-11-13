@@ -1,12 +1,16 @@
-import { BookOpenText, Search } from 'lucide-react'
+import { BookOpenText, Coins, Search } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/blocks/PageHeader'
+import { SortableHeader, SortMenu } from '@/components/data/SortControls'
+import { useSort } from '@/components/data/sorting'
+import { Progress } from '@/components/shadcn/progress'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { EntityPicker } from '@/components/ui/EntityPicker'
 import { Pagination } from '@/components/ui/Pagination'
 import { Table } from '@/components/ui/Table'
+import { formatPercent, toNumber } from '@/lib/chart'
 import { formatVND } from '@/lib/formatters'
 import { useAuth } from '../authentication/useAuth'
 import {
@@ -32,12 +36,31 @@ function lot(value: unknown): Row {
   return data
 }
 
+/** Server sort enum for GET /agencies/{id}/credit-lots: createdAt, id (±). */
+const LOT_SORTS = [
+  { field: 'createdAt', label: 'Thời điểm phát sinh' },
+  { field: 'id', label: 'Mã khoản' },
+]
+
 function Lots({ agencyId }: { agencyId: string }) {
-  const list = useSourcePage(`/agencies/${agencyId}/credit-lots`, {}, lot)
+  const sorter = useSort()
+  const list = useSourcePage(
+    `/agencies/${agencyId}/credit-lots`,
+    sorter.params,
+    lot,
+  )
   return (
     <SectionCard
       title="Các khoản dư có"
-      description="Mỗi khoản phát sinh từ một phiếu thu nộp thừa hoặc chứng từ giảm nợ; được dùng theo thứ tự cũ nhất trước."
+      description="Dùng theo thứ tự cũ nhất trước."
+      icon={<Coins />}
+      actions={
+        <SortMenu
+          options={LOT_SORTS}
+          sort={sorter.sort}
+          onChange={sorter.setSort}
+        />
+      }
     >
       {list.error && <Alert type="error">{list.error}</Alert>}
       <div className="overflow-hidden rounded-lg border">
@@ -52,7 +75,13 @@ function Lots({ agencyId }: { agencyId: string }) {
             <Table caption="Các khoản dư có">
               <thead>
                 <tr>
-                  <th scope="col">Khoản</th>
+                  <SortableHeader
+                    field="id"
+                    sort={sorter.sort}
+                    onSort={sorter.toggle}
+                  >
+                    Khoản
+                  </SortableHeader>
                   <th scope="col">Chứng từ nguồn</th>
                   <th scope="col">Phiếu thu gốc</th>
                   <th scope="col" className="cell-number">
@@ -63,6 +92,9 @@ function Lots({ agencyId }: { agencyId: string }) {
                   </th>
                   <th scope="col" className="cell-number">
                     Khả dụng
+                  </th>
+                  <th scope="col" className="min-w-32">
+                    Tỷ lệ khả dụng
                   </th>
                 </tr>
               </thead>
@@ -81,6 +113,13 @@ function Lots({ agencyId }: { agencyId: string }) {
                     <td className="cell-number font-medium">
                       {formatVND(String(item.available))}
                     </td>
+                    <td>
+                      <LotRatio
+                        id={String(item.id)}
+                        available={String(item.available)}
+                        balance={String(item.balance)}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -96,6 +135,34 @@ function Lots({ agencyId }: { agencyId: string }) {
         />
       </div>
     </SectionCard>
+  )
+}
+
+/** Available share of a lot's balance; the rest is reserved by a refund. */
+function LotRatio({
+  id,
+  available,
+  balance,
+}: {
+  id: string
+  available: string
+  balance: string
+}) {
+  const total = toNumber(balance)
+  if (total <= 0)
+    return <span className="text-xs text-muted-foreground">—</span>
+  const ratio = Math.max(0, Math.min(1, toNumber(available) / total))
+  return (
+    <div className="flex items-center gap-2">
+      <Progress
+        value={ratio * 100}
+        aria-label={`Tỷ lệ khả dụng khoản #${id}`}
+        className="h-1.5 w-20 [&_[data-slot=progress-indicator]]:bg-success"
+      />
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {formatPercent(ratio)}
+      </span>
+    </div>
   )
 }
 
@@ -123,7 +190,7 @@ export function AgencyCreditPage() {
       <PageHeader
         eyebrow="Tài chính"
         title="Hạn mức & Dư có đại lý"
-        description="Chọn đại lý để xem dư nợ, hạn mức còn lại và các khoản dư có."
+        description="Hạn mức nợ, cơ cấu dư có và từng khoản dư có của đại lý."
         className="mb-0"
       />
       <form
@@ -149,7 +216,7 @@ export function AgencyCreditPage() {
       {!selected ? (
         <EmptyState
           title="Chưa chọn đại lý"
-          description="Chọn một đại lý ở trên để xem số dư, hạn mức và các khoản dư có."
+          description="Chọn đại lý ở trên để xem hạn mức và dư có."
         />
       ) : (
         <div className="space-y-6">

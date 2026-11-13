@@ -1,0 +1,107 @@
+import { BookCheck, FilePen, Send, Undo2, XCircle } from 'lucide-react'
+import { toNumber } from '../../lib/chart'
+import { formatDate } from '../../lib/formatters'
+import { statusLabel } from '../../lib/labels'
+import type { DocumentKind, DocumentSummary } from './documentContracts'
+import type { LifecycleStep } from './DocumentParts'
+
+const STATUS_ORDER = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
+const STATUS_COLORS: Record<(typeof STATUS_ORDER)[number], string> = {
+  DRAFT: 'var(--chart-4)',
+  PENDING: 'var(--warning)',
+  POSTED: 'var(--success)',
+  CANCELLED: 'var(--destructive)',
+}
+
+/** Exact page total from decimal strings (whole VND), as a bigint. */
+export function pageTotal(items: readonly DocumentSummary[]): bigint {
+  return items.reduce((sum, row) => {
+    try {
+      return sum + BigInt(row.totalAmount)
+    } catch {
+      return sum
+    }
+  }, 0n)
+}
+
+/** Status counts in lifecycle order, skipping empty statuses. */
+export function statusParts(items: readonly DocumentSummary[]) {
+  return STATUS_ORDER.map((status) => ({
+    key: status,
+    label: statusLabel(status),
+    value: items.filter((row) => row.status === status).length,
+    color: STATUS_COLORS[status],
+  })).filter((part) => part.value > 0)
+}
+
+/** Sum of document totals per business date, oldest first. */
+export function valueByDay(items: readonly DocumentSummary[]) {
+  const days = new Map<string, bigint>()
+  for (const row of items) {
+    let amount = 0n
+    try {
+      amount = BigInt(row.totalAmount)
+    } catch {
+      amount = 0n
+    }
+    days.set(row.businessDate, (days.get(row.businessDate) ?? 0n) + amount)
+  }
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, amount]) => ({
+      day,
+      label: formatDate(day).slice(0, 5),
+      value: toNumber(amount.toString()),
+      exact: amount.toString(),
+    }))
+}
+
+const DRAFT: LifecycleStep = {
+  key: 'draft',
+  label: 'Lập phiếu',
+  icon: FilePen,
+  hint: 'Bản nháp: còn sửa được, chưa tác động sổ sách.',
+}
+const PENDING: LifecycleStep = {
+  key: 'pending',
+  label: 'Chờ xuất',
+  icon: Send,
+  hint: 'Đã nộp và chốt giá; tồn kho được kiểm tra lại khi ghi sổ.',
+}
+const POSTED: LifecycleStep = {
+  key: 'posted',
+  label: 'Ghi sổ',
+  icon: BookCheck,
+  hint: 'Đã ghi vào sổ kho và công nợ.',
+}
+const CHANGE: LifecycleStep = {
+  key: 'change',
+  label: 'Sửa sai/Hủy',
+  icon: Undo2,
+  hint: 'Chỉ bằng phiên bản mới có lý do; lịch sử giữ nguyên.',
+}
+const CANCELLED: LifecycleStep = {
+  key: 'cancelled',
+  label: 'Hủy',
+  icon: XCircle,
+  hint: 'Chứng từ đã hủy; tác động sổ sách được đảo lại.',
+}
+
+/** Steps a document of this kind passes through; only issues wait in PENDING. */
+export function lifecycleSteps(
+  kind: DocumentKind,
+  status: DocumentSummary['status'],
+): { steps: LifecycleStep[]; current: number } {
+  const main =
+    kind === 'STOCK_ISSUE' ? [DRAFT, PENDING, POSTED] : [DRAFT, POSTED]
+  if (status === 'CANCELLED')
+    return { steps: [...main, CANCELLED], current: main.length }
+  const steps = [...main, CHANGE]
+  const current =
+    status === 'POSTED'
+      ? main.indexOf(POSTED)
+      : status === 'PENDING'
+        ? main.indexOf(PENDING)
+        : 0
+  return { steps, current: Math.max(0, current) }
+}

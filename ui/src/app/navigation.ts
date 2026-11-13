@@ -15,7 +15,6 @@ export interface NavigationItem {
 export const routePermissions: Record<string, NavigationPolicy> = {
   '/agencies': { anyOf: ['agency.read', 'agency.manage'] },
   '/products': { anyOf: ['product.manage', 'inventory.read'] },
-  '/districts': { anyOf: ['district.manage', 'agency.read', 'agency.manage'] },
   '/agency-types': {
     anyOf: ['agency_type.manage', 'agency.read', 'agency.manage'],
   },
@@ -141,7 +140,6 @@ export const navigationGroups: { title: string; items: NavigationItem[] }[] = [
   {
     title: 'Danh mục & Quy định',
     items: [
-      { path: '/districts', label: 'Danh sách quận' },
       { path: '/agency-types', label: 'Loại đại lý' },
       { path: '/units', label: 'Đơn vị tính' },
       { path: '/business-rules', label: 'Thay đổi quy định' },

@@ -35,7 +35,7 @@ class SalesFilters(ApiModel):
 
 
 class DebtFilters(SalesFilters):
-    districtId: CatalogParameter | None = None
+    wardId: CatalogParameter | None = None
 
 
 class InventoryFilters(ApiModel):

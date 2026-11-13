@@ -4,6 +4,7 @@ from app.common.catalogue import CatalogueService
 from app.common.preconditions import Preconditions
 from app.core.exceptions import ApiError
 from app.modules.auth.models import AppFunction, GroupPermission
+from app.modules.auth.permissions import RETIRED_FUNCTION_CODES
 from app.modules.permissions.repository import FunctionRepository, PermissionRepository
 from app.modules.permissions.schemas import (
     FunctionListResponse,
@@ -56,7 +57,12 @@ class PermissionService(CatalogueService):
             self.repo.require_group(group_id, lock=True)
             self.authorize((self.permission,))
             if (
-                self.session.scalar(select(AppFunction.id).where(AppFunction.id == function_id))
+                self.session.scalar(
+                    select(AppFunction.id).where(
+                        AppFunction.id == function_id,
+                        AppFunction.code.not_in(sorted(RETIRED_FUNCTION_CODES)),
+                    )
+                )
                 is None
             ):
                 raise ApiError(404, "NOT_FOUND", "Function not found")

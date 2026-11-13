@@ -1,6 +1,14 @@
-import { ChevronsUpDown, KeyRound, LogOut, Search } from 'lucide-react'
+import {
+  ChevronsUpDown,
+  KeyRound,
+  LogOut,
+  Search,
+  UserRound,
+} from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { PageIconContext } from '@/components/blocks/pageIconContext'
+import { PageTransition } from '@/components/motion/Motion'
 import { Avatar, AvatarFallback } from '@/components/shadcn/avatar'
 import {
   Breadcrumb,
@@ -38,6 +46,8 @@ import {
   useSidebar,
 } from '@/components/shadcn/sidebar'
 import { TooltipProvider } from '@/components/shadcn/tooltip'
+import { ModeToggle } from '@/components/theme/ModeToggle'
+import { initials } from '../features/profile/profileModel'
 import { ChangePasswordModal } from '../features/authentication/ChangePasswordModal'
 import { useAuth } from '../features/authentication/useAuth'
 import {
@@ -46,12 +56,6 @@ import {
   routePermissions,
 } from './navigation'
 import { navigationIcons } from './navigationIcons'
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  const last = parts.at(-1) ?? ''
-  return last.charAt(0).toLocaleUpperCase('vi') || '?'
-}
 
 function isRouteActive(pathname: string, path: string): boolean {
   return path === '/'
@@ -89,20 +93,30 @@ function WorkspaceSidebar({
 
   return (
     <Sidebar collapsible="icon" id="workspace-navigation">
-      <SidebarHeader className="gap-3 px-3 pt-4">
+      <SidebarHeader className="gap-3 px-2 pt-4">
         <NavLink
           to="/"
           aria-label="Agentra - Bàn làm việc"
-          className="flex items-center gap-2 rounded-md px-1 py-1 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          data-testid="sidebar-brand"
+          className="flex min-w-0 items-center gap-2 rounded-md py-1 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <img
-            src="/assets/brand/agentra-icon.png"
-            alt=""
-            className="size-8 shrink-0 rounded-md bg-white/95 p-0.5"
-          />
-          <span className="grid leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-base font-semibold text-white">Agentra</span>
-            <span className="text-[11px] tracking-wide text-sidebar-foreground/70">
+          {/* Fixed 32px square at the same inset as the menu buttons: it never
+              shrinks, stretches or moves while the rail animates and sits
+              centred in the 48px collapsed rail, like the nav icons. */}
+          <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/95">
+            <img
+              src="/assets/brand/agentra-icon.png"
+              alt=""
+              width={28}
+              height={28}
+              className="aspect-square size-7 max-w-none shrink-0 object-contain"
+            />
+          </span>
+          <span className="grid min-w-0 leading-tight whitespace-nowrap group-data-[collapsible=icon]:hidden">
+            <span className="truncate text-base font-semibold text-white">
+              Agentra
+            </span>
+            <span className="truncate text-[11px] tracking-wide text-sidebar-foreground/70">
               Hệ thống phân phối
             </span>
           </span>
@@ -181,7 +195,7 @@ function WorkspaceSidebar({
                     className="data-[state=open]:bg-sidebar-accent"
                   >
                     <Avatar className="size-8 rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-sidebar-primary font-semibold text-sidebar-primary-foreground">
+                      <AvatarFallback className="rounded-lg bg-gradient-to-br from-[#5fd4ff] via-sidebar-primary to-[#1f4fd8] text-xs font-bold text-white">
                         {initials(user.fullName)}
                       </AvatarFallback>
                     </Avatar>
@@ -210,6 +224,15 @@ function WorkspaceSidebar({
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <NavLink
+                      to="/profile"
+                      onClick={() => isMobile && setOpenMobile(false)}
+                    >
+                      <UserRound />
+                      Hồ sơ cá nhân
+                    </NavLink>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={onChangePassword}>
                     <KeyRound />
                     Đổi mật khẩu
@@ -244,7 +267,19 @@ export function ShellLayout() {
   const current = navigationGroups
     .flatMap((group) => group.items.map((item) => ({ group, item })))
     .find(({ item }) => item.path === location.pathname)
-  const pageLabel = current?.item.label ?? 'Không gian làm việc'
+  const pageIcon =
+    location.pathname === '/profile'
+      ? UserRound
+      : (navigationIcons[current?.item.path ?? ''] ??
+        Object.entries(navigationIcons)
+          .filter(
+            ([path]) => path !== '/' && isRouteActive(location.pathname, path),
+          )
+          .sort(([a], [b]) => b.length - a.length)[0]?.[1] ??
+        null)
+  const pageLabel =
+    current?.item.label ??
+    (location.pathname === '/profile' ? 'Hồ sơ cá nhân' : 'Không gian làm việc')
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -298,6 +333,9 @@ export function ShellLayout() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+            <div className="ml-auto flex items-center gap-1">
+              <ModeToggle />
+            </div>
           </header>
           <main
             id="main-content"
@@ -312,7 +350,11 @@ export function ShellLayout() {
                 Không thể đăng xuất. Vui lòng thử lại.
               </p>
             )}
-            <Outlet />
+            <PageIconContext.Provider value={pageIcon}>
+              <PageTransition key={location.pathname}>
+                <Outlet />
+              </PageTransition>
+            </PageIconContext.Provider>
           </main>
         </SidebarInset>
         <ChangePasswordModal

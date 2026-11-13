@@ -10,14 +10,16 @@
 
 .entity-picker__input {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 32px 8px 12px;
+  height: 36px;
+  padding: 6px 32px 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--color-bg-surface);
   color: var(--color-text-main);
   font: inherit;
   font-size: 14px;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
 }
 
 .entity-picker__input:hover:not(:disabled) {
@@ -57,30 +59,42 @@
 }
 
 .entity-picker__list {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  max-height: 280px;
+  /* Portalled popover: sized by its content, never narrower than the input,
+     bounded by the viewport so long product/agency names stay readable. */
+  z-index: 60;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: max(var(--radix-popover-trigger-width, 0px), 16rem);
+  max-width: min(36rem, var(--radix-popover-content-available-width, 36rem));
+  max-height: min(20rem, var(--radix-popover-content-available-height, 20rem));
   margin: 0;
   padding: 4px;
   overflow-y: auto;
   list-style: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-  box-shadow: 0 8px 24px rgb(32 42 36 / 0.12);
+  background: var(--popover, var(--color-bg-surface));
+  color: var(--popover-foreground, var(--color-text-main));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
 }
 
 .entity-picker__option {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 16px;
   padding: 8px 10px;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 14px;
+  line-height: 1.4;
+}
+
+.entity-picker__label {
+  min-width: 0;
+  flex: 1 1 14rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .entity-picker__option.is-active,
@@ -89,10 +103,11 @@
 }
 
 .entity-picker__detail {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   color: var(--color-text-muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .entity-picker__hint {

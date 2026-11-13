@@ -1,4 +1,9 @@
-import { PackageCheck } from 'lucide-react'
+import { HeartPulse, PackageCheck, PackagePlus } from 'lucide-react'
+import {
+  LegendList,
+  SegmentedMeter,
+} from '../../components/charts/MebiusCharts'
+import { Badge as ShadcnBadge } from '../../components/shadcn/badge'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { ChartCard } from '../../components/blocks/ChartCard'
 import {
@@ -49,7 +54,7 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
   return (
     <ChartCard
       title="Giá trị tồn kho cao nhất"
-      description={`Top ${TOP} mặt hàng theo tồn × giá nhập hiện hành`}
+      description={`Top ${TOP} · tồn × giá nhập`}
       isEmpty={!data.length}
       empty={
         <p className="flex h-64 items-center justify-center px-6 text-center text-sm text-muted-foreground">
@@ -82,7 +87,7 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
     >
       <ChartContainer
         config={chartConfig}
-        className="aspect-auto w-full"
+        className="bg-dots aspect-auto w-full rounded-lg"
         style={{ height: Math.max(160, data.length * 30 + 40) }}
       >
         <BarChart
@@ -91,7 +96,25 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
           margin={{ top: 4, right: 12, bottom: 4, left: 4 }}
           barCategoryGap={6}
         >
-          <CartesianGrid horizontal={false} stroke={CHART_GRID} />
+          <defs>
+            <linearGradient id="stock-value-fill" x1="0" y1="0" x2="1" y2="0">
+              <stop
+                offset="0%"
+                stopColor="var(--color-value)"
+                stopOpacity={0.55}
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--color-value)"
+                stopOpacity={1}
+              />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            horizontal={false}
+            stroke={CHART_GRID}
+            strokeDasharray="4 4"
+          />
           <XAxis
             type="number"
             tickFormatter={(value: number) => formatCompact(value)}
@@ -125,10 +148,11 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
           />
           <Bar
             dataKey="value"
-            fill="var(--color-value)"
-            radius={[0, 4, 4, 0]}
+            fill="url(#stock-value-fill)"
+            radius={9}
             maxBarSize={18}
-            isAnimationActive={false}
+            isAnimationActive
+            animationDuration={700}
           />
         </BarChart>
       </ChartContainer>
@@ -152,7 +176,8 @@ export function LowStockCard({
   return (
     <SectionCard
       title="Cần nhập thêm"
-      description="Mặt hàng dưới ngưỡng cảnh báo tồn"
+      description="Dưới ngưỡng cảnh báo"
+      icon={<PackagePlus />}
       contentClassName="px-2"
     >
       {low.length ? (
@@ -176,7 +201,7 @@ export function LowStockCard({
                   value={level ?? 0}
                   aria-valuenow={level ?? 0}
                   aria-label={`Mức tồn ${row.name}`}
-                  className="mt-1.5 h-1.5 bg-amber-100 [&>[data-slot=progress-indicator]]:bg-amber-500"
+                  className="mt-1.5 h-1.5 bg-warning/15 [&>[data-slot=progress-indicator]]:bg-warning"
                 />
               </button>
             </li>
@@ -185,9 +210,78 @@ export function LowStockCard({
       ) : (
         <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
           <PackageCheck className="size-6 text-success" aria-hidden="true" />
-          Không có mặt hàng nào dưới ngưỡng tồn.
+          Không có mặt hàng dưới ngưỡng.
         </div>
       )}
+    </SectionCard>
+  )
+}
+
+/**
+ * Stock health of the loaded catalogue: a segmented meter of products at or
+ * above their threshold plus the split by stock state.
+ */
+export function StockHealthCard({
+  rows,
+  partial,
+}: {
+  rows: StockRow[]
+  /** True when only the first page of products is loaded. */
+  partial: boolean
+}) {
+  const low = rows.filter((row) => row.low).length
+  const unknown = rows.filter(
+    (row) => !row.low && row.threshold === null,
+  ).length
+  const healthy = rows.length - low - unknown
+  const ratio = rows.length ? healthy / rows.length : 0
+  return (
+    <SectionCard
+      title="Sức khỏe tồn kho"
+      icon={<HeartPulse />}
+      actions={
+        <ShadcnBadge variant="secondary" className="font-normal">
+          {partial ? 'Trang hiện tại' : 'Toàn bộ danh mục'}
+        </ShadcnBadge>
+      }
+    >
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-2xl font-semibold tracking-tight tabular-nums">
+            {Math.round(ratio * 100)}%
+          </span>
+          <span className="text-xs text-muted-foreground">trên ngưỡng</span>
+        </div>
+        <SegmentedMeter
+          label="Tỷ lệ mặt hàng trên ngưỡng tồn"
+          ratio={ratio}
+          color="var(--success)"
+          segments={28}
+        />
+        <LegendList
+          className="text-xs"
+          items={[
+            {
+              key: 'healthy',
+              label: 'Trên ngưỡng',
+              value: healthy,
+              color: 'var(--success)',
+            },
+            {
+              key: 'low',
+              label: 'Dưới ngưỡng',
+              value: low,
+              color: 'var(--warning)',
+            },
+            {
+              key: 'unknown',
+              label: 'Chưa đặt ngưỡng',
+              value: unknown,
+              color: 'var(--chart-4)',
+            },
+          ]}
+        />
+      </div>
     </SectionCard>
   )
 }

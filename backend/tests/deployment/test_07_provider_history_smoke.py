@@ -12,6 +12,7 @@ from pypdf import PdfReader
 
 from app.db.seed import DEMO_USERS
 from tests.support.contract import assert_schema
+from tests.support.wards import open_ward
 
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
@@ -47,13 +48,13 @@ def test_controlled_provider_full_cash_refund_and_snapshot_history(variable):
             return response
 
         name = "PROVIDER_" + uuid4().hex
-        district = create("/api/v1/districts", {"code": name, "name": name})
+        ward = open_ward(client)
         agency = create(
             "/api/v1/agencies",
             {
                 "name": name,
                 "typeId": 1,
-                "districtId": district.json()["id"],
+                "wardId": ward,
                 "email": "smoke@example.com",
                 "acceptedDate": "2026-10-01",
             },

@@ -15,6 +15,13 @@
       href="/assets/brand/agentra-icon.png"
     />
     <title>Agentra · Quản lý đại lý</title>
+    <script>
+      try {
+        var p = localStorage.getItem('agentra-palette')
+        if (/^(thuy|moc|kim|hoa|tho|tim)$/.test(p || ''))
+          document.documentElement.dataset.palette = p
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

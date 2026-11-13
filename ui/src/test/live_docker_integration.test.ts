@@ -78,7 +78,7 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
     const [
       agenciesRes,
       productsRes,
-      districtsRes,
+      wardsRes,
       rulesRes,
       usersRes,
       receiptsRes,
@@ -97,7 +97,7 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
       fetch(`${LIVE_API_BASE}/products?limit=5`, {
         headers: { Authorization: `Bearer ${tokens.accessToken}` },
       }),
-      fetch(`${LIVE_API_BASE}/districts`, {
+      fetch(`${LIVE_API_BASE}/wards?limit=5`, {
         headers: { Authorization: `Bearer ${tokens.accessToken}` },
       }),
       fetch(`${LIVE_API_BASE}/business-rules`, {
@@ -137,7 +137,7 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
 
     expect(agenciesRes.status).toBe(200)
     expect(productsRes.status).toBe(200)
-    expect(districtsRes.status).toBe(200)
+    expect(wardsRes.status).toBe(200)
     expect(rulesRes.status).toBe(200)
     expect(usersRes.status).toBe(200)
     expect(receiptsRes.status).toBe(200)

@@ -6,13 +6,13 @@ from app.common.catalogue_http import (
     SessionDependency,
     make_service,
 )
-from app.modules.districts.service import DistrictService
+from app.modules.wards.service import WardService
 
 
-def get_district_service(
+def get_ward_service(
     request: Request,
     session: SessionDependency,
     principal: PrincipalDependency,
     auth: AuthDependency,
-) -> DistrictService:
-    return make_service(DistrictService, request, session, principal, auth)
+) -> WardService:
+    return make_service(WardService, request, session, principal, auth)

@@ -1,4 +1,4 @@
-import { Calculator, MapPin, RefreshCw, Save } from 'lucide-react'
+import { Calculator, MapPin, Percent, RefreshCw, Save } from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -6,15 +6,18 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
+import { KpiCard } from '../../components/blocks/KpiCard'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import { CountUp, Stagger, StaggerItem } from '../../components/motion/Motion'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { apiFetch } from '../../lib/api'
-import { formatQuantity } from '../../lib/formatters'
+import { formatQuantity, formatVND } from '../../lib/formatters'
 import { invalidateCache } from '../../lib/cache'
 import { useAuth } from '../authentication/useAuth'
+import { InfoHint } from '../master_data/listParts'
 import {
   catalog,
   decimal,
@@ -28,6 +31,8 @@ export function BusinessRulesPage() {
   const [capacity, setCapacity] = useState('')
   const [rate, setRate] = useState('')
   const [etag, setEtag] = useState<string | null>(null)
+  /** Last server values: the tiles show what applies, not unsaved edits. */
+  const [saved, setSaved] = useState({ capacity: '', rate: '' })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,11 +44,15 @@ export function BusinessRulesPage() {
     apiFetch<unknown>('/business-rules', { signal: controller.signal })
       .then((response) => {
         const data = record(response.data)
-        catalog(data.maxAgenciesPerDistrict)
+        catalog(data.maxAgenciesPerWard)
         decimal(data.sellingPriceRate)
         if (current) {
-          setCapacity(String(data.maxAgenciesPerDistrict))
+          setCapacity(String(data.maxAgenciesPerWard))
           setRate(String(data.sellingPriceRate))
+          setSaved({
+            capacity: String(data.maxAgenciesPerWard),
+            rate: String(data.sellingPriceRate),
+          })
           setEtag(response.etag)
         }
       })
@@ -69,7 +78,7 @@ export function BusinessRulesPage() {
           'Hệ số phải dương, tối đa 3 chữ số nguyên và 6 chữ số lẻ.',
         )
       const body = {
-        maxAgenciesPerDistrict: catalog(capacity),
+        maxAgenciesPerWard: catalog(capacity),
         sellingPriceRate: rate,
       }
       setBusy(true)
@@ -79,12 +88,16 @@ export function BusinessRulesPage() {
         false,
       )
       const data = record(response.data)
-      catalog(data.maxAgenciesPerDistrict)
+      catalog(data.maxAgenciesPerWard)
       decimal(data.sellingPriceRate)
       setEtag(response.etag)
-      setCapacity(String(data.maxAgenciesPerDistrict))
+      setCapacity(String(data.maxAgenciesPerWard))
       setRate(String(data.sellingPriceRate))
-      for (const prefix of ['/business-rules', '/districts', '/products'])
+      setSaved({
+        capacity: String(data.maxAgenciesPerWard),
+        rate: String(data.sellingPriceRate),
+      })
+      for (const prefix of ['/business-rules', '/products'])
         invalidateCache(prefix)
       setNotice(
         'Đã cập nhật quy định. Giá trên các chứng từ đã lập không thay đổi.',
@@ -97,12 +110,21 @@ export function BusinessRulesPage() {
   }
   const canManage = hasPermission('rules.manage')
   const loading = !etag && !error
+  const rateValue = /^\d+(\.\d+)?$/.test(saved.rate) ? Number(saved.rate) : null
+  const capacityValue = /^\d+$/.test(saved.capacity)
+    ? Number(saved.capacity)
+    : null
   return (
     <div className="space-y-6">
       <PageHeader
         className="mb-0"
         title="Thay đổi quy định"
-        description="Quy định chung áp dụng cho việc tiếp nhận đại lý và tính giá bán."
+        actions={
+          <InfoHint label="Giới thiệu quy định">
+            Quy định chung cho việc tiếp nhận đại lý và tính giá bán. Thay đổi
+            chỉ ảnh hưởng tới các chứng từ lập sau khi lưu.
+          </InfoHint>
+        }
       />
       {(error || notice) && (
         <div className="space-y-3">
@@ -110,29 +132,70 @@ export function BusinessRulesPage() {
           {notice && <Alert type="success">{notice}</Alert>}
         </div>
       )}
+      {etag && (
+        <Stagger
+          className="grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-3"
+          aria-label="Quy định đang áp dụng"
+          role="list"
+        >
+          <StaggerItem role="listitem">
+            <KpiCard
+              className="h-full"
+              label="Đại lý tối đa / phường/xã"
+              icon={<MapPin />}
+              value={
+                capacityValue === null ? '—' : <CountUp value={capacityValue} />
+              }
+            />
+          </StaggerItem>
+          <StaggerItem role="listitem">
+            <KpiCard
+              className="h-full"
+              label="Hệ số giá bán"
+              icon={<Calculator />}
+              value={
+                rateValue === null ? '—' : `×${formatQuantity(saved.rate)}`
+              }
+              delta={
+                rateValue === null
+                  ? undefined
+                  : { ratio: rateValue - 1, label: 'so với giá nhập' }
+              }
+            />
+          </StaggerItem>
+          <StaggerItem role="listitem" className="col-span-2 sm:col-span-1">
+            <KpiCard
+              className="h-full"
+              label="Ví dụ giá nhập 100.000 ₫"
+              icon={<Percent />}
+              value={
+                rateValue === null
+                  ? '—'
+                  : formatVND(String(Math.round(100000 * rateValue)))
+              }
+              hint="Giá bán tương ứng"
+            />
+          </StaggerItem>
+        </Stagger>
+      )}
       <form
         onSubmit={submit}
         className="max-w-3xl overflow-hidden rounded-xl border bg-card shadow-xs"
         aria-busy={loading || undefined}
       >
-        <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
-          <div>
-            <h2 className="text-base font-semibold">Quy định đang áp dụng</h2>
-            <p className="text-sm text-muted-foreground">
-              Thay đổi chỉ ảnh hưởng tới các chứng từ lập sau khi lưu.
-            </p>
-          </div>
+        <div className="flex items-center justify-between gap-3 border-b px-5 py-3">
+          <h2 className="text-base font-semibold">Quy định đang áp dụng</h2>
           {!canManage && <Badge variant="neutral">Chỉ xem</Badge>}
         </div>
         <div className="divide-y">
           <RuleRow
             icon={<MapPin className="size-5" />}
             title="Tiếp nhận đại lý"
-            description="Giới hạn số đại lý đang hoạt động trong cùng một quận."
+            hint="Giới hạn số đại lý đang hoạt động trong cùng một phường/xã."
           >
             <Input
               id="rule-capacity"
-              label="Số đại lý tối đa trong mỗi quận"
+              label="Số đại lý tối đa mỗi phường/xã"
               inputMode="numeric"
               className="tabular-nums"
               value={capacity}
@@ -144,7 +207,7 @@ export function BusinessRulesPage() {
           <RuleRow
             icon={<Calculator className="size-5" />}
             title="Tính giá bán"
-            description="Giá bán của mặt hàng được tính từ giá nhập nhân với hệ số."
+            hint="Giá bán của mặt hàng được tính từ giá nhập nhân với hệ số."
           >
             <Input
               id="rule-rate"
@@ -194,27 +257,25 @@ export function BusinessRulesPage() {
 function RuleRow({
   icon,
   title,
-  description,
+  hint,
   children,
 }: {
   icon: ReactNode
   title: string
-  description: string
+  hint: string
   children: ReactNode
 }) {
   return (
-    <div className="grid gap-4 px-5 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] md:items-start">
-      <div className="flex gap-3">
+    <div className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] md:items-start">
+      <div className="flex items-center gap-3">
         <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-chart-2/15 text-primary ring-1 ring-primary/10"
           aria-hidden="true"
         >
           {icon}
         </span>
-        <div className="space-y-0.5">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <InfoHint label={`Giải thích ${title}`}>{hint}</InfoHint>
       </div>
       <div className="min-w-0">{children}</div>
     </div>

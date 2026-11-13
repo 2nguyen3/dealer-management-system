@@ -1,0 +1,941 @@
+{
+ "source": {
+  "legalBasis": "Nghị quyết 1685/NQ-UBTVQH15 ngày 16/6/2025 (hiệu lực vận hành 01/7/2025)",
+  "dataset": "https://provinces.open-api.vn/api/v2/p/79?depth=2 (mã đơn vị hành chính GSO)",
+  "retrievedAt": "2026-11-13",
+  "province": {
+   "code": "79",
+   "name": "Thành phố Hồ Chí Minh"
+  },
+  "counts": {
+   "WARD": 113,
+   "COMMUNE": 54,
+   "SPECIAL_ZONE": 1,
+   "total": 168
+  }
+ },
+ "legacyDistrictToWard": {
+  "Quận 1": {
+   "code": "26740",
+   "name": "Phường Sài Gòn"
+  },
+  "Quận 3": {
+   "code": "27139",
+   "name": "Phường Xuân Hòa"
+  },
+  "Quận 4": {
+   "code": "27265",
+   "name": "Phường Khánh Hội"
+  },
+  "Quận 5": {
+   "code": "27343",
+   "name": "Phường Chợ Lớn"
+  },
+  "Quận 6": {
+   "code": "27364",
+   "name": "Phường Bình Phú"
+  },
+  "Quận 7": {
+   "code": "27478",
+   "name": "Phường Tân Thuận"
+  },
+  "Quận 8": {
+   "code": "27418",
+   "name": "Phường Chánh Hưng"
+  },
+  "Quận 10": {
+   "code": "27169",
+   "name": "Phường Diên Hồng"
+  },
+  "Quận 11": {
+   "code": "27238",
+   "name": "Phường Minh Phụng"
+  },
+  "Quận 12": {
+   "code": "26791",
+   "name": "Phường Đông Hưng Thuận"
+  },
+  "Bình Thạnh": {
+   "code": "26929",
+   "name": "Phường Bình Thạnh"
+  },
+  "Gò Vấp": {
+   "code": "26884",
+   "name": "Phường Gò Vấp"
+  },
+  "Phú Nhuận": {
+   "code": "27073",
+   "name": "Phường Phú Nhuận"
+  },
+  "Tân Bình": {
+   "code": "27004",
+   "name": "Phường Tân Bình"
+  },
+  "Tân Phú": {
+   "code": "27031",
+   "name": "Phường Tân Phú"
+  },
+  "Bình Tân": {
+   "code": "27442",
+   "name": "Phường Bình Tân"
+  },
+  "Thủ Đức": {
+   "code": "26824",
+   "name": "Phường Thủ Đức"
+  },
+  "Bình Chánh": {
+   "code": "27637",
+   "name": "Xã Bình Chánh"
+  },
+  "Hóc Môn": {
+   "code": "27559",
+   "name": "Xã Hóc Môn"
+  },
+  "Nhà Bè": {
+   "code": "27655",
+   "name": "Xã Nhà Bè"
+  }
+ },
+ "wards": [
+  {
+   "code": "25747",
+   "name": "Phường Thủ Dầu Một",
+   "kind": "WARD"
+  },
+  {
+   "code": "25750",
+   "name": "Phường Phú Lợi",
+   "kind": "WARD"
+  },
+  {
+   "code": "25760",
+   "name": "Phường Bình Dương",
+   "kind": "WARD"
+  },
+  {
+   "code": "25768",
+   "name": "Phường Phú An",
+   "kind": "WARD"
+  },
+  {
+   "code": "25771",
+   "name": "Phường Chánh Hiệp",
+   "kind": "WARD"
+  },
+  {
+   "code": "25777",
+   "name": "Xã Dầu Tiếng",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25780",
+   "name": "Xã Minh Thạnh",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25792",
+   "name": "Xã Long Hòa",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25807",
+   "name": "Xã Thanh An",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25813",
+   "name": "Phường Bến Cát",
+   "kind": "WARD"
+  },
+  {
+   "code": "25819",
+   "name": "Xã Trừ Văn Thố",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25822",
+   "name": "Xã Bàu Bàng",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25837",
+   "name": "Phường Chánh Phú Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "25840",
+   "name": "Phường Long Nguyên",
+   "kind": "WARD"
+  },
+  {
+   "code": "25843",
+   "name": "Phường Tây Nam",
+   "kind": "WARD"
+  },
+  {
+   "code": "25846",
+   "name": "Phường Thới Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "25849",
+   "name": "Phường Hòa Lợi",
+   "kind": "WARD"
+  },
+  {
+   "code": "25858",
+   "name": "Xã Phú Giáo",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25864",
+   "name": "Xã Phước Thành",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25867",
+   "name": "Xã An Long",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25882",
+   "name": "Xã Phước Hòa",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25888",
+   "name": "Phường Tân Uyên",
+   "kind": "WARD"
+  },
+  {
+   "code": "25891",
+   "name": "Phường Tân Khánh",
+   "kind": "WARD"
+  },
+  {
+   "code": "25906",
+   "name": "Xã Bắc Tân Uyên",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25909",
+   "name": "Xã Thường Tân",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "25912",
+   "name": "Phường Vĩnh Tân",
+   "kind": "WARD"
+  },
+  {
+   "code": "25915",
+   "name": "Phường Bình Cơ",
+   "kind": "WARD"
+  },
+  {
+   "code": "25920",
+   "name": "Phường Tân Hiệp",
+   "kind": "WARD"
+  },
+  {
+   "code": "25942",
+   "name": "Phường Dĩ An",
+   "kind": "WARD"
+  },
+  {
+   "code": "25945",
+   "name": "Phường Tân Đông Hiệp",
+   "kind": "WARD"
+  },
+  {
+   "code": "25951",
+   "name": "Phường Đông Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "25966",
+   "name": "Phường Lái Thiêu",
+   "kind": "WARD"
+  },
+  {
+   "code": "25969",
+   "name": "Phường Thuận Giao",
+   "kind": "WARD"
+  },
+  {
+   "code": "25975",
+   "name": "Phường An Phú",
+   "kind": "WARD"
+  },
+  {
+   "code": "25978",
+   "name": "Phường Thuận An",
+   "kind": "WARD"
+  },
+  {
+   "code": "25987",
+   "name": "Phường Bình Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "26506",
+   "name": "Phường Vũng Tàu",
+   "kind": "WARD"
+  },
+  {
+   "code": "26526",
+   "name": "Phường Tam Thắng",
+   "kind": "WARD"
+  },
+  {
+   "code": "26536",
+   "name": "Phường Rạch Dừa",
+   "kind": "WARD"
+  },
+  {
+   "code": "26542",
+   "name": "Phường Phước Thắng",
+   "kind": "WARD"
+  },
+  {
+   "code": "26545",
+   "name": "Xã Long Sơn",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26560",
+   "name": "Phường Bà Rịa",
+   "kind": "WARD"
+  },
+  {
+   "code": "26566",
+   "name": "Phường Long Hương",
+   "kind": "WARD"
+  },
+  {
+   "code": "26572",
+   "name": "Phường Tam Long",
+   "kind": "WARD"
+  },
+  {
+   "code": "26575",
+   "name": "Xã Ngãi Giao",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26584",
+   "name": "Xã Xuân Sơn",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26590",
+   "name": "Xã Bình Giã",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26596",
+   "name": "Xã Châu Đức",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26608",
+   "name": "Xã Kim Long",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26617",
+   "name": "Xã Nghĩa Thành",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26620",
+   "name": "Xã Hồ Tràm",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26632",
+   "name": "Xã Xuyên Mộc",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26638",
+   "name": "Xã Bàu Lâm",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26641",
+   "name": "Xã Hòa Hội",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26647",
+   "name": "Xã Hòa Hiệp",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26656",
+   "name": "Xã Bình Châu",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26659",
+   "name": "Xã Long Điền",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26662",
+   "name": "Xã Long Hải",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26680",
+   "name": "Xã Đất Đỏ",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26686",
+   "name": "Xã Phước Hải",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26704",
+   "name": "Phường Phú Mỹ",
+   "kind": "WARD"
+  },
+  {
+   "code": "26710",
+   "name": "Phường Tân Hải",
+   "kind": "WARD"
+  },
+  {
+   "code": "26713",
+   "name": "Phường Tân Phước",
+   "kind": "WARD"
+  },
+  {
+   "code": "26725",
+   "name": "Phường Tân Thành",
+   "kind": "WARD"
+  },
+  {
+   "code": "26728",
+   "name": "Xã Châu Pha",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "26732",
+   "name": "Đặc khu Côn Đảo",
+   "kind": "SPECIAL_ZONE"
+  },
+  {
+   "code": "26737",
+   "name": "Phường Tân Định",
+   "kind": "WARD"
+  },
+  {
+   "code": "26740",
+   "name": "Phường Sài Gòn",
+   "kind": "WARD"
+  },
+  {
+   "code": "26743",
+   "name": "Phường Bến Thành",
+   "kind": "WARD"
+  },
+  {
+   "code": "26758",
+   "name": "Phường Cầu Ông Lãnh",
+   "kind": "WARD"
+  },
+  {
+   "code": "26767",
+   "name": "Phường An Phú Đông",
+   "kind": "WARD"
+  },
+  {
+   "code": "26773",
+   "name": "Phường Thới An",
+   "kind": "WARD"
+  },
+  {
+   "code": "26782",
+   "name": "Phường Tân Thới Hiệp",
+   "kind": "WARD"
+  },
+  {
+   "code": "26785",
+   "name": "Phường Trung Mỹ Tây",
+   "kind": "WARD"
+  },
+  {
+   "code": "26791",
+   "name": "Phường Đông Hưng Thuận",
+   "kind": "WARD"
+  },
+  {
+   "code": "26800",
+   "name": "Phường Linh Xuân",
+   "kind": "WARD"
+  },
+  {
+   "code": "26803",
+   "name": "Phường Tam Bình",
+   "kind": "WARD"
+  },
+  {
+   "code": "26809",
+   "name": "Phường Hiệp Bình",
+   "kind": "WARD"
+  },
+  {
+   "code": "26824",
+   "name": "Phường Thủ Đức",
+   "kind": "WARD"
+  },
+  {
+   "code": "26833",
+   "name": "Phường Long Bình",
+   "kind": "WARD"
+  },
+  {
+   "code": "26842",
+   "name": "Phường Tăng Nhơn Phú",
+   "kind": "WARD"
+  },
+  {
+   "code": "26848",
+   "name": "Phường Phước Long",
+   "kind": "WARD"
+  },
+  {
+   "code": "26857",
+   "name": "Phường Long Phước",
+   "kind": "WARD"
+  },
+  {
+   "code": "26860",
+   "name": "Phường Long Trường",
+   "kind": "WARD"
+  },
+  {
+   "code": "26876",
+   "name": "Phường An Nhơn",
+   "kind": "WARD"
+  },
+  {
+   "code": "26878",
+   "name": "Phường An Hội Đông",
+   "kind": "WARD"
+  },
+  {
+   "code": "26882",
+   "name": "Phường An Hội Tây",
+   "kind": "WARD"
+  },
+  {
+   "code": "26884",
+   "name": "Phường Gò Vấp",
+   "kind": "WARD"
+  },
+  {
+   "code": "26890",
+   "name": "Phường Hạnh Thông",
+   "kind": "WARD"
+  },
+  {
+   "code": "26898",
+   "name": "Phường Thông Tây Hội",
+   "kind": "WARD"
+  },
+  {
+   "code": "26905",
+   "name": "Phường Bình Lợi Trung",
+   "kind": "WARD"
+  },
+  {
+   "code": "26911",
+   "name": "Phường Bình Quới",
+   "kind": "WARD"
+  },
+  {
+   "code": "26929",
+   "name": "Phường Bình Thạnh",
+   "kind": "WARD"
+  },
+  {
+   "code": "26944",
+   "name": "Phường Gia Định",
+   "kind": "WARD"
+  },
+  {
+   "code": "26956",
+   "name": "Phường Thạnh Mỹ Tây",
+   "kind": "WARD"
+  },
+  {
+   "code": "26968",
+   "name": "Phường Tân Sơn Nhất",
+   "kind": "WARD"
+  },
+  {
+   "code": "26977",
+   "name": "Phường Tân Sơn Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "26983",
+   "name": "Phường Bảy Hiền",
+   "kind": "WARD"
+  },
+  {
+   "code": "26995",
+   "name": "Phường Tân Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "27004",
+   "name": "Phường Tân Bình",
+   "kind": "WARD"
+  },
+  {
+   "code": "27007",
+   "name": "Phường Tân Sơn",
+   "kind": "WARD"
+  },
+  {
+   "code": "27013",
+   "name": "Phường Tây Thạnh",
+   "kind": "WARD"
+  },
+  {
+   "code": "27019",
+   "name": "Phường Tân Sơn Nhì",
+   "kind": "WARD"
+  },
+  {
+   "code": "27022",
+   "name": "Phường Phú Thọ Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "27028",
+   "name": "Phường Phú Thạnh",
+   "kind": "WARD"
+  },
+  {
+   "code": "27031",
+   "name": "Phường Tân Phú",
+   "kind": "WARD"
+  },
+  {
+   "code": "27043",
+   "name": "Phường Đức Nhuận",
+   "kind": "WARD"
+  },
+  {
+   "code": "27058",
+   "name": "Phường Cầu Kiệu",
+   "kind": "WARD"
+  },
+  {
+   "code": "27073",
+   "name": "Phường Phú Nhuận",
+   "kind": "WARD"
+  },
+  {
+   "code": "27094",
+   "name": "Phường An Khánh",
+   "kind": "WARD"
+  },
+  {
+   "code": "27097",
+   "name": "Phường Bình Trưng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27112",
+   "name": "Phường Cát Lái",
+   "kind": "WARD"
+  },
+  {
+   "code": "27139",
+   "name": "Phường Xuân Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "27142",
+   "name": "Phường Nhiêu Lộc",
+   "kind": "WARD"
+  },
+  {
+   "code": "27154",
+   "name": "Phường Bàn Cờ",
+   "kind": "WARD"
+  },
+  {
+   "code": "27163",
+   "name": "Phường Hòa Hưng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27169",
+   "name": "Phường Diên Hồng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27190",
+   "name": "Phường Vườn Lài",
+   "kind": "WARD"
+  },
+  {
+   "code": "27211",
+   "name": "Phường Hòa Bình",
+   "kind": "WARD"
+  },
+  {
+   "code": "27226",
+   "name": "Phường Phú Thọ",
+   "kind": "WARD"
+  },
+  {
+   "code": "27232",
+   "name": "Phường Bình Thới",
+   "kind": "WARD"
+  },
+  {
+   "code": "27238",
+   "name": "Phường Minh Phụng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27259",
+   "name": "Phường Xóm Chiếu",
+   "kind": "WARD"
+  },
+  {
+   "code": "27265",
+   "name": "Phường Khánh Hội",
+   "kind": "WARD"
+  },
+  {
+   "code": "27286",
+   "name": "Phường Vĩnh Hội",
+   "kind": "WARD"
+  },
+  {
+   "code": "27301",
+   "name": "Phường Chợ Quán",
+   "kind": "WARD"
+  },
+  {
+   "code": "27316",
+   "name": "Phường An Đông",
+   "kind": "WARD"
+  },
+  {
+   "code": "27343",
+   "name": "Phường Chợ Lớn",
+   "kind": "WARD"
+  },
+  {
+   "code": "27349",
+   "name": "Phường Phú Lâm",
+   "kind": "WARD"
+  },
+  {
+   "code": "27364",
+   "name": "Phường Bình Phú",
+   "kind": "WARD"
+  },
+  {
+   "code": "27367",
+   "name": "Phường Bình Tây",
+   "kind": "WARD"
+  },
+  {
+   "code": "27373",
+   "name": "Phường Bình Tiên",
+   "kind": "WARD"
+  },
+  {
+   "code": "27418",
+   "name": "Phường Chánh Hưng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27424",
+   "name": "Phường Bình Đông",
+   "kind": "WARD"
+  },
+  {
+   "code": "27427",
+   "name": "Phường Phú Định",
+   "kind": "WARD"
+  },
+  {
+   "code": "27439",
+   "name": "Phường Bình Hưng Hòa",
+   "kind": "WARD"
+  },
+  {
+   "code": "27442",
+   "name": "Phường Bình Tân",
+   "kind": "WARD"
+  },
+  {
+   "code": "27448",
+   "name": "Phường Bình Trị Đông",
+   "kind": "WARD"
+  },
+  {
+   "code": "27457",
+   "name": "Phường Tân Tạo",
+   "kind": "WARD"
+  },
+  {
+   "code": "27460",
+   "name": "Phường An Lạc",
+   "kind": "WARD"
+  },
+  {
+   "code": "27475",
+   "name": "Phường Tân Hưng",
+   "kind": "WARD"
+  },
+  {
+   "code": "27478",
+   "name": "Phường Tân Thuận",
+   "kind": "WARD"
+  },
+  {
+   "code": "27484",
+   "name": "Phường Phú Thuận",
+   "kind": "WARD"
+  },
+  {
+   "code": "27487",
+   "name": "Phường Tân Mỹ",
+   "kind": "WARD"
+  },
+  {
+   "code": "27496",
+   "name": "Xã Tân An Hội",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27508",
+   "name": "Xã An Nhơn Tây",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27511",
+   "name": "Xã Nhuận Đức",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27526",
+   "name": "Xã Thái Mỹ",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27541",
+   "name": "Xã Phú Hòa Đông",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27544",
+   "name": "Xã Bình Mỹ",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27553",
+   "name": "Xã Củ Chi",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27559",
+   "name": "Xã Hóc Môn",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27568",
+   "name": "Xã Đông Thạnh",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27577",
+   "name": "Xã Xuân Thới Sơn",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27592",
+   "name": "Xã Bà Điểm",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27595",
+   "name": "Xã Tân Nhựt",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27601",
+   "name": "Xã Vĩnh Lộc",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27604",
+   "name": "Xã Tân Vĩnh Lộc",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27610",
+   "name": "Xã Bình Lợi",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27619",
+   "name": "Xã Bình Hưng",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27628",
+   "name": "Xã Hưng Long",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27637",
+   "name": "Xã Bình Chánh",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27655",
+   "name": "Xã Nhà Bè",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27658",
+   "name": "Xã Hiệp Phước",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27664",
+   "name": "Xã Cần Giờ",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27667",
+   "name": "Xã Bình Khánh",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27673",
+   "name": "Xã An Thới Đông",
+   "kind": "COMMUNE"
+  },
+  {
+   "code": "27676",
+   "name": "Xã Thạnh An",
+   "kind": "COMMUNE"
+  }
+ ]
+}

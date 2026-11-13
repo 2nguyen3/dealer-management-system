@@ -1,13 +1,18 @@
 import {
   BadgeCheck,
   FileCheck2,
+  Hourglass,
   PencilLine,
+  ReceiptText,
   RefreshCw,
   Undo2,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DateField } from '@/components/blocks/DateField'
 import { PageHeader } from '@/components/blocks/PageHeader'
+import { SortMenu } from '@/components/data/SortControls'
+import { useSort } from '@/components/data/sorting'
+import { CountUp } from '@/components/motion/Motion'
 import { Skeleton } from '@/components/shadcn/skeleton'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +26,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Table } from '@/components/ui/Table'
 import { apiFetch } from '@/lib/api'
 import { invalidateCache } from '@/lib/cache'
+import { formatCompactVND } from '@/lib/chart'
 import { formatDateTime, formatVND } from '@/lib/formatters'
 import { enumOptions, methodLabel, statusLabel } from '@/lib/labels'
 import { useAuth } from '../authentication/useAuth'
@@ -46,10 +52,21 @@ import {
   TableCard,
   TableSkeleton,
 } from '../payment_receipts/financeUi'
+import { groupTotals, upfrontLifecycle } from '../payment_receipts/flow'
+import { FlowSteps } from '../payment_receipts/FlowSteps'
+import { PageSummary } from '../payment_receipts/PageSummary'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { readyIssue, type ReadyIssue } from './readyIssue'
 
 const UPFRONT_STATES = ['VERIFIED', 'CONSUMED', 'RECEIVED_SEPARATELY'] as const
+/** Where each state sits in the flow (worded apart from the status badges). */
+const STATE_GROUPS: Record<string, { label: string; color: string }> = {
+  VERIFIED: { label: 'Chờ phiếu xuất ghi sổ', color: 'var(--warning)' },
+  CONSUMED: { label: 'Đã thành phiếu thu', color: 'var(--success)' },
+  RECEIVED_SEPARATELY: { label: 'Thu riêng', color: 'var(--chart-3)' },
+}
+/** Server sort enum for GET /upfront-confirmations: createdAt, id (±). */
+const SORT_OPTIONS = [{ field: 'createdAt', label: 'Thời điểm xác minh' }]
 
 function dateTime(value: unknown): string {
   return typeof value === 'string' && value ? formatDateTime(value) : '—'
@@ -112,11 +129,21 @@ export function UpfrontPaymentsPage() {
     ['createdFrom', 'createdTo'],
     true,
   )
+  const sorter = useSort()
   const list = useSourcePage(
     '/upfront-confirmations',
-    { state, issueDocumentId: issueFilter, ...range.params },
+    {
+      state,
+      issueDocumentId: issueFilter,
+      ...range.params,
+      ...sorter.params,
+    },
     confirmation,
   )
+  const groups = groupTotals(list.items, 'state', 'amount', UPFRONT_STATES).map(
+    (group) => ({ ...group, ...STATE_GROUPS[group.key]! }),
+  )
+  const group = (key: string) => groups.find((entry) => entry.key === key)
   const [formOpen, setFormOpen] = useState(false)
   const [issueId, setIssueId] = useState('')
   const [manual, setManual] = useState(false)
@@ -262,7 +289,7 @@ export function UpfrontPaymentsPage() {
       <PageHeader
         eyebrow="Tài chính"
         title="Xác nhận thanh toán trả ngay"
-        description="Ghi nhận tiền đại lý trả ngay khi xuất hàng. Khoản tiền đã xác minh được chuyển thành phiếu thu khi phiếu xuất được ghi sổ, và không bị mất nếu việc xuất kho không thành công."
+        description="Xác minh tiền trả ngay → phiếu xuất ghi sổ → phiếu thu tự động (hoặc thu riêng)."
         className="mb-0"
         actions={
           canVerify && (
@@ -280,6 +307,36 @@ export function UpfrontPaymentsPage() {
       />
       {error && <Alert type="error">{error}</Alert>}
       {notice && <Alert type="info">{notice}</Alert>}
+      {!list.loading && list.items.length > 0 && (
+        <PageSummary
+          title="Tổng quan khoản thực nhận"
+          noun="khoản"
+          total={list.items.length}
+          groups={groups}
+          kpis={[
+            {
+              label: 'Chờ phiếu xuất ghi sổ',
+              icon: <Hourglass />,
+              value: formatCompactVND(group('VERIFIED')?.amount ?? 0),
+              hint: `${group('VERIFIED')?.count ?? 0} khoản`,
+            },
+            {
+              label: 'Đã thành phiếu thu',
+              icon: <ReceiptText />,
+              value: formatCompactVND(group('CONSUMED')?.amount ?? 0),
+              hint: `${group('CONSUMED')?.count ?? 0} khoản`,
+            },
+            {
+              label: 'Thu riêng',
+              icon: <Undo2 />,
+              value: (
+                <CountUp value={group('RECEIVED_SEPARATELY')?.count ?? 0} />
+              ),
+              hint: formatCompactVND(group('RECEIVED_SEPARATELY')?.amount ?? 0),
+            },
+          ]}
+        />
+      )}
       <FilterBar>
         <EntityPicker
           resource="stock-issues"
@@ -318,7 +375,14 @@ export function UpfrontPaymentsPage() {
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
         title="Các khoản thực nhận"
-        description="Mới xác minh nhất trước."
+        icon={<BadgeCheck />}
+        actions={
+          <SortMenu
+            options={SORT_OPTIONS}
+            sort={sorter.sort}
+            onChange={sorter.setSort}
+          />
+        }
       >
         {list.loading ? (
           <TableSkeleton label="Đang tải khoản thực nhận..." />
@@ -521,6 +585,12 @@ export function UpfrontPaymentsPage() {
               meta={`Phiên bản #${String(item.issueRevisionId)}`}
               tone={item.state === 'VERIFIED' ? 'neutral' : 'success'}
             />
+            {upfrontLifecycle(item.state) && (
+              <FlowSteps
+                label="Vòng đời khoản tiền"
+                steps={upfrontLifecycle(item.state)!}
+              />
+            )}
             <DetailList
               entries={[
                 ['Hình thức', methodLabel(item.method)],

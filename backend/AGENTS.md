@@ -228,7 +228,7 @@ DMS/
 │   │   │   ├── business_rules/ # Locked singleton capacity/rate policy
 │   │   │   ├── products/       # Exact quotes/source and eligible deletion
 │   │   │   ├── agencies/       # Admission/profile and keyed permanent termination
-│   │   │   ├── districts/      # Global capacity and reference/state guards
+│   │   │   ├── wards/          # Read-only HCMC 2025 ward catalogue (0010) and capacity counts
 │   │   │   ├── agency_types/   # Exact limits/current-debt blocker guards
 │   │   │   ├── units/          # Recorded fraction policy/reference/state guards
 │   │   │   ├── document_core/  # SQL-owned mappings, exact snapshots/revisions/draft lines/batches

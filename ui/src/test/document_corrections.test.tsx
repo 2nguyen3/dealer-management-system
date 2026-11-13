@@ -102,7 +102,7 @@ describe('DocumentCorrectionsPage Component', () => {
       paymentMethod: null,
       agencySnapshot: {
         name: 'Đại lý Minh Phát',
-        address: '120 Nguyễn Trãi, Quận 1',
+        address: '120 Nguyễn Trãi, Phường Bến Thành',
         phone: '0901234567',
         email: 'daily@example.com',
       },

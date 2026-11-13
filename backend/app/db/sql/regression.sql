@@ -177,12 +177,12 @@ DO $$ DECLARE agency_id bigint; other_id bigint; product_id bigint;
   allocation_batch bigint; correction_issue bigint; correction_target bigint; correction_receipt bigint;
   history_agency bigint; history_issue bigint; history_receipt bigint;
 BEGIN
-  INSERT INTO dms.agency (name, "typeId", "districtId", email, "acceptedDate")
+  INSERT INTO dms.agency (name, "typeId", "wardId", email, "acceptedDate")
     SELECT 'Same name', t.id, x.id, 'agency-test@example.invalid', DATE '2026-01-01'
-    FROM dms.agency_type t CROSS JOIN dms.district x WHERE t.code = 'TYPE_1' AND x.code = 'DEMO_DISTRICT_1' RETURNING id INTO agency_id;
-  INSERT INTO dms.agency (name, "typeId", "districtId", email, "acceptedDate")
+    FROM dms.agency_type t CROSS JOIN dms.ward x WHERE t.code = 'TYPE_1' AND x.code = '26740' RETURNING id INTO agency_id;
+  INSERT INTO dms.agency (name, "typeId", "wardId", email, "acceptedDate")
     SELECT 'Same name', t.id, x.id, 'other-test@example.invalid', DATE '2026-01-01'
-    FROM dms.agency_type t CROSS JOIN dms.district x WHERE t.code = 'TYPE_1' AND x.code = 'DEMO_DISTRICT_2' RETURNING id INTO other_id;
+    FROM dms.agency_type t CROSS JOIN dms.ward x WHERE t.code = 'TYPE_1' AND x.code = '27139' RETURNING id INTO other_id;
   SELECT id INTO product_id FROM dms.product WHERE name = 'Mặt hàng mẫu 1';
   PERFORM pg_temp.require((SELECT count(*) = 2 FROM dms.agency WHERE name = 'Same name'), 'agency names may repeat');
   PERFORM pg_temp.reject('UPDATE dms.business_rule SET "sellingPriceRate"=''NaN''', 'NaN rate');
@@ -393,9 +393,9 @@ BEGIN
 
   -- Current debt stays positive if the invoice moves after its collection;
   -- the historical debt at the collection date must still reject that edit.
-  INSERT INTO dms.agency (name,"typeId","districtId",email,"acceptedDate")
-    SELECT 'history-check',t.id,x.id,'history@example.invalid','2026-01-01' FROM dms.agency_type t CROSS JOIN dms.district x
-    WHERE t.code='TYPE_2' AND x.code='DEMO_DISTRICT_3' RETURNING id INTO history_agency;
+  INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate")
+    SELECT 'history-check',t.id,x.id,'history@example.invalid','2026-01-01' FROM dms.agency_type t CROSS JOIN dms.ward x
+    WHERE t.code='TYPE_2' AND x.code='27265' RETURNING id INTO history_agency;
   history_issue := pg_temp.stock_draft('STOCK_ISSUE',history_agency,'2026-08-01',product_id,10,150);
   PERFORM pg_temp.post_stock(history_issue);
   SET CONSTRAINTS ALL IMMEDIATE; SET CONSTRAINTS ALL DEFERRED;
@@ -414,11 +414,11 @@ BEGIN
   PERFORM pg_temp.require((SELECT state='CONFIRMED' AND "adjustmentDocumentId" IS NULL FROM dms.stock_count WHERE id=count_id), 'zero-difference count needs no adjustment');
 
   -- Capacity is global policy, inactive agencies do not count, termination cannot be undone.
-  INSERT INTO dms.agency (name,"typeId","districtId",email,"acceptedDate")
+  INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate")
     SELECT 'capacity-'||n,t.id,x.id,'capacity-'||n||'@example.invalid','2026-01-01'
-    FROM dms.agency_type t CROSS JOIN dms.district x CROSS JOIN generate_series(1,3) n WHERE t.code='TYPE_1' AND x.code='DEMO_DISTRICT_1';
-  PERFORM pg_temp.reject('INSERT INTO dms.agency (name,"typeId","districtId",email,"acceptedDate") SELECT ''fifth'',t.id,x.id,''fifth@example.invalid'',''2026-01-01'' FROM dms.agency_type t CROSS JOIN dms.district x WHERE t.code=''TYPE_1'' AND x.code=''DEMO_DISTRICT_1''', 'district capacity');
-  PERFORM pg_temp.reject('UPDATE dms.business_rule SET "maxAgenciesPerDistrict"=3', 'cannot lower district capacity below usage');
+    FROM dms.agency_type t CROSS JOIN dms.ward x CROSS JOIN generate_series(1,3) n WHERE t.code='TYPE_1' AND x.code='26740';
+  PERFORM pg_temp.reject('INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate") SELECT ''fifth'',t.id,x.id,''fifth@example.invalid'',''2026-01-01'' FROM dms.agency_type t CROSS JOIN dms.ward x WHERE t.code=''TYPE_1'' AND x.code=''26740''', 'ward capacity');
+  PERFORM pg_temp.reject('UPDATE dms.business_rule SET "maxAgenciesPerWard"=3', 'cannot lower ward capacity below usage');
   UPDATE dms.agency SET status='TERMINATED',"terminatedAt"=clock_timestamp(),"terminationReason"='test' WHERE id=other_id;
   PERFORM pg_temp.reject(format('UPDATE dms.agency SET status=''ACTIVE'',"terminatedAt"=NULL,"terminationReason"=NULL WHERE id=%s',other_id), 'termination cannot be reopened');
   PERFORM pg_temp.reject('UPDATE dms.audit_log SET action=''UPDATE''', 'audit immutable');

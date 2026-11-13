@@ -36,7 +36,6 @@ const functionCodes: readonly FunctionCode[] = [
   'groups.manage',
   'permissions.manage',
   'rules.manage',
-  'district.manage',
   'agency_type.manage',
   'unit.manage',
   'product.manage',

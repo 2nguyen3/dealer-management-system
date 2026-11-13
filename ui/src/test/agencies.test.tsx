@@ -8,7 +8,7 @@ import {
 } from '../features/authentication/useAuth'
 import * as apiModule from '../lib/api'
 import * as cacheModule from '../lib/cache'
-import type { Agency, AgencyType, District, UserResponse } from '../lib/types'
+import type { Agency, AgencyType, UserResponse } from '../lib/types'
 
 describe('AgenciesPage Component', () => {
   const mockUser: UserResponse = {
@@ -37,11 +37,6 @@ describe('AgenciesPage Component', () => {
     refreshProfile: vi.fn(),
   }
 
-  const sampleDistricts: District[] = [
-    { id: 1, name: 'Quận 1', status: 'ACTIVE' },
-    { id: 2, name: 'Quận 3', status: 'ACTIVE' },
-  ]
-
   const sampleAgencyTypes: AgencyType[] = [
     {
       id: 1,
@@ -65,8 +60,8 @@ describe('AgenciesPage Component', () => {
       phone: '0901234567',
       email: 'minhphat@example.com',
       address: '123 Lê Lợi',
-      districtId: 1,
-      districtName: 'Quận 1',
+      wardId: 2,
+      wardName: 'Phường Sài Gòn',
       typeId: 1,
       typeName: 'Đại lý cấp 1',
       currentDebt: '15000000',
@@ -80,8 +75,8 @@ describe('AgenciesPage Component', () => {
       phone: '0912345678',
       email: 'hungcuong@example.com',
       address: '456 Hai Bà Trưng',
-      districtId: 2,
-      districtName: 'Quận 3',
+      wardId: 160,
+      wardName: 'Xã Cần Giờ',
       typeId: 2,
       typeName: 'Đại lý cấp 2',
       currentDebt: '0',
@@ -95,9 +90,6 @@ describe('AgenciesPage Component', () => {
     vi.spyOn(cacheModule, 'getCachedData').mockReturnValue(null)
     vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
       async (path: string) => {
-        if (path.startsWith('/districts')) {
-          return { data: sampleDistricts, status: 200, etag: 'etag-districts' }
-        }
         if (path.startsWith('/agency-types')) {
           return {
             data: sampleAgencyTypes,
@@ -109,6 +101,19 @@ describe('AgenciesPage Component', () => {
       },
     )
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/wards')) {
+        return {
+          data: {
+            items: [
+              { id: 2, code: '26740', name: 'Phường Sài Gòn', kind: 'WARD' },
+              { id: 160, code: '27673', name: 'Xã Cần Giờ', kind: 'COMMUNE' },
+            ],
+            pagination: { limit: 20, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: null,
+        }
+      }
       if (path.startsWith('/agencies')) {
         return {
           data: { items: sampleAgencies, nextCursor: null },
@@ -120,7 +125,7 @@ describe('AgenciesPage Component', () => {
     })
   })
 
-  it('renders agency list with search, status badges and district filters', async () => {
+  it('renders agency list with search, status badges and ward column', async () => {
     render(
       <MemoryRouter>
         <AuthContext.Provider value={mockAuthContext}>
@@ -136,6 +141,44 @@ describe('AgenciesPage Component', () => {
 
     expect(screen.getByText('123 Lê Lợi')).toBeDefined()
     expect(screen.getAllByText('Đại lý cấp 1').length).toBeGreaterThan(0)
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((cell) => cell.textContent)
+    expect(headers).toContain('Phường/xã')
+    expect(headers.join(' ')).not.toMatch(/Quận/)
+    expect(screen.getAllByText('Phường Sài Gòn').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Xã Cần Giờ').length).toBeGreaterThan(0)
+  })
+
+  it('filters agencies by ward through the searchable ward combobox', async () => {
+    render(
+      <MemoryRouter>
+        <AuthContext.Provider value={mockAuthContext}>
+          <AgenciesPage />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+    await screen.findByText('Đại lý Minh Phát')
+    const filter = screen.getByRole('combobox', { name: 'Phường/xã' })
+    expect(filter.getAttribute('placeholder')).toBe('Tất cả phường/xã')
+    fireEvent.focus(filter)
+    fireEvent.change(filter, { target: { value: 'Cần' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Xã Cần Giờ/ }))
+    await waitFor(() => {
+      const calls = vi
+        .mocked(apiModule.apiFetch)
+        .mock.calls.map(([path]) => String(path))
+        .filter((path) => path.startsWith('/agencies?'))
+      expect(calls.at(-1)).toContain('wardId=160')
+    })
+    // The loaded page is also narrowed client-side to the chosen ward.
+    expect(screen.queryByText('Đại lý Minh Phát')).toBeNull()
+    expect(screen.getByText('Đại lý Hùng Cường')).toBeDefined()
+    expect(
+      vi
+        .mocked(apiModule.apiFetch)
+        .mock.calls.some(([path]) => String(path).includes('district')),
+    ).toBe(false)
   })
 
   it('filters agency list by search keyword', async () => {

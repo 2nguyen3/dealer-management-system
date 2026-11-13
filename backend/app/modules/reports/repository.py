@@ -15,7 +15,7 @@ class ReportQueries:
         return text(REPORT_SQL[kind])
 
     def read(self, kind, from_date, to_date, filters=None):
-        parameters = dict.fromkeys(("agencyId", "productId", "typeId", "districtId"))
+        parameters = dict.fromkeys(("agencyId", "productId", "typeId", "wardId"))
         parameters.update(filters or {})
         parameters = {
             key: None if value is None else int(value) for key, value in parameters.items()

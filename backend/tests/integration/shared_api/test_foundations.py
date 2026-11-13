@@ -14,6 +14,7 @@ from app.common.preconditions import canonical_etag
 from app.core.exceptions import ApiError
 from app.core.request_context import set_audit_context
 from app.core.transactions import TransactionRunner
+from app.db.manifest import COMPATIBLE_HEAD
 from app.db.seed import main as seed
 from app.db.verify import check_database, run_regression
 from tests.integration.shared_api.test_commands import authorize, increment
@@ -23,12 +24,10 @@ pytestmark = pytest.mark.integration
 
 
 def test_populated_upgrade_repeat_seed_manifest_and_downgrade(database_factory):
-    with database_factory("0003") as engine:
-        with (
-            patch("app.db.manifest.COMPATIBLE_HEAD", "0003"),
-            patch("app.db.verify.INFRASTRUCTURE_TABLES", frozenset()),
-            patch("app.db.seed.build_engine", return_value=engine),
-        ):
+    # The seed tracks the source head (0010 wards): populate there, repeat-seed, then prove
+    # the reviewed downgrade to 0003 and re-upgrade preserve identities and history.
+    with database_factory() as engine:
+        with patch("app.db.seed.build_engine", return_value=engine):
             seed()
             with engine.connect() as connection:
                 before = check_database(connection, seeded=True)
@@ -38,13 +37,18 @@ def test_populated_upgrade_repeat_seed_manifest_and_downgrade(database_factory):
                 history = connection.execute(
                     text("SELECT id,code FROM dms.document ORDER BY id")
                 ).all()
-        migrate(engine.url)
-        with patch("app.db.seed.build_engine", return_value=engine):
             seed()
             seed()
         with engine.connect() as connection:
             after = check_database(connection, seeded=True)
-            assert after.pop("api_idempotency") == 0 and after == before
+            assert after["api_idempotency"] == 0 and after == before
+            assert run_regression(connection) == 54
+            connection.rollback()
+        migrate(engine.url, "0003", downgrade=True)
+        assert "api_idempotency" not in inspect(engine).get_table_names(schema="dms")
+        migrate(engine.url)
+        with engine.connect() as connection:
+            assert check_database(connection, seeded=True)["document"] == 410
             assert (
                 connection.execute(
                     text('SELECT id,"passwordHash" FROM dms.app_user ORDER BY id')
@@ -55,11 +59,6 @@ def test_populated_upgrade_repeat_seed_manifest_and_downgrade(database_factory):
                 connection.execute(text("SELECT id,code FROM dms.document ORDER BY id")).all()
                 == history
             )
-            assert run_regression(connection) == 54
-            connection.rollback()
-        migrate(engine.url, "0003", downgrade=True)
-        assert "api_idempotency" not in inspect(engine).get_table_names(schema="dms")
-        migrate(engine.url)
         with engine.begin() as connection:
             connection.exec_driver_sql("CREATE TABLE dms.unexpected (id int)")
         with (
@@ -114,7 +113,8 @@ def test_command_constraints_and_downgrade_blocker(database_factory):
             migrate(engine.url, "0003", downgrade=True)
         with engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM public.alembic_version")) == "0007"
+                connection.scalar(text("SELECT version_num FROM public.alembic_version"))
+                == COMPATIBLE_HEAD
             )
             assert connection.scalar(text("SELECT count(*) FROM dms.api_idempotency")) == 1
 
@@ -123,8 +123,8 @@ def test_audit_context_and_parent_child_etag(engine, actor):
     with Session(engine) as session:
         with pytest.raises(ValueError):
             set_audit_context(session, actor, "x", function_code="invalid")
-        set_audit_context(session, actor, "business-audit", function_code="district.manage")
-        session.execute(text("INSERT INTO dms.district (code,name) VALUES ('CONTEXT','Context')"))
+        set_audit_context(session, actor, "business-audit", function_code="unit.manage")
+        session.execute(text("INSERT INTO dms.unit (code,name) VALUES ('CONTEXT','Context')"))
         session.commit()
         record = session.execute(
             text(
@@ -132,10 +132,10 @@ def test_audit_context_and_parent_child_etag(engine, actor):
                 "FROM dms.audit_log WHERE \"requestId\"='business-audit'"
             )
         ).one()
-        assert tuple(record) == (actor, "USER", "district.manage", "business-audit")
-        set_audit_context(session, actor, "will-clear", function_code="district.manage")
-        set_audit_context(session, None, "system-audit", function_code="district.manage")
-        session.execute(text("INSERT INTO dms.district (code,name) VALUES ('SYSTEM','System')"))
+        assert tuple(record) == (actor, "USER", "unit.manage", "business-audit")
+        set_audit_context(session, actor, "will-clear", function_code="unit.manage")
+        set_audit_context(session, None, "system-audit", function_code="unit.manage")
+        session.execute(text("INSERT INTO dms.unit (code,name) VALUES ('SYSTEM','System')"))
         session.commit()
         record = session.execute(
             text(

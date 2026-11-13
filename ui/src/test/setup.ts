@@ -1,5 +1,9 @@
 import { afterEach } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
+
+// findBy*/waitFor default to 1 s; popover-positioned pickers and chart pages can
+// exceed that when every worker renders jsdom in parallel (they pass alone).
+configure({ asyncUtilTimeout: 3_000 })
 
 afterEach(() => {
   cleanup()

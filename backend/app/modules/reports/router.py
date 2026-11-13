@@ -160,7 +160,7 @@ def get_debt_report(
     toDate: BusinessDate,
     agencyId: Id | None = None,
     typeId: CatalogParameter | None = None,
-    districtId: CatalogParameter | None = None,
+    wardId: CatalogParameter | None = None,
 ):
     return read_report(
         "debt",
@@ -169,7 +169,7 @@ def get_debt_report(
         service,
         fromDate,
         toDate,
-        {"agencyId": agencyId, "typeId": typeId, "districtId": districtId},
+        {"agencyId": agencyId, "typeId": typeId, "wardId": wardId},
     )
 
 

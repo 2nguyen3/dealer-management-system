@@ -133,20 +133,21 @@ Table dms.api_idempotency {
 
 Table dms.business_rule {
   id boolean [pk, not null, default: true, check: `id`]
-  "maxAgenciesPerDistrict" integer [not null, default: 4, check: `"maxAgenciesPerDistrict" > 0`]
+  "maxAgenciesPerWard" integer [not null, default: 4, check: `"maxAgenciesPerWard" > 0`]
   "sellingPriceRate" price_rate [not null, default: 1.02]
   "createdAt" timestamptz [not null, default: `clock_timestamp()`]
   "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
-  Note: 'Singleton id=true. Trigger chặn giảm giới hạn quận dưới số đại lý đang hoạt động.'
+  Note: 'Singleton id=true. Trigger chặn giảm giới hạn mỗi phường/xã dưới số đại lý đang hoạt động (revision 0010 đổi tên từ maxAgenciesPerDistrict).'
 }
 
-Table dms.district {
+Table dms.ward {
   id integer [pk, not null, increment]
-  code text [not null, unique, check: `btrim(code) <> ''`]
+  code text [not null, unique, check: `code ~ '^[0-9]{5}$'`, note: 'Mã GSO']
   name text [not null, unique, check: `btrim(name) <> ''`]
-  status text [not null, default: 'ACTIVE', check: `status IN ('ACTIVE', 'INACTIVE')`]
+  kind text [not null, check: `kind IN ('WARD', 'COMMUNE', 'SPECIAL_ZONE')`]
   "createdAt" timestamptz [not null, default: `clock_timestamp()`]
   "updatedAt" timestamptz [not null, default: `clock_timestamp()`]
+  Note: 'Revision 0010: 168 phường/xã/đặc khu TP.HCM sau 01/7/2025 (NQ 1685/NQ-UBTVQH15), nạp từ hcmc_wards_2025.json; chỉ đọc, không trạng thái. Thay bảng district.'
 }
 
 Table dms.agency_type {
@@ -176,7 +177,7 @@ Table dms.agency {
   code text [unique, note: 'Generated stored: tiền tố DL- ghép id; không phải default.']
   name text [not null, check: `btrim(name) <> ''`]
   "typeId" integer [not null]
-  "districtId" integer [not null]
+  "wardId" integer [not null]
   phone text [check: `phone IS NULL OR btrim(phone) <> ''`]
   address text
   email text [not null, check: `email = btrim(email) AND position('@' IN email) > 1`]
@@ -194,13 +195,13 @@ Table dms.agency {
     `status <> 'TERMINATED' OR btrim(coalesce("terminationReason", '')) <> ''`
   }
   indexes {
-    (districtId, id) [name: 'ix_agency_district_active', note: 'PARTIAL: WHERE status = ACTIVE']
+    (wardId, id) [name: 'ix_agency_ward_active', note: 'PARTIAL: WHERE status = ACTIVE']
     (typeId, id) [name: 'ix_agency_type']
-    (districtId, id) [name: 'ix_agency_district']
+    (wardId, id) [name: 'ix_agency_ward']
     (`lower(name)`) [name: 'ix_agency_name_prefix', note: 'PostgreSQL opclass: text_pattern_ops']
     phone [name: 'ix_agency_phone', note: 'PARTIAL: WHERE phone IS NOT NULL']
   }
-  Note: 'Tên không cần duy nhất. Đại lý mới ACTIVE, nợ ban đầu 0. Trigger kiểm tra sức chứa quận và hạn mức khi đổi loại; TERMINATED không mở lại.'
+  Note: 'Tên không cần duy nhất. Đại lý mới ACTIVE, nợ ban đầu 0. Trigger kiểm tra sức chứa phường/xã và hạn mức khi đổi loại; TERMINATED không mở lại.'
 }
 
 Table dms.product {
@@ -645,7 +646,7 @@ Ref fk_permission_function: dms.group_permission.functionId > dms.app_function.i
 Ref fk_auth_token_user: dms.auth_token.userId > dms.app_user.id [delete: restrict]
 
 Ref fk_agency_type: dms.agency.typeId > dms.agency_type.id [delete: restrict]
-Ref fk_agency_district: dms.agency.districtId > dms.district.id [delete: restrict]
+Ref fk_agency_ward: dms.agency.wardId > dms.ward.id [delete: restrict]
 Ref fk_agency_created_by: dms.agency.createdBy > dms.app_user.id [delete: restrict]
 Ref fk_agency_updated_by: dms.agency.updatedBy > dms.app_user.id [delete: restrict]
 Ref fk_product_unit: dms.product.unitId > dms.unit.id [delete: restrict]
@@ -737,7 +738,7 @@ TableGroup api_infrastructure {
 
 TableGroup master_data {
   dms.business_rule
-  dms.district
+  dms.ward
   dms.agency_type
   dms.unit
   dms.agency

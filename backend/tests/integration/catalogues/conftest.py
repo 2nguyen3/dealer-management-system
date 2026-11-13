@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import CursorCodec
 from app.modules.agency_types.service import AgencyTypeService
-from app.modules.districts.service import DistrictService
 from app.modules.units.service import UnitService
 from app.modules.users.service import UserAdministrationService
 from tests.integration.user_groups.conftest import (  # noqa: F401
@@ -14,7 +13,6 @@ from tests.integration.user_groups.conftest import (  # noqa: F401
 )
 
 CASES = {
-    "districts": (DistrictService, "District", {"code": "NEW", "name": "New"}),
     "agency-types": (
         AgencyTypeService,
         "AgencyType",

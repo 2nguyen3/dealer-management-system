@@ -9,6 +9,9 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { KpiCard } from '../../components/blocks/KpiCard'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import { SortableHeader } from '../../components/data/SortControls'
+import { nextSort, type SortValue } from '../../components/data/sorting'
+import { CountUp } from '../../components/motion/Motion'
 import { Card } from '../../components/shadcn/card'
 import { Progress } from '../../components/shadcn/progress'
 import { Skeleton } from '../../components/shadcn/skeleton'
@@ -30,7 +33,11 @@ import {
 } from '../document_history/DocumentParts'
 import { id, message } from '../payment_receipts/contracts'
 import { SourceStatement } from '../receivables/SourceStatement'
-import { LowStockCard, StockValueChart } from './InventoryInsights'
+import {
+  LowStockCard,
+  StockHealthCard,
+  StockValueChart,
+} from './InventoryInsights'
 import {
   parseStockRows,
   stockLevel,
@@ -38,7 +45,10 @@ import {
   type StockRow,
 } from './inventoryRows'
 
-const OVERVIEW_PATH = '/products?limit=100&sort=name'
+/** Product list contract sort default for the overview (name ascending). */
+const OVERVIEW_DEFAULT_SORT = 'name'
+const overviewPath = (sort: SortValue) =>
+  `/products?limit=100&sort=${encodeURIComponent(sort || OVERVIEW_DEFAULT_SORT)}`
 
 function KpiSkeleton() {
   return (
@@ -63,12 +73,13 @@ export function InventoryPage() {
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [stockFilter, setStockFilter] = useState('')
+  const [sort, setSort] = useState<SortValue>(OVERVIEW_DEFAULT_SORT)
   const statementRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!canRead) return
     const controller = new AbortController()
-    apiFetch<unknown>(OVERVIEW_PATH, { signal: controller.signal })
+    apiFetch<unknown>(overviewPath(sort), { signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return
         const data = result.data as { pagination?: { hasMore?: unknown } }
@@ -83,7 +94,7 @@ export function InventoryPage() {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [canRead, attempt])
+  }, [canRead, attempt, sort])
 
   useEffect(() => {
     if (selected) statementRef.current?.scrollIntoView?.({ block: 'start' })
@@ -103,6 +114,13 @@ export function InventoryPage() {
     } catch (failure) {
       setError(message(failure))
     }
+  }
+
+  function onSort(field: string, firstDirection?: 'asc' | 'desc') {
+    // Server order over the contract fields; clearing returns to name order.
+    setLoading(true)
+    setOverviewError('')
+    setSort(nextSort(sort, field, firstDirection) || OVERVIEW_DEFAULT_SORT)
   }
 
   if (!canRead)
@@ -128,7 +146,7 @@ export function InventoryPage() {
       <PageHeader
         eyebrow="Kho hàng"
         title="Tồn kho & Thẻ kho"
-        description="Xem tồn hiện tại của từng mặt hàng và chọn một mặt hàng để xem thẻ kho."
+        description="Tồn hiện tại và thẻ kho từng mặt hàng."
         className="mb-0"
       />
 
@@ -147,7 +165,7 @@ export function InventoryPage() {
             <>
               <KpiCard
                 label="Mặt hàng đang theo dõi"
-                value={rows.length}
+                value={<CountUp value={rows.length} />}
                 icon={<Boxes />}
                 hint={
                   hasMore ? 'Tính trên 100 mặt hàng đầu' : 'Toàn bộ danh mục'
@@ -155,14 +173,14 @@ export function InventoryPage() {
               />
               <KpiCard
                 label="Sắp hết hàng"
-                value={lowCount}
+                value={<CountUp value={lowCount} />}
                 icon={<TriangleAlert />}
                 hint={
                   lowCount
                     ? stockFilter === 'low'
-                      ? 'Đang lọc — bấm để bỏ lọc'
-                      : 'Bấm để lọc danh sách'
-                    : 'Không có mặt hàng dưới ngưỡng'
+                      ? 'Đang lọc · bấm để bỏ'
+                      : 'Bấm để lọc'
+                    : 'Không có'
                 }
                 active={stockFilter === 'low'}
                 onClick={() =>
@@ -172,9 +190,14 @@ export function InventoryPage() {
               <KpiCard
                 label="Giá trị tồn kho"
                 value={
-                  total === null
-                    ? '—'
-                    : formatCompactVND(toNumber(total.toString()))
+                  total === null ? (
+                    '—'
+                  ) : (
+                    <CountUp
+                      value={toNumber(total.toString())}
+                      format={(value) => formatCompactVND(value)}
+                    />
+                  )
                 }
                 exactValue={
                   total === null ? undefined : formatVND(total.toString())
@@ -194,10 +217,13 @@ export function InventoryPage() {
       {ready && rows.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <StockValueChart rows={rows} />
-          <LowStockCard
-            rows={rows}
-            onSelect={(row) => choose(row.id, `${row.code} — ${row.name}`)}
-          />
+          <div className="grid content-start gap-4">
+            <StockHealthCard rows={rows} partial={hasMore} />
+            <LowStockCard
+              rows={rows}
+              onSelect={(row) => choose(row.id, `${row.code} — ${row.name}`)}
+            />
+          </div>
         </div>
       )}
 
@@ -277,9 +303,18 @@ export function InventoryPage() {
                   <thead>
                     <tr>
                       <th>Mã</th>
-                      <th>Tên mặt hàng</th>
+                      <SortableHeader field="name" sort={sort} onSort={onSort}>
+                        Tên mặt hàng
+                      </SortableHeader>
                       <th>Đơn vị</th>
-                      <th className="cell-number">Tồn hiện tại</th>
+                      <SortableHeader
+                        field="currentStock"
+                        sort={sort}
+                        onSort={onSort}
+                        align="right"
+                      >
+                        Tồn hiện tại
+                      </SortableHeader>
                       <th>Mức tồn</th>
                       <th className="cell-number">Giá trị tồn</th>
                       <th>Tình trạng</th>
@@ -336,8 +371,8 @@ export function InventoryPage() {
                                 className={cn(
                                   'h-1.5',
                                   row.low
-                                    ? 'bg-amber-100 [&>[data-slot=progress-indicator]]:bg-amber-500'
-                                    : 'bg-emerald-100 [&>[data-slot=progress-indicator]]:bg-emerald-600',
+                                    ? 'bg-warning/15 [&>[data-slot=progress-indicator]]:bg-warning'
+                                    : 'bg-success/15 [&>[data-slot=progress-indicator]]:bg-success',
                                 )}
                               />
                             )}
@@ -389,8 +424,8 @@ export function InventoryPage() {
             )}
             {hasMore && (
               <p className="border-t px-4 py-3 text-xs text-muted-foreground">
-                Đang hiển thị 100 mặt hàng đầu tiên. Dùng ô tìm kiếm bên dưới để
-                chọn mặt hàng khác.
+                Chỉ 100 mặt hàng đầu tiên theo thứ tự đang chọn · tra cứu thẻ
+                kho bên dưới cho mặt hàng khác.
               </p>
             )}
           </>
@@ -400,7 +435,7 @@ export function InventoryPage() {
       <SectionCard
         as="h2"
         title="Tra cứu thẻ kho"
-        description="Chọn một mặt hàng để xem nhập – xuất – tồn theo thời gian."
+        description="Nhập – xuất – tồn theo thời gian."
       >
         <div className="max-w-md">
           <EntityPicker

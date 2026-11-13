@@ -7,6 +7,7 @@ import pytest
 
 from app.db.seed import DEMO_USERS
 from tests.support.contract import assert_schema
+from tests.support.wards import open_ward
 
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
@@ -40,14 +41,13 @@ def test_credit_application_no_new_cash(variable):
             return response
 
         name = "M25_" + uuid4().hex
-        district = client.post("/api/v1/districts", json={"code": name, "name": name})
-        assert district.status_code == 201, district.text
+        ward = open_ward(client)
         agency = client.post(
             "/api/v1/agencies",
             json={
                 "name": name,
                 "typeId": 1,
-                "districtId": district.json()["id"],
+                "wardId": ward,
                 "email": "smoke@example.com",
                 "acceptedDate": "2026-10-01",
             },

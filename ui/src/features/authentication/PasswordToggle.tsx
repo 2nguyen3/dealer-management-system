@@ -21,6 +21,7 @@ export function PasswordToggle({
       className="cursor-pointer text-muted-foreground hover:text-foreground"
       onClick={onToggle}
       aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+      title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
       aria-controls={controls}
     >
       {visible ? (

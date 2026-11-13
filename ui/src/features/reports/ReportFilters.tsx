@@ -5,7 +5,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Select } from '../../components/ui/Select'
-import { CatalogSelect } from '../districts/CatalogSelect'
 import { reports, type ReportQuery } from './contracts'
 import { filterLabels, sortLabel } from './display'
 import {
@@ -20,6 +19,7 @@ const pickerResource = {
   agencyId: 'agencies',
   typeId: 'agency-types',
   productId: 'products',
+  wardId: 'wards',
 } as const
 const limitOptions = ['10', '25', '50', '100']
 
@@ -54,7 +54,7 @@ export function ReportFilters({
   }
   return (
     <form
-      className="space-y-4 rounded-xl border bg-card p-4 shadow-xs"
+      className="space-y-3 rounded-xl border bg-card/95 p-4 shadow-xs"
       onSubmit={submit}
       aria-label="Bộ lọc báo cáo"
     >
@@ -105,29 +105,17 @@ export function ReportFilters({
           min={draft.fromDate ? shiftDate(draft.fromDate, 1) : undefined}
           onChange={(toDate) => onChange({ ...draft, toDate })}
         />
-        {reports[kind].filters.map((filter) =>
-          filter === 'districtId' ? (
-            <CatalogSelect
-              key={filter}
-              id={`report-${filter}`}
-              label={filterLabels[filter] ?? filter}
-              path="/districts"
-              emptyLabel="Tất cả quận"
-              value={draft.filters[filter] || ''}
-              onChange={(value) => setFilter(filter, value)}
-            />
-          ) : (
-            <EntityPicker
-              key={`${kind}-${filter}`}
-              id={`report-${filter}`}
-              resource={pickerResource[filter as keyof typeof pickerResource]}
-              label={filterLabels[filter] ?? filter}
-              placeholder="Tất cả — gõ mã hoặc tên để lọc"
-              value={draft.filters[filter] || ''}
-              onChange={(value) => setFilter(filter, value)}
-            />
-          ),
-        )}
+        {reports[kind].filters.map((filter) => (
+          <EntityPicker
+            key={`${kind}-${filter}`}
+            id={`report-${filter}`}
+            resource={pickerResource[filter as keyof typeof pickerResource]}
+            label={filterLabels[filter] ?? filter}
+            placeholder={filter === 'wardId' ? 'Tất cả phường/xã' : 'Tất cả'}
+            value={draft.filters[filter] || ''}
+            onChange={(value) => setFilter(filter, value)}
+          />
+        ))}
         <Select
           id="report-sort"
           label="Sắp xếp"
@@ -149,7 +137,7 @@ export function ReportFilters({
           }))}
         />
       </div>
-      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-2 border-t border-dashed pt-3 sm:flex-row sm:justify-end">
         <Button
           type="button"
           variant="outline"

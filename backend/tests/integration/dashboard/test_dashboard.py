@@ -90,7 +90,7 @@ def test_independent_current_period_oracles_and_twelve_tied_rankings(
 ):
     with Session(engine) as session:
         install_builders(session, actor)
-        session.execute(text('UPDATE dms.business_rule SET "maxAgenciesPerDistrict"=100 WHERE id'))
+        session.execute(text('UPDATE dms.business_rule SET "maxAgenciesPerWard"=100 WHERE id'))
         unit = session.scalar(text("SELECT id FROM dms.unit WHERE code='PCS'"))
         tied_products, tied_agencies = [], []
         for _ in range(12):

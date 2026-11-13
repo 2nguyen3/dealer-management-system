@@ -45,7 +45,7 @@ export function agency(value: unknown): Row {
   const data = record(value)
   id(data.id)
   catalog(data.typeId)
-  catalog(data.districtId)
+  catalog(data.wardId)
   text(data.code)
   text(data.name)
   text(data.email)

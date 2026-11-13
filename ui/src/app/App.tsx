@@ -1,6 +1,8 @@
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { Skeleton } from '../components/shadcn/skeleton'
+import { Toaster } from '../components/shadcn/sonner'
+import { ThemeProvider } from '../components/theme/ThemeProvider'
 import { AuthProvider } from '../features/authentication/AuthContext'
 import { LoginPage } from '../features/authentication/LoginPage'
 import { NotFoundPage } from './NotFoundPage'
@@ -54,11 +56,6 @@ const CreditApplicationsPage = lazy(() =>
   import('../features/credit_applications/CreditApplicationsPage').then(
     (m) => ({ default: m.CreditApplicationsPage }),
   ),
-)
-const DistrictsPage = lazy(() =>
-  import('../features/districts/DistrictsPage').then((m) => ({
-    default: m.DistrictsPage,
-  })),
 )
 const DocumentHistoryPage = lazy(() =>
   import('../features/document_history/DocumentHistoryPage').then((m) => ({
@@ -146,6 +143,11 @@ const UserGroupsPage = lazy(() =>
 const UsersPage = lazy(() =>
   import('../features/users/UsersPage').then((m) => ({ default: m.UsersPage })),
 )
+const ProfilePage = lazy(() =>
+  import('../features/profile/ProfilePage').then((m) => ({
+    default: m.ProfilePage,
+  })),
+)
 const ForgotPasswordPage = lazy(() =>
   import('../features/authentication/ForgotPasswordPage').then((m) => ({
     default: m.ForgotPasswordPage,
@@ -221,77 +223,89 @@ export class PageErrorBoundary extends Component<
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <PageErrorBoundary>
-          <Suspense fallback={<RouteLoading />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <ShellLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<HomePage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/chatbot" element={<ChatbotPage />} />
-                <Route path="/agencies" element={<AgenciesPage />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/districts" element={<DistrictsPage />} />
-                <Route path="/agency-types" element={<AgencyTypesPage />} />
-                <Route path="/units" element={<UnitsPage />} />
-                <Route path="/business-rules" element={<BusinessRulesPage />} />
-                <Route path="/users" element={<UsersPage />} />
-                <Route path="/user-groups" element={<UserGroupsPage />} />
-                <Route path="/permissions" element={<PermissionsPage />} />
-                <Route path="/audit-logs" element={<AuditLogsPage />} />
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <PageErrorBoundary>
+            <Suspense fallback={<RouteLoading />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
                 <Route
-                  path="/document-history"
-                  element={<DocumentHistoryPage />}
+                  path="/forgot-password"
+                  element={<ForgotPasswordPage />}
                 />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route
-                  path="/document-corrections"
-                  element={<DocumentCorrectionsPage />}
-                />
-                <Route path="/inventory" element={<InventoryPage />} />
-                <Route path="/stock-receipts" element={<StockReceiptsPage />} />
-                <Route path="/stock-issues" element={<StockIssuesPage />} />
-                <Route
-                  path="/payment-receipts"
-                  element={<PaymentReceiptsPage />}
-                />
-                <Route
-                  path="/upfront-payments"
-                  element={<UpfrontPaymentsPage />}
-                />
-                <Route
-                  path="/online-payments"
-                  element={<OnlinePaymentsPage />}
-                />
-                <Route path="/receivables" element={<ReceivablesPage />} />
-                <Route path="/sales-returns" element={<SalesReturnsPage />} />
-                <Route
-                  path="/credit-applications"
-                  element={<CreditApplicationsPage />}
-                />
-                <Route path="/refunds" element={<RefundsPage />} />
-                <Route
-                  path="/stock-adjustments"
-                  element={<StockAdjustmentsPage />}
-                />
-                <Route path="/stock-counts" element={<StockCountsPage />} />
-                <Route path="/agency-credit" element={<AgencyCreditPage />} />
-              </Route>
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-        </PageErrorBoundary>
-      </AuthProvider>
-    </BrowserRouter>
+                  element={
+                    <ProtectedRoute>
+                      <ShellLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<HomePage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/chatbot" element={<ChatbotPage />} />
+                  <Route path="/agencies" element={<AgenciesPage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/agency-types" element={<AgencyTypesPage />} />
+                  <Route path="/units" element={<UnitsPage />} />
+                  <Route
+                    path="/business-rules"
+                    element={<BusinessRulesPage />}
+                  />
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/user-groups" element={<UserGroupsPage />} />
+                  <Route path="/permissions" element={<PermissionsPage />} />
+                  <Route path="/audit-logs" element={<AuditLogsPage />} />
+                  <Route
+                    path="/document-history"
+                    element={<DocumentHistoryPage />}
+                  />
+                  <Route
+                    path="/document-corrections"
+                    element={<DocumentCorrectionsPage />}
+                  />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route
+                    path="/stock-receipts"
+                    element={<StockReceiptsPage />}
+                  />
+                  <Route path="/stock-issues" element={<StockIssuesPage />} />
+                  <Route
+                    path="/payment-receipts"
+                    element={<PaymentReceiptsPage />}
+                  />
+                  <Route
+                    path="/upfront-payments"
+                    element={<UpfrontPaymentsPage />}
+                  />
+                  <Route
+                    path="/online-payments"
+                    element={<OnlinePaymentsPage />}
+                  />
+                  <Route path="/receivables" element={<ReceivablesPage />} />
+                  <Route path="/sales-returns" element={<SalesReturnsPage />} />
+                  <Route
+                    path="/credit-applications"
+                    element={<CreditApplicationsPage />}
+                  />
+                  <Route path="/refunds" element={<RefundsPage />} />
+                  <Route
+                    path="/stock-adjustments"
+                    element={<StockAdjustmentsPage />}
+                  />
+                  <Route path="/stock-counts" element={<StockCountsPage />} />
+                  <Route path="/agency-credit" element={<AgencyCreditPage />} />
+                </Route>
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </PageErrorBoundary>
+        </AuthProvider>
+      </BrowserRouter>
+      <Toaster richColors position="top-right" />
+    </ThemeProvider>
   )
 }

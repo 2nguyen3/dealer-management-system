@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -130,8 +136,12 @@ describe('ProductsPage Component', () => {
       expect(screen.getByText('Tập 96 trang')).toBeDefined()
     })
 
-    expect(screen.getByText('SP-201')).toBeDefined()
-    expect(screen.getByText('SP-202')).toBeDefined()
+    // Codes also label the stock chart, so read them from the list table.
+    const table = within(
+      screen.getByRole('table', { name: 'Danh mục mặt hàng' }),
+    )
+    expect(table.getByText('SP-201')).toBeDefined()
+    expect(table.getByText('SP-202')).toBeDefined()
     expect(screen.getByText('85.000 ₫').className).toContain('cell-number')
     expect(screen.getByText('70.000 ₫')).toBeDefined()
     expect(

@@ -153,3 +153,41 @@ describe('EntityPicker', () => {
     expect(input.getAttribute('aria-expanded')).toBe('false')
   })
 })
+
+describe('EntityPicker long options', () => {
+  const longName =
+    'Đại lý Thương mại Dịch vụ Xuất Nhập Khẩu Hưng Thịnh Phát Toàn Cầu Chi nhánh Sài Gòn'
+
+  it('shows the full option text in a wrapping list and exposes the chosen label as a title', async () => {
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(() =>
+      ok({
+        items: [{ id: '90', code: 'DL-90', name: longName, currentDebt: '0' }],
+      }),
+    )
+    render(<Harness />)
+    const input = screen.getByRole('combobox', { name: /Đại lý/ })
+    fireEvent.focus(input)
+    const option = await screen.findByRole('option', {
+      name: new RegExp(longName),
+    })
+    expect(option.querySelector('.entity-picker__label')?.textContent).toBe(
+      `DL-90 — ${longName}`,
+    )
+    expect(screen.getByRole('listbox').className).toContain(
+      'entity-picker__list',
+    )
+    fireEvent.click(option)
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+    expect(input.getAttribute('title')).toBe(`DL-90 — ${longName}`)
+  })
+
+  it('has no title while nothing is chosen or while the list is open', async () => {
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(() => ok({ items: [] }))
+    render(<Harness />)
+    const input = screen.getByRole('combobox', { name: /Đại lý/ })
+    expect(input.getAttribute('title')).toBeNull()
+    fireEvent.focus(input)
+    expect(await screen.findByText('Không có kết quả phù hợp.')).toBeTruthy()
+    expect(input.getAttribute('title')).toBeNull()
+  })
+})

@@ -6,9 +6,10 @@ from pydantic import Field, WithJsonSchema, model_validator
 
 from app.common.canonical import canonical_value
 from app.common.schemas import ApiModel, Id, Instant, Pagination
-from app.modules.auth.permissions import FunctionCode
+from app.modules.auth.permissions import AuditFunctionCode
 
-CATALOGUES = {"user_group", "app_function", "district", "agency_type", "unit"}
+# "district"/"districtId" remain for historical audit rows written before revision 0010.
+CATALOGUES = {"user_group", "app_function", "district", "ward", "agency_type", "unit"}
 ENTITIES = CATALOGUES | {
     "app_user",
     "group_permission",
@@ -36,7 +37,7 @@ ENTITIES = CATALOGUES | {
     "agency_balance",
     "inventory_balance",
 }
-CATALOG_KEYS = {"groupId", "functionId", "unitId", "typeId", "districtId"}
+CATALOG_KEYS = {"groupId", "functionId", "unitId", "typeId", "districtId", "wardId"}
 NUMERIC_KEYS = {
     "maxDebt",
     "currentDebt",
@@ -133,7 +134,7 @@ class AuditResponse(ApiModel):
     id: Id
     actorId: Id | None
     actorType: Literal["USER", "SYSTEM"]
-    functionCode: FunctionCode
+    functionCode: AuditFunctionCode
     action: Literal["INSERT", "UPDATE", "DELETE"]
     entityName: str
     entityKey: str

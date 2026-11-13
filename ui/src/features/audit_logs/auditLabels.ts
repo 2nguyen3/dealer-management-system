@@ -8,7 +8,8 @@ const ENTITY_LABELS: Record<string, string> = {
   business_rule: 'Quy định',
   credit_entry: 'Bút toán dư có',
   credit_lot: 'Lô dư có',
-  district: 'Quận',
+  // Historical rows only: districts were abolished on 2025-07-01.
+  district: 'Quận (cũ)',
   document: 'Chứng từ',
   document_line: 'Dòng chứng từ',
   document_revision: 'Phiên bản chứng từ',
@@ -27,6 +28,7 @@ const ENTITY_LABELS: Record<string, string> = {
   unit: 'Đơn vị tính',
   upfront_confirmation: 'Xác nhận trả ngay',
   user_group: 'Nhóm người dùng',
+  ward: 'Phường/xã',
 }
 
 export function entityLabel(name: unknown): string {

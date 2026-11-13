@@ -1,6 +1,8 @@
-import { Info } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { Info, ListFilter, RotateCcw, type LucideIcon } from 'lucide-react'
+import { Fragment, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { Badge as ShadcnBadge } from '../../components/shadcn/badge'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
 import {
   Card,
   CardAction,
@@ -10,10 +12,17 @@ import {
   CardTitle,
 } from '../../components/shadcn/card'
 import { Skeleton } from '../../components/shadcn/skeleton'
+import { FilterIcon } from '../../components/ui/FilterIcon'
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from '../../components/shadcn/toggle-group'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../../components/shadcn/tooltip'
 
 /** One labelled fact in a description grid. */
 export function Fact({
@@ -66,8 +75,11 @@ export function SectionCard({
   className,
   contentClassName,
   as: Heading = 'h3',
+  icon,
 }: {
   title: ReactNode
+  /** Optional decorative title icon. */
+  icon?: ReactNode
   description?: ReactNode
   actions?: ReactNode
   children: ReactNode
@@ -79,7 +91,17 @@ export function SectionCard({
     <Card className={cn('gap-4 py-4 shadow-xs', className)}>
       <CardHeader className="px-4">
         <CardTitle className="text-sm font-semibold">
-          <Heading className="flex items-center gap-2">{title}</Heading>
+          <Heading className="flex items-center gap-2">
+            {icon && (
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary [&_svg]:size-3.5"
+              >
+                {icon}
+              </span>
+            )}
+            {title}
+          </Heading>
         </CardTitle>
         {description && (
           <CardDescription className="text-xs">{description}</CardDescription>
@@ -186,12 +208,165 @@ export function SegmentedFilter({
           <ToggleGroupItem
             key={option.value || '__all__'}
             value={option.value || '__all__'}
-            className="h-8 cursor-pointer rounded-md! border-0 px-3 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+            className="h-8 cursor-pointer gap-1.5 rounded-md! border-0 px-3 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm [&_svg]:size-3.5"
           >
+            <FilterIcon value={option.value} />
             {option.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
     </div>
+  )
+}
+
+/** Small "i" button whose tooltip carries the explanation instead of prose. */
+export function InfoTip({
+  label,
+  children,
+  className,
+}: {
+  label: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <ShadcnButton
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={label}
+            className={cn('rounded-full text-muted-foreground', className)}
+          >
+            <Info aria-hidden="true" />
+          </ShadcnButton>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-64 text-xs leading-relaxed">
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+/**
+ * Active-filter summary for a filter bar: a count pill and a reset action.
+ * Renders nothing while no filter is active.
+ */
+export function FilterStatus({
+  count,
+  onReset,
+  resetLabel = 'Xóa lọc',
+}: {
+  count: number
+  onReset: () => void
+  resetLabel?: string
+}) {
+  if (count <= 0) return null
+  return (
+    <span className="flex items-center gap-1.5">
+      <ShadcnBadge
+        variant="secondary"
+        className="gap-1 tabular-nums"
+        aria-label={`${count} bộ lọc đang áp dụng`}
+      >
+        <ListFilter aria-hidden="true" />
+        {count}
+      </ShadcnBadge>
+      <ShadcnButton
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 gap-1.5 px-2 text-muted-foreground"
+        onClick={onReset}
+      >
+        <RotateCcw className="size-3.5" aria-hidden="true" />
+        {resetLabel}
+      </ShadcnButton>
+    </span>
+  )
+}
+
+export interface LifecycleStep {
+  key: string
+  label: string
+  icon: LucideIcon
+  hint: string
+}
+
+/**
+ * Compact lifecycle rail: steps before `current` are done, `current` is
+ * highlighted (destructive when `tone` says so) and later steps stay muted.
+ */
+export function LifecycleSteps({
+  steps,
+  current,
+  tone = 'primary',
+  label = 'Vòng đời chứng từ',
+  className,
+}: {
+  steps: readonly LifecycleStep[]
+  current: number
+  tone?: 'primary' | 'success' | 'destructive'
+  label?: string
+  className?: string
+}) {
+  const active = {
+    primary: 'border-primary/40 bg-primary/10 text-primary',
+    success: 'border-success/40 bg-success/10 text-success',
+    destructive: 'border-destructive/40 bg-destructive/10 text-destructive',
+  }[tone]
+  return (
+    <TooltipProvider delayDuration={150}>
+      <ol
+        aria-label={label}
+        className={cn('flex flex-wrap items-center gap-1', className)}
+      >
+        {steps.map((step, index) => {
+          const done = index < current
+          const isCurrent = index === current
+          const Icon = step.icon
+          return (
+            <Fragment key={step.key}>
+              {index > 0 && (
+                <li
+                  aria-hidden="true"
+                  className={cn(
+                    'h-px w-3 rounded-full sm:w-6',
+                    index <= current ? 'bg-primary/50' : 'bg-border',
+                  )}
+                />
+              )}
+              <li aria-current={isCurrent ? 'step' : undefined}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ShadcnBadge
+                      variant="outline"
+                      tabIndex={0}
+                      className={cn(
+                        'h-6 cursor-default gap-1 px-2 font-medium transition-colors',
+                        isCurrent && active,
+                        done && 'border-transparent bg-muted text-foreground',
+                        !done &&
+                          !isCurrent &&
+                          'border-dashed text-muted-foreground',
+                      )}
+                    >
+                      <Icon aria-hidden="true" />
+                      {step.label}
+                    </ShadcnBadge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-56 text-xs">
+                    {step.hint}
+                  </TooltipContent>
+                </Tooltip>
+              </li>
+            </Fragment>
+          )
+        })}
+      </ol>
+    </TooltipProvider>
   )
 }

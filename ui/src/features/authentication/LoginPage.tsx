@@ -1,4 +1,4 @@
-import { LogIn } from 'lucide-react'
+import { LogIn, ShieldCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Alert } from '../../components/ui/Alert'
@@ -90,6 +90,7 @@ export function LoginPage() {
     <AuthLayout
       title="Đăng nhập"
       description="Dùng tài khoản được cấp để tiếp tục."
+      icon={<ShieldCheck />}
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {errorMessage && <Alert type="error">{errorMessage}</Alert>}

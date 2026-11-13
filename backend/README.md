@@ -375,7 +375,7 @@ app/
     user_groups/              # Router, schemas, models, service, repository,
                               # dependencies; service owns commit/rollback
     users/                    # Existing identity plus account/group/status/admin reset
-    districts/                # Global capacity, state and all-reference guards
+    wards/                    # Read-only HCMC 2025 ward catalogue (0010) and capacity counts
     agency_types/             # Exact maxDebt, counts and current-debt blockers
     units/                    # Recorded fraction policy, state and reference guards
     health/router.py          # Public liveness/readiness endpoints
@@ -451,7 +451,7 @@ exists; it does not overwrite a legacy schema. Downgrading `0001` removes the wh
 The five identity/access tables have one mapping each in `app/modules/auth/models.py`,
 `app/modules/users/models.py` and `app/modules/user_groups/models.py`;
 `app/common/commands.py` maps the 0004 command infrastructure; three catalogue
-mappings own district/agency_type/unit, including the exact money_vnd domain.
+mappings own ward/agency_type/unit, including the exact money_vnd domain.
 All nine mapped tables have zero inspected autogenerate drift. Future models must use
 `app.db.base.Base`, `schema="dms"`, the quoted camelCase SQL names and PostgreSQL
 domains, and be imported in `alembic/env.py`. Autogeneration is scoped to mapped
@@ -582,6 +582,17 @@ authorization; uncertain commit is recovered using the same key. Financial ident
 are not expired or deleted. ACCEPTED/recovery records are a seam for later provider
 modules. Downgrade is blocked while durable commands exist.
 
+Revision `0010` (source head) replaces the abolished district level with the read-only
+`dms.ward` catalogue: 168 HCMC 2025 wards/communes/special zone (NQ 1685/NQ-UBTVQH15,
+GSO codes from `openwiki/database-design/hcmc_wards_2025.json`). It backfills
+`agency."wardId"` from the reviewed 20-district mapping (an unmapped district fails the
+upgrade), rewrites `, <district>, TP.HCM` address suffixes, renames the rule column to
+`maxAgenciesPerWard`, replaces `guard_agency`/`guard_rules`/`agency_overview`, removes
+`district.manage` grants (the function row stays only while historical audit rows
+reference it) and drops `district`. Downgrade restores districts `DISTRICT_01..20`
+(ids/status regenerated, agency column order changes) and refuses agencies in unmapped
+wards. Seed and `verify --regression` (0001+0010) require head `0010`.
+
 The five User Groups operations are published under `/api/v1`:
 
 | Method/path | Policy and behavior |
@@ -618,7 +629,7 @@ the [single target OpenAPI](../openwiki/backend-design/API/openapi.json).
 | --- | --- |
 | `/users` and `/users/{userId}` | List/create/detail/patch; users.manage throughout; BIGINT IDs stay strings, group selectors use catalogue integers. Case-insensitive email uniqueness, Argon2id hashes, no password patch/delete. Actual group/status changes invalidate all sessions/reset tokens atomically; profile/no-op updates retain sessions. |
 | `/users/{userId}/password-reset` | users.manage, nonempty newPassword and required If-Match; empty204, no automatic login/unlock or password response. |
-| `/districts` and `/districts/{districtId}` | Five CRUD operations; read any district.manage/agency.read/agency.manage, write district.manage. Global-rule capacity/current active counts; inactive admission and all-reference deletion protection. |
+| `/wards` and `/wards/{wardId}` | Read-only listWards/getWard (revision 0010 replaced the five district CRUD operations); read any agency.read/agency.manage. 168 HCMC 2025 wards/communes/special zone with GSO code and kind (WARD/COMMUNE/SPECIAL_ZONE), filters q/code/kind, catalogue sorts, ETag detail and global maxAgenciesPerWard capacity counts. No status, no writes; district.manage is retired and survives only in historical audit rows. |
 | `/agency-types` and `/agency-types/{typeId}` | Five CRUD operations; read any agency_type.manage/agency.read/agency.manage, write agency_type.manage. Exact string maxDebt including zero, all/active counts, safe blockers for any current debt including TERMINATED agencies; snapshots unchanged. |
 | `/units` and `/units/{unitId}` | Five CRUD operations; read any unit.manage/product.manage/inventory.read, write unit.manage. Strict fraction flag defaults false; recorded document/count history freezes meaning, all references block deletion, inactive goods posting rejected. |
 
@@ -631,7 +642,8 @@ require strong single If-Match where specified, return 428/412 on missing/stale
 tokens, recheck live grants after lock waits, and commit before success.
 
 Owning plans/evidence: [users](../openwiki/backend-design/plan/users/VERIFICATION.md),
-[districts](../openwiki/backend-design/plan/districts/VERIFICATION.md),
+[districts](../openwiki/backend-design/plan/districts/VERIFICATION.md) (historical; superseded by
+[wards](../openwiki/backend-design/plan/wards/VERIFICATION.md)),
 [agency types](../openwiki/backend-design/plan/agency_types/VERIFICATION.md),
 [units](../openwiki/backend-design/plan/units/VERIFICATION.md). Local gate: 207 offline,
 217 PostgreSQL/TLS, 16 direct/Nginx cases and exact 100% combined statements/branches.

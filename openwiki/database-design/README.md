@@ -13,7 +13,8 @@ xác minh chữ ký cổng thanh toán hoặc gọi API hoàn tiền.
 | [business_decision_making.md](business_decision_making.md) | Toàn bộ interview, phương án, **✅ lựa chọn**, quy ước bổ sung |
 | [DMS.sql](DMS.sql) | Entry point psql; DDL PostgreSQL 16+ có version ở [0001_initial.sql](../../backend/alembic/sql/0001_initial.sql) |
 | [DMS.dbml](DMS.dbml) | Bản DBML; 29 bảng nghiệp vụ + hạ tầng command, cột, khóa/quan hệ, CHECK và ghi chú SQL |
-| [seed.example.sql](seed.example.sql) | 20 quận mẫu, 3 đơn vị, 5 hàng mẫu; tùy chọn cho demo |
+| [seed.example.sql](seed.example.sql) | 3 đơn vị, 5 hàng mẫu; tùy chọn cho demo (phường/xã do 0010 nạp) |
+| [hcmc_wards_2025.json](hcmc_wards_2025.json) | Nguồn 168 phường/xã/đặc khu TP.HCM 2025 (mã GSO) và ánh xạ 20 quận demo cũ → phường, dùng sinh revision 0010 |
 | [search-indexes.sql](search-indexes.sql) | GIN/pg_trgm cho tìm chứa chuỗi; tùy chọn |
 | [verify.sql](verify.sql) | Kiểm tra hồi quy SQL, fixture rollback |
 | [archive/DMS.legacy.sql](archive/DMS.legacy.sql) | Bảo toàn schema đầu vào để đối chiếu; không dùng triển khai |
@@ -179,7 +180,7 @@ erDiagram
   app_user ||--o{ auth_token : owns
   app_user o|--o{ audit_log : performs
   agency_type ||--o{ agency : classifies
-  district ||--o{ agency : locates
+  ward ||--o{ agency : locates
   agency ||--|| agency_balance : caches
   unit ||--o{ product : measures
   product ||--|| inventory_balance : caches
@@ -214,11 +215,11 @@ ERD giản lược; các liên kết origin, currentRevision, reversal và FK co
 | RBAC | `app_user` | Email login unique không phân biệt hoa thường, passwordHash, groupId, status, authVersion |
 | RBAC | `group_permission` | UNIQUE(groupId,functionId), isAllowed BOOLEAN |
 | Auth | `auth_token` | Digest SHA-256, loại refresh/reset, hết hạn/thu hồi, issuance authVersion và sessionId; không lưu token thô |
-| Quy định | `business_rule` | Một record true: maxAgenciesPerDistrict, sellingPriceRate |
-| Danh mục | `district` | Code/tên/trạng thái; số quận là số record |
+| Quy định | `business_rule` | Một record true: maxAgenciesPerWard, sellingPriceRate |
+| Danh mục | `ward` | Revision 0010: 168 phường/xã/đặc khu TP.HCM sau 01/7/2025 (mã GSO, kind WARD/COMMUNE/SPECIAL_ZONE); chỉ đọc, không trạng thái. Thay bảng `district` đã bỏ |
 | Danh mục | `agency_type` | Code/tên, maxDebt, trạng thái |
 | Danh mục | `unit` | Code/tên, allowsFraction, trạng thái |
-| Đại lý | `agency` | Hồ sơ, type/district FK, ngày nhận, ACTIVE/TERMINATED, người/lý do ngừng |
+| Đại lý | `agency` | Hồ sơ, type/ward FK, ngày nhận, ACTIVE/TERMINATED, người/lý do ngừng |
 | Đại lý | `agency_balance` | Cache phải thu và dư có, 1:1 đại lý |
 | Hàng | `product` | Tên, đơn vị FK, ngưỡng cảnh báo, trạng thái |
 | Hàng | `inventory_balance` | Cache tồn, giá nhập hiện tại và dòng nguồn giá |
@@ -394,7 +395,7 @@ See [auth verification](../backend-design/plan/authentication/VERIFICATION.md).
 | Nhu cầu | Index/read model |
 | --- | --- |
 | Mã chính xác | Unique agency/product/document code |
-| Loại/quận/đại lý đang dùng | agency type/district + partial active district |
+| Loại/phường-xã/đại lý đang dùng | agency type/ward + partial active ward |
 | Tên prefix, phone | lower(name) text_pattern_ops, phone B-tree |
 | Tên chứa chuỗi | search-indexes.sql GIN pg_trgm; lọc >= 3 ký tự có ích nhất |
 | Kho hiện tại/giá bán | inventory_overview + product/balance PK |
@@ -410,7 +411,7 @@ Ví dụ keyset pagination (không bọc tùy ý mọi điều kiện trong `OR 
 
 ```sql
 SELECT * FROM dms.agency_overview
-WHERE id > :last_id AND "districtId" = :district_id
+WHERE id > :last_id AND "wardId" = :ward_id
 ORDER BY id LIMIT :page_size;
 
 SELECT * FROM dms.current_document
@@ -472,7 +473,7 @@ nhất để dựng lại lịch sử.
 
 | BM/QĐ | Cách đáp ứng / bổ sung |
 | --- | --- |
-| 1 | agency/type/district; cap active, duplicate name, không mở lại terminated, thu nợ vẫn được |
+| 1 | agency/type/ward; cap active, duplicate name, không mở lại terminated, thu nợ vẫn được |
 | 2 | STOCK_RECEIPT + version/line; draft/post, giá mới nhất theo ngày nghiệp vụ |
 | 3 | STOCK_ISSUE, snapshot giá/tỷ lệ, READY, upfront + auto receipt atomic |
 | 4 | agency_overview và indexes; không gộp đại lý theo tên |
@@ -487,7 +488,7 @@ nhất để dựng lại lịch sử.
 | 13 | app_function + group_permission; quyền chi tiết chuẩn bị/xác nhận/điều chỉnh |
 | 14 | audit tự động trước/sau, actor/request, append-only; không lộ hash |
 | 15 | online_payment + verified events; idempotency, success receipt, excess credit, refund attempts |
-| 16 | Chỉ read có quyền; read models; tên trùng trả mã–tên–quận; không lưu hội thoại bắt buộc |
+| 16 | Chỉ read có quyền; read models; tên trùng trả mã–tên–phường/xã; không lưu hội thoại bắt buộc |
 | Phần mở rộng | stock_count/adjustment, FIFO allocations, return, credit, refund và quy trình trách nhiệm |
 
 BA cần cập nhật đặc biệt: thêm nháp/chờ/xác nhận; mốc chốt giá; quy tắc phân
@@ -527,7 +528,7 @@ psql -v ON_ERROR_STOP=1 -f verify.sql          # expects demo seed; all fixtures
 DMS.sql tạo schema `dms` trong một transaction; thất bại nếu schema đã có để
 không ghi đè dữ liệu. Không tự chạy migrations lúc API startup. Không chứa
 credential hoặc tài khoản/mật khẩu mặc định. Seed core chỉ gồm quy định, hai
-loại và bốn nhóm/quyền; tên quận/hàng/đơn vị demo không phải dữ liệu BA chính thức.
+loại và bốn nhóm/quyền; tên hàng/đơn vị demo không phải dữ liệu BA chính thức.
 
 **Kiểm chứng thực hiện trong phiên này:** PostgreSQL 18.3 qua PGlite 0.5.8,
 thực thi DMS.sql, extension search indexes, seed và verify.sql; 29/29 bảng có

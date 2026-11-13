@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from pydantic import Field
 from starlette.requests import Request as StarletteRequest
 
+from app.common.catalogue_http import MatchHeader
 from app.common.preconditions import read_preconditions
 from app.common.rate_limit import check_business_limit
 from app.common.responses import field_pointer
@@ -41,6 +42,11 @@ def client(settings):
     def action(request: Request, match: Annotated[str | None, Header(alias="If-Match")] = None):
         read_preconditions(request).compare('"current"')
         assert matched_operation(request) == "probeAction"
+        return Response(status_code=204)
+
+    @router.post("/typed-match")
+    def typed_match(request: Request, match: MatchHeader):
+        read_preconditions(request).compare('"current"')
         return Response(status_code=204)
 
     @router.post("/raw", openapi_extra={"x-raw-body": True})
@@ -142,6 +148,15 @@ def test_bodyless_raw_and_preconditions(client):
     success = client.post("/api/v1/action", headers={"If-Match": '"current"'})
     assert success.status_code == 204 and success.content == b""
     assert client.post("/api/v1/raw", content=b"signed bytes").json() == {"length": 12}
+    # Vercel compresses responses and weakens the issued ETag; browsers echo W/"...".
+    weak = client.post("/api/v1/typed-match", headers={"If-Match": 'W/"current"'})
+    assert weak.status_code == 204
+    assert client.post("/api/v1/typed-match", headers={"If-Match": '"current"'}).status_code == 204
+    weak_stale = client.post("/api/v1/typed-match", headers={"If-Match": 'W/"old"'})
+    assert weak_stale.status_code == 412 and weak_stale.headers["ETag"] == '"current"'
+    for malformed in ("current", 'w/"current"', "W/current", 'W/W/"current"'):
+        rejected = client.post("/api/v1/typed-match", headers={"If-Match": malformed})
+        assert rejected.status_code == 422, malformed
     repeated = client.post(
         "/api/v1/action", headers=[("If-Match", '"current"'), ("If-Match", '"old"')]
     )

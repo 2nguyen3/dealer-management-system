@@ -90,11 +90,17 @@ def test_etags_and_preconditions():
     ):
         assert canonical_etag(resource, change) != etag
     parse_preconditions(etag).compare(etag)
+    # CDN compression (Vercel br/gzip) weakens issued ETags; the opaque tag still matches.
+    assert parse_preconditions("W/" + etag).match == etag
+    parse_preconditions("W/" + etag).compare(etag)
     parse_preconditions(None, "*", allow_create=True).compare(None)
     for headers, status in (
         ((None, None), 428),
         (("*", None), 422),
-        (("W/" + etag, None), 422),
+        (("W/", None), 422),
+        (("w/" + etag, None), 422),
+        (("W/W/" + etag, None), 422),
+        (("W/" + etag + "," + etag, None), 422),
         ((etag + "," + etag, None), 422),
         ((etag, "*"), 422),
         ((None, etag), 422),
@@ -105,6 +111,7 @@ def test_etags_and_preconditions():
         assert caught.value.status == status
     for precondition, current in (
         (parse_preconditions('"old"'), etag),
+        (parse_preconditions('W/"old"'), etag),
         (parse_preconditions(None, "*", allow_create=True), etag),
         (parse_preconditions('"old"'), None),
     ):
@@ -223,7 +230,8 @@ def test_transaction_error_translation():
 
 def test_shared_harness_and_contract(monkeypatch):
     matrix = transport_matrix()
-    assert len(matrix) == 154 and len({item["operationId"] for item in matrix}) == 154
+    # 0010 replaced five district operations with read-only listWards/getWard.
+    assert len(matrix) == 151 and len({item["operationId"] for item in matrix}) == 151
     for item in matrix:
         assert item["responses"] and item["method"] in ("GET", "POST", "PATCH", "PUT", "DELETE")
     assert any(item["bodyRequired"] for item in matrix)

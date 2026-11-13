@@ -59,8 +59,8 @@ def test_rules_contract_validation_state_rollback(client, engine, actor):
         {"sellingPriceRate": "0"},
         {"sellingPriceRate": "1000"},
         {"sellingPriceRate": "1.0000001"},
-        {"maxAgenciesPerDistrict": 0},
-        {"maxAgenciesPerDistrict": 2147483648},
+        {"maxAgenciesPerWard": 0},
+        {"maxAgenciesPerWard": 2147483648},
         {"id": True},
     ):
         assert (
@@ -106,25 +106,27 @@ def test_rules_contract_validation_state_rollback(client, engine, actor):
             ),
             {"id": updated.headers["X-Request-Id"]},
         ).one() == ("1.02", "2")
-    district = client.post("/api/v1/districts", json={"code": "CAP", "name": "Cap"}).json()["id"]
+    ward = client.get("/api/v1/wards", params={"code": "26740"}).json()["items"][0]["id"]
     with engine.begin() as c:
         for index in range(2):
             c.execute(
                 text(
-                    'INSERT INTO dms.agency(name,"typeId","districtId",email,"acceptedDate") '
-                    "VALUES (:name,1,:district,'agency@example.com','2026-01-01')"
+                    'INSERT INTO dms.agency(name,"typeId","wardId",email,"acceptedDate") '
+                    "VALUES (:name,1,:ward,'agency@example.com','2026-01-01')"
                 ),
-                {"name": str(index), "district": district},
+                {"name": str(index), "ward": ward},
             )
     rejected = client.patch(
-        path, json={"maxAgenciesPerDistrict": 1}, headers={"If-Match": updated.headers["ETag"]}
+        path, json={"maxAgenciesPerWard": 1}, headers={"If-Match": updated.headers["ETag"]}
     )
     assert (
         rejected.status_code == 409
-        and rejected.json()["details"]["blockedDistricts"][0]["activeAgencyCount"] == 2
+        and rejected.json()["code"] == "LIMIT_CONFLICT"
+        and rejected.json()["details"]["blockedWards"]
+        == [{"wardId": ward, "code": "26740", "name": "Phường Sài Gòn", "activeAgencyCount": 2}]
     )
     accepted = client.patch(
-        path, json={"maxAgenciesPerDistrict": 2}, headers={"If-Match": updated.headers["ETag"]}
+        path, json={"maxAgenciesPerWard": 2}, headers={"If-Match": updated.headers["ETag"]}
     )
     assert accepted.status_code == 200
     assert client.post(path, json={}).status_code == 405 and client.delete(path).status_code == 405

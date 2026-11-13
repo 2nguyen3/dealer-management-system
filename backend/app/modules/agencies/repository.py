@@ -8,7 +8,7 @@ from app.common.sql_catalogue import SqlCatalogueRepository
 from app.core.exceptions import ApiError
 from app.modules.agencies.models import AGENCY, BALANCE
 from app.modules.agency_types.models import AgencyType
-from app.modules.districts.models import District
+from app.modules.wards.models import Ward
 
 
 class AgencyRepository(SqlCatalogueRepository):
@@ -16,7 +16,7 @@ class AgencyRepository(SqlCatalogueRepository):
     model = SimpleNamespace(id=AGENCY.c.id)
     columns = dict(AGENCY.c.items()) | {
         "typeName": AgencyType.name,
-        "districtName": District.name,
+        "wardName": Ward.name,
         "maxDebt": AgencyType.max_debt,
         "currentDebt": BALANCE.c.currentDebt,
         "currentCredit": BALANCE.c.currentCredit,
@@ -39,21 +39,22 @@ class AgencyRepository(SqlCatalogueRepository):
             )
         ).select_from(
             AGENCY.join(AgencyType.__table__, AgencyType.id == AGENCY.c.typeId)
-            .join(District.__table__, District.id == AGENCY.c.districtId)
+            .join(Ward.__table__, Ward.id == AGENCY.c.wardId)
             .join(BALANCE, BALANCE.c.agencyId == AGENCY.c.id)
         )
 
-    def masters(self, type_id: int, district_id: int, *, new_type=False, new_district=False):
+    def masters(self, type_id: int, ward_id: int, *, new_type=False):
         kind = self.session.execute(
             text('SELECT id,status,"maxDebt" FROM dms.agency_type WHERE id=:id FOR SHARE'),
             {"id": type_id},
         ).one_or_none()
-        district = self.session.execute(
-            text("SELECT id,status FROM dms.district WHERE id=:id FOR UPDATE"), {"id": district_id}
+        # Wards are read-only reference rows without status; only existence matters.
+        ward = self.session.execute(
+            text("SELECT id FROM dms.ward WHERE id=:id FOR SHARE"), {"id": ward_id}
         ).one_or_none()
-        if kind is None or district is None:
+        if kind is None or ward is None:
             raise ApiError(404, "NOT_FOUND", "Agency master not found")
-        if (new_type and kind.status != "ACTIVE") or (new_district and district.status != "ACTIVE"):
+        if new_type and kind.status != "ACTIVE":
             raise ApiError(409, "INACTIVE_MASTER", "Agency master is inactive")
         return kind.maxDebt
 
@@ -66,7 +67,7 @@ class AgencyRepository(SqlCatalogueRepository):
         )
         if current is None:
             return None
-        self.masters(current["typeId"], current["districtId"])
+        self.masters(current["typeId"], current["wardId"])
         row = super().lock(identifier)
         self.session.execute(
             text('SELECT "agencyId" FROM dms.agency_balance WHERE "agencyId"=:id FOR UPDATE'),
@@ -74,24 +75,24 @@ class AgencyRepository(SqlCatalogueRepository):
         )
         return row
 
-    def capacity(self, district_id: int, *, exclude: int = 0):
+    def capacity(self, ward_id: int, *, exclude: int = 0):
         maximum = self.session.scalar(
-            text('SELECT "maxAgenciesPerDistrict" FROM dms.business_rule WHERE id')
+            text('SELECT "maxAgenciesPerWard" FROM dms.business_rule WHERE id')
         )
         count = self.session.scalar(
             text(
-                'SELECT count(*) FROM dms.agency WHERE "districtId"=:district '
+                'SELECT count(*) FROM dms.agency WHERE "wardId"=:ward '
                 "AND status='ACTIVE' AND id<>:exclude"
             ),
-            {"district": district_id, "exclude": exclude},
+            {"ward": ward_id, "exclude": exclude},
         )
         if count >= maximum:
             raise ApiError(
                 409,
-                "DISTRICT_CAPACITY_EXCEEDED",
-                "District has no remaining agency slots",
+                "WARD_CAPACITY_EXCEEDED",
+                "Ward has no remaining agency slots",
                 details={
-                    "districtId": district_id,
+                    "wardId": ward_id,
                     "activeAgencyCount": count,
                     "maxAgencies": maximum,
                 },
@@ -99,26 +100,21 @@ class AgencyRepository(SqlCatalogueRepository):
 
     def prepare_create(self, values: dict) -> None:
         self.session.execute(text("SELECT id FROM dms.business_rule WHERE id FOR UPDATE"))
-        self.masters(values["typeId"], values["districtId"], new_type=True, new_district=True)
-        self.capacity(values["districtId"])
+        self.masters(values["typeId"], values["wardId"], new_type=True)
+        self.capacity(values["wardId"])
 
     def validate_update(self, row, values: dict):
         type_id = values.get("typeId", row.typeId)
-        district_id = values.get("districtId", row.districtId)
-        maximum = self.masters(
-            type_id,
-            district_id,
-            new_type=type_id != row.typeId,
-            new_district=district_id != row.districtId and row.status == "ACTIVE",
-        )
+        ward_id = values.get("wardId", row.wardId)
+        maximum = self.masters(type_id, ward_id, new_type=type_id != row.typeId)
         debt = self.session.scalar(
             text('SELECT "currentDebt" FROM dms.agency_balance WHERE "agencyId"=:id'),
             {"id": row.id},
         )
         if debt > maximum:
             raise ApiError(409, "LIMIT_CONFLICT", "New agency type limit is below current debt")
-        if district_id != row.districtId and row.status == "ACTIVE":
-            self.capacity(district_id, exclude=row.id)
+        if ward_id != row.wardId and row.status == "ACTIVE":
+            self.capacity(ward_id, exclude=row.id)
         if "acceptedDate" in values:
             values["acceptedDate"] = parse_date(values["acceptedDate"])
             earliest = self.session.scalar(

@@ -22,21 +22,21 @@ Business screens, business HTTP endpoints and frontend authentication are future
 
 ## Technology stack
 
-| Area             | Technology and role                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| Runtime/tooling  | Node.js 24 LTS recommended and used in Docker; `package.json` requires Node.js `>=22.12.0`. |
-| Dependencies     | npm with `package-lock.json` for reproducible installs.                                     |
-| UI               | React 19 and React DOM 19; function components and built-in hooks.                          |
-| Language         | TypeScript 5.9 with strict checking; ECMAScript modules.                                    |
-| Build/dev server | Vite 7 with `@vitejs/plugin-react` 5.                                                       |
-| Styling/UI       | Tailwind CSS v4 + shadcn/ui (Radix) in `src/components/shadcn/`; lucide icons; tokens in `src/styles.css`. |
-| Charts           | Recharts 3 via shadcn `chart`; palette/formatters in `src/lib/chart.ts`.                    |
-| Routing/tests    | React Router; Vitest + Testing Library (no jest-dom matchers).                              |
-| HTTP             | Browser `fetch`, `AbortController`, and `AbortSignal`; no API client library is installed.  |
-| Quality          | ESLint 9, typescript-eslint, React Hooks/Refresh rules, and Prettier 3.                     |
-| Backend          | Python 3.12, FastAPI, Pydantic Settings, synchronous SQLAlchemy 2, psycopg 3, and Alembic.  |
-| Database         | Neon PostgreSQL (Singapore), accessed only by the backend.                                  |
-| Deployment       | Docker Compose and unprivileged Nginx 1.28 serving static assets.                           |
+| Area             | Technology and role                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime/tooling  | Node.js 24 LTS recommended and used in Docker; `package.json` requires Node.js `>=22.12.0`.                                                                              |
+| Dependencies     | npm with `package-lock.json` for reproducible installs.                                                                                                                  |
+| UI               | React 19 and React DOM 19; function components and built-in hooks.                                                                                                       |
+| Language         | TypeScript 5.9 with strict checking; ECMAScript modules.                                                                                                                 |
+| Build/dev server | Vite 7 with `@vitejs/plugin-react` 5.                                                                                                                                    |
+| Styling/UI       | Tailwind CSS v4 + shadcn/ui (Radix) in `src/components/shadcn/`; lucide icons; palette + light/dark tokens in `src/styles.css`; Be Vietnam Pro; `next-themes`; `motion`. |
+| Charts           | Recharts 3 via shadcn `chart`; palette/formatters in `src/lib/chart.ts`.                                                                                                 |
+| Routing/tests    | React Router; Vitest + Testing Library (no jest-dom matchers).                                                                                                           |
+| HTTP             | Browser `fetch`, `AbortController`, and `AbortSignal`; no API client library is installed.                                                                               |
+| Quality          | ESLint 9, typescript-eslint, React Hooks/Refresh rules, and Prettier 3.                                                                                                  |
+| Backend          | Python 3.12, FastAPI, Pydantic Settings, synchronous SQLAlchemy 2, psycopg 3, and Alembic.                                                                               |
+| Database         | Neon PostgreSQL (Singapore), accessed only by the backend.                                                                                                               |
+| Deployment       | Docker Compose and unprivileged Nginx 1.28 serving static assets.                                                                                                        |
 
 There is no global state library or end-to-end test framework configured. Exact
 dependency resolutions are recorded in the lockfiles.
@@ -155,6 +155,23 @@ Pagination, EntityPicker, StatusBadge…) keep stable APIs/test markers; page-le
 blocks live in `src/components/blocks/` (PageHeader, KpiCard with delta+sparkline,
 ChartCard with chart⇄table toggle, DateField showing dd/MM/yyyy while keeping ISO
 business dates). The shell is the shadcn Sidebar (`src/app/ShellLayout.tsx`).
+
+Theme: six colour palettes (Thủy default, Mộc, Kim, Hỏa, Thổ, Tím) selected through
+`<html data-palette>` (`src/components/theme/palette.ts`, key `agentra-palette`, pre-paint
+script in `index.html`), each with light and dark tokens; light/dark comes from
+`ThemeProvider` (next-themes, class strategy, key `agentra-theme`). The header
+`ModeToggle` and the `/profile` appearance tab switch both. Type is Be Vietnam Pro;
+the brand stays the original `/assets/brand/agentra-*.png` logo (`BrandLogo` swaps the
+dark/white wordmark via `.dark`; figures get `?theme=&shadow=` tokens from `figureTheme.ts`).
+Icons are central: `Button`/`Modal` infer a lucide icon from the Vietnamese label/title
+(`components/ui/actionIcons.ts`, `action`/`icon={false}` to override), `PageHeader` shows
+the route's sidebar icon (`PageIconContext`), and status badges/filters use `statusIcons.ts`. Motion helpers
+(`PageTransition`, `Stagger`, `CountUp`) live in `src/components/motion/`; Mebius-style
+chart wrappers (rounded bars, gradient areas, donut, radial rings, segmented meter) in
+`src/components/charts/MebiusCharts.tsx`.
+Lists sort server-side through `SortableHeader`/`SortMenu` + `useSort`
+(`src/components/data/`) using only the contract `sort` enum of each endpoint.
+`/profile` shows identity, permission coverage and theme preference.
 
 Charts follow the validated categorical palette `--chart-1..8` in fixed entity
 order (never cycled or rank-coloured), single-hue magnitude, no dual axes, a legend

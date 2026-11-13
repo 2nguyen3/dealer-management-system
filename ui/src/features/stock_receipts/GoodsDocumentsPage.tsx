@@ -1,7 +1,9 @@
 import {
   BookCheck,
+  ChevronDown,
   Eye,
   History,
+  Info,
   MoreHorizontal,
   PencilLine,
   Plus,
@@ -19,6 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/shadcn/dropdown-menu'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../../components/shadcn/collapsible'
 import { Separator } from '../../components/shadcn/separator'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
@@ -47,7 +54,7 @@ import {
   type GoodsKind,
   type LineInput,
 } from '../document_history/documentContracts'
-import { Hint, SectionCard } from '../document_history/DocumentParts'
+import { Hint, InfoTip, SectionCard } from '../document_history/DocumentParts'
 import {
   errorMessage,
   useDocumentMutation,
@@ -58,11 +65,10 @@ import { GoodsLineEditor } from './GoodsLineEditor'
 import { canEstimate, emptyLine, summarizeLines } from './lineEstimates'
 
 const descriptions: Record<GoodsKind, string> = {
-  STOCK_RECEIPT: 'Ghi nhận hàng nhập vào kho.',
-  STOCK_ISSUE:
-    'Lập phiếu giao hàng cho đại lý, nộp phiếu rồi ghi sổ khi xuất kho.',
-  SALES_RETURN: 'Ghi nhận hàng đại lý trả lại theo phiếu xuất gốc.',
-  STOCK_ADJUSTMENT: 'Điều chỉnh tăng hoặc giảm tồn kho, luôn kèm lý do.',
+  STOCK_RECEIPT: 'Nhập hàng vào kho.',
+  STOCK_ISSUE: 'Lập → nộp → ghi sổ khi xuất kho.',
+  SALES_RETURN: 'Nhận hàng trả theo phiếu xuất gốc.',
+  STOCK_ADJUSTMENT: 'Tăng/giảm tồn kho kèm lý do.',
 }
 const postEffects: Record<GoodsKind, string> = {
   STOCK_RECEIPT: 'tăng tồn kho và cập nhật giá nhập hiện hành',
@@ -99,10 +105,17 @@ function EditorSummary({
       aria-label="Tóm tắt chứng từ"
       className="space-y-4 rounded-xl border bg-card p-4 shadow-xs lg:sticky lg:top-0"
     >
-      <h3 className="text-sm font-semibold text-foreground">Tóm tắt</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-foreground">Tóm tắt</h3>
+        <InfoTip label="Cách tính tóm tắt">
+          {kind === 'STOCK_ISSUE'
+            ? 'Giá bán được hệ thống chốt khi nộp phiếu; tồn kho và trả ngay được kiểm tra lại khi ghi sổ.'
+            : 'Số tiền chính thức do hệ thống tính khi lưu.'}
+        </InfoTip>
+      </div>
       {mode === 'header' ? (
         <p className="text-[13px] text-muted-foreground">
-          Chỉ sửa thông tin chung; dòng hàng giữ nguyên.
+          Chỉ sửa thông tin chung.
         </p>
       ) : (
         <dl className="space-y-2.5 text-sm">
@@ -144,19 +157,14 @@ function EditorSummary({
                 </dd>
               </div>
               {missing > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {missing} dòng chưa đủ số lượng hoặc đơn giá.
+                <p className="text-xs text-warning">
+                  {missing} dòng chưa đủ số lượng/đơn giá
                 </p>
               )}
             </>
           )}
         </dl>
       )}
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {kind === 'STOCK_ISSUE'
-          ? 'Giá bán được hệ thống chốt khi nộp phiếu; tồn kho và trả ngay được kiểm tra lại khi ghi sổ.'
-          : 'Số tiền chính thức do hệ thống tính khi lưu.'}
-      </p>
       <div className="grid gap-2">
         <Button type="submit" isLoading={busy}>
           {mode === 'pending' ? 'Lưu thay thế' : 'Lưu nháp'}
@@ -579,14 +587,12 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
               {kind === 'STOCK_ISSUE' &&
                 detail.doc.currentRevision.state === 'READY' && (
                   <Hint>
-                    Phiếu đã sẵn sàng và chốt giá. Tồn kho và khoản trả ngay
-                    được kiểm tra lại khi ghi sổ.
+                    Đã chốt giá; tồn kho và trả ngay kiểm tra lại khi ghi sổ.
                   </Hint>
                 )}
               {!independent && (
                 <Hint>
-                  Phiếu điều chỉnh sinh từ biên bản kiểm kê được ghi sổ cùng
-                  biên bản, không sửa hoặc ghi sổ riêng tại đây.
+                  Sinh từ kiểm kê: ghi sổ cùng biên bản, không sửa riêng.
                 </Hint>
               )}
             </>
@@ -623,8 +629,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
           Ghi sổ <strong>{detail?.doc.code}</strong> sẽ {postEffects[kind]}.
         </p>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Sau khi ghi sổ, chỉ có thể sửa sai hoặc hủy bằng phiên bản mới có lý
-          do.
+          Sau đó chỉ sửa sai/hủy bằng phiên bản mới.
         </p>
       </Modal>
       <Modal
@@ -649,7 +654,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
         >
           <div className="min-w-0 space-y-4">
             {formError && <Alert type="error">{formError}</Alert>}
-            <SectionCard title="Thông tin chung">
+            <SectionCard title="Thông tin chung" icon={<Info />}>
               <fieldset
                 disabled={mutation.busy}
                 className="grid min-w-0 gap-4 sm:grid-cols-2"
@@ -726,15 +731,19 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
               </fieldset>
               {sourceBusy && <Spinner label="Đang tải phiếu xuất gốc..." />}
               {source && (
-                <details className="group mt-4 rounded-lg border bg-muted/30 px-3 py-2">
-                  <summary className="cursor-pointer text-[13px] font-medium text-foreground">
-                    Xem phiếu xuất gốc {source.code} (
-                    {formatDate(source.currentRevision.businessDate)})
-                  </summary>
-                  <div className="mt-3">
+                <Collapsible className="group mt-4 rounded-lg border bg-muted/30">
+                  <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-[13px] font-medium text-foreground">
+                    Phiếu xuất gốc {source.code} ·{' '}
+                    {formatDate(source.currentRevision.businessDate)}
+                    <ChevronDown
+                      className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="border-t p-3">
                     <DocumentSnapshot doc={source} />
-                  </div>
-                </details>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </SectionCard>
             {!editHeader && (

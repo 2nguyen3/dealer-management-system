@@ -5,6 +5,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react'
+import { Popover as PopoverPrimitive } from 'radix-ui'
 import { apiFetch } from '../../lib/api'
 import {
   describeItem,
@@ -164,81 +165,108 @@ export function EntityPicker({
 
   return (
     <div
-      className={`form-field entity-picker ${error ? 'form-field--error' : ''}`.trim()}
+      className={`form-field entity-picker grid min-w-0 gap-1.5 ${error ? 'form-field--error' : ''}`.trim()}
     >
-      <Label htmlFor={inputId} className="form-label">
-        {label} {required && <span className="form-required">*</span>}
-      </Label>
-      <div className="entity-picker__control">
-        <input
-          id={inputId}
-          className="entity-picker__input"
-          role="combobox"
-          autoComplete="off"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={activeId}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          aria-required={required || undefined}
-          disabled={disabled}
-          placeholder={placeholder}
-          value={open ? query : (current?.label ?? '')}
-          onFocus={() => setOpen(true)}
-          onBlur={() => {
-            setOpen(false)
-            setQuery('')
-          }}
-          onChange={(event) => {
-            setQuery(event.target.value)
-            if (!open) setOpen(true)
-          }}
-          onKeyDown={onKeyDown}
-        />
-        {value && !disabled && (
-          <button
-            type="button"
-            className="entity-picker__clear"
-            aria-label={`Bỏ chọn ${label}`}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => choose(null)}
-          >
-            ×
-          </button>
+      <Label htmlFor={inputId} className="text-[13px] text-foreground/85">
+        {label}{' '}
+        {required && (
+          <span className="text-destructive" aria-hidden="true">
+            *
+          </span>
         )}
-      </div>
-      {name && <input type="hidden" name={name} value={value} />}
-      {open && (
-        <ul id={listId} role="listbox" className="entity-picker__list">
-          {loading && items.length === 0 && (
-            <li className="entity-picker__hint">Đang tìm…</li>
-          )}
-          {!loading && failed && (
-            <li className="entity-picker__hint">Không tải được danh sách.</li>
-          )}
-          {!loading && !failed && items.length === 0 && (
-            <li className="entity-picker__hint">Không có kết quả phù hợp.</li>
-          )}
-          {items.map((item, index) => (
-            <li
-              key={item.id}
-              id={`${listId}-${index}`}
-              role="option"
-              aria-selected={item.id === value}
-              className={`entity-picker__option ${index === active ? 'is-active' : ''}`.trim()}
-              onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActive(index)}
-              onClick={() => choose(item)}
-            >
-              <span className="entity-picker__label">{item.label}</span>
-              {item.detail && (
-                <span className="entity-picker__detail">{item.detail}</span>
+      </Label>
+      <PopoverPrimitive.Root open={open}>
+        <PopoverPrimitive.Anchor asChild>
+          <div className="entity-picker__control">
+            <input
+              id={inputId}
+              className="entity-picker__input"
+              role="combobox"
+              autoComplete="off"
+              aria-expanded={open}
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={activeId}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+              aria-required={required || undefined}
+              disabled={disabled}
+              placeholder={placeholder}
+              value={open ? query : (current?.label ?? '')}
+              title={!open && current ? current.label : undefined}
+              onFocus={() => setOpen(true)}
+              onBlur={() => {
+                setOpen(false)
+                setQuery('')
+              }}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                if (!open) setOpen(true)
+              }}
+              onKeyDown={onKeyDown}
+            />
+            {value && !disabled && (
+              <button
+                type="button"
+                className="entity-picker__clear"
+                aria-label={`Bỏ chọn ${label}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(null)}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </PopoverPrimitive.Anchor>
+        {open && (
+          <PopoverPrimitive.Content
+            asChild
+            align="start"
+            sideOffset={4}
+            collisionPadding={16}
+            onOpenAutoFocus={(event) => event.preventDefault()}
+            onCloseAutoFocus={(event) => event.preventDefault()}
+            onInteractOutside={(event) => {
+              // The input keeps focus; its own blur handler closes the list.
+              event.preventDefault()
+            }}
+          >
+            <ul id={listId} role="listbox" className="entity-picker__list">
+              {loading && items.length === 0 && (
+                <li className="entity-picker__hint">Đang tìm…</li>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
+              {!loading && failed && (
+                <li className="entity-picker__hint">
+                  Không tải được danh sách.
+                </li>
+              )}
+              {!loading && !failed && items.length === 0 && (
+                <li className="entity-picker__hint">
+                  Không có kết quả phù hợp.
+                </li>
+              )}
+              {items.map((item, index) => (
+                <li
+                  key={item.id}
+                  id={`${listId}-${index}`}
+                  role="option"
+                  aria-selected={item.id === value}
+                  className={`entity-picker__option ${index === active ? 'is-active' : ''}`.trim()}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActive(index)}
+                  onClick={() => choose(item)}
+                >
+                  <span className="entity-picker__label">{item.label}</span>
+                  {item.detail && (
+                    <span className="entity-picker__detail">{item.detail}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </PopoverPrimitive.Content>
+        )}
+      </PopoverPrimitive.Root>
+      {name && <input type="hidden" name={name} value={value} />}
       {error && (
         <p id={errorId} className="form-error" role="alert">
           {error}

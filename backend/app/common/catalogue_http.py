@@ -13,7 +13,7 @@ from app.modules.auth.service import AuthService, Principal
 
 CatalogSort = Literal["id", "-id", "code", "-code", "name", "-name"]
 MasterStatus = Literal["ACTIVE", "INACTIVE"]
-MatchHeader = Annotated[str, Header(alias="If-Match", pattern='^"[^"]+"$')]
+MatchHeader = Annotated[str, Header(alias="If-Match", pattern='^(W/)?"[^"]+"$')]
 SessionDependency = Annotated[Session, Depends(get_session)]
 PrincipalDependency = Annotated[Principal, Depends(get_current_principal)]
 AuthDependency = Annotated[AuthService, Depends(get_auth_service)]

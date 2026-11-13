@@ -43,7 +43,7 @@ def shared_engine(database_factory):
 def engine(shared_engine):
     with shared_engine.begin() as connection:
         connection.exec_driver_sql("TRUNCATE dms.app_user RESTART IDENTITY CASCADE")
-        connection.exec_driver_sql("TRUNCATE dms.district RESTART IDENTITY CASCADE")
+        connection.exec_driver_sql("TRUNCATE dms.unit RESTART IDENTITY CASCADE")
         connection.exec_driver_sql("TRUNCATE dms.probe_child")
         connection.exec_driver_sql("TRUNCATE dms.probe_keys")
         connection.exec_driver_sql("UPDATE dms.probe SET value=0")

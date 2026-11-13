@@ -182,17 +182,13 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
 ):
     path = "/api/v1/agencies"
     body = body_for("agencies", masters)
-    for invalid in ({"typeId": 99999}, {"districtId": 99999}):
+    for invalid in ({"typeId": 99999}, {"wardId": 99999}):
         assert client.post(path, json={**body, **invalid}).status_code == 404
     inactive_type = client.post(
         "/api/v1/agency-types",
         json={"code": "OFF", "name": "Off", "maxDebt": "0", "status": "INACTIVE"},
     ).json()["id"]
-    inactive_district = client.post(
-        "/api/v1/districts", json={"code": "OFF", "name": "Off", "status": "INACTIVE"}
-    ).json()["id"]
     assert client.post(path, json={**body, "typeId": inactive_type}).status_code == 409
-    assert client.post(path, json={**body, "districtId": inactive_district}).status_code == 409
     agency = client.post(path, json={**body, "phone": "123", "address": "Address"})
     assert agency.status_code == 201, agency.text
     detail = agency.headers["Location"]
@@ -205,12 +201,10 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
     low_type = client.post(
         "/api/v1/agency-types", json={"code": "LOW", "name": "Low", "maxDebt": "0"}
     ).json()["id"]
-    destination = client.post(
-        "/api/v1/districts", json={"code": "DEST", "name": "Destination"}
-    ).json()["id"]
+    destination = masters[0] + 1
     moved = client.patch(
         detail,
-        json={"typeId": low_type, "districtId": destination},
+        json={"typeId": low_type, "wardId": destination},
         headers={"If-Match": cleared.headers["ETag"]},
     )
     assert moved.status_code == 200, moved.text
@@ -248,7 +242,7 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
             "q": "Same",
             "code": current.json()["code"],
             "typeId": 1,
-            "districtId": destination,
+            "wardId": destination,
             "status": "ACTIVE",
             "debtFrom": "102",
             "debtTo": "102",
@@ -295,10 +289,16 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
     assert (
         client.patch(
             "/api/v1/business-rules",
-            json={"maxAgenciesPerDistrict": 1},
+            json={"maxAgenciesPerWard": 1},
             headers={"If-Match": rule.headers["ETag"]},
         ).status_code
         == 200
     )
     assert client.post(path, json=body).status_code == 201
-    assert client.post(path, json=body).status_code == 409
+    full = client.post(path, json=body)
+    assert full.status_code == 409 and full.json()["code"] == "WARD_CAPACITY_EXCEEDED"
+    assert full.json()["details"] == {
+        "wardId": body["wardId"],
+        "activeAgencyCount": 1,
+        "maxAgencies": 1,
+    }

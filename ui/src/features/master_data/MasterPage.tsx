@@ -1,6 +1,7 @@
 import { Eye, KeyRound, Plus, RefreshCw, Trash2, UserX } from 'lucide-react'
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -8,6 +9,8 @@ import {
 } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { DateField } from '../../components/blocks/DateField'
+import { SortableHeader, SortMenu } from '../../components/data/SortControls'
+import { useSort } from '../../components/data/sorting'
 import { Separator } from '../../components/shadcn/separator'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
@@ -49,12 +52,16 @@ import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { CatalogSelect } from './CatalogSelect'
 import {
   DetailGrid,
+  FilterReset,
   IconAction,
+  InfoHint,
   ListCard,
   ResultCount,
   SearchField,
   TableSkeleton,
+  ToggleFilter,
 } from './listParts'
+import { SummaryGrid } from './summaryParts'
 
 /** How an id-valued field/filter is chosen: searchable picker or small list. */
 export type Lookup =
@@ -83,10 +90,21 @@ interface Field {
   choices?: string[]
   lookup?: Lookup
 }
+/**
+ * One server sort field from the endpoint's contract `sort` enum. `column`
+ * names the list column whose header toggles it (defaults to `field`).
+ */
+export interface MasterSort {
+  field: string
+  label: string
+  column?: string
+  firstDirection?: 'asc' | 'desc'
+}
+
 export interface MasterConfig {
   path: string
   title: string
-  /** Short plain-language explanation shown under the title. */
+  /** Short plain-language explanation, shown in an info tooltip. */
   description?: string
   manage: FunctionCode
   fields: Field[]
@@ -98,6 +116,13 @@ export interface MasterConfig {
   noDelete?: boolean
   terminate?: boolean
   passwordReset?: boolean
+  /** Contract sort fields; omitted lists keep the server default order. */
+  sorts?: MasterSort[]
+  /**
+   * Visual summary (StatTile/ChartTile children) computed from the rows that
+   * are already loaded; it is labelled as partial when more pages exist.
+   */
+  summary?: (items: Row[]) => ReactNode
 }
 
 const booleanLabels: Record<string, string> = { true: 'Có', false: 'Không' }
@@ -143,7 +168,27 @@ export function MasterPage({ config }: { config: MasterConfig }) {
   const { hasPermission } = useAuth()
   const canManage = hasPermission(config.manage)
   const [filters, setFilters] = useState<Record<string, string>>({ q: '' })
-  const list = useSourcePage(config.path, filters, config.decode)
+  const sort = useSort()
+  const list = useSourcePage(
+    config.path,
+    { ...filters, ...sort.params },
+    config.decode,
+  )
+  // Keep the last loaded rows for the summary so it does not flicker while
+  // the next page or filter result is loading.
+  const [summaryRows, setSummaryRows] = useState<Row[]>([])
+  if (!list.loading && !list.error && list.items !== summaryRows)
+    setSummaryRows(list.items)
+  const activeFilters = Object.values(filters).filter(
+    (value) => value.trim() !== '',
+  ).length
+  // Memoised so opening a dialog does not redraw the summary charts.
+  const summary = useMemo(
+    () => config.summary?.(summaryRows),
+    [config, summaryRows],
+  )
+  const sortFor = (column: string) =>
+    config.sorts?.find((option) => (option.column ?? option.field) === column)
   const [selected, setSelected] = useState('')
   const [creating, setCreating] = useState(false)
   const [detail, setDetail] = useState<{
@@ -461,20 +506,34 @@ export function MasterPage({ config }: { config: MasterConfig }) {
       <PageHeader
         className="mb-0"
         title={config.title}
-        description={config.description}
         actions={
-          canManage && (
-            <Button
-              disabled={busy}
-              onClick={openCreate}
-              icon={<Plus className="size-4" />}
-            >
-              Thêm mới
-            </Button>
-          )
+          <>
+            {config.description && (
+              <InfoHint label={`Giới thiệu ${config.title}`}>
+                {config.description}
+              </InfoHint>
+            )}
+            {canManage && (
+              <Button
+                disabled={busy}
+                onClick={openCreate}
+                icon={<Plus className="size-4" />}
+              >
+                Thêm mới
+              </Button>
+            )}
+          </>
         }
       />
       {pageAlerts.length > 0 && <div className="space-y-3">{pageAlerts}</div>}
+      {config.summary && summaryRows.length > 0 && (
+        <SummaryGrid
+          label={`Tổng quan ${config.title}`}
+          partial={list.hasMore || list.hasPrevious}
+        >
+          {summary}
+        </SummaryGrid>
+      )}
       <ListCard
         toolbar={
           <>
@@ -485,20 +544,15 @@ export function MasterPage({ config }: { config: MasterConfig }) {
               onChange={(q) => setFilters({ ...filters, q })}
             />
             {config.statuses && (
-              <div className="lg:w-44">
-                <Select
-                  label="Trạng thái"
-                  id="master-filter-status"
-                  value={filters.status ?? ''}
-                  onChange={(event) =>
-                    setFilters({ ...filters, status: event.target.value })
-                  }
-                  options={['', ...config.statuses].map((value) => ({
-                    value,
-                    label: value ? statusLabel(value) : 'Tất cả',
-                  }))}
-                />
-              </div>
+              <ToggleFilter
+                label="Trạng thái"
+                value={filters.status ?? ''}
+                onChange={(status) => setFilters({ ...filters, status })}
+                options={config.statuses.map((value) => ({
+                  value,
+                  label: statusLabel(value),
+                }))}
+              />
             )}
             {config.filters?.map(([key, label, lookup]) => {
               const value = filters[key] ?? ''
@@ -548,6 +602,18 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                 </div>
               )
             })}
+            {config.sorts && config.sorts.length > 0 && (
+              <SortMenu
+                options={config.sorts}
+                sort={sort.sort}
+                onChange={sort.setSort}
+                className="h-9 lg:self-end"
+              />
+            )}
+            <FilterReset
+              count={activeFilters}
+              onReset={() => setFilters({ q: '' })}
+            />
             <ResultCount count={list.items.length} loading={list.loading} />
             <Button
               type="button"
@@ -584,18 +650,34 @@ export function MasterPage({ config }: { config: MasterConfig }) {
           <Table caption={config.title}>
             <thead>
               <tr>
-                {config.columns.map(([key, label, kind]) => (
-                  <th
-                    scope="col"
-                    key={key}
-                    className={cn(
-                      cellClass(kind),
-                      numericKinds.has(kind) && 'text-right',
-                    )}
-                  >
-                    {label}
-                  </th>
-                ))}
+                {config.columns.map(([key, label, kind]) => {
+                  const option = sortFor(key)
+                  return option ? (
+                    <SortableHeader
+                      key={key}
+                      field={option.field}
+                      sort={sort.sort}
+                      onSort={sort.toggle}
+                      firstDirection={option.firstDirection}
+                      align={numericKinds.has(kind) ? 'right' : 'left'}
+                      className={cn(numericKinds.has(kind) && 'text-right')}
+                    >
+                      {label}
+                    </SortableHeader>
+                  ) : (
+                    <th
+                      scope="col"
+                      key={key}
+                      className={cn(
+                        cellClass(kind),
+                        numericKinds.has(kind) && 'text-right',
+                      )}
+                    >
+                      {label}
+                    </th>
+                  )
+                })}
+
                 <th scope="col" className="cell-actions w-16 text-right">
                   <span className="sr-only">Thao tác</span>
                 </th>

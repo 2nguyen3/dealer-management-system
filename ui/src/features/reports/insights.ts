@@ -1,6 +1,6 @@
 // Pure projections of a report page into KPI and chart data. Exact server
 // strings are kept for display; numbers are only used for plotting/ranking.
-import { toNumber } from '../../lib/chart'
+import { formatCompactVND, formatPlain, toNumber } from '../../lib/chart'
 import type { ReportKind, ReportRow } from './contracts'
 import { displayValue } from './display'
 
@@ -152,4 +152,134 @@ export function returnRatio(totals: ReportRow | undefined): number | null {
   if (!totals) return null
   const gross = toNumber(totals.salesAmount)
   return gross > 0 ? toNumber(totals.returnAmount) / gross : null
+}
+
+/** One part of a composition visual (donut slice or radial ring). */
+export interface CompositionPart {
+  key: string
+  label: string
+  /** Plotted magnitude (never negative). */
+  value: number
+  /** Exact formatted value. */
+  display: string
+  /** Share of the donut total, or the ring's own ratio (0…1). */
+  ratio: number
+  color: string
+}
+
+export interface Composition {
+  title: string
+  shape: 'donut' | 'rings'
+  centerLabel: string
+  centerValue: string
+  parts: CompositionPart[]
+}
+
+const compositionSpecs: Record<
+  Exclude<ReportKind, 'inventory'>,
+  {
+    title: string
+    centerLabel: string
+    center?: string
+    parts: { key: string; label: string; color: string }[]
+  }
+> = {
+  sales: {
+    title: 'Cơ cấu doanh số',
+    centerLabel: 'Doanh số gộp',
+    center: 'salesAmount',
+    parts: [
+      {
+        key: 'netSalesAmount',
+        label: 'Doanh số thuần',
+        color: 'var(--chart-1)',
+      },
+      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
+    ],
+  },
+  'product-sales': {
+    title: 'Cơ cấu doanh số',
+    centerLabel: 'Doanh số gộp',
+    center: 'salesAmount',
+    parts: [
+      {
+        key: 'netSalesAmount',
+        label: 'Doanh số thuần',
+        color: 'var(--chart-1)',
+      },
+      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
+    ],
+  },
+  debt: {
+    title: 'Cơ cấu giảm nợ',
+    centerLabel: 'Tổng giảm nợ',
+    center: 'debtDecrease',
+    parts: [
+      { key: 'cashApplied', label: 'Thu tiền', color: 'var(--chart-1)' },
+      { key: 'returnsApplied', label: 'Trả hàng', color: 'var(--chart-2)' },
+      { key: 'creditApplied', label: 'Cấn trừ dư có', color: 'var(--chart-3)' },
+    ],
+  },
+  'cash-and-credit': {
+    title: 'Sử dụng dư có',
+    centerLabel: 'Đã dùng',
+    parts: [
+      { key: 'creditApplied', label: 'Đã cấn trừ', color: 'var(--chart-1)' },
+      { key: 'creditRefunded', label: 'Đã hoàn', color: 'var(--chart-2)' },
+    ],
+  },
+}
+
+/**
+ * Part-to-whole view of a report: a donut over the full-filter totals, or for
+ * inventory (no totals) radial rings of product shares on the current page.
+ */
+export function compositionOf(
+  kind: ReportKind,
+  totals: ReportRow | undefined,
+  items: ReportRow[],
+): Composition {
+  if (kind === 'inventory') {
+    const counts = inventoryCounts(items)
+    const share = (n: number) => (counts.products ? n / counts.products : 0)
+    const ring = (key: string, label: string, n: number, color: string) => ({
+      key,
+      label,
+      value: n,
+      display: `${formatPlain(n)} / ${formatPlain(counts.products)}`,
+      ratio: share(n),
+      color,
+    })
+    return {
+      title: 'Tình trạng mặt hàng',
+      shape: 'rings',
+      centerLabel: 'Mặt hàng',
+      centerValue: formatPlain(counts.products),
+      parts: [
+        ring('moving', 'Có nhập/xuất', counts.moving, 'var(--chart-1)'),
+        ring('outOfStock', 'Hết tồn', counts.outOfStock, 'var(--chart-8)'),
+        ring('adjusted', 'Có điều chỉnh', counts.adjusted, 'var(--chart-3)'),
+      ],
+    }
+  }
+  const spec = compositionSpecs[kind]
+  const parts = spec.parts.map(({ key, label, color }) => ({
+    key,
+    label,
+    value: Math.max(0, toNumber(totals?.[key])),
+    display: displayValue(key, totals?.[key]),
+    ratio: 0,
+    color,
+  }))
+  const total = parts.reduce((sum, part) => sum + part.value, 0)
+  for (const part of parts) part.ratio = total ? part.value / total : 0
+  return {
+    title: spec.title,
+    shape: 'donut',
+    centerLabel: spec.centerLabel,
+    centerValue: formatCompactVND(
+      spec.center ? toNumber(totals?.[spec.center]) : total,
+    ),
+    parts,
+  }
 }

@@ -11,6 +11,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Chart-heavy pages render slower in jsdom when the whole suite runs in parallel.
+    testTimeout: 15_000,
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

@@ -25,7 +25,7 @@ NullableInstant = Annotated[
 class AgencyCreate(EmailRequest):
     name: NonEmptyText
     typeId: CatalogId
-    districtId: CatalogId
+    wardId: CatalogId
     phone: NonEmptyText | None = None
     address: NullableText = None
     email: Email
@@ -35,7 +35,7 @@ class AgencyCreate(EmailRequest):
 class AgencyUpdate(PatchModel, EmailRequest):
     name: NonEmptyText = None
     typeId: CatalogId = None
-    districtId: CatalogId = None
+    wardId: CatalogId = None
     phone: NonEmptyText | None = None
     address: NullableText = None
     email: Email = None
@@ -52,8 +52,8 @@ class AgencyResponse(ApiModel):
     name: str
     typeId: CatalogId
     typeName: str
-    districtId: CatalogId
-    districtName: str
+    wardId: CatalogId
+    wardName: str
     phone: NullableText
     address: NullableText
     email: Email

@@ -1,18 +1,36 @@
 import {
   ClipboardCheck,
   ClipboardList,
+  FileWarning,
+  Filter,
   ListPlus,
   PencilLine,
   Plus,
   RefreshCw,
   RotateCcw,
+  Scale,
   Search,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { ChartCard } from '../../components/blocks/ChartCard'
+import { KpiCard } from '../../components/blocks/KpiCard'
 import { PageHeader } from '../../components/blocks/PageHeader'
+import {
+  RoundedBarChart,
+  SegmentedMeter,
+} from '../../components/charts/MebiusCharts'
+import { SortableHeader } from '../../components/data/SortControls'
+import { nextSort, type SortValue } from '../../components/data/sorting'
+import { CountUp } from '../../components/motion/Motion'
 import { Card } from '../../components/shadcn/card'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '../../components/shadcn/input-group'
+import { Label } from '../../components/shadcn/label'
 import { Separator } from '../../components/shadcn/separator'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
@@ -34,9 +52,12 @@ import { exact, isZero, validId } from '../document_history/documentContracts'
 import {
   Fact,
   FactGrid,
+  FilterStatus,
   Hint,
+  LifecycleSteps,
   SegmentedFilter,
   TableSkeleton,
+  type LifecycleStep,
 } from '../document_history/DocumentParts'
 import {
   errorMessage,
@@ -92,6 +113,54 @@ function VarianceBadge({ difference }: { difference: string }) {
   return <Badge variant={badge.tone}>{badge.label}</Badge>
 }
 
+/** Server default order of /stock-counts (contract `sort` default). */
+const COUNT_DEFAULT_SORT = '-countedAt'
+
+const COUNT_STEPS: Record<'draft' | 'confirmed' | 'adjust', LifecycleStep> = {
+  draft: {
+    key: 'draft',
+    label: 'Đếm',
+    icon: ClipboardList,
+    hint: 'Biên bản nháp: còn sửa số đếm.',
+  },
+  confirmed: {
+    key: 'confirmed',
+    label: 'Xác nhận',
+    icon: ClipboardCheck,
+    hint: 'Đã chốt, không sửa được.',
+  },
+  adjust: {
+    key: 'adjust',
+    label: 'Điều chỉnh kho',
+    icon: Scale,
+    hint: 'Chênh lệch được ghi thành phiếu điều chỉnh kho.',
+  },
+}
+
+/** Count → confirm (→ adjustment when a variance was posted). */
+function countLifecycle(count: StockCount) {
+  const steps = [COUNT_STEPS.draft, COUNT_STEPS.confirmed]
+  if (count.state === 'DRAFT') return { steps, current: 0 }
+  if (count.adjustmentDocumentId)
+    return { steps: [...steps, COUNT_STEPS.adjust], current: 2 }
+  return { steps, current: 1 }
+}
+
+/** Per-product surplus/shortage magnitudes for the variance chart (display only). */
+function varianceRows(lines: readonly CountLine[]) {
+  return lines
+    .filter((line) => !isZero(line.difference))
+    .map((line) => {
+      const value = Math.abs(Number(line.difference))
+      const shortage = line.difference.startsWith('-')
+      return {
+        product: line.productCode,
+        surplus: shortage ? 0 : value,
+        shortage: shortage ? value : 0,
+      }
+    })
+}
+
 export function StockCountsPage() {
   const { user, allowedFunctions } = useAuth()
   return <CountsScreen key={`${user?.id}:${allowedFunctions.join(',')}`} />
@@ -99,16 +168,18 @@ export function StockCountsPage() {
 function CountsScreen() {
   const { hasPermission } = useAuth()
   const canCount = hasPermission('stock.count')
+  const searchId = useId()
   const [draftCode, setDraftCode] = useState('')
   const [code, setCode] = useState('')
   const [state, setState] = useState('')
+  const [sort, setSort] = useState<SortValue>(COUNT_DEFAULT_SORT)
   const [cursors, setCursors] = useState([''])
   const [version, setVersion] = useState(0)
   const query = new URLSearchParams()
   if (code) query.set('code', code)
   if (state) query.set('state', state)
   query.set('limit', '25')
-  query.set('sort', '-countedAt')
+  query.set('sort', sort || COUNT_DEFAULT_SORT)
   if (cursors.at(-1)) query.set('cursor', cursors.at(-1)!)
   const data = useDocumentPage(
     canCount ? `/stock-counts?${query}` : null,
@@ -288,12 +359,28 @@ function CountsScreen() {
       hasPermission('stock.adjustment.post'),
     )
   const totals = detail ? varianceCounts(detail.count.lines) : null
+  const activeFilters = (code ? 1 : 0) + (state ? 1 : 0)
+  const onSort = (field: string, firstDirection?: 'asc' | 'desc') => {
+    setSort(nextSort(sort, field, firstDirection) || COUNT_DEFAULT_SORT)
+    setCursors([''])
+  }
+  const items = data.page?.items ?? []
+  const pageDrafts = items.filter((item) => item.state === 'DRAFT').length
+  const pageOff = items.filter((item) =>
+    item.lines.some((line) => !isZero(line.difference)),
+  ).length
+  const scope =
+    data.page && (data.page.pagination.hasMore || cursors.length > 1)
+      ? 'Trang hiện tại'
+      : 'Toàn bộ kết quả'
+  const lifecycle = detail ? countLifecycle(detail.count) : null
+  const variances = detail ? varianceRows(detail.count.lines) : []
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Kho hàng"
         title="Kiểm kê kho hàng"
-        description="Đối chiếu số đếm thực tế với sổ kho. Biên bản đã xác nhận không thể sửa."
+        description="Số đếm thực tế so với sổ kho."
         className="mb-0"
         actions={
           <Button
@@ -305,7 +392,7 @@ function CountsScreen() {
         }
       />
       {notice && <Alert type="success">{notice}</Alert>}
-      <Card className="gap-0 p-4 shadow-xs">
+      <Card className="gap-0 p-3 shadow-xs sm:p-4">
         <form
           aria-label="Bộ lọc kiểm kê"
           className="flex flex-col gap-3 sm:flex-row sm:items-end"
@@ -315,36 +402,56 @@ function CountsScreen() {
             setCursors([''])
           }}
         >
-          <div className="relative min-w-0 flex-1 sm:max-w-sm">
-            <Input
-              label="Mã kiểm kê"
-              placeholder="Ví dụ KK-12"
-              className="pl-9"
-              value={draftCode}
-              onChange={(event) => setDraftCode(event.target.value)}
-            />
-            <Search
-              className="pointer-events-none absolute bottom-2.5 left-3 size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
-          </div>
-          <Button type="submit">Áp dụng bộ lọc</Button>
-          {code && (
-            <Button
-              type="button"
-              variant="ghost"
-              icon={<RotateCcw className="size-4" />}
-              onClick={() => {
-                setDraftCode('')
-                setCode('')
-                setCursors([''])
-              }}
+          <div className="grid min-w-0 flex-1 gap-1.5 sm:max-w-sm">
+            <Label
+              htmlFor={searchId}
+              className="text-[13px] text-foreground/85"
             >
-              Xóa lọc
-            </Button>
-          )}
+              Mã kiểm kê
+            </Label>
+            <InputGroup className="bg-card">
+              <InputGroupAddon>
+                <Search aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id={searchId}
+                type="search"
+                placeholder="KK-12"
+                value={draftCode}
+                onChange={(event) => setDraftCode(event.target.value)}
+              />
+            </InputGroup>
+          </div>
+          <Button type="submit" icon={<Filter className="size-4" />}>
+            Áp dụng bộ lọc
+          </Button>
         </form>
       </Card>
+      {data.page && items.length > 0 && (
+        <section
+          aria-label="Tổng quan kiểm kê"
+          className="grid gap-4 sm:grid-cols-3"
+        >
+          <KpiCard
+            label="Biên bản"
+            value={<CountUp value={items.length} />}
+            icon={<ClipboardList />}
+            hint={scope}
+          />
+          <KpiCard
+            label="Đang nháp"
+            value={<CountUp value={pageDrafts} />}
+            icon={<PencilLine />}
+            hint={scope}
+          />
+          <KpiCard
+            label="Có chênh lệch"
+            value={<CountUp value={pageOff} />}
+            icon={<FileWarning />}
+            hint={scope}
+          />
+        </section>
+      )}
       {data.error && (
         <Alert type="error">
           <span className="flex flex-wrap items-center gap-3">
@@ -370,6 +477,15 @@ function CountsScreen() {
               setCursors([''])
             }}
           />
+          <FilterStatus
+            count={activeFilters}
+            onReset={() => {
+              setDraftCode('')
+              setCode('')
+              setState('')
+              setCursors([''])
+            }}
+          />
         </div>
         {data.loading && (
           <TableSkeleton columns={6} label="Đang tải kiểm kê..." />
@@ -380,8 +496,22 @@ function CountsScreen() {
               <Table caption="Danh sách kiểm kê" className="min-w-[680px]">
                 <thead>
                   <tr>
-                    <th>Mã</th>
-                    <th>Thời điểm đếm</th>
+                    <SortableHeader
+                      field="id"
+                      sort={sort}
+                      onSort={onSort}
+                      firstDirection="desc"
+                    >
+                      Mã
+                    </SortableHeader>
+                    <SortableHeader
+                      field="countedAt"
+                      sort={sort}
+                      onSort={onSort}
+                      firstDirection="desc"
+                    >
+                      Thời điểm đếm
+                    </SortableHeader>
                     <th>Trạng thái</th>
                     <th className="cell-number">Số mặt hàng</th>
                     <th>Đối chiếu</th>
@@ -446,7 +576,6 @@ function CountsScreen() {
               <EmptyState
                 icon={<ClipboardList className="size-6" />}
                 title="Chưa có biên bản kiểm kê phù hợp."
-                description="Lập kiểm kê để đối chiếu số đếm thực tế với sổ kho."
               />
             </div>
           ))}
@@ -537,6 +666,16 @@ function CountsScreen() {
                   </span>
                   <StatusBadge status={detail.count.state} />
                 </div>
+                {lifecycle && (
+                  <LifecycleSteps
+                    label="Vòng đời biên bản"
+                    steps={lifecycle.steps}
+                    current={lifecycle.current}
+                    tone={
+                      detail.count.state === 'CONFIRMED' ? 'success' : 'primary'
+                    }
+                  />
+                )}
                 <Separator />
                 <FactGrid className="lg:grid-cols-3">
                   <Fact label="Thời điểm đếm">
@@ -565,7 +704,71 @@ function CountsScreen() {
                     </Fact>
                   )}
                 </FactGrid>
+                {detail.count.lines.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Khớp sổ</span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {totals.match}/{detail.count.lines.length}
+                      </span>
+                    </div>
+                    <SegmentedMeter
+                      label="Tỷ lệ dòng khớp sổ"
+                      ratio={totals.match / detail.count.lines.length}
+                      segments={24}
+                      color="var(--success)"
+                      className="h-6"
+                    />
+                  </div>
+                )}
               </Card>
+              {variances.length > 0 && (
+                <ChartCard
+                  title="Chênh lệch theo mặt hàng"
+                  table={
+                    <Table caption="Chênh lệch theo mặt hàng">
+                      <thead>
+                        <tr>
+                          <th>Mặt hàng</th>
+                          <th className="cell-number">Chênh lệch</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.count.lines
+                          .filter((line) => !isZero(line.difference))
+                          .map((line) => (
+                            <tr key={line.id}>
+                              <td>{line.productCode}</td>
+                              <td className="cell-number">
+                                <Difference value={line.difference} />
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </Table>
+                  }
+                >
+                  <RoundedBarChart
+                    data={variances}
+                    xKey="product"
+                    stacked
+                    series={[
+                      {
+                        key: 'surplus',
+                        label: 'Thừa',
+                        color: 'var(--success)',
+                      },
+                      {
+                        key: 'shortage',
+                        label: 'Thiếu',
+                        color: 'var(--destructive)',
+                      },
+                    ]}
+                    valueFormatter={(value) => formatQuantity(String(value))}
+                    height={180}
+                  />
+                </ChartCard>
+              )}
               <Card className="gap-0 overflow-hidden py-0 shadow-xs">
                 <div className="overflow-x-auto">
                   <Table
@@ -592,7 +795,7 @@ function CountsScreen() {
                         <tr
                           key={line.id}
                           className={cn(
-                            !isZero(line.difference) && 'bg-amber-500/5',
+                            !isZero(line.difference) && 'bg-warning/5',
                           )}
                         >
                           <td>
@@ -637,9 +840,8 @@ function CountsScreen() {
               </Card>
               {isDraft && (
                 <Hint>
-                  Khi xác nhận, phần chênh lệch (nếu có) được ghi thành phiếu
-                  điều chỉnh kho và cần quyền ghi sổ điều chỉnh. Nếu tồn kho
-                  thay đổi sau lúc đếm, hãy đếm lại.
+                  Chênh lệch thành phiếu điều chỉnh khi xác nhận (cần quyền ghi
+                  sổ điều chỉnh). Tồn kho đổi sau lúc đếm thì đếm lại.
                 </Hint>
               )}
             </>

@@ -33,7 +33,7 @@ const CLEAR   = { l:'#e4f2f4', m:'#c4dfe4', d:'#97b9c0' };
 const CERAMIC = { l:'#fbfaf3', m:'#e3e0d2', d:'#bdb8a6' };
 const DARK    = { l:'#55504a', m:'#3d3935', d:'#272421' };
 const INK = '#231e16';
-const SHADOW = '#41538f';
+const SHADOW = (q => /^#[0-9a-f]{6}$/i.test(q) ? q : '#41538f')(new URLSearchParams(location.search).get('shadow') || ''); // host palette tint (IllustratedFigure)
 
 /* ---------- projection (x = depth toward viewer-right, y = toward viewer-left, z = up) ---------- */
 const C = Math.cos(Math.PI/6), S = Math.sin(Math.PI/6);

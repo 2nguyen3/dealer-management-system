@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, MailCheck } from 'lucide-react'
+import { ArrowLeft, KeyRound, Mail, MailCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Button as ShadcnButton } from '../../components/shadcn/button'
@@ -57,6 +57,7 @@ export function ForgotPasswordPage() {
     <AuthLayout
       title="Quên mật khẩu"
       description="Nhập email tài khoản để nhận liên kết đặt lại mật khẩu"
+      icon={<KeyRound />}
     >
       {isSubmitted ? (
         <div className="space-y-5">
@@ -70,7 +71,10 @@ export function ForgotPasswordPage() {
             đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra hộp thư đến.
           </Alert>
           <ShadcnButton asChild size="lg" className="w-full">
-            <Link to="/login">Quay lại Đăng nhập</Link>
+            <Link to="/login">
+              <ArrowLeft aria-hidden="true" />
+              Quay lại Đăng nhập
+            </Link>
           </ShadcnButton>
         </div>
       ) : (

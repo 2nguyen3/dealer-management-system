@@ -30,7 +30,7 @@ Deleter = Annotated[
     Principal, Depends(require_permissions(all_of=("groups.manage", "permissions.manage")))
 ]
 CatalogSort = Literal["id", "-id", "code", "-code", "name", "-name"]
-MatchHeader = Annotated[str, Header(alias="If-Match", pattern='^"[^"]+"$')]
+MatchHeader = Annotated[str, Header(alias="If-Match", pattern='^(W/)?"[^"]+"$')]
 
 
 def responses(*statuses: int, etag: bool = False) -> dict:

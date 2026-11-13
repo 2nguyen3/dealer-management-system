@@ -103,10 +103,10 @@ def migrate_schema(url, revision="head", *, downgrade=False):
     from app.common import commands  # noqa: F401
     from app.modules.agency_types import models as agency_types  # noqa: F401
     from app.modules.auth import models as auth  # noqa: F401
-    from app.modules.districts import models as districts  # noqa: F401
     from app.modules.units import models as units  # noqa: F401
     from app.modules.user_groups import models as user_groups  # noqa: F401
     from app.modules.users import models as users  # noqa: F401
+    from app.modules.wards import models as wards  # noqa: F401
 
     schema = validate_schema(url.query["agentra_test_schema"])
     engine = schema_engine(url, schema)

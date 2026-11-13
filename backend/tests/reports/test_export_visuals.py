@@ -413,7 +413,7 @@ def test_generated_line_uses_vietnam_time(value, expected):
 def test_filter_line_labels_known_and_unknown_filters():
     assert exports._filter_line({}) == "Bộ lọc: tất cả"
     assert (
-        exports._filter_line({"agencyId": "5", "typeId": 2, "districtId": 3, "x": "y"})
-        == "Bộ lọc: Đại lý (ID) = 5; Loại đại lý (ID) = 2; Quận/huyện (ID) = 3; x = y"
+        exports._filter_line({"agencyId": "5", "typeId": 2, "wardId": 3, "x": "y"})
+        == "Bộ lọc: Đại lý (ID) = 5; Loại đại lý (ID) = 2; Phường/xã (ID) = 3; x = y"
     )
     assert exports._filter_line({"productId": "9"}) == "Bộ lọc: Mặt hàng (ID) = 9"
