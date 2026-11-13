@@ -41,9 +41,23 @@ def parse_preconditions(
         if not allow_create or none_match != "*":
             raise ApiError(422, "VALIDATION_FAILED", "Invalid create precondition")
         return Preconditions(None, True)
+    match = strip_weak_prefix(match)
     if not re.fullmatch(r'"[\x21\x23-\x7e]+"', match or "") or "," in (match or ""):
-        raise ApiError(422, "VALIDATION_FAILED", "A single strong ETag is required")
+        raise ApiError(422, "VALIDATION_FAILED", "A single ETag is required")
     return Preconditions(match)
+
+
+def strip_weak_prefix(match: str | None) -> str | None:
+    """Return the opaque tag of an If-Match value echoed from this API.
+
+    The API only issues strong ETags, but CDNs that compress responses (Vercel
+    serves br/gzip) rewrite them to weak ``W/"..."`` validators and browsers echo
+    that value back. The weakness reflects the transfer encoding, not another
+    resource version, so the opaque tag still identifies the exact representation.
+    """
+    if match is not None and match.startswith('W/"'):
+        return match[2:]
+    return match
 
 
 def read_preconditions(request: Request, *, allow_create: bool = False) -> Preconditions:

@@ -119,7 +119,7 @@ def set_group_permission(
     service: Permissions,
     request: Request,
     response: Response,
-    match: Annotated[str | None, Header(alias="If-Match", pattern='^"[^"]+"$')] = None,
+    match: Annotated[str | None, Header(alias="If-Match", pattern='^(W/)?"[^"]+"$')] = None,
     none_match: Annotated[Literal["*"] | None, Header(alias="If-None-Match")] = None,
 ):
     item, created = service.set(
