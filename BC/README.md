@@ -11,6 +11,8 @@ Ngày đối chiếu mã nguồn: **06/11/2026**. Bộ tài liệu này phục v
 | [03_Cac_thanh_phan_he_thong.md](03_Cac_thanh_phan_he_thong.md) | Hai bảng STT, thành phần, diễn giải ngắn gọn cho kỹ thuật và nghiệp vụ. |
 | [04_Mo_ta_co_so_du_lieu.md](04_Mo_ta_co_so_du_lieu.md) | Mô tả đủ 30 bảng theo nhóm, cột, khóa, quan hệ và quy tắc dữ liệu chính. |
 | [05_Ket_qua_doi_chieu_database.md](05_Ket_qua_doi_chieu_database.md) | Chuỗi migration, sai khác của DBML gốc, hiệu chỉnh và giới hạn xác minh. |
+| [06_Logic_nghiep_vu_dong_tien.md](06_Logic_nghiep_vu_dong_tien.md) | Logic dòng tiền theo mã nguồn (13/11/2026): công nợ, trả ngay, phiếu thu FIFO và replay lùi ngày, dư có, bù trừ, trả hàng, hoàn tiền, VNPAY, sửa/hủy, khóa đồng thời, các trường hợp xảy ra và sai khác so với BA. |
+| [07_Danh_sach_chuc_nang.md](07_Danh_sach_chuc_nang.md) | Danh sách chức năng nghiệp vụ hiện có (13/11/2026) theo module: operationId, method/path, quyền và mức hiển thị trên giao diện; ghi nhận thay quản lý quận bằng danh mục phường/xã chỉ đọc. |
 | [Database/DMS.dbml](Database/DMS.dbml) | Code DBML hoàn chỉnh để dựng ERD trong dbdiagram. |
 | [So_do/Kien_truc_he_thong.drawio](So_do/Kien_truc_he_thong.drawio) | Sơ đồ kiến trúc trắng đen dạng XML, có các khối và đường nối chỉnh sửa được. |
 | [So_do/Kien_truc_he_thong.svg](So_do/Kien_truc_he_thong.svg) | Hình vector kiến trúc, nền trắng, nét/chữ đen. |
