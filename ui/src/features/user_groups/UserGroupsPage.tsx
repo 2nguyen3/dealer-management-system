@@ -1,8 +1,8 @@
 import { Users, UsersRound } from 'lucide-react'
-import { MasterPage, type MasterConfig } from '../districts/MasterPage'
-import { master } from '../districts/masterContracts'
-import { num, partsBy, sumBy } from '../districts/summaryData'
-import { DonutTile, StatTile } from '../districts/summaryParts'
+import { MasterPage, type MasterConfig } from '../master_data/MasterPage'
+import { master } from '../master_data/masterContracts'
+import { num, partsBy, sumBy } from '../master_data/summaryData'
+import { DonutTile, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
 
 function groupSummary(items: Row[]) {

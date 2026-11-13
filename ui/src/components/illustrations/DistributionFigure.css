@@ -35,10 +35,10 @@
   min-height: 44px;
   max-width: 100%;
   padding: 0.65rem 1rem;
-  border: 1px solid #8eafd8;
+  border: 1px solid color-mix(in oklab, var(--primary) 35%, var(--border));
   border-radius: 6px;
-  background: #edf3fa;
-  color: #304e73;
+  background: var(--accent);
+  color: var(--accent-foreground);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 500;
@@ -47,12 +47,12 @@
 }
 
 .distribution-figure__button:hover:not(:disabled) {
-  border-color: #547bab;
-  background: #d9e8fa;
+  border-color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 16%, var(--accent));
 }
 
 .distribution-figure__button:focus-visible {
-  outline: 3px solid #8eafd8;
+  outline: 3px solid var(--ring);
   outline-offset: 4px;
 }
 

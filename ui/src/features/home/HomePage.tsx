@@ -59,7 +59,6 @@ const DESCRIPTIONS: Record<string, string> = {
   '/credit-applications': 'Dư có bù công nợ',
   '/online-payments': 'Giao dịch trực tuyến',
   '/refunds': 'Hoàn trả dư có',
-  '/districts': 'Quận, số đại lý tối đa',
   '/agency-types': 'Loại đại lý, giới hạn nợ',
   '/units': 'Đơn vị tính',
   '/business-rules': 'Quy định, hệ số giá bán',

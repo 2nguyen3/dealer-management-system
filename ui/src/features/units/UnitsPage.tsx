@@ -1,10 +1,10 @@
 import { Ruler, SplitSquareHorizontal } from 'lucide-react'
 import { RoundedBarChart } from '@/components/charts/MebiusCharts'
 import { formatPlain } from '@/lib/chart'
-import { MasterPage, type MasterConfig } from '../districts/MasterPage'
-import { master } from '../districts/masterContracts'
-import { countWhere, num } from '../districts/summaryData'
-import { ChartTile, MiniTable, StatTile } from '../districts/summaryParts'
+import { MasterPage, type MasterConfig } from '../master_data/MasterPage'
+import { master } from '../master_data/masterContracts'
+import { countWhere, num } from '../master_data/summaryData'
+import { ChartTile, MiniTable, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
 
 function unitSummary(items: Row[]) {

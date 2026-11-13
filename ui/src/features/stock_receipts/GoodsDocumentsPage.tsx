@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Eye,
   History,
+  Info,
   MoreHorizontal,
   PencilLine,
   Plus,
@@ -653,7 +654,7 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
         >
           <div className="min-w-0 space-y-4">
             {formError && <Alert type="error">{formError}</Alert>}
-            <SectionCard title="Thông tin chung">
+            <SectionCard title="Thông tin chung" icon={<Info />}>
               <fieldset
                 disabled={mutation.busy}
                 className="grid min-w-0 gap-4 sm:grid-cols-2"

@@ -37,6 +37,13 @@ describe('audit labels', () => {
     expect(entityLabel('dms.app_user')).toBe('Tài khoản')
   })
 
+  it('labels wards and marks historical district rows as legacy', () => {
+    expect(entityLabel('ward')).toBe('Phường/xã')
+    expect(entityLabel('dms.wards')).toBe('Phường/xã')
+    expect(entityLabel('district')).toBe('Quận (cũ)')
+    expect(entityLabel('dms.districts')).toBe('Quận (cũ)')
+  })
+
   it('keeps unknown or empty table names unchanged', () => {
     expect(entityLabel('mystery_table')).toBe('mystery_table')
     expect(entityLabel(undefined)).toBe('')

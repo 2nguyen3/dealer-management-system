@@ -17,7 +17,7 @@ import { apiFetch } from '../../lib/api'
 import { formatQuantity, formatVND } from '../../lib/formatters'
 import { invalidateCache } from '../../lib/cache'
 import { useAuth } from '../authentication/useAuth'
-import { InfoHint } from '../districts/listParts'
+import { InfoHint } from '../master_data/listParts'
 import {
   catalog,
   decimal,
@@ -44,13 +44,13 @@ export function BusinessRulesPage() {
     apiFetch<unknown>('/business-rules', { signal: controller.signal })
       .then((response) => {
         const data = record(response.data)
-        catalog(data.maxAgenciesPerDistrict)
+        catalog(data.maxAgenciesPerWard)
         decimal(data.sellingPriceRate)
         if (current) {
-          setCapacity(String(data.maxAgenciesPerDistrict))
+          setCapacity(String(data.maxAgenciesPerWard))
           setRate(String(data.sellingPriceRate))
           setSaved({
-            capacity: String(data.maxAgenciesPerDistrict),
+            capacity: String(data.maxAgenciesPerWard),
             rate: String(data.sellingPriceRate),
           })
           setEtag(response.etag)
@@ -78,7 +78,7 @@ export function BusinessRulesPage() {
           'Hệ số phải dương, tối đa 3 chữ số nguyên và 6 chữ số lẻ.',
         )
       const body = {
-        maxAgenciesPerDistrict: catalog(capacity),
+        maxAgenciesPerWard: catalog(capacity),
         sellingPriceRate: rate,
       }
       setBusy(true)
@@ -88,16 +88,16 @@ export function BusinessRulesPage() {
         false,
       )
       const data = record(response.data)
-      catalog(data.maxAgenciesPerDistrict)
+      catalog(data.maxAgenciesPerWard)
       decimal(data.sellingPriceRate)
       setEtag(response.etag)
-      setCapacity(String(data.maxAgenciesPerDistrict))
+      setCapacity(String(data.maxAgenciesPerWard))
       setRate(String(data.sellingPriceRate))
       setSaved({
-        capacity: String(data.maxAgenciesPerDistrict),
+        capacity: String(data.maxAgenciesPerWard),
         rate: String(data.sellingPriceRate),
       })
-      for (const prefix of ['/business-rules', '/districts', '/products'])
+      for (const prefix of ['/business-rules', '/products'])
         invalidateCache(prefix)
       setNotice(
         'Đã cập nhật quy định. Giá trên các chứng từ đã lập không thay đổi.',
@@ -141,7 +141,7 @@ export function BusinessRulesPage() {
           <StaggerItem role="listitem">
             <KpiCard
               className="h-full"
-              label="Đại lý tối đa / quận"
+              label="Đại lý tối đa / phường/xã"
               icon={<MapPin />}
               value={
                 capacityValue === null ? '—' : <CountUp value={capacityValue} />
@@ -191,11 +191,11 @@ export function BusinessRulesPage() {
           <RuleRow
             icon={<MapPin className="size-5" />}
             title="Tiếp nhận đại lý"
-            hint="Giới hạn số đại lý đang hoạt động trong cùng một quận."
+            hint="Giới hạn số đại lý đang hoạt động trong cùng một phường/xã."
           >
             <Input
               id="rule-capacity"
-              label="Số đại lý tối đa trong mỗi quận"
+              label="Số đại lý tối đa mỗi phường/xã"
               inputMode="numeric"
               className="tabular-nums"
               value={capacity}

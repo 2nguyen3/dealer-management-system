@@ -47,8 +47,8 @@ const agencies = [
     code: 'DL-101',
     name: 'Đại lý Minh Phát',
     phone: '0901234567',
-    districtId: 1,
-    districtName: 'Quận 1',
+    wardId: 1,
+    wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
     currentDebt: '45000000',
@@ -60,8 +60,8 @@ const agencies = [
     code: 'DL-102',
     name: 'Đại lý Hùng Cường',
     phone: '0912345678',
-    districtId: 2,
-    districtName: 'Quận 3',
+    wardId: 2,
+    wardName: 'Phường Xuân Hòa',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
     currentDebt: '5000000',
@@ -75,12 +75,9 @@ describe('AgenciesPage sort and debt usage', { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(cache, 'cachedApiFetch').mockImplementation(async (path) => ({
-      data: path.startsWith('/districts')
-        ? [
-            { id: 1, name: 'Quận 1', status: 'ACTIVE' },
-            { id: 2, name: 'Quận 3', status: 'ACTIVE' },
-          ]
-        : [{ id: 1, name: 'Đại lý cấp 1', maxDebt: '50000000' }],
+      data: path.startsWith('/agency-types')
+        ? [{ id: 1, name: 'Đại lý cấp 1', maxDebt: '50000000' }]
+        : [],
       status: 200,
       etag: null,
     }))
@@ -299,7 +296,7 @@ describe('BusinessRulesPage tiles', { timeout: 20000 }, () => {
 
   it('shows the saved rules, not unsaved edits', async () => {
     vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      data: { maxAgenciesPerDistrict: 4, sellingPriceRate: '1.020000' },
+      data: { maxAgenciesPerWard: 4, sellingPriceRate: '1.020000' },
       etag: '"r1"',
       status: 200,
     })

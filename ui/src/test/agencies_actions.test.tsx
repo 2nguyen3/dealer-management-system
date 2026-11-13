@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgenciesPage } from '../features/agencies/AgenciesPage'
@@ -7,6 +13,7 @@ import {
   type AuthContextValue,
 } from '../features/authentication/useAuth'
 import * as apiModule from '../lib/api'
+import { ApiError } from '../lib/api'
 import * as cacheModule from '../lib/cache'
 import type { Agency } from '../lib/types'
 
@@ -32,8 +39,8 @@ const agencies: Agency[] = [
     code: 'DL-101',
     name: 'Đại lý Minh Phát',
     phone: '0901234567',
-    districtId: 1,
-    districtName: 'Quận 1',
+    wardId: 2,
+    wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
     currentDebt: '15000000',
@@ -44,8 +51,8 @@ const agencies: Agency[] = [
     code: 'DL-102',
     name: 'Đại lý Hùng Cường',
     phone: '0912345678',
-    districtId: 1,
-    districtName: 'Quận 1',
+    wardId: 2,
+    wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
     currentDebt: '0',
@@ -53,7 +60,10 @@ const agencies: Agency[] = [
   } as Agency,
 ]
 
-let districts: unknown[]
+let types: unknown[]
+let wardRows: unknown[]
+let posted: { path: string; body: unknown }[]
+let failCreate: unknown = null
 
 function renderPage(granted = ['agency.read', 'agency.manage']) {
   return render(
@@ -63,6 +73,15 @@ function renderPage(granted = ['agency.read', 'agency.manage']) {
       </AuthContext.Provider>
     </MemoryRouter>,
   )
+}
+
+function fillContact(dialog: HTMLElement) {
+  fireEvent.change(within(dialog).getByLabelText(/Tên đại lý/), {
+    target: { value: 'Đại lý Mới' },
+  })
+  fireEvent.change(within(dialog).getByLabelText(/Số điện thoại/), {
+    target: { value: '0900000000' },
+  })
 }
 
 function openMenu(code: string) {
@@ -75,21 +94,47 @@ function openMenu(code: string) {
 describe('AgenciesPage row actions and overview', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    districts = [
-      { id: 1, name: 'Quận 1', status: 'ACTIVE' },
-      { id: 2, name: 'Quận 3', status: 'ACTIVE' },
+    types = [{ id: 1, name: 'Đại lý cấp 1', maxDebt: '50000000' }]
+    wardRows = [
+      { id: 2, code: '26740', name: 'Phường Sài Gòn', kind: 'WARD' },
+      {
+        id: 168,
+        code: '26732',
+        name: 'Đặc khu Côn Đảo',
+        kind: 'SPECIAL_ZONE',
+      },
     ]
+    posted = []
+    failCreate = null
     vi.spyOn(cacheModule, 'getCachedData').mockReturnValue(null)
     vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
       async (path: string) => ({
-        data: path.startsWith('/districts')
-          ? districts
-          : [{ id: 1, name: 'Đại lý cấp 1', maxDebt: '50000000' }],
+        data: path.startsWith('/agency-types') ? types : [],
         status: 200,
         etag: null,
       }),
     )
-    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path) => {
+    vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path, opts) => {
+      if (opts?.method === 'POST' || opts?.method === 'PATCH') {
+        posted.push({ path, body: opts.body })
+        if (failCreate) throw failCreate
+        return { data: agencies[0], status: 201, etag: '"a2"' }
+      }
+      if (path.startsWith('/wards/'))
+        return {
+          data: { id: 2, code: '26740', name: 'Phường Sài Gòn', kind: 'WARD' },
+          status: 200,
+          etag: null,
+        }
+      if (path.startsWith('/wards'))
+        return {
+          data: {
+            items: wardRows,
+            pagination: { limit: 20, nextCursor: null, hasMore: false },
+          },
+          status: 200,
+          etag: null,
+        }
       if (path === '/agencies/101')
         return { data: agencies[0], status: 200, etag: '"a1"' }
       return {
@@ -156,42 +201,152 @@ describe('AgenciesPage row actions and overview', () => {
     ).toEqual(['Xem chi tiết'])
   })
 
-  it('summarises catalogue counts only when the district data provides them', async () => {
-    districts = [
+  it('summarises active agencies and ward coverage from the ward catalogue', async () => {
+    types = [
+      { id: 1, name: 'Đại lý cấp 1', maxDebt: '50000000' },
+      { id: 2, name: 'Đại lý cấp 2', maxDebt: '20000000' },
+    ]
+    wardRows = [
       {
-        id: 1,
-        name: 'Quận 1',
-        status: 'ACTIVE',
+        id: 2,
+        code: '26740',
+        name: 'Phường Sài Gòn',
+        kind: 'WARD',
+        activeAgencyCount: 4,
+        maxAgencies: 4,
+        remainingSlots: 0,
+      },
+      {
+        id: 3,
+        code: '26743',
+        name: 'Phường Bến Thành',
+        kind: 'WARD',
         activeAgencyCount: 3,
+        maxAgencies: 4,
         remainingSlots: 1,
       },
       {
-        id: 2,
-        name: 'Quận 3',
-        status: 'ACTIVE',
-        activeAgencyCount: '4',
-        remainingSlots: 0,
+        id: 168,
+        code: '26732',
+        name: 'Đặc khu Côn Đảo',
+        kind: 'SPECIAL_ZONE',
+        activeAgencyCount: 0,
+        maxAgencies: 4,
+        remainingSlots: 4,
       },
     ]
     renderPage()
     const overview = await screen.findByRole('list', {
       name: 'Tổng quan đại lý',
     })
+    await waitFor(() =>
+      expect(overview.textContent ?? '').toContain('Đại lý đang hoạt động7'),
+    )
     const text = overview.textContent ?? ''
-    expect(text).toContain('Đại lý đang hoạt động7')
-    expect(text).toContain('Quận2')
-    expect(text).toContain('Loại đại lý1')
-    expect(text).toContain('Chỗ còn nhận1')
+    expect(text).toContain('Phường/xã có đại lý2')
+    expect(text).toContain('Loại đại lý2')
+    expect(text).toContain('Phường/xã đã đủ đại lý1')
+    expect(text).not.toMatch(/Quận|Chỗ còn nhận/)
   })
 
-  it('omits counts that the district rows do not carry', async () => {
+  it('rejects a ward row with a negative capacity count', async () => {
+    wardRows = [
+      {
+        id: 2,
+        code: '26740',
+        name: 'Phường Sài Gòn',
+        kind: 'WARD',
+        activeAgencyCount: -1,
+      },
+    ]
+    renderPage()
+    const overview = await screen.findByRole('list', {
+      name: 'Tổng quan đại lý',
+    })
+    expect(overview.textContent).not.toContain('Phường/xã có đại lý')
+  })
+
+  it('omits counts that the type rows do not carry', async () => {
     renderPage()
     const overview = await screen.findByRole('list', {
       name: 'Tổng quan đại lý',
     })
     expect(overview.textContent).not.toContain('Đại lý đang hoạt động')
-    expect(overview.textContent).not.toContain('Chỗ còn nhận')
-    expect(overview.textContent).toContain('Quận2')
+    expect(overview.textContent).toContain('Loại đại lý1')
+  })
+
+  it('requires a ward before creating and sends the chosen wardId', async () => {
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    fireEvent.click(
+      screen.getByRole('button', { name: /Tiếp nhận đại lý mới/ }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    fillContact(dialog)
+    const ward = within(dialog).getByRole('combobox', { name: /Phường\/xã/ })
+    expect((ward as HTMLInputElement).value).toBe('')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp nhận' }))
+    expect(
+      await within(dialog).findByText('Vui lòng chọn phường/xã.'),
+    ).toBeTruthy()
+    expect(posted).toHaveLength(0)
+
+    fireEvent.focus(ward)
+    fireEvent.click(
+      await within(dialog).findByRole('option', { name: /Đặc khu Côn Đảo/ }),
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp nhận' }))
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]!.path).toBe('/agencies')
+    expect(posted[0]!.body).toMatchObject({
+      name: 'Đại lý Mới',
+      typeId: 1,
+      wardId: 168,
+    })
+    expect(posted[0]!.body).not.toHaveProperty('districtId')
+  })
+
+  it('shows the ward capacity conflict message on create', async () => {
+    failCreate = new ApiError(
+      409,
+      'WARD_CAPACITY_EXCEEDED',
+      apiModule.ERROR_CODE_MESSAGES.WARD_CAPACITY_EXCEEDED!,
+    )
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    fireEvent.click(
+      screen.getByRole('button', { name: /Tiếp nhận đại lý mới/ }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    fillContact(dialog)
+    fireEvent.focus(
+      within(dialog).getByRole('combobox', { name: /Phường\/xã/ }),
+    )
+    fireEvent.click(
+      await within(dialog).findByRole('option', { name: /Phường Sài Gòn/ }),
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp nhận' }))
+    expect(
+      await within(dialog).findByText(/Phường\/xã đã đủ số đại lý tối đa/),
+    ).toBeTruthy()
+  })
+
+  it('keeps the agency ward when editing and patches wardId', async () => {
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    openMenu('DL-101')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Sửa hồ sơ' }))
+    const dialog = await screen.findByRole('dialog')
+    const ward = within(dialog).getByRole('combobox', { name: /Phường\/xã/ })
+    await waitFor(() =>
+      expect((ward as HTMLInputElement).value).toBe('Phường Sài Gòn'),
+    )
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Lưu thay đổi' }),
+    )
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]!.path).toBe('/agencies/101')
+    expect(posted[0]!.body).toMatchObject({ wardId: 2 })
   })
 
   it('uses a dd/MM/yyyy date picker for the reception date', async () => {

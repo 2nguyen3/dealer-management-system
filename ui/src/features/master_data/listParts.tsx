@@ -16,6 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/shadcn/tooltip'
+import { FilterIcon } from '@/components/ui/FilterIcon'
 import { cn } from '@/lib/utils'
 
 /** Card shell shared by list pages: toolbar on top, table, footer. */
@@ -110,15 +111,17 @@ export function ToggleFilter({
         onValueChange={(next) => onChange(next === '__all' ? '' : next)}
         className="h-9 bg-card"
       >
-        <ToggleGroupItem value="__all" className="h-9 text-xs">
+        <ToggleGroupItem value="__all" className="h-9 gap-1.5 text-xs">
+          <FilterIcon value="" />
           {allLabel}
         </ToggleGroupItem>
         {options.map((option) => (
           <ToggleGroupItem
             key={option.value}
             value={option.value}
-            className="h-9 text-xs"
+            className="h-9 gap-1.5 text-xs"
           >
+            <FilterIcon value={option.value} />
             {option.label}
           </ToggleGroupItem>
         ))}

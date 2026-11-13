@@ -148,7 +148,7 @@ describe('exact source report validation', () => {
           agencyId: '9223372036854775807',
           productId: '17',
           typeId: '2147483647',
-          districtId: '2',
+          wardId: '2',
           madeUpFilter: 'no',
         },
       }
@@ -190,6 +190,18 @@ describe('exact source report validation', () => {
         filters: { agencyId: '9223372036854775808' },
       }),
     ).toThrow('ID đại lý không hợp lệ.')
+  })
+
+  it('validates the debt ward filter as an integer catalogue id', () => {
+    const debt = (wardId: string) =>
+      reportPath({ ...reportQuery('debt'), filters: { wardId } })
+    expect(new URL(debt('1'), 'http://t').searchParams.get('wardId')).toBe('1')
+    expect(
+      new URL(debt('2147483647'), 'http://t').searchParams.get('wardId'),
+    ).toBe('2147483647')
+    for (const bad of ['0', '01', '2147483648', '-1', '1.5', 'x'])
+      expect(() => debt(bad)).toThrow('ID phường/xã không hợp lệ.')
+    expect(new URL(debt(''), 'http://t').searchParams.has('wardId')).toBe(false)
   })
 })
 

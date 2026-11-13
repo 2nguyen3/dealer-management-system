@@ -4,7 +4,8 @@ import { Button as ShadcnButton } from '../../components/shadcn/button'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Select } from '../../components/ui/Select'
-import { useCatalogOptions } from '../districts/useCatalogOptions'
+import { useCatalogOptions } from '../master_data/useCatalogOptions'
+import { WardPicker } from '../wards/WardPicker'
 import {
   activeFilters,
   filterNames,
@@ -16,7 +17,7 @@ import {
 export interface SlicerAvailability {
   agencyId: boolean
   typeId: boolean
-  districtId: boolean
+  wardId: boolean
   productId: boolean
 }
 
@@ -39,13 +40,10 @@ export function Slicers({
   onReset: () => void
 }) {
   const types = useCatalogOptions(available.typeId ? '/agency-types' : null)
-  const districts = useCatalogOptions(
-    available.districtId ? '/districts' : null,
-  )
   const active = activeFilters(filters)
 
   function catalogChange(
-    key: 'typeId' | 'districtId',
+    key: 'typeId',
     options: { value: string; label: string }[],
     value: string,
   ) {
@@ -102,22 +100,17 @@ export function Slicers({
             ]}
           />
         )}
-        {available.districtId && (
-          <Select
-            id="dashboard-district"
-            label="Quận"
-            value={filters.districtId?.id ?? ''}
-            error={districts.error || undefined}
-            onChange={(event) =>
-              catalogChange('districtId', districts.options, event.target.value)
+        {available.wardId && (
+          <WardPicker
+            id="dashboard-ward"
+            placeholder="Tất cả phường/xã"
+            value={filters.wardId?.id ?? ''}
+            onChange={(id, item) =>
+              onFilter(
+                'wardId',
+                id ? { id, label: item?.label ?? `#${id}` } : null,
+              )
             }
-            options={[
-              {
-                value: '',
-                label: districts.loading ? 'Đang tải…' : 'Tất cả quận',
-              },
-              ...districts.options,
-            ]}
           />
         )}
         {available.productId && (

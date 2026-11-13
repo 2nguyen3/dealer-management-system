@@ -32,14 +32,14 @@ import {
   ListCard,
   ResultCount,
   TableSkeleton,
-} from '../districts/listParts'
-import { countWhere, partsBy, ratioOf } from '../districts/summaryData'
+} from '../master_data/listParts'
+import { countWhere, partsBy, ratioOf } from '../master_data/summaryData'
 import {
   DonutTile,
   MeterTile,
   StatTile,
   SummaryGrid,
-} from '../districts/summaryParts'
+} from '../master_data/summaryParts'
 import {
   id,
   message,
@@ -399,7 +399,12 @@ export function AuditLogsPage() {
               <div className="flex flex-wrap items-center gap-1.5 text-sm">
                 <span className="text-muted-foreground">Trường thay đổi:</span>
                 {changes.map((key) => (
-                  <Badge key={key} variant="info" className="font-mono">
+                  <Badge
+                    key={key}
+                    variant="info"
+                    icon={false}
+                    className="font-mono"
+                  >
                     {key}
                   </Badge>
                 ))}

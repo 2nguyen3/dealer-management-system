@@ -46,8 +46,9 @@ describe('Authentication redesign', () => {
       name: 'Giới thiệu Agentra',
     })
     expect(intro.querySelectorAll('li')).toHaveLength(0)
-    expect(intro.querySelector('iframe')?.getAttribute('src')).toBe(
-      '/figures/supplychain.html',
+    // Theme tokens (light/dark + palette-tinted shadow) travel in the query.
+    expect(intro.querySelector('iframe')?.getAttribute('src')).toMatch(
+      /^\/figures\/supplychain\.html\?theme=light&shadow=%23[0-9a-f]{6}$/,
     )
     expect(screen.getByRole('heading', { name: 'Đăng nhập' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Quên mật khẩu?' })).toBeTruthy()

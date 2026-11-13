@@ -2,8 +2,8 @@ import {
   BadgeCheck,
   FileCheck2,
   Hourglass,
-  ReceiptText,
   PencilLine,
+  ReceiptText,
   RefreshCw,
   Undo2,
 } from 'lucide-react'
@@ -375,6 +375,7 @@ export function UpfrontPaymentsPage() {
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
         title="Các khoản thực nhận"
+        icon={<BadgeCheck />}
         actions={
           <SortMenu
             options={SORT_OPTIONS}

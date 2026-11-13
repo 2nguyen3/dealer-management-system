@@ -1,8 +1,8 @@
 import { UserCheck, UserLock } from 'lucide-react'
-import { MasterPage, type MasterConfig } from '../districts/MasterPage'
-import { user } from '../districts/masterContracts'
-import { countWhere, num, partsBy, ratioOf } from '../districts/summaryData'
-import { DonutTile, MeterTile, StatTile } from '../districts/summaryParts'
+import { MasterPage, type MasterConfig } from '../master_data/MasterPage'
+import { user } from '../master_data/masterContracts'
+import { countWhere, num, partsBy, ratioOf } from '../master_data/summaryData'
+import { DonutTile, MeterTile, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
 
 function userSummary(items: Row[]) {

@@ -7,8 +7,11 @@ import {
   within,
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { MasterPage, type MasterConfig } from '../features/districts/MasterPage'
-import { master } from '../features/districts/masterContracts'
+import {
+  MasterPage,
+  type MasterConfig,
+} from '../features/master_data/MasterPage'
+import { master } from '../features/master_data/masterContracts'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { UsersPage } from '../features/users/UsersPage'
 import * as api from '../lib/api'
@@ -213,25 +216,25 @@ describe('MasterPage server sort', { timeout: 20000 }, () => {
 
   it('keeps configs without sorts or summary unchanged', async () => {
     const plain: MasterConfig = {
-      path: '/districts',
-      title: 'Danh sách quận',
-      manage: 'district.manage',
+      path: '/agency-types',
+      title: 'Danh sách loại đại lý',
+      manage: 'agency_type.manage',
       decode: master,
-      fields: [{ key: 'name', label: 'Tên quận' }],
+      fields: [{ key: 'name', label: 'Tên loại' }],
       columns: [
         ['code', 'Mã'],
-        ['name', 'Tên quận'],
+        ['name', 'Tên loại'],
       ],
     }
     const fetch = vi
       .spyOn(api, 'apiFetch')
-      .mockResolvedValue(page([{ id: 1, code: 'Q1', name: 'Quận 1' }]))
+      .mockResolvedValue(page([{ id: 1, code: 'L1', name: 'Loại 1' }]))
     render(<MasterPage config={plain} />)
-    const name = await header(/Tên quận/)
+    const name = await header(/Tên loại/)
     expect(name.getAttribute('aria-sort')).toBeNull()
     expect(screen.queryByRole('button', { name: /Sắp xếp/ })).toBeNull()
     expect(screen.queryByRole('region', { name: /Tổng quan/ })).toBeNull()
-    expect(lastCall(fetch, '/districts')).toBe('/districts?limit=25')
+    expect(lastCall(fetch, '/agency-types')).toBe('/agency-types?limit=25')
   })
 
   it('labels a summary of a single complete page as the whole list', async () => {

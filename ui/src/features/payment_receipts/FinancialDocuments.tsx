@@ -448,10 +448,7 @@ export function FinancialDocuments({
         </Button>
       </FilterBar>
       {list.error && <Alert type="error">{list.error}</Alert>}
-      <TableCard
-        title={`Danh sách ${title.toLowerCase()}`}
-        description="Bấm tiêu đề cột để sắp xếp."
-      >
+      <TableCard title={`Danh sách ${title.toLowerCase()}`}>
         {list.loading ? (
           <TableSkeleton label="Đang tải chứng từ..." />
         ) : list.items.length === 0 ? (

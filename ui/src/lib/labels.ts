@@ -151,3 +151,15 @@ export function enumOptions(
   const options = values.map((value) => ({ value, label: label(value) }))
   return allLabel ? [{ value: '', label: allLabel }, ...options] : options
 }
+
+/** Kinds of Ho Chi Minh City wards/communes after the 2025 reform. */
+export const WARD_KIND_LABELS = {
+  WARD: 'Phường',
+  COMMUNE: 'Xã',
+  SPECIAL_ZONE: 'Đặc khu',
+} as const
+
+/** Vietnamese label for a ward kind (Phường / Xã / Đặc khu). */
+export function wardKindLabel(value: unknown): string {
+  return lookup(WARD_KIND_LABELS, value)
+}

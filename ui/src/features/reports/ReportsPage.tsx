@@ -1,4 +1,14 @@
-import { CalendarRange, FileBarChart2, RefreshCw } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  CalendarRange,
+  FileBarChart2,
+  Package,
+  RefreshCw,
+  TrendingUp,
+  Wallet,
+  Warehouse,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { nextSort } from '../../components/data/sorting'
@@ -48,6 +58,14 @@ const tabLabels: Record<ReportKind, string> = {
   inventory: 'Xuất nhập tồn',
   'product-sales': 'Doanh số mặt hàng',
   'cash-and-credit': 'Thu chi & dư có',
+}
+
+const tabIcons: Record<ReportKind, LucideIcon> = {
+  sales: TrendingUp,
+  debt: Wallet,
+  inventory: Warehouse,
+  'product-sales': Package,
+  'cash-and-credit': ArrowLeftRight,
 }
 
 const notes: Partial<Record<ReportKind, string>> = {
@@ -396,7 +414,6 @@ export function ReportsPage() {
       <PageHeader
         eyebrow="Phân tích"
         title="Báo cáo kinh doanh"
-        description="Doanh số · công nợ · tồn kho · thu chi — xuất PDF/Excel."
         actions={
           available.length ? (
             <ExportMenu
@@ -419,11 +436,15 @@ export function ReportsPage() {
         >
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
             <TabsList aria-label="Loại báo cáo">
-              {available.map((item) => (
-                <TabsTrigger key={item} value={item} className="px-3">
-                  {tabLabels[item]}
-                </TabsTrigger>
-              ))}
+              {available.map((item) => {
+                const Icon = tabIcons[item]
+                return (
+                  <TabsTrigger key={item} value={item} className="px-3">
+                    <Icon aria-hidden="true" />
+                    {tabLabels[item]}
+                  </TabsTrigger>
+                )
+              })}
             </TabsList>
           </div>
           {available.map((item) => (

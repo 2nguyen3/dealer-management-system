@@ -1,4 +1,4 @@
-import { BookOpenText, Search } from 'lucide-react'
+import { BookOpenText, Coins, Search } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/blocks/PageHeader'
 import { SortableHeader, SortMenu } from '@/components/data/SortControls'
@@ -53,6 +53,7 @@ function Lots({ agencyId }: { agencyId: string }) {
     <SectionCard
       title="Các khoản dư có"
       description="Dùng theo thứ tự cũ nhất trước."
+      icon={<Coins />}
       actions={
         <SortMenu
           options={LOT_SORTS}

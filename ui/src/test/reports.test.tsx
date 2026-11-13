@@ -91,10 +91,10 @@ function response(path: string) {
     etag: null,
   }
 }
-/** Non-report reads: picker searches and the district list. */
+/** Non-report reads: picker searches, including the wards catalogue. */
 function lookup(path: string) {
-  const items = path.startsWith('/districts')
-    ? [{ id: 1, code: 'Q1', name: 'Quận 1' }]
+  const items = path.startsWith('/wards')
+    ? [{ id: 1, code: '26740', name: 'Phường Sài Gòn', kind: 'WARD' }]
     : pickerRows
   return {
     data: {
@@ -349,21 +349,30 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     expect(second).not.toContain('agencyId=')
   })
 
-  it('filters by agency type and district through readable choices', async () => {
+  it('filters by agency type and ward through readable choices', async () => {
     render(<ReportsPage />)
     await choose('Loại đại lý', '3')
     apply()
     await sourceRow()
     expect(reportCalls()[0]![0]).toContain('typeId=3')
     openTab('debt')
-    const district = (await screen.findByRole('option', {
-      name: 'Q1 — Quận 1',
-    })) as HTMLOptionElement
-    expect(district.value).toBe('1')
-    fireEvent.change(screen.getByLabelText('Quận'), { target: { value: '1' } })
+    const ward = await screen.findByRole('combobox', { name: 'Phường/xã' })
+    expect(ward.getAttribute('placeholder')).toBe('Tất cả phường/xã')
+    fireEvent.focus(ward)
+    fireEvent.change(ward, { target: { value: 'Sài' } })
+    fireEvent.click(
+      await screen.findByRole('option', { name: /Phường Sài Gòn/ }),
+    )
+    expect((ward as HTMLInputElement).value).toBe('Phường Sài Gòn')
+    const search = vi
+      .mocked(api.apiFetch)
+      .mock.calls.map(([path]) => String(path))
+      .filter((path) => path.startsWith('/wards?'))
+      .at(-1)
+    expect(search).toContain(`q=${encodeURIComponent('Sài')}`)
     apply()
     await waitFor(() => expect(reportCalls()).toHaveLength(2))
-    expect(reportCalls()[1]![0]).toContain('districtId=1')
+    expect(reportCalls()[1]![0]).toContain('wardId=1')
   })
 
   it('offers readable sort and page-size choices with unchanged values', async () => {

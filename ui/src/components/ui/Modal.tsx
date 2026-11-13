@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { ACTION_ICONS, inferAction } from './actionIcons'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,8 @@ export interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
+  /** Title icon; inferred from the title verb when omitted, `false` hides it. */
+  icon?: ReactNode | false
   children: ReactNode
   footer?: ReactNode
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl'
@@ -29,10 +32,14 @@ export function Modal({
   isOpen,
   onClose,
   title,
+  icon,
   children,
   footer,
   maxWidth = 'md',
 }: ModalProps) {
+  const kind = icon === undefined ? inferAction(title) : null
+  const KindIcon = kind ? ACTION_ICONS[kind] : null
+  const titleIcon = KindIcon ? <KindIcon /> : icon || null
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -44,7 +51,17 @@ export function Modal({
         )}
       >
         <DialogHeader className="flex-row items-center justify-between gap-4 border-b px-6 py-4">
-          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          <DialogTitle className="flex min-w-0 items-center gap-2.5 text-base font-semibold">
+            {titleIcon && (
+              <span
+                aria-hidden="true"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4"
+              >
+                {titleIcon}
+              </span>
+            )}
+            <span className="min-w-0">{title}</span>
+          </DialogTitle>
           <button
             type="button"
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"

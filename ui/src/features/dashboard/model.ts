@@ -57,7 +57,7 @@ export function monthPeriod(value: string): {
 
 // ---------------------------------------------------------------- slicers
 
-export type FilterKey = 'agencyId' | 'typeId' | 'districtId' | 'productId'
+export type FilterKey = 'agencyId' | 'typeId' | 'wardId' | 'productId'
 export interface FilterValue {
   id: string
   label: string
@@ -67,14 +67,14 @@ export type Filters = Record<FilterKey, FilterValue | null>
 export const emptyFilters: Filters = {
   agencyId: null,
   typeId: null,
-  districtId: null,
+  wardId: null,
   productId: null,
 }
 
 export const filterNames: Record<FilterKey, string> = {
   agencyId: 'Đại lý',
   typeId: 'Loại đại lý',
-  districtId: 'Quận',
+  wardId: 'Phường/xã',
   productId: 'Mặt hàng',
 }
 
@@ -98,7 +98,7 @@ export const reportPlan: Record<
   debt: {
     sort: '-closingDebt',
     limit: '100',
-    server: ['typeId', 'districtId'],
+    server: ['typeId', 'wardId'],
   },
   'product-sales': { sort: '-salesAmount', limit: '10', server: ['agencyId'] },
   'cash-and-credit': {

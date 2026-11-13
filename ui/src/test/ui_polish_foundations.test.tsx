@@ -105,7 +105,8 @@ describe('profile model', () => {
     expect(coverage.find((a) => a.key === 'admin')!.ratio).toBe(0)
     const all = PERMISSION_AREAS.flatMap((a) => a.codes.map((c) => c.code))
     expect(new Set(all).size).toBe(all.length)
-    expect(all).toHaveLength(33)
+    expect(all).toHaveLength(32)
+    expect(all).not.toContain('district.manage')
   })
 
   it('counts whole days since an ISO time and rejects invalid input', () => {

@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MasterPage, type MasterConfig } from '../features/districts/MasterPage'
-import { master } from '../features/districts/masterContracts'
+import {
+  MasterPage,
+  type MasterConfig,
+} from '../features/master_data/MasterPage'
+import { master } from '../features/master_data/masterContracts'
 import * as api from '../lib/api'
 
 const permission = vi.hoisted(() => ({ allow: true }))
@@ -10,18 +13,18 @@ vi.mock('../features/authentication/useAuth', () => ({
 }))
 
 const config: MasterConfig = {
-  path: '/districts',
-  title: 'Danh sách quận',
-  manage: 'district.manage',
+  path: '/agency-types',
+  title: 'Danh sách loại đại lý',
+  manage: 'agency_type.manage',
   decode: master,
   fields: [
-    { key: 'code', label: 'Mã quận' },
-    { key: 'name', label: 'Tên quận' },
+    { key: 'code', label: 'Mã loại' },
+    { key: 'name', label: 'Tên loại' },
     { key: 'status', label: 'Trạng thái', type: 'status' },
   ],
   columns: [
     ['code', 'Mã'],
-    ['name', 'Tên quận'],
+    ['name', 'Tên loại'],
     ['activeAgencyCount', 'Đại lý hoạt động', 'count'],
     ['status', 'Trạng thái', 'status'],
   ],
@@ -38,10 +41,10 @@ function listResponse(items: unknown[]) {
   }
 }
 
-const district = {
+const catalogueRow = {
   id: 1,
-  code: 'Q1',
-  name: 'Quận 1',
+  code: 'L1',
+  name: 'Loại 1',
   activeAgencyCount: 4,
   status: 'ACTIVE',
 }
@@ -55,10 +58,10 @@ describe('MasterPage', () => {
   it('shows read-only attributes once and enables save only after editing', async () => {
     vi.spyOn(api, 'apiFetch').mockImplementation(async (path) => ({
       data:
-        path === '/districts/1'
-          ? district
+        path === '/agency-types/1'
+          ? catalogueRow
           : {
-              items: [district],
+              items: [catalogueRow],
               pagination: { limit: 25, nextCursor: null, hasMore: false },
             },
       etag: '"v1"',
@@ -72,11 +75,11 @@ describe('MasterPage', () => {
     expect(
       screen.getAllByRole('option', { name: 'Đang hoạt động' }).length,
     ).toBeGreaterThan(0)
-    expect(screen.getAllByText('Quận 1')).toHaveLength(1)
+    expect(screen.getAllByText('Loại 1')).toHaveLength(1)
     const save = screen.getByRole('button', { name: 'Lưu thay đổi' })
     expect((save as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText(/^Tên quận/), {
-      target: { value: 'Quận mới' },
+    fireEvent.change(screen.getByLabelText(/^Tên loại/), {
+      target: { value: 'Loại mới' },
     })
     expect((save as HTMLButtonElement).disabled).toBe(false)
   })
@@ -84,14 +87,14 @@ describe('MasterPage', () => {
   it('offers a retry instead of an endless spinner when detail fails', async () => {
     let detailReads = 0
     vi.spyOn(api, 'apiFetch').mockImplementation(async (path) => {
-      if (path === '/districts/1') {
+      if (path === '/agency-types/1') {
         detailReads++
         if (detailReads === 1) throw new Error('Không tải được chi tiết')
-        return { data: district, etag: '"v1"', status: 200 }
+        return { data: catalogueRow, etag: '"v1"', status: 200 }
       }
       return {
         data: {
-          items: [district],
+          items: [catalogueRow],
           pagination: { limit: 25, nextCursor: null, hasMore: false },
         },
         etag: null,
@@ -113,10 +116,10 @@ describe('MasterPage', () => {
     permission.allow = false
     vi.spyOn(api, 'apiFetch').mockImplementation(async (path) => ({
       data:
-        path === '/districts/1'
-          ? district
+        path === '/agency-types/1'
+          ? catalogueRow
           : {
-              items: [district],
+              items: [catalogueRow],
               pagination: { limit: 25, nextCursor: null, hasMore: false },
             },
       etag: '"v1"',
@@ -126,14 +129,14 @@ describe('MasterPage', () => {
     render(<MasterPage config={config} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Chi tiết' }))
     expect(await screen.findByRole('dialog')).toBeDefined()
-    expect(screen.getByRole('dialog').textContent).toContain('Quận 1')
+    expect(screen.getByRole('dialog').textContent).toContain('Loại 1')
     expect(screen.queryByRole('button', { name: 'Lưu thay đổi' })).toBeNull()
   })
 
   it('skips blank search requests and trims a real search query', async () => {
     const fetch = vi.spyOn(api, 'apiFetch').mockResolvedValue({
       data: {
-        items: [district],
+        items: [catalogueRow],
         pagination: { limit: 25, nextCursor: null, hasMore: false },
       },
       etag: null,
@@ -146,10 +149,10 @@ describe('MasterPage', () => {
     fireEvent.change(search, { target: { value: '   ' } })
     await new Promise((resolve) => setTimeout(resolve, 350))
     expect(fetch).toHaveBeenCalledTimes(1)
-    fireEvent.change(search, { target: { value: '  Q1  ' } })
+    fireEvent.change(search, { target: { value: '  L1  ' } })
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('q=Q1'),
+        expect.stringContaining('q=L1'),
         expect.any(Object),
       )
     })

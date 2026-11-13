@@ -46,10 +46,12 @@ import { Table } from '../../components/ui/Table'
 import { apiFetch } from '../../lib/api'
 import { cachedApiFetch, invalidateCache } from '../../lib/cache'
 import { formatDate, formatVND } from '../../lib/formatters'
-import type { Agency, AgencyType, District } from '../../lib/types'
+import type { Agency, AgencyType, Ward } from '../../lib/types'
 import { formatCompactVND, formatPercent, formatPlain } from '../../lib/chart'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../authentication/useAuth'
+import { WardPicker } from '../wards/WardPicker'
+import { listAllWards } from '../wards/wardsApi'
 import {
   DetailGrid,
   FilterReset,
@@ -60,15 +62,15 @@ import {
   TableSkeleton,
   ToggleFilter,
   type DetailEntry,
-} from '../districts/listParts'
-import { num, partsBy, ratioOf, sumBy } from '../districts/summaryData'
+} from '../master_data/listParts'
+import { num, partsBy, ratioOf, sumBy } from '../master_data/summaryData'
 import {
   ChartTile,
   DonutTile,
   MeterTile,
   MiniTable,
   SummaryGrid,
-} from '../districts/summaryParts'
+} from '../master_data/summaryParts'
 
 /** Contract sort fields of GET /agencies (prefix "-" = descending). */
 const AGENCY_SORTS = [
@@ -82,8 +84,8 @@ export function AgenciesPage() {
   const { hasPermission } = useAuth()
   const canManage = hasPermission('agency.manage')
 
-  const [districts, setDistricts] = useState<District[]>([])
   const [agencyTypes, setAgencyTypes] = useState<AgencyType[]>([])
+  const [wards, setWards] = useState<Ward[]>([])
   const [agencies, setAgencies] = useState<Agency[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -91,7 +93,7 @@ export function AgenciesPage() {
 
   // Filters
   const [search, setSearch] = useState('')
-  const [filterDistrict, setFilterDistrict] = useState('')
+  const [filterWard, setFilterWard] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState<
     'ACTIVE' | 'TERMINATED' | ''
@@ -110,7 +112,7 @@ export function AgenciesPage() {
   }
   const activeFilters = [
     search.trim(),
-    filterDistrict,
+    filterWard,
     filterType,
     filterStatus,
   ].filter(Boolean).length
@@ -132,7 +134,7 @@ export function AgenciesPage() {
   const [formPhone, setFormPhone] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formAddress, setFormAddress] = useState('')
-  const [formDistrictId, setFormDistrictId] = useState('')
+  const [formWardId, setFormWardId] = useState('')
   const [formTypeId, setFormTypeId] = useState('')
   const [formAcceptedDate, setFormAcceptedDate] = useState('')
   const [terminateReason, setTerminateReason] = useState('')
@@ -155,7 +157,7 @@ export function AgenciesPage() {
     if (currentCursor) params.append('cursor', currentCursor)
     params.append('limit', String(pageSize))
     if (search.trim()) params.append('q', search.trim())
-    if (filterDistrict) params.append('districtId', filterDistrict)
+    if (filterWard) params.append('wardId', filterWard)
     if (filterType) params.append('typeId', filterType)
     if (filterStatus) params.append('status', filterStatus)
     if (sort.sort) params.append('sort', sort.sort)
@@ -193,7 +195,7 @@ export function AgenciesPage() {
     currentCursor,
     pageSize,
     search,
-    filterDistrict,
+    filterWard,
     filterType,
     filterStatus,
     sort.sort,
@@ -201,19 +203,12 @@ export function AgenciesPage() {
 
   useEffect(() => {
     let active = true
-    Promise.all([
-      cachedApiFetch<District[] | { items: District[] }>('/districts'),
-      cachedApiFetch<AgencyType[] | { items: AgencyType[] }>('/agency-types'),
-    ])
-      .then(([dRes, tRes]) => {
+    cachedApiFetch<AgencyType[] | { items: AgencyType[] }>('/agency-types')
+      .then((tRes) => {
         if (!active) return
-        const dItems = Array.isArray(dRes.data)
-          ? dRes.data
-          : (dRes.data as { items?: District[] }).items || []
         const tItems = Array.isArray(tRes.data)
           ? tRes.data
           : (tRes.data as { items?: AgencyType[] }).items || []
-        setDistricts(dItems)
         setAgencyTypes(tItems)
       })
       .catch(() => {})
@@ -221,6 +216,15 @@ export function AgenciesPage() {
       active = false
     }
   }, [])
+
+  // Ward capacity feeds the overview tiles; refreshed after each mutation notice.
+  useEffect(() => {
+    const controller = new AbortController()
+    listAllWards(controller.signal)
+      .then(setWards)
+      .catch(() => {})
+    return () => controller.abort()
+  }, [successNotice])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -239,7 +243,7 @@ export function AgenciesPage() {
           (agency.phone && agency.phone.includes(q))
         if (!match) return false
       }
-      if (filterDistrict && String(agency.districtId) !== filterDistrict) {
+      if (filterWard && String(agency.wardId) !== filterWard) {
         return false
       }
       if (
@@ -253,7 +257,7 @@ export function AgenciesPage() {
       }
       return true
     })
-  }, [agencies, search, filterDistrict, filterType, filterStatus])
+  }, [agencies, search, filterWard, filterType, filterStatus])
 
   const handleNextPage = () => {
     if (!nextCursor) return
@@ -274,7 +278,7 @@ export function AgenciesPage() {
     setFormPhone('')
     setFormEmail('')
     setFormAddress('')
-    setFormDistrictId(districts[0] ? String(districts[0].id) : '')
+    setFormWardId('')
     setFormTypeId(agencyTypes[0] ? String(agencyTypes[0].id) : '')
     setFormAcceptedDate(new Date().toISOString().slice(0, 10))
     setFormError(null)
@@ -293,8 +297,8 @@ export function AgenciesPage() {
       setFormError('Vui lòng nhập số điện thoại.')
       return
     }
-    if (!formDistrictId) {
-      setFormError('Vui lòng chọn quận.')
+    if (!formWardId) {
+      setFormError('Vui lòng chọn phường/xã.')
       return
     }
     if (!formTypeId) {
@@ -309,7 +313,7 @@ export function AgenciesPage() {
         body: {
           name: formName.trim(),
           typeId: Number(formTypeId),
-          districtId: Number(formDistrictId),
+          wardId: Number(formWardId),
           phone: formPhone.trim() || null,
           address: formAddress.trim() || null,
           email: formEmail.trim() || null,
@@ -335,7 +339,7 @@ export function AgenciesPage() {
     setFormPhone(agencyItem.phone || '')
     setFormEmail(agencyItem.email || '')
     setFormAddress(agencyItem.address || '')
-    setFormDistrictId(String(agencyItem.districtId))
+    setFormWardId(String(agencyItem.wardId))
     setFormTypeId(String(agencyItem.typeId ?? agencyItem.agencyTypeId ?? ''))
     setEditAgency({ agency: agencyItem, etag: null })
 
@@ -348,7 +352,7 @@ export function AgenciesPage() {
       setFormPhone(res.data.phone || '')
       setFormEmail(res.data.email || '')
       setFormAddress(res.data.address || '')
-      setFormDistrictId(String(res.data.districtId))
+      setFormWardId(String(res.data.wardId))
       setFormTypeId(String(res.data.typeId ?? res.data.agencyTypeId ?? ''))
     } catch {
       // If fetching fails, keep the in-memory values and wait for submission
@@ -368,8 +372,8 @@ export function AgenciesPage() {
       setFormError('Vui lòng nhập số điện thoại.')
       return
     }
-    if (!formDistrictId) {
-      setFormError('Vui lòng chọn quận.')
+    if (!formWardId) {
+      setFormError('Vui lòng chọn phường/xã.')
       return
     }
     if (!formTypeId) {
@@ -398,7 +402,7 @@ export function AgenciesPage() {
         body: {
           name: formName.trim(),
           typeId: Number(formTypeId),
-          districtId: Number(formDistrictId),
+          wardId: Number(formWardId),
           phone: formPhone.trim() || null,
           address: formAddress.trim() || null,
           email: formEmail.trim() || null,
@@ -417,7 +421,7 @@ export function AgenciesPage() {
       } else if (e.status === 409) {
         setFormError(
           e.message ||
-            'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc quận đã hết chỗ.',
+            'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc phường/xã đã hết chỗ.',
         )
       } else {
         setFormError(e.message || 'Không thể cập nhật thông tin đại lý.')
@@ -502,15 +506,11 @@ export function AgenciesPage() {
         Ngừng hợp tác
       </Badge>
     )
-  const districtOptions = districts.map((d) => ({
-    value: String(d.id),
-    label: d.name,
-  }))
   const typeOptions = agencyTypes.map((t) => ({
     value: String(t.id),
     label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
   }))
-  const kpis = agencyKpis(districts, agencyTypes)
+  const kpis = agencyKpis(wards, agencyTypes)
   const limitOf = (agency: Agency) => debtLimit(agency, agencyTypes)
   // Memoised so menus/dialogs opening on this page do not redraw the charts.
   const pageSummary = useMemo(
@@ -546,12 +546,10 @@ export function AgenciesPage() {
           placeholder="Số nhà, tên đường..."
         />
       </div>
-      <Select
-        id="agency-form-district"
-        label="Quận"
-        value={formDistrictId}
-        onChange={(e) => setFormDistrictId(e.target.value)}
-        options={districtOptions}
+      <WardPicker
+        id="agency-form-ward"
+        value={formWardId}
+        onChange={(next) => setFormWardId(next)}
         required
       />
       <Select
@@ -573,8 +571,8 @@ export function AgenciesPage() {
         actions={
           <>
             <InfoHint label="Giới thiệu hồ sơ đại lý">
-              Tiếp nhận đại lý, phân loại, quận và theo dõi dư nợ so với hạn mức
-              của loại đại lý.
+              Tiếp nhận đại lý, phân loại, phường/xã và theo dõi dư nợ so với
+              hạn mức của loại đại lý.
             </InfoHint>
             {canManage && (
               <Button
@@ -637,19 +635,15 @@ export function AgenciesPage() {
               }}
               placeholder="Tìm theo tên hoặc số điện thoại..."
             />
-            <div className="lg:w-44">
-              <Select
-                id="agency-filter-district"
-                label="Quận"
-                value={filterDistrict}
-                onChange={(e) => {
-                  setFilterDistrict(e.target.value)
+            <div className="lg:w-56">
+              <WardPicker
+                id="agency-filter-ward"
+                placeholder="Tất cả phường/xã"
+                value={filterWard}
+                onChange={(next) => {
+                  setFilterWard(next)
                   restart()
                 }}
-                options={[
-                  { value: '', label: 'Tất cả quận' },
-                  ...districtOptions,
-                ]}
               />
             </div>
             <div className="lg:w-48">
@@ -695,7 +689,7 @@ export function AgenciesPage() {
               count={activeFilters}
               onReset={() => {
                 setSearch('')
-                setFilterDistrict('')
+                setFilterWard('')
                 setFilterType('')
                 setFilterStatus('')
                 restart()
@@ -759,7 +753,7 @@ export function AgenciesPage() {
                   Tên đại lý
                 </SortableHeader>
                 <th scope="col">Điện thoại</th>
-                <th scope="col">Quận</th>
+                <th scope="col">Phường/xã</th>
                 <th scope="col">Loại</th>
                 <SortableHeader
                   field="currentDebt"
@@ -816,9 +810,7 @@ export function AgenciesPage() {
                   <td className="whitespace-nowrap tabular-nums">
                     {agency.phone || '—'}
                   </td>
-                  <td className="whitespace-nowrap">
-                    {agency.districtName || `Quận ${agency.districtId}`}
-                  </td>
+                  <td className="whitespace-nowrap">{wardLabel(agency)}</td>
                   <td className="whitespace-nowrap">{typeLabel(agency)}</td>
                   <td className="cell-number text-right font-semibold whitespace-nowrap tabular-nums">
                     {formatVND(agency.currentDebt)}
@@ -1027,10 +1019,7 @@ export function AgenciesPage() {
               ['Điện thoại', detailAgency.phone || '—'],
               ['Email', detailAgency.email || '—'],
               ['Địa chỉ', detailAgency.address || '—', true],
-              [
-                'Quận',
-                detailAgency.districtName || `Quận ${detailAgency.districtId}`,
-              ],
+              ['Phường/xã', wardLabel(detailAgency)],
               ['Loại đại lý', typeLabel(detailAgency)],
               [
                 'Ngày tiếp nhận',
@@ -1074,36 +1063,36 @@ export function AgenciesPage() {
   )
 }
 
-/** Count of a numeric field summed over rows; null when any row lacks it. */
-function sumField(rows: object[], keys: string[]): number | null {
-  if (!rows.length) return null
-  let total = 0
-  for (const row of rows) {
-    const record = row as Record<string, unknown>
-    const raw = keys.map((key) => record[key]).find((v) => v !== undefined)
-    const value = typeof raw === 'string' ? Number(raw) : raw
-    if (typeof value !== 'number' || !Number.isFinite(value)) return null
-    total += value
-  }
-  return total
+/** Ward/commune name of an agency, falling back to its exact id. */
+function wardLabel(agency: Agency): string {
+  return agency.wardName || `Phường/xã #${agency.wardId}`
 }
 
-/** Overview tiles derived from the already-loaded district/type catalogues. */
-function agencyKpis(districts: District[], agencyTypes: AgencyType[]) {
-  const active = sumField(districts, [
-    'activeAgencyCount',
-    'activeAgenciesCount',
-  ])
-  const remaining = sumField(districts, ['remainingSlots'])
+/** Overview tiles derived from the already-loaded agency type catalogue. */
+function agencyKpis(wards: Ward[], agencyTypes: AgencyType[]) {
+  const counted = wards.filter((w) => w.activeAgencyCount !== undefined)
   const items: { label: string; value: number; icon: typeof Store }[] = []
-  if (active !== null)
-    items.push({ label: 'Đại lý đang hoạt động', value: active, icon: Store })
-  if (districts.length)
-    items.push({ label: 'Quận', value: districts.length, icon: MapPin })
+  if (counted.length) {
+    items.push({
+      label: 'Đại lý đang hoạt động',
+      value: sumBy(counted, (w) => w.activeAgencyCount ?? 0),
+      icon: Store,
+    })
+    items.push({
+      label: 'Phường/xã có đại lý',
+      value: counted.filter((w) => (w.activeAgencyCount ?? 0) > 0).length,
+      icon: MapPin,
+    })
+  }
   if (agencyTypes.length)
     items.push({ label: 'Loại đại lý', value: agencyTypes.length, icon: Tags })
-  if (remaining !== null)
-    items.push({ label: 'Chỗ còn nhận', value: remaining, icon: CircleDashed })
+  const full = wards.filter((w) => w.remainingSlots !== undefined)
+  if (full.length)
+    items.push({
+      label: 'Phường/xã đã đủ đại lý',
+      value: full.filter((w) => w.remainingSlots === 0).length,
+      icon: CircleDashed,
+    })
   return items
 }
 
@@ -1130,7 +1119,7 @@ function DebtUsage({ debt, limit }: { debt: number; limit: number | null }) {
 
 /**
  * Charts for the agencies already loaded on this page: type mix, debt by
- * district and overall debt-limit usage of active agencies.
+ * ward/commune and overall debt-limit usage of active agencies.
  */
 function agencyTypeLabel(agency: Agency): string {
   return (
@@ -1157,10 +1146,10 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
   const limited = active.filter((agency) => limitOf(agency) !== null)
   const debt = sumBy(limited, (agency) => num(agency.currentDebt))
   const limit = sumBy(limited, (agency) => limitOf(agency) ?? 0)
-  const byDistrict = partsBy(
+  const byWard = partsBy(
     agencies,
-    (agency) => agency.districtId,
-    (agency) => agency.districtName || `Quận ${agency.districtId}`,
+    (agency) => agency.wardId,
+    wardLabel,
     (agency) => num(agency.currentDebt),
   ).map((part) => ({ name: part.label, debt: part.value }))
   return (
@@ -1176,20 +1165,17 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
         )}
       />
       <ChartTile
-        title="Dư nợ theo quận"
+        title="Dư nợ theo phường/xã"
         table={
           <MiniTable
-            caption="Dư nợ theo quận"
-            head={['Quận', 'Dư nợ']}
-            rows={byDistrict.map((row) => [
-              row.name,
-              formatVND(String(row.debt)),
-            ])}
+            caption="Dư nợ theo phường/xã"
+            head={['Phường/xã', 'Dư nợ']}
+            rows={byWard.map((row) => [row.name, formatVND(String(row.debt))])}
           />
         }
       >
         <RoundedBarChart
-          data={byDistrict}
+          data={byWard}
           xKey="name"
           height={150}
           valueFormatter={formatCompactVND}

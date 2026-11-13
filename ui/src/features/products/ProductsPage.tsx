@@ -1,15 +1,15 @@
 import { Package, PackageX } from 'lucide-react'
 import { RoundedBarChart } from '@/components/charts/MebiusCharts'
 import { formatQuantity } from '@/lib/formatters'
-import { MasterPage, type MasterConfig } from '../districts/MasterPage'
-import { product } from '../districts/masterContracts'
-import { countWhere, num, ratioOf } from '../districts/summaryData'
+import { MasterPage, type MasterConfig } from '../master_data/MasterPage'
+import { product } from '../master_data/masterContracts'
+import { countWhere, num, ratioOf } from '../master_data/summaryData'
 import {
   ChartTile,
   MeterTile,
   MiniTable,
   StatTile,
-} from '../districts/summaryParts'
+} from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
 
 /** Low stock as the server defines it: current stock below the threshold. */

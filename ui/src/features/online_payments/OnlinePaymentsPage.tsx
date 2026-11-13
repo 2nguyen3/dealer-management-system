@@ -8,6 +8,7 @@ import {
   Copy,
   CreditCard,
   ExternalLink,
+  Globe,
   Hourglass,
   QrCode,
   RefreshCw,
@@ -483,7 +484,8 @@ export function OnlinePaymentsPage() {
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
         title="Giao dịch trực tuyến"
-        description="Trạng thái do hệ thống xác nhận qua IPN, không lấy từ trang quay lại."
+        description="Trạng thái theo xác nhận IPN của cổng."
+        icon={<Globe />}
       >
         {list.loading ? (
           <TableSkeleton label="Đang tải giao dịch..." />
@@ -834,6 +836,7 @@ export function OnlinePaymentsPage() {
               <SectionCard
                 title="Phản hồi từ cổng thanh toán"
                 description="Đã kiểm tra chữ ký."
+                icon={<ShieldCheck />}
               >
                 {events.length ? (
                   <div className="overflow-x-auto rounded-lg border">

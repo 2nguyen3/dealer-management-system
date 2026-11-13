@@ -1,4 +1,4 @@
-import { ChevronDown, Undo2, XCircle } from 'lucide-react'
+import { Ban, ChevronDown, FilePen, Undo2, XCircle } from 'lucide-react'
 import { useId, useState } from 'react'
 import { DateField } from '../../components/blocks/DateField'
 import {
@@ -195,6 +195,7 @@ export function CorrectionDialog({
           )}
           <SectionCard
             title={cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
+            icon={cancel ? <Ban /> : <FilePen />}
             description={
               cancel ? 'Lưu cùng lịch sử.' : 'Thay toàn bộ phiên bản hiện hành.'
             }

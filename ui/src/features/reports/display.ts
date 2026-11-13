@@ -55,7 +55,7 @@ export const columnLabels: Record<string, string> = {
 export const filterLabels: Record<string, string> = {
   agencyId: 'Đại lý',
   typeId: 'Loại đại lý',
-  districtId: 'Quận',
+  wardId: 'Phường/xã',
   productId: 'Mặt hàng',
 }
 

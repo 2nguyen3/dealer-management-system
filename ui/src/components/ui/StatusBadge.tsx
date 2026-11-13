@@ -1,5 +1,7 @@
+import { createElement } from 'react'
 import { statusLabel, statusTone } from '../../lib/labels'
 import { Badge } from './Badge'
+import { statusIcon } from './statusIcons'
 
 export interface StatusBadgeProps {
   status: string | null | undefined
@@ -7,10 +9,14 @@ export interface StatusBadgeProps {
   suffix?: string
 }
 
-/** Vietnamese status badge; the raw server value stays available as a data attribute. */
+/** Vietnamese status badge with a status pictogram; the raw server value stays available as a data attribute. */
 export function StatusBadge({ status, suffix }: StatusBadgeProps) {
   return (
-    <Badge variant={statusTone(status)} data-status={status ?? ''}>
+    <Badge
+      variant={statusTone(status)}
+      data-status={status ?? ''}
+      icon={createElement(statusIcon(status))}
+    >
       {statusLabel(status)}
       {suffix ? ` · ${suffix}` : ''}
     </Badge>

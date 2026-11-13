@@ -1,4 +1,5 @@
 import {
+  LayoutGrid,
   ListChecks,
   ShieldCheck,
   ShieldOff,
@@ -42,9 +43,9 @@ import {
   SearchField,
   TableSkeleton,
   ToggleFilter,
-} from '../districts/listParts'
-import { countWhere, partsBy } from '../districts/summaryData'
-import { DonutTile, StatTile, SummaryGrid } from '../districts/summaryParts'
+} from '../master_data/listParts'
+import { countWhere, partsBy } from '../master_data/summaryData'
+import { DonutTile, StatTile, SummaryGrid } from '../master_data/summaryParts'
 
 function registry(value: unknown): Row {
   const data = record(value)
@@ -294,7 +295,10 @@ export function PermissionsPage() {
             />
           </div>
           <TabsList>
-            <TabsTrigger value="functions">Chức năng</TabsTrigger>
+            <TabsTrigger value="functions">
+              <LayoutGrid aria-hidden="true" />
+              Chức năng
+            </TabsTrigger>
             <TabsTrigger value="grants" disabled={!group}>
               <ListChecks aria-hidden="true" />
               Quyền của nhóm

@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleCheck, Lock } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Lock, LockKeyhole, LogIn } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Button as ShadcnButton } from '../../components/shadcn/button'
@@ -116,6 +116,7 @@ export function ResetPasswordPage() {
     <AuthLayout
       title="Đặt lại mật khẩu"
       description="Tạo mật khẩu mới cho tài khoản của bạn"
+      icon={<LockKeyhole />}
     >
       {isSuccess ? (
         <div className="space-y-5">
@@ -129,7 +130,10 @@ export function ResetPasswordPage() {
             bằng mật khẩu mới.
           </Alert>
           <ShadcnButton asChild size="lg" className="w-full">
-            <Link to="/login">Đăng nhập ngay</Link>
+            <Link to="/login">
+              <LogIn aria-hidden="true" />
+              Đăng nhập ngay
+            </Link>
           </ShadcnButton>
         </div>
       ) : (

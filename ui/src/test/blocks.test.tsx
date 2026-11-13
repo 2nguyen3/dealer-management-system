@@ -155,7 +155,9 @@ describe('IllustratedFigure', () => {
       <IllustratedFigure name="forklift.html" title="Xe nâng" />,
     )
     const frame = screen.getByTitle('Xe nâng')
-    expect(frame.getAttribute('src')).toBe('/figures/forklift.html')
+    expect(frame.getAttribute('src')).toMatch(
+      /^\/figures\/forklift\.html\?theme=light&shadow=%23[0-9a-f]{6}$/,
+    )
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts')
     expect(frame.getAttribute('loading')).toBe('lazy')
     expect(frame.className).toContain('opacity-0')

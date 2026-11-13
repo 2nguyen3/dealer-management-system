@@ -205,11 +205,9 @@ export function DashboardPage() {
       ['agency_type.manage', 'agency.read', 'agency.manage'].some((g) =>
         grants.has(g),
       ),
-    districtId:
+    wardId:
       reportAllowed('debt') &&
-      ['district.manage', 'agency.read', 'agency.manage'].some((g) =>
-        grants.has(g),
-      ),
+      (grants.has('agency.read') || grants.has('agency.manage')),
     productId:
       (reportAllowed('product-sales') || reportAllowed('inventory')) &&
       (grants.has('product.manage') || grants.has('inventory.read')),

@@ -1,4 +1,10 @@
-import { BookOpenText, Landmark, PiggyBank, Wallet } from 'lucide-react'
+import {
+  BookOpenText,
+  FileText,
+  Landmark,
+  PiggyBank,
+  Wallet,
+} from 'lucide-react'
 import { useState } from 'react'
 import { ChartCard } from '@/components/blocks/ChartCard'
 import { KpiCard } from '@/components/blocks/KpiCard'
@@ -156,7 +162,8 @@ function Invoices({ agencyId }: { agencyId: string }) {
   return (
     <SectionCard
       title="Số dư hóa đơn"
-      description="Phiếu xuất còn nợ. Bấm tiêu đề cột để sắp xếp."
+      description="Phiếu xuất còn nợ."
+      icon={<FileText />}
     >
       {list.error && <Alert type="error">{list.error}</Alert>}
       {!list.loading && !list.error && <Aging items={list.items} />}
@@ -376,10 +383,7 @@ export function ReceivablesPage() {
           </ChartCard>
         </div>
       )}
-      <TableCard
-        title="Công nợ theo đại lý"
-        description="Bấm tiêu đề cột để sắp xếp; “Chi tiết” để xem số dư và sổ."
-      >
+      <TableCard title="Công nợ theo đại lý" icon={<Wallet />}>
         {list.loading ? (
           <TableSkeleton label="Đang tải công nợ..." />
         ) : !list.error && list.items.length === 0 ? (

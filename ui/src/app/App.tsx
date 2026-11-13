@@ -57,11 +57,6 @@ const CreditApplicationsPage = lazy(() =>
     (m) => ({ default: m.CreditApplicationsPage }),
   ),
 )
-const DistrictsPage = lazy(() =>
-  import('../features/districts/DistrictsPage').then((m) => ({
-    default: m.DistrictsPage,
-  })),
-)
 const DocumentHistoryPage = lazy(() =>
   import('../features/document_history/DocumentHistoryPage').then((m) => ({
     default: m.DocumentHistoryPage,
@@ -254,7 +249,6 @@ export function App() {
                   <Route path="/chatbot" element={<ChatbotPage />} />
                   <Route path="/agencies" element={<AgenciesPage />} />
                   <Route path="/products" element={<ProductsPage />} />
-                  <Route path="/districts" element={<DistrictsPage />} />
                   <Route path="/agency-types" element={<AgencyTypesPage />} />
                   <Route path="/units" element={<UnitsPage />} />
                   <Route

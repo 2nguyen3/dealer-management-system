@@ -34,6 +34,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Vietnamese messages for business error codes whose server text is not
+ * meant for end users. Other codes keep the server's own message.
+ */
+export const ERROR_CODE_MESSAGES: Readonly<Record<string, string>> = {
+  WARD_CAPACITY_EXCEEDED:
+    'Phường/xã đã đủ số đại lý tối đa theo quy định. Hãy chọn phường/xã khác hoặc điều chỉnh quy định.',
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   headers?: Record<string, string>
@@ -206,6 +215,7 @@ export async function apiFetch<T = unknown>(
           ? errorPayload.code
           : `HTTP_${response.status}`
       const message =
+        ERROR_CODE_MESSAGES[code] ||
         (response.status < 500 &&
         typeof errorPayload.message === 'string' &&
         errorPayload.message.length <= 1000 &&

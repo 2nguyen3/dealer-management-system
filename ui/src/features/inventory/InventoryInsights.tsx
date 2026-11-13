@@ -1,4 +1,4 @@
-import { PackageCheck } from 'lucide-react'
+import { HeartPulse, PackageCheck, PackagePlus } from 'lucide-react'
 import {
   LegendList,
   SegmentedMeter,
@@ -177,6 +177,7 @@ export function LowStockCard({
     <SectionCard
       title="Cần nhập thêm"
       description="Dưới ngưỡng cảnh báo"
+      icon={<PackagePlus />}
       contentClassName="px-2"
     >
       {low.length ? (
@@ -237,6 +238,7 @@ export function StockHealthCard({
   return (
     <SectionCard
       title="Sức khỏe tồn kho"
+      icon={<HeartPulse />}
       actions={
         <ShadcnBadge variant="secondary" className="font-normal">
           {partial ? 'Trang hiện tại' : 'Toàn bộ danh mục'}

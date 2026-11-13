@@ -244,8 +244,11 @@ export function mockDashboardApi(overrides: Record<string, Responder> = {}) {
     else if (path.startsWith('/reports/')) data = reportResponse(path)
     else if (path.startsWith('/agency-types'))
       data = { items: [{ id: 3, code: 'LDL-1', name: 'Loại 1' }] }
-    else if (path.startsWith('/districts'))
-      data = { items: [{ id: 5, code: 'Q1', name: 'Quận 1' }] }
+    else if (path.startsWith('/wards'))
+      data = {
+        items: [{ id: 5, code: '26740', name: 'Phường Sài Gòn', kind: 'WARD' }],
+        pagination: { limit: 20, nextCursor: null, hasMore: false },
+      }
     else if (path.startsWith('/agencies/'))
       data = { id: '2', code: 'DL-02', name: 'Đại lý Bình Minh' }
     else data = { items: [] }

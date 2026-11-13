@@ -35,12 +35,7 @@ const auth = vi.hoisted(() => ({
 }))
 vi.mock('../features/authentication/useAuth', () => ({ useAuth: () => auth }))
 
-const FULL = [
-  ...dashboardAdmission,
-  'reports.read',
-  'agency.read',
-  'district.manage',
-]
+const FULL = [...dashboardAdmission, 'reports.read', 'agency.read']
 const monthText = (value: string) => `${value.slice(5)}/${value.slice(0, 4)}`
 
 function statusLine() {
@@ -99,7 +94,7 @@ describe('dashboard model', () => {
       ...emptyFilters,
       agencyId: { id: '2', label: 'B' },
       typeId: { id: '3', label: 'T' },
-      districtId: { id: '5', label: 'Q' },
+      wardId: { id: '5', label: 'P' },
       productId: { id: '11', label: 'P' },
     }
     const params = (kind: Parameters<typeof buildReportQuery>[0]) =>
@@ -109,7 +104,7 @@ describe('dashboard model', () => {
       ).searchParams
     expect(params('sales').get('typeId')).toBe('3')
     expect(params('sales').get('agencyId')).toBeNull()
-    expect(params('debt').get('districtId')).toBe('5')
+    expect(params('debt').get('wardId')).toBe('5')
     expect(params('product-sales').get('agencyId')).toBe('2')
     expect(params('product-sales').get('productId')).toBeNull()
     expect(params('product-sales').get('limit')).toBe('10')
@@ -449,19 +444,33 @@ describe(
         'Không áp dụng: Loại đại lý',
       )
 
-      const district = screen.getByLabelText('Quận') as HTMLSelectElement
-      await waitFor(() => expect(district.options.length).toBe(2))
-      fireEvent.change(district, { target: { value: '5' } })
+      const ward = screen.getByRole('combobox', { name: 'Phường/xã' })
+      expect(ward.getAttribute('placeholder')).toBe('Tất cả phường/xã')
+      fireEvent.focus(ward)
+      fireEvent.click(
+        await screen.findByRole('option', { name: /Phường Sài Gòn/ }),
+      )
       await waitFor(() => expect(callsTo('/reports/debt?').length).toBe(3))
-      expect(callsTo('/reports/debt?')[2]!.get('districtId')).toBe('5')
+      expect(callsTo('/reports/debt?')[2]!.get('wardId')).toBe('5')
       expect(callsTo('/reports/sales?').length).toBe(2)
+      expect(
+        screen.getByRole('list', { name: 'Bộ lọc đang áp dụng' }).textContent,
+      ).toContain('Phường/xã: Phường Sài Gòn')
 
       fireEvent.click(screen.getByText('Xóa bộ lọc'))
       expect(
         screen.queryByRole('list', { name: 'Bộ lọc đang áp dụng' }),
       ).toBeNull()
       await waitFor(() => expect(callsTo('/reports/debt?').length).toBe(4))
-      expect(callsTo('/reports/debt?')[3]!.get('districtId')).toBeNull()
+      expect(callsTo('/reports/debt?')[3]!.get('wardId')).toBeNull()
+    })
+
+    it('hides the ward slicer without an agency read/manage grant', async () => {
+      auth.allowedFunctions = FULL.filter((code) => code !== 'agency.read')
+      render(<DashboardPage />)
+      await screen.findByText(/Cập nhật lúc/)
+      expect(screen.queryByRole('combobox', { name: 'Phường/xã' })).toBeNull()
+      expect(callsTo('/wards').length).toBe(0)
     })
 
     it('cross-filters by agency from the matrix and clears it from the chip', async () => {

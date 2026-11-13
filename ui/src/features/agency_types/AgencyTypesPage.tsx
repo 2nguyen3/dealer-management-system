@@ -2,15 +2,15 @@ import { Store, Tags } from 'lucide-react'
 import { RoundedBarChart } from '@/components/charts/MebiusCharts'
 import { formatCompactVND } from '@/lib/chart'
 import { formatVND } from '@/lib/formatters'
-import { MasterPage, type MasterConfig } from '../districts/MasterPage'
-import { master } from '../districts/masterContracts'
-import { num, partsBy, sumBy } from '../districts/summaryData'
+import { MasterPage, type MasterConfig } from '../master_data/MasterPage'
+import { master } from '../master_data/masterContracts'
+import { num, partsBy, sumBy } from '../master_data/summaryData'
 import {
   ChartTile,
   DonutTile,
   MiniTable,
   StatTile,
-} from '../districts/summaryParts'
+} from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
 
 function agencyTypeSummary(items: Row[]) {

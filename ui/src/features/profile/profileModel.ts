@@ -10,7 +10,6 @@ export const PERMISSION_AREAS: readonly {
     key: 'catalog',
     label: 'Danh mục',
     codes: [
-      { code: 'district.manage', label: 'Quận' },
       { code: 'agency_type.manage', label: 'Loại đại lý' },
       { code: 'unit.manage', label: 'Đơn vị tính' },
       { code: 'product.manage', label: 'Mặt hàng' },

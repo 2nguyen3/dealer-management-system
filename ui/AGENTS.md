@@ -161,7 +161,11 @@ Theme: six colour palettes (Thủy default, Mộc, Kim, Hỏa, Thổ, Tím) sele
 script in `index.html`), each with light and dark tokens; light/dark comes from
 `ThemeProvider` (next-themes, class strategy, key `agentra-theme`). The header
 `ModeToggle` and the `/profile` appearance tab switch both. Type is Be Vietnam Pro;
-the brand stays the original `/assets/brand/agentra-*.png` logo. Motion helpers
+the brand stays the original `/assets/brand/agentra-*.png` logo (`BrandLogo` swaps the
+dark/white wordmark via `.dark`; figures get `?theme=&shadow=` tokens from `figureTheme.ts`).
+Icons are central: `Button`/`Modal` infer a lucide icon from the Vietnamese label/title
+(`components/ui/actionIcons.ts`, `action`/`icon={false}` to override), `PageHeader` shows
+the route's sidebar icon (`PageIconContext`), and status badges/filters use `statusIcons.ts`. Motion helpers
 (`PageTransition`, `Stagger`, `CountUp`) live in `src/components/motion/`; Mebius-style
 chart wrappers (rounded bars, gradient areas, donut, radial rings, segmented meter) in
 `src/components/charts/MebiusCharts.tsx`.

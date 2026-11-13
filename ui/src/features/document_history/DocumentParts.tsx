@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '../../components/shadcn/card'
 import { Skeleton } from '../../components/shadcn/skeleton'
+import { FilterIcon } from '../../components/ui/FilterIcon'
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -74,8 +75,11 @@ export function SectionCard({
   className,
   contentClassName,
   as: Heading = 'h3',
+  icon,
 }: {
   title: ReactNode
+  /** Optional decorative title icon. */
+  icon?: ReactNode
   description?: ReactNode
   actions?: ReactNode
   children: ReactNode
@@ -87,7 +91,17 @@ export function SectionCard({
     <Card className={cn('gap-4 py-4 shadow-xs', className)}>
       <CardHeader className="px-4">
         <CardTitle className="text-sm font-semibold">
-          <Heading className="flex items-center gap-2">{title}</Heading>
+          <Heading className="flex items-center gap-2">
+            {icon && (
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary [&_svg]:size-3.5"
+              >
+                {icon}
+              </span>
+            )}
+            {title}
+          </Heading>
         </CardTitle>
         {description && (
           <CardDescription className="text-xs">{description}</CardDescription>
@@ -194,8 +208,9 @@ export function SegmentedFilter({
           <ToggleGroupItem
             key={option.value || '__all__'}
             value={option.value || '__all__'}
-            className="h-8 cursor-pointer rounded-md! border-0 px-3 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+            className="h-8 cursor-pointer gap-1.5 rounded-md! border-0 px-3 text-[13px] text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm [&_svg]:size-3.5"
           >
+            <FilterIcon value={option.value} />
             {option.label}
           </ToggleGroupItem>
         ))}

@@ -3,7 +3,6 @@ export type FunctionCode =
   | 'groups.manage'
   | 'permissions.manage'
   | 'rules.manage'
-  | 'district.manage'
   | 'agency_type.manage'
   | 'unit.manage'
   | 'product.manage'
@@ -78,11 +77,19 @@ export interface PaginatedResponse<T> {
 }
 
 // Master Data Types
-export interface District {
+/** Administrative kind of a Ho Chi Minh City ward/commune (2025 reform). */
+export type WardKind = 'WARD' | 'COMMUNE' | 'SPECIAL_ZONE'
+
+/** Read-only ward/commune reference row (`GET /wards`). */
+export interface Ward {
   id: number
+  code: string
   name: string
-  activeAgenciesCount?: number
-  status: 'ACTIVE' | 'INACTIVE'
+  kind: WardKind
+  /** Capacity view under the "max agencies per ward" rule (server-computed). */
+  activeAgencyCount?: number
+  maxAgencies?: number
+  remainingSlots?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -107,7 +114,7 @@ export interface Unit {
 }
 
 export interface BusinessRules {
-  maxAgenciesPerDistrict: number
+  maxAgenciesPerWard: number
   maxAgencyTypesCount: number
   maxUnitsCount: number
   priceMultiplier: string
@@ -141,8 +148,8 @@ export interface Agency {
   phone: string
   email?: string
   address: string
-  districtId: number
-  districtName?: string
+  wardId: number
+  wardName?: string
   agencyTypeId?: number
   typeId?: number
   agencyTypeName?: string
