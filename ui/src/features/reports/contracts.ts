@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n/core'
 // Runtime projection of the mounted reports schemas. Numeric strings stay strings.
 export type Rule = (value: unknown) => boolean
 export const text: Rule = (v) => typeof v === 'string'
@@ -32,7 +33,7 @@ export const instant: Rule = (v) =>
 
 export function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('Dữ liệu máy chủ không đúng hợp đồng.')
+    throw new Error(t('Dữ liệu máy chủ không đúng hợp đồng.'))
   return value as Record<string, unknown>
 }
 
@@ -45,7 +46,7 @@ export function fields(
     Object.keys(result).some((key) => !(key in rules)) ||
     Object.entries(rules).some(([key, rule]) => !rule(result[key]))
   )
-    throw new Error('Dữ liệu máy chủ không đúng hợp đồng.')
+    throw new Error(t('Dữ liệu máy chủ không đúng hợp đồng.'))
   return result
 }
 
@@ -161,7 +162,7 @@ export function parseReport(
       : {}),
   })
   if (source.fromDate !== fromDate || source.toDate !== toDate)
-    throw new Error('Kỳ báo cáo máy chủ không khớp yêu cầu.')
+    throw new Error(t('Kỳ báo cáo máy chủ không khớp yêu cầu.'))
   const pagination = fields(source.pagination, {
     limit: (v) => count(v) && (v as number) >= 1 && (v as number) <= 100,
     hasMore: (v) => typeof v === 'boolean',
@@ -171,7 +172,7 @@ export function parseReport(
     pagination.hasMore !== (pagination.nextCursor !== null) ||
     (source.items as unknown[]).length > (pagination.limit as number)
   )
-    throw new Error('Phân trang máy chủ không hợp lệ.')
+    throw new Error(t('Phân trang máy chủ không hợp lệ.'))
   for (const item of source.items as unknown[]) fields(item, rowRules[kind])
   const totals = totalRules[kind]
   if (totals) fields(source.totals, totals)
@@ -183,7 +184,7 @@ export const reports: Record<
   { label: string; permission: string; filters: string[]; sorts: string[] }
 > = {
   sales: {
-    label: 'Doanh số đại lý (BM6.1)',
+    label: t('Doanh số đại lý (BM6.1)'),
     permission: 'sales.read',
     filters: ['agencyId', 'typeId'],
     sorts: [
@@ -196,19 +197,19 @@ export const reports: Record<
     ],
   },
   debt: {
-    label: 'Công nợ (BM6.2)',
+    label: t('Công nợ (BM6.2)'),
     permission: 'debt.read',
     filters: ['agencyId', 'typeId', 'wardId'],
     sorts: ['agencyId', '-agencyId', 'closingDebt', '-closingDebt'],
   },
   inventory: {
-    label: 'Xuất nhập tồn',
+    label: t('Xuất nhập tồn'),
     permission: 'inventory.read',
     filters: ['productId'],
     sorts: ['productId', '-productId', 'closingStock', '-closingStock'],
   },
   'product-sales': {
-    label: 'Doanh số mặt hàng',
+    label: t('Doanh số mặt hàng'),
     permission: 'sales.read',
     filters: ['productId', 'agencyId'],
     sorts: [
@@ -221,7 +222,7 @@ export const reports: Record<
     ],
   },
   'cash-and-credit': {
-    label: 'Thu chi và dư có',
+    label: t('Thu chi và dư có'),
     permission: 'debt.read',
     filters: ['agencyId'],
     sorts: [
@@ -237,45 +238,45 @@ export const reports: Record<
 
 export const labels: Record<string, string> = {
   agencyId: 'ID',
-  agencyCode: 'Mã đại lý',
-  agencyName: 'Tên đại lý',
-  productId: 'ID mặt hàng',
-  productCode: 'Mã hàng',
-  productName: 'Mặt hàng',
-  unitId: 'ID đơn vị',
-  unitName: 'Đơn vị',
-  typeId: 'ID loại đại lý',
-  wardId: 'ID phường/xã',
-  numberOfIssues: 'Số phiếu xuất',
-  salesAmount: 'Doanh số gộp (VND)',
-  returnAmount: 'Trả hàng (VND)',
-  netSalesAmount: 'Doanh số thuần (VND)',
-  salesRate: 'Tỷ lệ (%)',
-  companyGrossSales: 'Doanh số gộp toàn doanh nghiệp (VND)',
-  openingDebt: 'Nợ đầu kỳ (VND)',
-  debtIncrease: 'Tăng nợ (VND)',
-  cashApplied: 'Tiền giảm nợ (VND)',
-  returnsApplied: 'Trả hàng giảm nợ (VND)',
-  creditApplied: 'Dư có đã bù trừ (VND)',
-  debtDecrease: 'Tổng giảm nợ (VND)',
-  closingDebt: 'Nợ cuối kỳ (VND)',
-  openingStock: 'Tồn đầu',
-  receiptQuantity: 'Nhập',
-  issueQuantity: 'Xuất',
-  returnQuantity: 'Trả',
-  adjustmentQuantity: 'Điều chỉnh có dấu',
-  closingStock: 'Tồn cuối',
-  soldQuantity: 'Số lượng bán',
-  returnedQuantity: 'Số lượng trả',
-  cashReceived: 'Tiền thực thu (VND)',
-  cashRefunded: 'Tiền thực hoàn (VND)',
-  verifiedUnreceiptedAmount: 'Đã xác minh chưa ghi phiếu thu (VND)',
-  openingCredit: 'Dư có đầu kỳ (VND)',
-  creditCreated: 'Dư có phát sinh (VND)',
-  creditRefunded: 'Dư có đã hoàn (VND)',
-  closingCredit: 'Dư có cuối kỳ (VND)',
-  currentReservedCredit: 'Dư có đang dành hiện tại (VND)',
-  currentAvailableCredit: 'Dư có khả dụng hiện tại (VND)',
+  agencyCode: t('Mã đại lý'),
+  agencyName: t('Tên đại lý'),
+  productId: t('ID mặt hàng'),
+  productCode: t('Mã hàng'),
+  productName: t('Mặt hàng'),
+  unitId: t('ID đơn vị'),
+  unitName: t('Đơn vị'),
+  typeId: t('ID loại đại lý'),
+  wardId: t('ID phường/xã'),
+  numberOfIssues: t('Số phiếu xuất'),
+  salesAmount: t('Doanh số gộp (VND)'),
+  returnAmount: t('Trả hàng (VND)'),
+  netSalesAmount: t('Doanh số thuần (VND)'),
+  salesRate: t('Tỷ lệ (%)'),
+  companyGrossSales: t('Doanh số gộp toàn doanh nghiệp (VND)'),
+  openingDebt: t('Nợ đầu kỳ (VND)'),
+  debtIncrease: t('Tăng nợ (VND)'),
+  cashApplied: t('Tiền giảm nợ (VND)'),
+  returnsApplied: t('Trả hàng giảm nợ (VND)'),
+  creditApplied: t('Dư có đã bù trừ (VND)'),
+  debtDecrease: t('Tổng giảm nợ (VND)'),
+  closingDebt: t('Nợ cuối kỳ (VND)'),
+  openingStock: t('Tồn đầu'),
+  receiptQuantity: t('Nhập'),
+  issueQuantity: t('Xuất'),
+  returnQuantity: t('Trả'),
+  adjustmentQuantity: t('Điều chỉnh có dấu'),
+  closingStock: t('Tồn cuối'),
+  soldQuantity: t('Số lượng bán'),
+  returnedQuantity: t('Số lượng trả'),
+  cashReceived: t('Tiền thực thu (VND)'),
+  cashRefunded: t('Tiền thực hoàn (VND)'),
+  verifiedUnreceiptedAmount: t('Đã xác minh chưa ghi phiếu thu (VND)'),
+  openingCredit: t('Dư có đầu kỳ (VND)'),
+  creditCreated: t('Dư có phát sinh (VND)'),
+  creditRefunded: t('Dư có đã hoàn (VND)'),
+  closingCredit: t('Dư có cuối kỳ (VND)'),
+  currentReservedCredit: t('Dư có đang dành hiện tại (VND)'),
+  currentAvailableCredit: t('Dư có khả dụng hiện tại (VND)'),
 }
 
 export interface ReportQuery {
@@ -298,7 +299,9 @@ export function reportPath(
     query.fromDate >= query.toDate
   )
     throw new Error(
-      'Chọn khoảng ngày hợp lệ [từ ngày, đến ngày), không bao gồm ngày cuối.',
+      t(
+        'Chọn khoảng ngày hợp lệ [từ ngày, đến ngày), không bao gồm ngày cuối.',
+      ),
     )
   const params = new URLSearchParams({
     fromDate: query.fromDate,
@@ -313,7 +316,9 @@ export function reportPath(
         : id(value)
     if (!valid)
       throw new Error(
-        `${key === 'agencyId' ? 'ID đại lý' : labels[key]} không hợp lệ.`,
+        t('{value} không hợp lệ.', {
+          value: key === 'agencyId' ? t('ID đại lý') : labels[key],
+        }),
       )
     params.set(key, value)
   }
@@ -322,7 +327,7 @@ export function reportPath(
       !reports[query.kind].sorts.includes(query.sort) ||
       !/^[1-9][0-9]?$|^100$/.test(query.limit)
     )
-      throw new Error('Điều khiển phân trang không hợp lệ.')
+      throw new Error(t('Điều khiển phân trang không hợp lệ.'))
     params.set('sort', query.sort)
     params.set('limit', query.limit)
     if (cursor) params.set('cursor', cursor)

@@ -9,59 +9,60 @@ import {
   salesAmounts,
   type ReportKind,
 } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 /** Database identifiers are kept for requests/row keys but not shown. */
 export const hiddenColumns = new Set(['agencyId', 'productId', 'unitId'])
 
 export const columnLabels: Record<string, string> = {
-  agencyCode: 'Mã đại lý',
-  agencyName: 'Tên đại lý',
-  productCode: 'Mã hàng',
-  productName: 'Mặt hàng',
-  unitName: 'Đơn vị',
-  numberOfIssues: 'Số phiếu xuất',
-  salesAmount: 'Doanh số gộp',
-  returnAmount: 'Hàng trả lại',
-  netSalesAmount: 'Doanh số thuần',
-  salesRate: 'Tỷ lệ doanh số',
-  companyGrossSales: 'Doanh số gộp toàn công ty',
-  openingDebt: 'Nợ đầu kỳ',
-  debtIncrease: 'Phát sinh nợ',
-  cashApplied: 'Thu tiền trừ nợ',
-  returnsApplied: 'Trả hàng trừ nợ',
-  creditApplied: 'Cấn trừ dư có',
-  debtDecrease: 'Tổng giảm nợ',
-  closingDebt: 'Nợ cuối kỳ',
-  openingStock: 'Tồn đầu kỳ',
-  receiptQuantity: 'Nhập',
-  issueQuantity: 'Xuất',
-  returnQuantity: 'Trả lại',
-  adjustmentQuantity: 'Điều chỉnh',
-  closingStock: 'Tồn cuối kỳ',
-  soldQuantity: 'Số lượng bán',
-  returnedQuantity: 'Số lượng trả',
-  cashReceived: 'Tiền đã thu',
-  cashRefunded: 'Tiền đã hoàn',
-  verifiedUnreceiptedAmount: 'Đã xác nhận, chưa lập phiếu thu',
-  openingCredit: 'Dư có đầu kỳ',
-  creditCreated: 'Dư có phát sinh',
-  creditRefunded: 'Dư có đã hoàn',
-  closingCredit: 'Dư có cuối kỳ',
-  currentReservedCredit: 'Dư có đang giữ',
-  currentAvailableCredit: 'Dư có khả dụng',
+  agencyCode: t('Mã đại lý'),
+  agencyName: t('Tên đại lý'),
+  productCode: t('Mã hàng'),
+  productName: t('Mặt hàng'),
+  unitName: t('Đơn vị'),
+  numberOfIssues: t('Số phiếu xuất'),
+  salesAmount: t('Doanh số gộp'),
+  returnAmount: t('Hàng trả lại'),
+  netSalesAmount: t('Doanh số thuần'),
+  salesRate: t('Tỷ lệ doanh số'),
+  companyGrossSales: t('Doanh số gộp toàn công ty'),
+  openingDebt: t('Nợ đầu kỳ'),
+  debtIncrease: t('Phát sinh nợ'),
+  cashApplied: t('Thu tiền trừ nợ'),
+  returnsApplied: t('Trả hàng trừ nợ'),
+  creditApplied: t('Cấn trừ dư có'),
+  debtDecrease: t('Tổng giảm nợ'),
+  closingDebt: t('Nợ cuối kỳ'),
+  openingStock: t('Tồn đầu kỳ'),
+  receiptQuantity: t('Nhập'),
+  issueQuantity: t('Xuất'),
+  returnQuantity: t('Trả lại'),
+  adjustmentQuantity: t('Điều chỉnh'),
+  closingStock: t('Tồn cuối kỳ'),
+  soldQuantity: t('Số lượng bán'),
+  returnedQuantity: t('Số lượng trả'),
+  cashReceived: t('Tiền đã thu'),
+  cashRefunded: t('Tiền đã hoàn'),
+  verifiedUnreceiptedAmount: t('Đã xác nhận, chưa lập phiếu thu'),
+  openingCredit: t('Dư có đầu kỳ'),
+  creditCreated: t('Dư có phát sinh'),
+  creditRefunded: t('Dư có đã hoàn'),
+  closingCredit: t('Dư có cuối kỳ'),
+  currentReservedCredit: t('Dư có đang giữ'),
+  currentAvailableCredit: t('Dư có khả dụng'),
 }
 
 /** Filter parameter → picker label. Parameter names are unchanged. */
 export const filterLabels: Record<string, string> = {
-  agencyId: 'Đại lý',
-  typeId: 'Loại đại lý',
-  wardId: 'Phường/xã',
-  productId: 'Mặt hàng',
+  agencyId: t('Đại lý'),
+  typeId: t('Loại đại lý'),
+  wardId: t('Phường/xã'),
+  productId: t('Mặt hàng'),
 }
 
 const sortSubjects: Record<string, string> = {
-  agencyId: 'Đại lý',
-  productId: 'Mặt hàng',
+  agencyId: t('Đại lý'),
+  productId: t('Mặt hàng'),
 }
 
 /** Readable label for an exact server sort value such as `-salesAmount`. */
@@ -70,8 +71,8 @@ export function sortLabel(sort: string): string {
   const key = sort.replace(/^-/, '')
   const subject = sortSubjects[key]
   if (subject)
-    return `${subject}: ${descending ? 'mới thêm trước' : 'cũ trước'}`
-  return `${columnLabels[key] ?? key}: ${descending ? 'cao đến thấp' : 'thấp đến cao'}`
+    return `${subject}: ${descending ? t('mới thêm trước') : t('cũ trước')}`
+  return `${columnLabels[key] ?? key}: ${descending ? t('cao đến thấp') : t('thấp đến cao')}`
 }
 
 export type ValueKind = 'money' | 'quantity' | 'count' | 'percent' | 'text'
@@ -151,9 +152,9 @@ export function exportHint(
   dirty: boolean,
   exporting: boolean,
 ): string | null {
-  if (exporting) return 'Đang xuất tệp, vui lòng chờ.'
-  if (!hasPage) return 'Xem báo cáo trước để có thể xuất tệp.'
+  if (exporting) return t('Đang xuất tệp, vui lòng chờ.')
+  if (!hasPage) return t('Xem báo cáo trước để có thể xuất tệp.')
   if (dirty)
-    return 'Bộ lọc đã thay đổi. Nhấn Áp dụng để cập nhật trước khi xuất.'
+    return t('Bộ lọc đã thay đổi. Nhấn Áp dụng để cập nhật trước khi xuất.')
   return null
 }

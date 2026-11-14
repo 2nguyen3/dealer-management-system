@@ -9,6 +9,10 @@ import {
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { WorkflowSteps } from '../../components/guide/WorkflowSteps'
+import { t } from '../../lib/i18n/core'
+import { reportSteps } from '../guide/workflows'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { nextSort } from '../../components/data/sorting'
@@ -53,11 +57,11 @@ interface Applied {
 }
 
 const tabLabels: Record<ReportKind, string> = {
-  sales: 'Doanh số đại lý',
-  debt: 'Công nợ',
-  inventory: 'Xuất nhập tồn',
-  'product-sales': 'Doanh số mặt hàng',
-  'cash-and-credit': 'Thu chi & dư có',
+  sales: t('Doanh số đại lý'),
+  debt: t('Công nợ'),
+  inventory: t('Xuất nhập tồn'),
+  'product-sales': t('Doanh số mặt hàng'),
+  'cash-and-credit': t('Thu chi & dư có'),
 }
 
 const tabIcons: Record<ReportKind, LucideIcon> = {
@@ -69,15 +73,16 @@ const tabIcons: Record<ReportKind, LucideIcon> = {
 }
 
 const notes: Partial<Record<ReportKind, string>> = {
-  'cash-and-credit':
+  'cash-and-credit': t(
     'Dư có cuối kỳ tính tại thời điểm cuối kỳ; dư có đang giữ và khả dụng là số dư hiện tại.',
-  inventory: 'Số lượng tính theo đơn vị của từng mặt hàng.',
+  ),
+  inventory: t('Số lượng tính theo đơn vị của từng mặt hàng.'),
 }
 
 function LoadingReport() {
   return (
     <div role="status" aria-live="polite" className="space-y-6">
-      <span className="sr-only">Đang tải báo cáo...</span>
+      <span className="sr-only">{t('Đang tải báo cáo...')}</span>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-28 rounded-xl" />
@@ -171,7 +176,9 @@ export function ReportsPage() {
             setFailure({
               key,
               message:
-                err instanceof Error ? err.message : 'Không thể tải báo cáo.',
+                err instanceof Error
+                  ? err.message
+                  : t('Không thể tải báo cáo.'),
             })
         })
     }
@@ -195,7 +202,7 @@ export function ReportsPage() {
     try {
       reportPath(draft)
       if (!available.includes(draft.kind))
-        throw new Error('Bạn không có quyền đọc báo cáo này.')
+        throw new Error(t('Bạn không có quyền đọc báo cáo này.'))
       exportController.current?.abort()
       setFormError(null)
       setApplied({
@@ -210,7 +217,7 @@ export function ReportsPage() {
     } catch (err) {
       setFormError({
         kind,
-        message: err instanceof Error ? err.message : 'Bộ lọc không hợp lệ.',
+        message: err instanceof Error ? err.message : t('Bộ lọc không hợp lệ.'),
       })
     }
   }
@@ -246,7 +253,7 @@ export function ReportsPage() {
     exportController.current = controller
     setExportStatus({
       key,
-      message: 'Đang xuất toàn bộ kết quả đã lọc...',
+      message: t('Đang xuất toàn bộ kết quả đã lọc...'),
       phase: 'loading',
     })
     try {
@@ -254,15 +261,22 @@ export function ReportsPage() {
       if (!controller.signal.aborted)
         setExportStatus({
           key,
-          message: 'Đã tải tệp báo cáo toàn bộ kết quả đã lọc.',
+          message: t('Đã tải tệp báo cáo toàn bộ kết quả đã lọc.'),
           phase: 'success',
+        })
+      if (!controller.signal.aborted)
+        notifyNextStep({
+          done: t('Đã tải tệp báo cáo.'),
+          next: t(
+            'Tệp gồm toàn bộ kết quả theo bộ lọc đang áp dụng, không chỉ trang đang xem.',
+          ),
         })
     } catch (err) {
       if (!controller.signal.aborted)
         setExportStatus({
           key,
           message:
-            err instanceof Error ? err.message : 'Không thể xuất báo cáo.',
+            err instanceof Error ? err.message : t('Không thể xuất báo cáo.'),
           phase: 'error',
         })
     } finally {
@@ -273,6 +287,14 @@ export function ReportsPage() {
 
   const panel = (
     <div className="space-y-6">
+      <WorkflowSteps
+        label={t('Các bước lập báo cáo')}
+        steps={reportSteps(
+          !!query,
+          dirty,
+          exportStatus?.key === key && exportStatus.phase === 'success',
+        )}
+      />
       <ReportFilters
         key={`${kind}-${resets}`}
         draft={draft}
@@ -303,14 +325,14 @@ export function ReportsPage() {
         <div role="status">
           <EmptyState
             icon={<FileBarChart2 className="size-6" />}
-            title="Chưa có dữ liệu báo cáo"
-            description="Chọn bộ lọc và nhấn Áp dụng để tải dữ liệu."
+            title={t('Chưa có dữ liệu báo cáo')}
+            description={t('Chọn bộ lọc và nhấn Áp dụng để tải dữ liệu.')}
           />
         </div>
       )}
       {loading && <LoadingReport />}
       {error && (
-        <Alert type="error" title="Không thể tải báo cáo">
+        <Alert type="error" title={t('Không thể tải báo cáo')}>
           <span className="flex flex-wrap items-center gap-3">
             <span>{error}</span>
             <Button
@@ -319,7 +341,7 @@ export function ReportsPage() {
               icon={<RefreshCw className="size-3.5" />}
               onClick={() => update({ reload: (current?.reload ?? 0) + 1 })}
             >
-              Thử lại
+              {t('Thử lại')}
             </Button>
           </span>
         </Alert>
@@ -331,18 +353,22 @@ export function ReportsPage() {
               <h2 className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
                 {reports[query.kind].label}
                 {notes[query.kind] && (
-                  <InfoTip label="Ghi chú báo cáo">{notes[query.kind]}</InfoTip>
+                  <InfoTip label={t('Ghi chú báo cáo')}>
+                    {notes[query.kind]}
+                  </InfoTip>
                 )}
               </h2>
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarRange className="size-3.5" aria-hidden="true" />
                 <span>
-                  Kỳ báo cáo: {periodLabel(page.fromDate, page.toDate)}
+                  {t('Kỳ báo cáo: {periodLabel}', {
+                    periodLabel: periodLabel(page.fromDate, page.toDate),
+                  })}
                 </span>
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
-              Lập lúc{' '}
+              {t('Lập lúc')}{' '}
               <time dateTime={page.generatedAt}>
                 {formatDateTime(page.generatedAt)}
               </time>
@@ -351,8 +377,8 @@ export function ReportsPage() {
           {!page.items.length ? (
             <div role="status">
               <EmptyState
-                title="Không có dữ liệu"
-                description="Không có dữ liệu trong kỳ và bộ lọc đã chọn."
+                title={t('Không có dữ liệu')}
+                description={t('Không có dữ liệu trong kỳ và bộ lọc đã chọn.')}
               />
             </div>
           ) : (
@@ -361,9 +387,9 @@ export function ReportsPage() {
               <ReportCharts kind={query.kind} page={page} />
               <div className="space-y-3 rounded-xl border bg-card p-4 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Chi tiết</h3>
+                  <h3 className="text-sm font-semibold">{t('Chi tiết')}</h3>
                   <Badge variant="secondary" className="tabular-nums">
-                    {page.items.length} dòng
+                    {t('{count} dòng', { count: page.items.length })}
                   </Badge>
                 </div>
                 <ReportTable
@@ -385,7 +411,7 @@ export function ReportsPage() {
                       })
                     }}
                   >
-                    Trang trước
+                    {t('Trang trước')}
                   </Button>
                   <Button
                     variant="outline"
@@ -398,7 +424,7 @@ export function ReportsPage() {
                       })
                     }
                   >
-                    Trang tiếp
+                    {t('Trang tiếp')}
                   </Button>
                 </div>
               </div>
@@ -412,8 +438,8 @@ export function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Phân tích"
-        title="Báo cáo kinh doanh"
+        eyebrow={t('Phân tích')}
+        title={t('Báo cáo kinh doanh')}
         actions={
           available.length ? (
             <ExportMenu
@@ -425,8 +451,9 @@ export function ReportsPage() {
       />
       {!available.length ? (
         <Alert type="info">
-          Bạn không có quyền xem báo cáo. Liên hệ quản trị viên để được cấp
-          quyền.
+          {t(
+            'Bạn không có quyền xem báo cáo. Liên hệ quản trị viên để được cấp quyền.',
+          )}
         </Alert>
       ) : (
         <Tabs
@@ -435,7 +462,7 @@ export function ReportsPage() {
           className="gap-4"
         >
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
-            <TabsList aria-label="Loại báo cáo">
+            <TabsList aria-label={t('Loại báo cáo')}>
               {available.map((item) => {
                 const Icon = tabIcons[item]
                 return (

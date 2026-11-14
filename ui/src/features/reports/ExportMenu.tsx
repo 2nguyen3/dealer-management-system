@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/shadcn/dropdown-menu'
 import type { reportMedia } from './export'
+import { t } from '@/lib/i18n/core'
 
 export interface ExportMenuProps {
   /** Why export is unavailable; `null` enables the menu. */
@@ -28,39 +29,39 @@ export function ExportMenu({ reason, onExport }: ExportMenuProps) {
             type="button"
             className="cursor-pointer"
             disabled={!!reason}
-            title={reason ?? 'Xuất toàn bộ kết quả đã lọc'}
+            title={reason ?? t('Xuất toàn bộ kết quả đã lọc')}
             aria-describedby={reason ? HINT_ID : undefined}
           >
             <Download aria-hidden="true" />
-            Xuất báo cáo
+            {t('Xuất báo cáo')}
             <ChevronDown className="opacity-70" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Toàn bộ kết quả đã lọc
+            {t('Toàn bộ kết quả đã lọc')}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            title="Xuất toàn bộ kết quả ra PDF"
+            title={t('Xuất toàn bộ kết quả ra PDF')}
             onSelect={() => onExport('pdf')}
           >
             <FileText aria-hidden="true" />
-            Xuất PDF
+            {t('Xuất PDF')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            title="Xuất toàn bộ kết quả ra Excel"
+            title={t('Xuất toàn bộ kết quả ra Excel')}
             onSelect={() => onExport('xlsx')}
           >
             <Sheet aria-hidden="true" />
-            Xuất XLSX
+            {t('Xuất XLSX')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       {reason && (
         <p
           id={HINT_ID}
-          className="max-w-72 text-xs text-muted-foreground sm:text-right"
+          className="max-w-72 text-xs text-muted-foreground sm:text-end"
         >
           {reason}
         </p>

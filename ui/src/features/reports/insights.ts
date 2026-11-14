@@ -3,6 +3,7 @@
 import { formatCompactVND, formatPlain, toNumber } from '../../lib/chart'
 import type { ReportKind, ReportRow } from './contracts'
 import { displayValue } from './display'
+import { t } from '@/lib/i18n/core'
 
 /** One plotted category (agency or product) with numeric values per key. */
 export interface ChartDatum {
@@ -92,9 +93,9 @@ export function allZero(data: ChartDatum[], keys: string[]): boolean {
 export type FlowRole = 'balance' | 'increase' | 'decrease'
 
 export const flowRoles: Record<FlowRole, { label: string; color: string }> = {
-  balance: { label: 'Số dư', color: 'var(--chart-1)' },
-  increase: { label: 'Tăng', color: 'var(--chart-2)' },
-  decrease: { label: 'Giảm', color: 'var(--chart-3)' },
+  balance: { label: t('Số dư'), color: 'var(--chart-1)' },
+  increase: { label: t('Tăng'), color: 'var(--chart-2)' },
+  decrease: { label: t('Giảm'), color: 'var(--chart-3)' },
 }
 
 /** Balance/flow components taken from the full-filter totals. */
@@ -114,20 +115,20 @@ export function flowData(
 }
 
 export const debtFlow: { key: string; label: string; role: FlowRole }[] = [
-  { key: 'openingDebt', label: 'Nợ đầu kỳ', role: 'balance' },
-  { key: 'debtIncrease', label: 'Phát sinh nợ', role: 'increase' },
-  { key: 'cashApplied', label: 'Thu tiền trừ nợ', role: 'decrease' },
-  { key: 'returnsApplied', label: 'Trả hàng trừ nợ', role: 'decrease' },
-  { key: 'creditApplied', label: 'Cấn trừ dư có', role: 'decrease' },
-  { key: 'closingDebt', label: 'Nợ cuối kỳ', role: 'balance' },
+  { key: 'openingDebt', label: t('Nợ đầu kỳ'), role: 'balance' },
+  { key: 'debtIncrease', label: t('Phát sinh nợ'), role: 'increase' },
+  { key: 'cashApplied', label: t('Thu tiền trừ nợ'), role: 'decrease' },
+  { key: 'returnsApplied', label: t('Trả hàng trừ nợ'), role: 'decrease' },
+  { key: 'creditApplied', label: t('Cấn trừ dư có'), role: 'decrease' },
+  { key: 'closingDebt', label: t('Nợ cuối kỳ'), role: 'balance' },
 ]
 
 export const creditFlow: { key: string; label: string; role: FlowRole }[] = [
-  { key: 'openingCredit', label: 'Dư có đầu kỳ', role: 'balance' },
-  { key: 'creditCreated', label: 'Dư có phát sinh', role: 'increase' },
-  { key: 'creditApplied', label: 'Đã cấn trừ', role: 'decrease' },
-  { key: 'creditRefunded', label: 'Đã hoàn', role: 'decrease' },
-  { key: 'closingCredit', label: 'Dư có cuối kỳ', role: 'balance' },
+  { key: 'openingCredit', label: t('Dư có đầu kỳ'), role: 'balance' },
+  { key: 'creditCreated', label: t('Dư có phát sinh'), role: 'increase' },
+  { key: 'creditApplied', label: t('Đã cấn trừ'), role: 'decrease' },
+  { key: 'creditRefunded', label: t('Đã hoàn'), role: 'decrease' },
+  { key: 'closingCredit', label: t('Dư có cuối kỳ'), role: 'balance' },
 ]
 
 /** Exact non-negative decimal string compare against zero. */
@@ -185,47 +186,59 @@ const compositionSpecs: Record<
   }
 > = {
   sales: {
-    title: 'Cơ cấu doanh số',
-    centerLabel: 'Doanh số gộp',
+    title: t('Cơ cấu doanh số'),
+    centerLabel: t('Doanh số gộp'),
     center: 'salesAmount',
     parts: [
       {
         key: 'netSalesAmount',
-        label: 'Doanh số thuần',
+        label: t('Doanh số thuần'),
         color: 'var(--chart-1)',
       },
-      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
+      {
+        key: 'returnAmount',
+        label: t('Hàng trả lại'),
+        color: 'var(--chart-3)',
+      },
     ],
   },
   'product-sales': {
-    title: 'Cơ cấu doanh số',
-    centerLabel: 'Doanh số gộp',
+    title: t('Cơ cấu doanh số'),
+    centerLabel: t('Doanh số gộp'),
     center: 'salesAmount',
     parts: [
       {
         key: 'netSalesAmount',
-        label: 'Doanh số thuần',
+        label: t('Doanh số thuần'),
         color: 'var(--chart-1)',
       },
-      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
+      {
+        key: 'returnAmount',
+        label: t('Hàng trả lại'),
+        color: 'var(--chart-3)',
+      },
     ],
   },
   debt: {
-    title: 'Cơ cấu giảm nợ',
-    centerLabel: 'Tổng giảm nợ',
+    title: t('Cơ cấu giảm nợ'),
+    centerLabel: t('Tổng giảm nợ'),
     center: 'debtDecrease',
     parts: [
-      { key: 'cashApplied', label: 'Thu tiền', color: 'var(--chart-1)' },
-      { key: 'returnsApplied', label: 'Trả hàng', color: 'var(--chart-2)' },
-      { key: 'creditApplied', label: 'Cấn trừ dư có', color: 'var(--chart-3)' },
+      { key: 'cashApplied', label: t('Thu tiền'), color: 'var(--chart-1)' },
+      { key: 'returnsApplied', label: t('Trả hàng'), color: 'var(--chart-2)' },
+      {
+        key: 'creditApplied',
+        label: t('Cấn trừ dư có'),
+        color: 'var(--chart-3)',
+      },
     ],
   },
   'cash-and-credit': {
-    title: 'Sử dụng dư có',
-    centerLabel: 'Đã dùng',
+    title: t('Sử dụng dư có'),
+    centerLabel: t('Đã dùng'),
     parts: [
-      { key: 'creditApplied', label: 'Đã cấn trừ', color: 'var(--chart-1)' },
-      { key: 'creditRefunded', label: 'Đã hoàn', color: 'var(--chart-2)' },
+      { key: 'creditApplied', label: t('Đã cấn trừ'), color: 'var(--chart-1)' },
+      { key: 'creditRefunded', label: t('Đã hoàn'), color: 'var(--chart-2)' },
     ],
   },
 }
@@ -251,14 +264,14 @@ export function compositionOf(
       color,
     })
     return {
-      title: 'Tình trạng mặt hàng',
+      title: t('Tình trạng mặt hàng'),
       shape: 'rings',
-      centerLabel: 'Mặt hàng',
+      centerLabel: t('Mặt hàng'),
       centerValue: formatPlain(counts.products),
       parts: [
-        ring('moving', 'Có nhập/xuất', counts.moving, 'var(--chart-1)'),
-        ring('outOfStock', 'Hết tồn', counts.outOfStock, 'var(--chart-8)'),
-        ring('adjusted', 'Có điều chỉnh', counts.adjusted, 'var(--chart-3)'),
+        ring('moving', t('Có nhập/xuất'), counts.moving, 'var(--chart-1)'),
+        ring('outOfStock', t('Hết tồn'), counts.outOfStock, 'var(--chart-8)'),
+        ring('adjusted', t('Có điều chỉnh'), counts.adjusted, 'var(--chart-3)'),
       ],
     }
   }

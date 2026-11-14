@@ -10,9 +10,10 @@ import {
   sortableColumns,
   visibleColumns,
 } from './display'
+import { t } from '@/lib/i18n/core'
 
 const HEAD =
-  'sticky top-0 z-10 h-10 border-b bg-muted px-3 text-left text-xs font-semibold whitespace-nowrap text-muted-foreground'
+  'sticky top-0 z-10 h-10 border-b bg-muted px-3 text-start text-xs font-semibold whitespace-nowrap text-muted-foreground'
 
 /**
  * Detailed report rows: sticky header, tabular numbers, full-filter totals.
@@ -56,7 +57,7 @@ export function ReportTable({
                   onSort={onSort}
                   align="right"
                   firstDirection="desc"
-                  className={cn(HEAD, 'text-right')}
+                  className={cn(HEAD, 'text-end')}
                 >
                   {columnLabels[col] ?? col}
                 </SortableHeader>
@@ -64,10 +65,7 @@ export function ReportTable({
                 <th
                   scope="col"
                   key={col}
-                  className={cn(
-                    HEAD,
-                    isNumeric(col) && 'cell-number text-right',
-                  )}
+                  className={cn(HEAD, isNumeric(col) && 'cell-number text-end')}
                 >
                   {columnLabels[col] ?? col}
                 </th>
@@ -89,7 +87,7 @@ export function ReportTable({
                     className={cn(
                       'px-3 py-2.5 align-middle',
                       isNumeric(col)
-                        ? 'cell-number text-right tabular-nums'
+                        ? 'cell-number text-end tabular-nums'
                         : 'max-w-64 truncate',
                       max !== undefined && 'relative isolate',
                     )}
@@ -97,7 +95,7 @@ export function ReportTable({
                     {max ? (
                       <span
                         aria-hidden="true"
-                        className="absolute inset-y-2 right-1 -z-10 rounded-full bg-gradient-to-l from-chart-1/20 to-chart-2/10"
+                        className="absolute inset-y-2 end-1 -z-10 rounded-full bg-gradient-to-l rtl:bg-gradient-to-r from-chart-1/20 to-chart-2/10"
                         style={{
                           width: `calc(${(Math.abs(toNumber(row[col])) / max) * 100}% - 8px)`,
                         }}
@@ -118,11 +116,11 @@ export function ReportTable({
                   key={col}
                   className={cn(
                     'sticky bottom-0 border-t bg-muted px-3 py-2.5 whitespace-nowrap',
-                    isNumeric(col) && 'cell-number text-right tabular-nums',
+                    isNumeric(col) && 'cell-number text-end tabular-nums',
                   )}
                 >
                   {index === firstText
-                    ? 'Tổng toàn bộ kết quả đã lọc'
+                    ? t('Tổng toàn bộ kết quả đã lọc')
                     : col in totals
                       ? displayValue(col, totals[col])
                       : ''}
