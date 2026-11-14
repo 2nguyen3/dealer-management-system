@@ -1,4 +1,5 @@
 import { decimal, id, record, text } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 export interface ReadyIssue {
   documentId: string
@@ -40,14 +41,15 @@ export function readyIssue(value: unknown): ReadyIssue {
     problem: null,
   }
   if (data.status !== 'PENDING' || issue.revisionState !== 'READY')
-    issue.problem =
-      'Phiếu xuất chưa ở trạng thái Sẵn sàng (chờ ghi sổ), chưa thể xác minh tiền trả ngay.'
+    issue.problem = t(
+      'Phiếu xuất chưa ở trạng thái Sẵn sàng (chờ ghi sổ), chưa thể xác minh tiền trả ngay.',
+    )
   else if (
     data.upfrontConfirmationId !== null &&
     data.upfrontConfirmationId !== undefined
   )
-    issue.problem = 'Phiếu xuất này đã có khoản thực nhận được xác minh.'
+    issue.problem = t('Phiếu xuất này đã có khoản thực nhận được xác minh.')
   else if (/^0(\.0+)?$/.test(issue.immediatePayment))
-    issue.problem = 'Phiếu xuất không có khoản trả ngay cần xác minh.'
+    issue.problem = t('Phiếu xuất không có khoản trả ngay cần xác minh.')
   return issue
 }

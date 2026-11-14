@@ -4,6 +4,7 @@ import {
   object,
   validId,
 } from '../document_history/documentContracts'
+import { t } from '@/lib/i18n/core'
 
 export interface CountLine {
   id: string
@@ -41,7 +42,7 @@ export function parseCount(value: unknown): StockCount {
     !validInstant(row.countedAt) ||
     !Array.isArray(row.lines)
   )
-    throw new Error('Biên bản kiểm kê không hợp lệ.')
+    throw new Error(t('Biên bản kiểm kê không hợp lệ.'))
   const lines = row.lines.map((value) => {
     const line = object(value)
     if (
@@ -57,7 +58,7 @@ export function parseCount(value: unknown): StockCount {
       typeof line.difference !== 'string' ||
       !exact.signedQuantity.test(line.difference)
     )
-      throw new Error('Dòng kiểm kê không hợp lệ.')
+      throw new Error(t('Dòng kiểm kê không hợp lệ.'))
     return line as unknown as CountLine
   })
   return { ...row, lines } as unknown as StockCount

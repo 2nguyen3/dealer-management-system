@@ -23,10 +23,11 @@ import {
 import { formatQuantity, formatVND } from '../../lib/formatters'
 import { SectionCard } from '../document_history/DocumentParts'
 import { stockLevel, type StockRow } from './inventoryRows'
+import { t } from '@/lib/i18n/core'
 
 const TOP = 10
 const chartConfig = {
-  value: { label: 'Giá trị tồn', color: 'var(--chart-1)' },
+  value: { label: t('Giá trị tồn'), color: 'var(--chart-1)' },
 } satisfies ChartConfig
 
 function shorten(value: string, max = 18) {
@@ -53,20 +54,20 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
   }))
   return (
     <ChartCard
-      title="Giá trị tồn kho cao nhất"
-      description={`Top ${TOP} · tồn × giá nhập`}
+      title={t('Giá trị tồn kho cao nhất')}
+      description={t('Top {TOP} · tồn × giá nhập', { TOP })}
       isEmpty={!data.length}
       empty={
         <p className="flex h-64 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          Chưa có mặt hàng nào có giá nhập để tính giá trị tồn.
+          {t('Chưa có mặt hàng nào có giá nhập để tính giá trị tồn.')}
         </p>
       }
       table={
-        <Table caption="Giá trị tồn kho theo mặt hàng">
+        <Table caption={t('Giá trị tồn kho theo mặt hàng')}>
           <thead>
             <tr>
-              <th>Mặt hàng</th>
-              <th className="cell-number">Giá trị tồn</th>
+              <th>{t('Mặt hàng')}</th>
+              <th className="cell-number">{t('Giá trị tồn')}</th>
             </tr>
           </thead>
           <tbody>
@@ -137,7 +138,9 @@ export function StockValueChart({ rows }: { rows: StockRow[] }) {
               <ChartTooltipContent
                 formatter={(_value, _name, item) => (
                   <div className="flex w-full items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Giá trị tồn</span>
+                    <span className="text-muted-foreground">
+                      {t('Giá trị tồn')}
+                    </span>
                     <span className="font-medium text-foreground tabular-nums">
                       {(item.payload as { exact: string }).exact}
                     </span>
@@ -175,8 +178,8 @@ export function LowStockCard({
     .slice(0, 8)
   return (
     <SectionCard
-      title="Cần nhập thêm"
-      description="Dưới ngưỡng cảnh báo"
+      title={t('Cần nhập thêm')}
+      description={t('Dưới ngưỡng cảnh báo')}
       icon={<PackagePlus />}
       contentClassName="px-2"
     >
@@ -187,7 +190,7 @@ export function LowStockCard({
               <button
                 type="button"
                 onClick={() => onSelect(row)}
-                className="w-full cursor-pointer rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="w-full cursor-pointer rounded-lg px-2 py-2 text-start transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <span className="flex items-baseline justify-between gap-3 text-sm">
                   <span className="truncate font-medium text-foreground">
@@ -200,7 +203,7 @@ export function LowStockCard({
                 <Progress
                   value={level ?? 0}
                   aria-valuenow={level ?? 0}
-                  aria-label={`Mức tồn ${row.name}`}
+                  aria-label={t('Mức tồn {name}', { name: row.name })}
                   className="mt-1.5 h-1.5 bg-warning/15 [&>[data-slot=progress-indicator]]:bg-warning"
                 />
               </button>
@@ -210,7 +213,7 @@ export function LowStockCard({
       ) : (
         <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
           <PackageCheck className="size-6 text-success" aria-hidden="true" />
-          Không có mặt hàng dưới ngưỡng.
+          {t('Không có mặt hàng dưới ngưỡng.')}
         </div>
       )}
     </SectionCard>
@@ -237,11 +240,11 @@ export function StockHealthCard({
   const ratio = rows.length ? healthy / rows.length : 0
   return (
     <SectionCard
-      title="Sức khỏe tồn kho"
+      title={t('Sức khỏe tồn kho')}
       icon={<HeartPulse />}
       actions={
         <ShadcnBadge variant="secondary" className="font-normal">
-          {partial ? 'Trang hiện tại' : 'Toàn bộ danh mục'}
+          {partial ? t('Trang hiện tại') : t('Toàn bộ danh mục')}
         </ShadcnBadge>
       }
     >
@@ -250,10 +253,12 @@ export function StockHealthCard({
           <span className="text-2xl font-semibold tracking-tight tabular-nums">
             {Math.round(ratio * 100)}%
           </span>
-          <span className="text-xs text-muted-foreground">trên ngưỡng</span>
+          <span className="text-xs text-muted-foreground">
+            {t('trên ngưỡng')}
+          </span>
         </div>
         <SegmentedMeter
-          label="Tỷ lệ mặt hàng trên ngưỡng tồn"
+          label={t('Tỷ lệ mặt hàng trên ngưỡng tồn')}
           ratio={ratio}
           color="var(--success)"
           segments={28}
@@ -263,19 +268,19 @@ export function StockHealthCard({
           items={[
             {
               key: 'healthy',
-              label: 'Trên ngưỡng',
+              label: t('Trên ngưỡng'),
               value: healthy,
               color: 'var(--success)',
             },
             {
               key: 'low',
-              label: 'Dưới ngưỡng',
+              label: t('Dưới ngưỡng'),
               value: low,
               color: 'var(--warning)',
             },
             {
               key: 'unknown',
-              label: 'Chưa đặt ngưỡng',
+              label: t('Chưa đặt ngưỡng'),
               value: unknown,
               color: 'var(--chart-4)',
             },

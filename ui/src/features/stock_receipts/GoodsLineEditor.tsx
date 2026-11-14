@@ -13,6 +13,7 @@ import type {
 } from '../document_history/documentContracts'
 import { quantitySign } from '../document_history/lineMath'
 import { canEstimate, emptyLine, estimateLine } from './lineEstimates'
+import { t } from '@/lib/i18n/core'
 
 // Static class strings so Tailwind can see every column template.
 const GRID: Record<GoodsKind, { base: string; priced?: string }> = {
@@ -53,7 +54,9 @@ export function GoodsLineEditor({
   const isReturn = kind === 'SALES_RETURN'
   const isAdjustment = kind === 'STOCK_ADJUSTMENT'
   const priced = canEstimate(kind, originLines)
-  const quantityLabel = `Số lượng${isAdjustment ? ' (+/-)' : ''}`
+  const quantityLabel = t('Số lượng{value}', {
+    value: isAdjustment ? ' (+/-)' : '',
+  })
   // Adjustments may write off discontinued goods; new receipts/issues need active goods.
   const productParams = isAdjustment ? undefined : { status: 'ACTIVE' }
   const grid = (priced && GRID[kind].priced) || GRID[kind].base
@@ -71,19 +74,21 @@ export function GoodsLineEditor({
     >
       <legend className="float-left flex w-full items-center justify-between gap-3 border-b px-4 py-3">
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          Danh sách dòng hàng
+          {t('Danh sách dòng hàng')}
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
             {lines.length}
           </span>
         </span>
         {isAdjustment && (
-          <span className="text-xs text-muted-foreground">+ tăng · − giảm</span>
+          <span className="text-xs text-muted-foreground">
+            {t('+ tăng · − giảm')}
+          </span>
         )}
       </legend>
       <div className="clear-both space-y-3 p-3 md:space-y-0 md:p-0">
         {isReturn && originLines === null && (
           <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-[13px] text-muted-foreground md:m-3">
-            Chọn phiếu xuất gốc trước.
+            {t('Chọn phiếu xuất gốc trước.')}
           </p>
         )}
         <div
@@ -94,13 +99,13 @@ export function GoodsLineEditor({
           aria-hidden="true"
         >
           <span>#</span>
-          <span>{isReturn ? 'Dòng bán gốc' : 'Mặt hàng'}</span>
-          <span className="text-right">{quantityLabel}</span>
+          <span>{isReturn ? t('Dòng bán gốc') : t('Mặt hàng')}</span>
+          <span className="text-end">{quantityLabel}</span>
           {kind === 'STOCK_RECEIPT' && (
-            <span className="text-right">Đơn giá nhập</span>
+            <span className="text-end">{t('Đơn giá nhập')}</span>
           )}
-          {isAdjustment && <span>Hướng</span>}
-          {priced && <span className="text-right">Tạm tính</span>}
+          {isAdjustment && <span>{t('Hướng')}</span>}
+          {priced && <span className="text-end">{t('Tạm tính')}</span>}
           <span />
         </div>
         {lines.map((line, index) => {
@@ -110,7 +115,7 @@ export function GoodsLineEditor({
             <div
               key={index}
               role="group"
-              aria-label={`Dòng ${index + 1}`}
+              aria-label={t('Dòng {value}', { value: index + 1 })}
               className={cn(
                 'grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border p-3',
                 'md:rounded-none md:border-0 md:border-b md:px-3 md:py-2 md:last:border-b-0 md:[&_label]:sr-only',
@@ -118,7 +123,7 @@ export function GoodsLineEditor({
               )}
             >
               <span className="text-xs font-semibold text-muted-foreground tabular-nums md:text-sm md:font-normal">
-                <span className="md:hidden">Dòng </span>
+                <span className="md:hidden">{t('Dòng')} </span>
                 {index + 1}
               </span>
               <div className="col-span-2 min-w-0 md:col-span-1">
@@ -126,7 +131,7 @@ export function GoodsLineEditor({
                   <EntityPicker
                     id={`line-${index}-product`}
                     resource="products"
-                    label="Mặt hàng"
+                    label={t('Mặt hàng')}
                     required
                     disabled={disabled}
                     params={productParams}
@@ -136,8 +141,8 @@ export function GoodsLineEditor({
                 ) : originLines !== undefined ? (
                   <Select
                     id={`line-${index}-origin`}
-                    label="Dòng bán gốc"
-                    aria-label={`Dòng bán gốc ${index + 1}`}
+                    label={t('Dòng bán gốc')}
+                    aria-label={t('Dòng bán gốc {value}', { value: index + 1 })}
                     required
                     disabled={!originLines?.length}
                     value={line.originLineId}
@@ -145,18 +150,27 @@ export function GoodsLineEditor({
                       update(index, { originLineId: event.target.value })
                     }
                     options={[
-                      { value: '', label: 'Chọn dòng hàng đã bán…' },
+                      { value: '', label: t('Chọn dòng hàng đã bán…') },
                       ...(originLines ?? []).map((item) => ({
                         value: item.id,
-                        label: `${item.productName} — đã bán ${formatQuantity(item.quantity)} ${item.unitName}`,
+                        label: t(
+                          '{productName} — đã bán {quantity} {unitName}',
+                          {
+                            productName: item.productName,
+                            quantity: formatQuantity(item.quantity),
+                            unitName: item.unitName,
+                          },
+                        ),
                       })),
                     ]}
                   />
                 ) : (
                   <Input
                     id={`line-${index}-id`}
-                    label="Mã dòng bán gốc"
-                    aria-label={`Mã dòng bán gốc ${index + 1}`}
+                    label={t('Mã dòng bán gốc')}
+                    aria-label={t('Mã dòng bán gốc {value}', {
+                      value: index + 1,
+                    })}
                     required
                     value={line.originLineId}
                     onChange={(event) =>
@@ -169,10 +183,13 @@ export function GoodsLineEditor({
                 <Input
                   id={`line-${index}-quantity`}
                   label={quantityLabel}
-                  aria-label={`Số lượng ${index + 1}${isAdjustment ? ' (+/-)' : ''}`}
+                  aria-label={t('Số lượng {value}{value2}', {
+                    value: index + 1,
+                    value2: isAdjustment ? ' (+/-)' : '',
+                  })}
                   required
                   inputMode="decimal"
-                  className="text-right tabular-nums"
+                  className="text-end tabular-nums"
                   value={line.quantity}
                   onChange={(event) =>
                     update(index, { quantity: event.target.value })
@@ -183,11 +200,13 @@ export function GoodsLineEditor({
                 <div className="col-span-2 md:col-span-1">
                   <Input
                     id={`line-${index}-price`}
-                    label="Đơn giá nhập (VNĐ)"
-                    aria-label={`Đơn giá nhập ${index + 1} (VNĐ)`}
+                    label={t('Đơn giá nhập (VNĐ)')}
+                    aria-label={t('Đơn giá nhập {value} (VNĐ)', {
+                      value: index + 1,
+                    })}
                     required
                     inputMode="numeric"
-                    className="text-right tabular-nums"
+                    className="text-end tabular-nums"
                     value={line.unitPrice}
                     onChange={(event) =>
                       update(index, { unitPrice: event.target.value })
@@ -198,9 +217,9 @@ export function GoodsLineEditor({
               {isAdjustment && (
                 <div className="col-span-2 md:col-span-1">
                   {sign === 1 ? (
-                    <Badge variant="success">Tăng</Badge>
+                    <Badge variant="success">{t('Tăng')}</Badge>
                   ) : sign === -1 ? (
-                    <Badge variant="danger">Giảm</Badge>
+                    <Badge variant="danger">{t('Giảm')}</Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
@@ -209,7 +228,7 @@ export function GoodsLineEditor({
               {priced && (
                 <p className="col-span-2 flex items-center justify-between gap-2 text-sm md:col-span-1 md:justify-end">
                   <span className="text-xs text-muted-foreground md:sr-only">
-                    Tạm tính
+                    {t('Tạm tính')}
                   </span>
                   <span className="font-medium text-foreground tabular-nums">
                     {amount === null ? '—' : formatVND(amount.toString())}
@@ -222,8 +241,8 @@ export function GoodsLineEditor({
                   variant="ghost"
                   size="sm"
                   className="size-8 p-0 text-muted-foreground hover:text-destructive"
-                  aria-label={`Xóa dòng ${index + 1}`}
-                  title={`Xóa dòng ${index + 1}`}
+                  aria-label={t('Xóa dòng {value}', { value: index + 1 })}
+                  title={t('Xóa dòng {value}', { value: index + 1 })}
                   disabled={lines.length === 1}
                   onClick={() =>
                     onChange(lines.filter((_, position) => position !== index))
@@ -245,7 +264,7 @@ export function GoodsLineEditor({
           icon={<Plus className="size-4" />}
           onClick={() => onChange([...lines, emptyLine()])}
         >
-          Thêm dòng
+          {t('Thêm dòng')}
         </Button>
       </div>
     </fieldset>

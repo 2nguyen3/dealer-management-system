@@ -7,8 +7,11 @@ import {
   RefreshCw,
   Undo2,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useInRouterContext, useSearchParams } from 'react-router'
 import { DateField } from '@/components/blocks/DateField'
+import { notifyNextStep } from '@/components/guide/notifyNextStep'
+import { WorkflowSteps } from '@/components/guide/WorkflowSteps'
 import { PageHeader } from '@/components/blocks/PageHeader'
 import { SortMenu } from '@/components/data/SortControls'
 import { useSort } from '@/components/data/sorting'
@@ -28,6 +31,7 @@ import { apiFetch } from '@/lib/api'
 import { invalidateCache } from '@/lib/cache'
 import { formatCompactVND } from '@/lib/chart'
 import { formatDateTime, formatVND } from '@/lib/formatters'
+import { t } from '@/lib/i18n/core'
 import { enumOptions, methodLabel, statusLabel } from '@/lib/labels'
 import { useAuth } from '../authentication/useAuth'
 import {
@@ -56,17 +60,85 @@ import { groupTotals, upfrontLifecycle } from '../payment_receipts/flow'
 import { FlowSteps } from '../payment_receipts/FlowSteps'
 import { PageSummary } from '../payment_receipts/PageSummary'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
+import { ROLES } from '../guide/workflows'
 import { readyIssue, type ReadyIssue } from './readyIssue'
+
+const ISSUE_ID = /^[1-9][0-9]{0,18}$/
+
+/**
+ * Reads `?issue=<id>` (filter the list) and `?issue=<id>&new=1` (open the
+ * verification form with that stock issue preselected), then removes the
+ * one-shot `new` flag so a refresh does not reopen the form.
+ */
+function UpfrontDeepLink({
+  onFilter,
+  onOpen,
+}: {
+  onFilter: (issueId: string) => void
+  onOpen: (issueId: string) => void
+}) {
+  const [params, setParams] = useSearchParams()
+  const issue = params.get('issue') ?? ''
+  const open = params.get('new') === '1'
+  useEffect(() => {
+    if (!ISSUE_ID.test(issue)) return
+    if (open) {
+      onOpen(issue)
+      const next = new URLSearchParams(params)
+      next.delete('new')
+      next.delete('issue')
+      setParams(next, { replace: true })
+    } else onFilter(issue)
+  }, [issue, open, params, setParams, onFilter, onOpen])
+  return null
+}
+
+/** Rail for the verification form: pick issue → enter evidence → verify. */
+function verifySteps(picked: boolean, evidence: boolean) {
+  return [
+    {
+      key: 'pick',
+      label: t('Chọn phiếu xuất đang chờ'),
+      role: t(ROLES.accounting),
+      state: picked ? ('done' as const) : ('current' as const),
+      hint: t(
+        'Chỉ phiếu đã nộp (Sẵn sàng) có khoản trả ngay và chưa được xác nhận.',
+      ),
+    },
+    {
+      key: 'evidence',
+      label: t('Nhập bằng chứng tiền'),
+      role: t(ROLES.accounting),
+      state: !picked
+        ? ('todo' as const)
+        : evidence
+          ? ('done' as const)
+          : ('current' as const),
+      hint: t(
+        'Số tiền đúng bằng khoản trả ngay, thời điểm thực nhận và số biên lai/mã chuyển khoản.',
+      ),
+    },
+    {
+      key: 'verify',
+      label: t('Xác minh'),
+      role: t(ROLES.accounting),
+      state: picked && evidence ? ('current' as const) : ('todo' as const),
+      hint: t(
+        'Sau khi xác minh, Kho ghi sổ phiếu xuất; khoản tiền tự thành phiếu thu.',
+      ),
+    },
+  ]
+}
 
 const UPFRONT_STATES = ['VERIFIED', 'CONSUMED', 'RECEIVED_SEPARATELY'] as const
 /** Where each state sits in the flow (worded apart from the status badges). */
 const STATE_GROUPS: Record<string, { label: string; color: string }> = {
-  VERIFIED: { label: 'Chờ phiếu xuất ghi sổ', color: 'var(--warning)' },
-  CONSUMED: { label: 'Đã thành phiếu thu', color: 'var(--success)' },
-  RECEIVED_SEPARATELY: { label: 'Thu riêng', color: 'var(--chart-3)' },
+  VERIFIED: { label: t('Chờ phiếu xuất ghi sổ'), color: 'var(--warning)' },
+  CONSUMED: { label: t('Đã thành phiếu thu'), color: 'var(--success)' },
+  RECEIVED_SEPARATELY: { label: t('Thu riêng'), color: 'var(--chart-3)' },
 }
 /** Server sort enum for GET /upfront-confirmations: createdAt, id (±). */
-const SORT_OPTIONS = [{ field: 'createdAt', label: 'Thời điểm xác minh' }]
+const SORT_OPTIONS = [{ field: 'createdAt', label: t('Thời điểm xác minh') }]
 
 function dateTime(value: unknown): string {
   return typeof value === 'string' && value ? formatDateTime(value) : '—'
@@ -117,6 +189,7 @@ function useReadyIssue(issueId: string) {
 
 export function UpfrontPaymentsPage() {
   const { hasPermission } = useAuth()
+  const inRouter = useInRouterContext()
   const canVerify = hasPermission('cash.upfront.verify')
   const canSeparate = hasPermission('cash.receipt.post')
   const [state, setState] = useState('')
@@ -197,6 +270,21 @@ export function UpfrontPaymentsPage() {
     }
   }, [selected])
 
+  const openFor = useCallback(
+    (issue: string) => {
+      setIssueId(issue)
+      setManual(false)
+      setAutoAmount(true)
+      setError('')
+      setFormOpen(true)
+    },
+    [setIssueId, setManual, setAutoAmount, setError, setFormOpen],
+  )
+  const filterFor = useCallback(
+    (issue: string) => setIssueFilter(issue),
+    [setIssueFilter],
+  )
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (busy || !canVerify) return
@@ -205,12 +293,12 @@ export function UpfrontPaymentsPage() {
       if (!revisionId)
         throw new Error(
           manual
-            ? 'Vui lòng nhập mã phiên bản phiếu xuất.'
-            : 'Vui lòng chọn phiếu xuất đang ở trạng thái Sẵn sàng.',
+            ? t('Vui lòng nhập mã phiên bản phiếu xuất.')
+            : t('Vui lòng chọn phiếu xuất đang ở trạng thái Sẵn sàng.'),
         )
       if (!evidence.trim())
         throw new Error(
-          'Cần thời điểm thực nhận có múi giờ và tham chiếu bằng chứng.',
+          t('Cần thời điểm thực nhận có múi giờ và tham chiếu bằng chứng.'),
         )
       const body = {
         issueRevisionId: id(revisionId),
@@ -225,8 +313,24 @@ export function UpfrontPaymentsPage() {
         body,
       })
       setNotice(
-        'Đã xác minh khoản tiền. Phiếu thu sẽ được lập khi phiếu xuất được ghi sổ.',
+        t(
+          'Đã xác minh khoản tiền. Phiếu thu sẽ được lập khi phiếu xuất được ghi sổ.',
+        ),
       )
+      notifyNextStep({
+        done: t('Đã xác minh khoản trả ngay {code}.', {
+          code: pickedIssue?.code ?? `#${revisionId}`,
+        }),
+        next: t(
+          'Bước tiếp: Kho ghi sổ phiếu xuất; khoản tiền sẽ tự thành phiếu thu.',
+        ),
+        ...(hasPermission('stock.issue.post') ||
+        hasPermission('stock.issue.prepare') ||
+        hasPermission('debt.read') ||
+        hasPermission('sales.read')
+          ? { to: '/stock-issues' }
+          : {}),
+      })
       setFormOpen(false)
       setIssueId('')
       setManualRevision('')
@@ -263,8 +367,19 @@ export function UpfrontPaymentsPage() {
         },
       )
       setNotice(
-        'Đã lập phiếu thu riêng cho khoản tiền này. Trạng thái phiếu xuất không thay đổi.',
+        t(
+          'Đã lập phiếu thu riêng cho khoản tiền này. Trạng thái phiếu xuất không thay đổi.',
+        ),
       )
+      notifyNextStep({
+        done: t('Đã ghi nhận tiền riêng thành phiếu thu.'),
+        next: t(
+          'Phiếu xuất cần thay nội dung (phiên bản mới) và nộp lại; không nhập lại số tiền đã thu riêng vào trả ngay.',
+        ),
+        ...(hasPermission('stock.issue.prepare')
+          ? { to: '/stock-issues' }
+          : {}),
+      })
       setDetail(null)
       setSelected('')
       for (const prefix of [
@@ -286,10 +401,15 @@ export function UpfrontPaymentsPage() {
   const item = detail?.item
   return (
     <div className="page-container space-y-6">
+      {inRouter && canVerify && (
+        <UpfrontDeepLink onFilter={filterFor} onOpen={openFor} />
+      )}
       <PageHeader
-        eyebrow="Tài chính"
-        title="Xác nhận thanh toán trả ngay"
-        description="Xác minh tiền trả ngay → phiếu xuất ghi sổ → phiếu thu tự động (hoặc thu riêng)."
+        eyebrow={t('Tài chính')}
+        title={t('Xác nhận thanh toán trả ngay')}
+        description={t(
+          'Xác minh tiền trả ngay → phiếu xuất ghi sổ → phiếu thu tự động (hoặc thu riêng).',
+        )}
         className="mb-0"
         actions={
           canVerify && (
@@ -300,7 +420,7 @@ export function UpfrontPaymentsPage() {
                 setFormOpen(true)
               }}
             >
-              Ghi nhận tiền thực nhận
+              {t('Ghi nhận tiền thực nhận')}
             </Button>
           )
         }
@@ -309,25 +429,29 @@ export function UpfrontPaymentsPage() {
       {notice && <Alert type="info">{notice}</Alert>}
       {!list.loading && list.items.length > 0 && (
         <PageSummary
-          title="Tổng quan khoản thực nhận"
-          noun="khoản"
+          title={t('Tổng quan khoản thực nhận')}
+          noun={t('khoản')}
           total={list.items.length}
           groups={groups}
           kpis={[
             {
-              label: 'Chờ phiếu xuất ghi sổ',
+              label: t('Chờ phiếu xuất ghi sổ'),
               icon: <Hourglass />,
               value: formatCompactVND(group('VERIFIED')?.amount ?? 0),
-              hint: `${group('VERIFIED')?.count ?? 0} khoản`,
+              hint: t('{count} khoản', {
+                count: group('VERIFIED')?.count ?? 0,
+              }),
             },
             {
-              label: 'Đã thành phiếu thu',
+              label: t('Đã thành phiếu thu'),
               icon: <ReceiptText />,
               value: formatCompactVND(group('CONSUMED')?.amount ?? 0),
-              hint: `${group('CONSUMED')?.count ?? 0} khoản`,
+              hint: t('{count} khoản', {
+                count: group('CONSUMED')?.count ?? 0,
+              }),
             },
             {
-              label: 'Thu riêng',
+              label: t('Thu riêng'),
               icon: <Undo2 />,
               value: (
                 <CountUp value={group('RECEIVED_SEPARATELY')?.count ?? 0} />
@@ -340,25 +464,25 @@ export function UpfrontPaymentsPage() {
       <FilterBar>
         <EntityPicker
           resource="stock-issues"
-          label="Phiếu xuất"
+          label={t('Phiếu xuất')}
           value={issueFilter}
           onChange={(value) => setIssueFilter(value)}
-          placeholder="Tất cả phiếu xuất"
+          placeholder={t('Tất cả phiếu xuất')}
         />
         <Select
-          label="Trạng thái"
+          label={t('Trạng thái')}
           value={state}
           onChange={(event) => setState(event.target.value)}
-          options={enumOptions(UPFRONT_STATES, statusLabel, 'Tất cả')}
+          options={enumOptions(UPFRONT_STATES, statusLabel, t('Tất cả'))}
         />
         <DateField
-          label="Xác minh từ ngày"
+          label={t('Xác minh từ ngày')}
           value={fromDate}
           onChange={setFromDate}
           max={toDate || undefined}
         />
         <DateField
-          label="Đến ngày"
+          label={t('Đến ngày')}
           value={toDate}
           onChange={setToDate}
           min={fromDate || undefined}
@@ -369,12 +493,12 @@ export function UpfrontPaymentsPage() {
           icon={<RefreshCw className="size-4" />}
           onClick={list.reload}
         >
-          Tải lại
+          {t('Tải lại')}
         </Button>
       </FilterBar>
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
-        title="Các khoản thực nhận"
+        title={t('Các khoản thực nhận')}
         icon={<BadgeCheck />}
         actions={
           <SortMenu
@@ -385,25 +509,25 @@ export function UpfrontPaymentsPage() {
         }
       >
         {list.loading ? (
-          <TableSkeleton label="Đang tải khoản thực nhận..." />
+          <TableSkeleton label={t('Đang tải khoản thực nhận...')} />
         ) : !list.error && !list.items.length ? (
           <div className="p-4">
-            <EmptyState title="Chưa có khoản thực nhận phù hợp." />
+            <EmptyState title={t('Chưa có khoản thực nhận phù hợp.')} />
           </div>
         ) : (
-          <Table caption="Danh sách khoản thực nhận">
+          <Table caption={t('Danh sách khoản thực nhận')}>
             <thead>
               <tr>
-                <th scope="col">Thời điểm nhận</th>
-                <th scope="col">Phiếu xuất</th>
-                <th scope="col">Hình thức</th>
+                <th scope="col">{t('Thời điểm nhận')}</th>
+                <th scope="col">{t('Phiếu xuất')}</th>
+                <th scope="col">{t('Hình thức')}</th>
                 <th scope="col" className="cell-number">
-                  Số tiền
+                  {t('Số tiền')}
                 </th>
-                <th scope="col">Trạng thái</th>
-                <th scope="col">Phiếu thu</th>
+                <th scope="col">{t('Trạng thái')}</th>
+                <th scope="col">{t('Phiếu thu')}</th>
                 <th scope="col" className="cell-actions">
-                  Thao tác
+                  {t('Thao tác')}
                 </th>
               </tr>
             </thead>
@@ -416,7 +540,9 @@ export function UpfrontPaymentsPage() {
                       #{String(row.issueDocumentId)}
                     </span>
                     <div className="text-xs text-muted-foreground">
-                      Phiên bản #{String(row.issueRevisionId)}
+                      {t('Phiên bản #{issueRevisionId}', {
+                        issueRevisionId: String(row.issueRevisionId),
+                      })}
                     </div>
                   </td>
                   <td>{methodLabel(row.method)}</td>
@@ -435,14 +561,17 @@ export function UpfrontPaymentsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      aria-label={`Chi tiết khoản thực nhận phiếu xuất #${String(row.issueDocumentId)}`}
+                      aria-label={t(
+                        'Chi tiết khoản thực nhận phiếu xuất #{issueDocumentId}',
+                        { issueDocumentId: String(row.issueDocumentId) },
+                      )}
                       onClick={() => {
                         setDetail(null)
                         setReason('')
                         setSelected(String(row.id))
                       }}
                     >
-                      Chi tiết
+                      {t('Chi tiết')}
                     </Button>
                   </td>
                 </tr>
@@ -463,23 +592,30 @@ export function UpfrontPaymentsPage() {
         <Modal
           isOpen={formOpen}
           onClose={() => setFormOpen(false)}
-          title="Ghi nhận tiền thực nhận"
+          title={t('Ghi nhận tiền thực nhận')}
           maxWidth="lg"
         >
           <form onSubmit={submit} className="space-y-4">
+            <WorkflowSteps
+              label={t('Các bước xác nhận trả ngay')}
+              steps={verifySteps(
+                manual ? !!manualRevision : !!revisionId,
+                !!evidence.trim() && !!receivedAt,
+              )}
+            />
             {error && <Alert type="error">{error}</Alert>}
             {!manual ? (
               <div className="space-y-3">
                 <EntityPicker
                   resource="stock-issues"
-                  label="Chọn phiếu xuất chờ ghi sổ"
+                  label={t('Chọn phiếu xuất chờ ghi sổ')}
                   value={issueId}
                   onChange={(value) => {
                     setIssueId(value)
                     setAutoAmount(true)
                   }}
                   params={{ status: 'PENDING' }}
-                  placeholder="Tìm theo số phiếu hoặc đại lý"
+                  placeholder={t('Tìm theo số phiếu hoặc đại lý')}
                   required
                 />
                 {picked && !pickedIssue && !picked.error && (
@@ -490,8 +626,10 @@ export function UpfrontPaymentsPage() {
               </div>
             ) : (
               <Input
-                label="Mã phiên bản phiếu xuất (Sẵn sàng)"
-                helperText="Số mã phiên bản của phiếu xuất đang ở trạng thái Sẵn sàng, xem trong chi tiết phiếu xuất."
+                label={t('Mã phiên bản phiếu xuất (Sẵn sàng)')}
+                helperText={t(
+                  'Số mã phiên bản của phiếu xuất đang ở trạng thái Sẵn sàng, xem trong chi tiết phiếu xuất.',
+                )}
                 inputMode="numeric"
                 value={manualRevision}
                 onChange={(event) => setManualRevision(event.target.value)}
@@ -506,39 +644,39 @@ export function UpfrontPaymentsPage() {
               onClick={() => setManual((value) => !value)}
             >
               {manual
-                ? 'Chọn từ danh sách phiếu xuất'
-                : 'Nhập mã phiên bản thủ công'}
+                ? t('Chọn từ danh sách phiếu xuất')
+                : t('Nhập mã phiên bản thủ công')}
             </Button>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Số tiền (VND nguyên)"
+                label={t('Số tiền (VND nguyên)')}
                 inputMode="numeric"
-                className="text-right tabular-nums"
+                className="text-end tabular-nums"
                 value={effectiveAmount}
                 onChange={(event) => {
                   setAutoAmount(false)
                   setAmount(event.target.value)
                 }}
-                helperText="Phải bằng khoản trả ngay của phiếu xuất."
+                helperText={t('Phải bằng khoản trả ngay của phiếu xuất.')}
                 required
               />
               <Select
-                label="Phương thức"
+                label={t('Phương thức')}
                 value={method}
                 onChange={(event) => setMethod(event.target.value)}
                 options={enumOptions(['CASH', 'BANK_TRANSFER'], methodLabel)}
               />
               <Input
-                label="Thời điểm thực nhận"
+                label={t('Thời điểm thực nhận')}
                 type="datetime-local"
-                helperText="Giờ Việt Nam (GMT+7)"
+                helperText={t('Giờ Việt Nam (GMT+7)')}
                 value={receivedAt}
                 onChange={(event) => setReceivedAt(event.target.value)}
                 required
               />
               <Input
-                label="Tham chiếu bằng chứng"
-                placeholder="Số biên lai, mã chuyển khoản…"
+                label={t('Tham chiếu bằng chứng')}
+                placeholder={t('Số biên lai, mã chuyển khoản…')}
                 value={evidence}
                 onChange={(event) => setEvidence(event.target.value)}
                 required
@@ -550,10 +688,10 @@ export function UpfrontPaymentsPage() {
                 variant="outline"
                 onClick={() => setFormOpen(false)}
               >
-                Đóng
+                {t('Đóng')}
               </Button>
               <Button type="submit" isLoading={busy}>
-                Xác minh tiền thực nhận
+                {t('Xác minh tiền thực nhận')}
               </Button>
             </FormActions>
           </form>
@@ -565,12 +703,12 @@ export function UpfrontPaymentsPage() {
           setSelected('')
           setDetail(null)
         }}
-        title="Chi tiết khoản thực nhận"
+        title={t('Chi tiết khoản thực nhận')}
         maxWidth="lg"
       >
         {!item ? (
           <div role="status" className="space-y-3">
-            <span className="sr-only">Đang tải chi tiết...</span>
+            <span className="sr-only">{t('Đang tải chi tiết...')}</span>
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-32 w-full" />
           </div>
@@ -578,32 +716,36 @@ export function UpfrontPaymentsPage() {
           <div className="space-y-4">
             <DetailHeader
               icon={<FileCheck2 />}
-              code={`Phiếu xuất #${String(item.issueDocumentId)}`}
+              code={t('Phiếu xuất #{issueDocumentId}', {
+                issueDocumentId: String(item.issueDocumentId),
+              })}
               badge={<StatusBadge status={String(item.state)} />}
               amount={formatVND(String(item.amount))}
-              amountLabel="Số tiền thực nhận"
-              meta={`Phiên bản #${String(item.issueRevisionId)}`}
+              amountLabel={t('Số tiền thực nhận')}
+              meta={t('Phiên bản #{issueRevisionId}', {
+                issueRevisionId: String(item.issueRevisionId),
+              })}
               tone={item.state === 'VERIFIED' ? 'neutral' : 'success'}
             />
             {upfrontLifecycle(item.state) && (
               <FlowSteps
-                label="Vòng đời khoản tiền"
+                label={t('Vòng đời khoản tiền')}
                 steps={upfrontLifecycle(item.state)!}
               />
             )}
             <DetailList
               entries={[
-                ['Hình thức', methodLabel(item.method)],
-                ['Thời điểm nhận', dateTime(item.receivedAt)],
-                ['Xác minh lúc', dateTime(item.verifiedAt)],
+                [t('Hình thức'), methodLabel(item.method)],
+                [t('Thời điểm nhận'), dateTime(item.receivedAt)],
+                [t('Xác minh lúc'), dateTime(item.verifiedAt)],
                 [
-                  'Phiếu thu',
+                  t('Phiếu thu'),
                   item.receiptDocumentId
                     ? `#${String(item.receiptDocumentId)}`
-                    : 'Chưa có',
+                    : t('Chưa có'),
                 ],
                 [
-                  'Bằng chứng',
+                  t('Bằng chứng'),
                   typeof item.evidenceReference === 'string'
                     ? item.evidenceReference
                     : '—',
@@ -618,7 +760,7 @@ export function UpfrontPaymentsPage() {
                   disabled={busy || !detail?.etag}
                   onClick={() => setConfirmSeparate(true)}
                 >
-                  Ghi nhận tiền riêng
+                  {t('Ghi nhận tiền riêng')}
                 </Button>
               </ActionBar>
             )}
@@ -628,15 +770,17 @@ export function UpfrontPaymentsPage() {
       <ConfirmDialog
         isOpen={confirmSeparate}
         onClose={() => setConfirmSeparate(false)}
-        title="Ghi nhận tiền riêng"
-        description="Lập phiếu thu riêng cho khoản tiền này thay vì dùng cho phiếu xuất. Trạng thái phiếu xuất không thay đổi."
-        confirmLabel="Ghi nhận tiền riêng"
+        title={t('Ghi nhận tiền riêng')}
+        description={t(
+          'Lập phiếu thu riêng cho khoản tiền này thay vì dùng cho phiếu xuất. Trạng thái phiếu xuất không thay đổi.',
+        )}
+        confirmLabel={t('Ghi nhận tiền riêng')}
         busy={busy}
         disabled={busy || !detail?.etag || !reason.trim()}
         onConfirm={() => void separate()}
       >
         <Input
-          label="Lý do ghi nhận tiền riêng"
+          label={t('Lý do ghi nhận tiền riêng')}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           required
@@ -656,12 +800,15 @@ function IssueSummary({ issue }: { issue: ReadyIssue }) {
             {issue.agencyName ? ` · ${issue.agencyName}` : ''}
           </p>
           <p className="text-xs text-muted-foreground">
-            Phiên bản {issue.revisionNo} ({statusLabel(issue.revisionState)}) ·
-            mã #{issue.revisionId}
+            {t('Phiên bản {revisionNo} ({statusLabel}) · mã #{revisionId}', {
+              revisionNo: issue.revisionNo,
+              statusLabel: statusLabel(issue.revisionState),
+              revisionId: issue.revisionId,
+            })}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Khoản trả ngay</p>
+        <div className="text-end">
+          <p className="text-xs text-muted-foreground">{t('Khoản trả ngay')}</p>
           <p className="font-semibold tabular-nums">
             {formatVND(issue.immediatePayment)}
           </p>
@@ -673,7 +820,9 @@ function IssueSummary({ issue }: { issue: ReadyIssue }) {
         </p>
       ) : (
         <p className="mt-2 text-xs text-muted-foreground">
-          Sẽ xác minh cho phiên bản này; số tiền được điền theo khoản trả ngay.
+          {t(
+            'Sẽ xác minh cho phiên bản này; số tiền được điền theo khoản trả ngay.',
+          )}
         </p>
       )}
     </div>

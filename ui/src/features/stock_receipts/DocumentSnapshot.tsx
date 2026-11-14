@@ -12,6 +12,7 @@ import {
   InfoTip,
   SectionCard,
 } from '../document_history/DocumentParts'
+import { t } from '@/lib/i18n/core'
 
 const money = (value: string | null | undefined) =>
   value === null || value === undefined ? '—' : formatVND(value)
@@ -39,9 +40,9 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
               <StatusBadge status={doc.status} />
             </div>
           </div>
-          <div className="text-left sm:text-right">
+          <div className="text-start sm:text-end">
             <p className="text-xs font-medium text-muted-foreground">
-              Tổng tiền
+              {t('Tổng tiền')}
             </p>
             <p className="text-xl font-semibold text-foreground tabular-nums">
               {formatVND(revision.totalAmount)}
@@ -51,69 +52,72 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
         <DocumentLifecycle kind={doc.kind} status={doc.status} />
         <Separator />
         <FactGrid>
-          <Fact label="Phiên bản">
+          <Fact label={t('Phiên bản')}>
             v{revision.revisionNo} · {statusLabel(revision.state)}
           </Fact>
-          <Fact label="Ngày chứng từ">
+          <Fact label={t('Ngày chứng từ')}>
             <span className="tabular-nums">
               {formatDate(revision.businessDate)}
             </span>
           </Fact>
           {doc.kind === 'STOCK_ISSUE' && (
             <>
-              <Fact label="Trả ngay">
+              <Fact label={t('Trả ngay')}>
                 <span className="tabular-nums">
                   {formatVND(revision.immediatePayment)}
                 </span>
               </Fact>
-              <Fact label="Còn nợ lúc xuất">
+              <Fact label={t('Còn nợ lúc xuất')}>
                 <span className="tabular-nums">
                   {money(doc.remainingAtIssue)}
                 </span>
               </Fact>
-              <Fact label="Còn nợ hiện tại">
+              <Fact label={t('Còn nợ hiện tại')}>
                 <span className="tabular-nums">
                   {money(doc.invoiceBalance?.outstandingAmount)}
                 </span>
               </Fact>
-              <Fact label="Thanh toán trước">
-                {doc.upfrontConfirmationId ? 'Đã xác nhận' : 'Không có'}
+              <Fact label={t('Thanh toán trước')}>
+                {doc.upfrontConfirmationId ? t('Đã xác nhận') : t('Không có')}
               </Fact>
-              <Fact label="Phiếu thu kèm">
-                {doc.autoReceiptId ? 'Đã lập' : 'Không có'}
+              <Fact label={t('Phiếu thu kèm')}>
+                {doc.autoReceiptId ? t('Đã lập') : t('Không có')}
               </Fact>
             </>
           )}
           {isReturn && (
             <>
-              <Fact label="Phiếu xuất gốc">
+              <Fact label={t('Phiếu xuất gốc')}>
                 {doc.originDocumentId ? `#${doc.originDocumentId}` : '—'}
               </Fact>
-              <Fact label="Giảm công nợ">
+              <Fact label={t('Giảm công nợ')}>
                 <span className="tabular-nums">
                   {money(doc.debtReducedAmount)}
                 </span>
               </Fact>
-              <Fact label="Ghi có cho đại lý">
+              <Fact label={t('Ghi có cho đại lý')}>
                 <span className="inline-flex items-center gap-1 tabular-nums">
                   {money(doc.creditCreatedAmount)}
-                  <InfoTip label="Về khoản ghi có">
-                    Phần tiền vượt công nợ được ghi có cho đại lý, không tự động
-                    hoàn tiền.
+                  <InfoTip label={t('Về khoản ghi có')}>
+                    {t(
+                      'Phần tiền vượt công nợ được ghi có cho đại lý, không tự động hoàn tiền.',
+                    )}
                   </InfoTip>
                 </span>
               </Fact>
             </>
           )}
           {doc.kind === 'STOCK_ADJUSTMENT' && (
-            <Fact label="Nguồn">
+            <Fact label={t('Nguồn')}>
               {doc.stockCountId
-                ? `Từ biên bản kiểm kê #${doc.stockCountId}`
-                : 'Điều chỉnh độc lập'}
+                ? t('Từ biên bản kiểm kê #{stockCountId}', {
+                    stockCountId: doc.stockCountId,
+                  })
+                : t('Điều chỉnh độc lập')}
             </Fact>
           )}
           {agency && (
-            <Fact label="Đại lý" full>
+            <Fact label={t('Đại lý')} full>
               <span className="font-medium">{agency.name}</span>
               {(agency.address || agency.phone) && (
                 <span className="block text-xs text-muted-foreground">
@@ -123,12 +127,12 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
             </Fact>
           )}
           {revision.reason && (
-            <Fact label="Lý do" full>
+            <Fact label={t('Lý do')} full>
               {revision.reason}
             </Fact>
           )}
           {revision.note && (
-            <Fact label="Ghi chú" full>
+            <Fact label={t('Ghi chú')} full>
               {revision.note}
             </Fact>
           )}
@@ -137,7 +141,7 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
       <SectionCard
         title={
           <>
-            Dòng hàng
+            {t('Dòng hàng')}
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
               {revision.lines.length}
             </span>
@@ -146,16 +150,19 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
         contentClassName="px-0"
       >
         <div className="overflow-x-auto border-t">
-          <Table caption="Dòng hàng của chứng từ" className="min-w-[560px]">
+          <Table
+            caption={t('Dòng hàng của chứng từ')}
+            className="min-w-[560px]"
+          >
             <thead>
               <tr>
                 <th className="w-10">#</th>
-                <th>Mặt hàng</th>
-                <th className="cell-number">Số lượng</th>
-                <th>Đơn vị</th>
-                <th className="cell-number">Đơn giá</th>
-                <th className="cell-number">Thành tiền</th>
-                {isReturn && <th>Dòng gốc</th>}
+                <th>{t('Mặt hàng')}</th>
+                <th className="cell-number">{t('Số lượng')}</th>
+                <th>{t('Đơn vị')}</th>
+                <th className="cell-number">{t('Đơn giá')}</th>
+                <th className="cell-number">{t('Thành tiền')}</th>
+                {isReturn && <th>{t('Dòng gốc')}</th>}
               </tr>
             </thead>
             <tbody>

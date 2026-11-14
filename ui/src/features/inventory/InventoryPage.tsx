@@ -44,6 +44,7 @@ import {
   totalStockValue,
   type StockRow,
 } from './inventoryRows'
+import { t } from '@/lib/i18n/core'
 
 /** Product list contract sort default for the overview (name ascending). */
 const OVERVIEW_DEFAULT_SORT = 'name'
@@ -126,7 +127,7 @@ export function InventoryPage() {
   if (!canRead)
     return (
       <div className="space-y-6">
-        <Alert type="error">Bạn không có quyền xem tồn kho.</Alert>
+        <Alert type="error">{t('Bạn không có quyền xem tồn kho.')}</Alert>
       </div>
     )
 
@@ -144,14 +145,14 @@ export function InventoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Kho hàng"
-        title="Tồn kho & Thẻ kho"
-        description="Tồn hiện tại và thẻ kho từng mặt hàng."
+        eyebrow={t('Kho hàng')}
+        title={t('Tồn kho & Thẻ kho')}
+        description={t('Tồn hiện tại và thẻ kho từng mặt hàng.')}
         className="mb-0"
       />
 
       <section
-        aria-label="Chỉ số tồn kho"
+        aria-label={t('Chỉ số tồn kho')}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         {loading ? (
@@ -164,23 +165,25 @@ export function InventoryPage() {
           ready && (
             <>
               <KpiCard
-                label="Mặt hàng đang theo dõi"
+                label={t('Mặt hàng đang theo dõi')}
                 value={<CountUp value={rows.length} />}
                 icon={<Boxes />}
                 hint={
-                  hasMore ? 'Tính trên 100 mặt hàng đầu' : 'Toàn bộ danh mục'
+                  hasMore
+                    ? t('Tính trên 100 mặt hàng đầu')
+                    : t('Toàn bộ danh mục')
                 }
               />
               <KpiCard
-                label="Sắp hết hàng"
+                label={t('Sắp hết hàng')}
                 value={<CountUp value={lowCount} />}
                 icon={<TriangleAlert />}
                 hint={
                   lowCount
                     ? stockFilter === 'low'
-                      ? 'Đang lọc · bấm để bỏ'
-                      : 'Bấm để lọc'
-                    : 'Không có'
+                      ? t('Đang lọc · bấm để bỏ')
+                      : t('Bấm để lọc')
+                    : t('Không có')
                 }
                 active={stockFilter === 'low'}
                 onClick={() =>
@@ -188,7 +191,7 @@ export function InventoryPage() {
                 }
               />
               <KpiCard
-                label="Giá trị tồn kho"
+                label={t('Giá trị tồn kho')}
                 value={
                   total === null ? (
                     '—'
@@ -205,8 +208,8 @@ export function InventoryPage() {
                 icon={<Wallet />}
                 hint={
                   total === null
-                    ? 'Chưa có giá nhập để tính'
-                    : 'Theo giá nhập hiện hành'
+                    ? t('Chưa có giá nhập để tính')
+                    : t('Theo giá nhập hiện hành')
                 }
               />
             </>
@@ -229,18 +232,18 @@ export function InventoryPage() {
 
       <Card
         className="gap-0 overflow-hidden py-0 shadow-xs"
-        aria-label="Tồn kho hiện tại"
+        aria-label={t('Tồn kho hiện tại')}
         role="region"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="space-y-0.5">
             <h2 className="text-sm font-semibold text-foreground">
-              Tồn kho hiện tại
+              {t('Tồn kho hiện tại')}
             </h2>
             {ready && (
               <p className="text-xs text-muted-foreground tabular-nums">
-                {rows.length} mặt hàng
-                {lowCount > 0 && ` · ${lowCount} sắp hết`}
+                {t('{count} mặt hàng', { count: rows.length })}
+                {lowCount > 0 && t(' · {lowCount} sắp hết', { lowCount })}
               </p>
             )}
           </div>
@@ -248,35 +251,39 @@ export function InventoryPage() {
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
                 <Input
-                  aria-label="Lọc theo mã hoặc tên"
-                  placeholder="Lọc theo mã hoặc tên…"
-                  className="h-8 pl-8"
+                  aria-label={t('Lọc theo mã hoặc tên')}
+                  placeholder={t('Lọc theo mã hoặc tên…')}
+                  className="h-8 ps-8"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
                 <Search
-                  className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+                  className="pointer-events-none absolute top-2 start-2.5 size-4 text-muted-foreground"
                   aria-hidden="true"
                 />
               </div>
               <SegmentedFilter
-                label="Lọc tình trạng tồn"
+                label={t('Lọc tình trạng tồn')}
                 value={stockFilter}
                 options={[
-                  { value: '', label: 'Tất cả' },
-                  { value: 'low', label: 'Sắp hết' },
+                  { value: '', label: t('Tất cả') },
+                  { value: 'low', label: t('Sắp hết') },
                 ]}
                 onChange={setStockFilter}
               />
             </div>
           )}
         </div>
-        {loading && <TableSkeleton columns={6} label="Đang tải tồn kho..." />}
+        {loading && (
+          <TableSkeleton columns={6} label={t('Đang tải tồn kho...')} />
+        )}
         {overviewError && (
           <div className="p-4">
             <Alert type="error">
               <span className="flex flex-wrap items-center gap-3">
-                Không tải được tồn kho. {overviewError}
+                {t('Không tải được tồn kho. {overviewError}', {
+                  overviewError,
+                })}
                 <Button
                   variant="outline"
                   size="sm"
@@ -286,7 +293,7 @@ export function InventoryPage() {
                     setAttempt((value) => value + 1)
                   }}
                 >
-                  Thử lại
+                  {t('Thử lại')}
                 </Button>
               </span>
             </Alert>
@@ -297,29 +304,29 @@ export function InventoryPage() {
             {visible.length > 0 && (
               <div className="max-h-[480px] overflow-auto">
                 <Table
-                  caption="Tồn kho theo mặt hàng"
+                  caption={t('Tồn kho theo mặt hàng')}
                   className="min-w-[760px] [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10"
                 >
                   <thead>
                     <tr>
-                      <th>Mã</th>
+                      <th>{t('Mã')}</th>
                       <SortableHeader field="name" sort={sort} onSort={onSort}>
-                        Tên mặt hàng
+                        {t('Tên mặt hàng')}
                       </SortableHeader>
-                      <th>Đơn vị</th>
+                      <th>{t('Đơn vị')}</th>
                       <SortableHeader
                         field="currentStock"
                         sort={sort}
                         onSort={onSort}
                         align="right"
                       >
-                        Tồn hiện tại
+                        {t('Tồn hiện tại')}
                       </SortableHeader>
-                      <th>Mức tồn</th>
-                      <th className="cell-number">Giá trị tồn</th>
-                      <th>Tình trạng</th>
+                      <th>{t('Mức tồn')}</th>
+                      <th className="cell-number">{t('Giá trị tồn')}</th>
+                      <th>{t('Tình trạng')}</th>
                       <th className="cell-actions">
-                        <span className="sr-only">Thao tác</span>
+                        <span className="sr-only">{t('Thao tác')}</span>
                       </th>
                     </tr>
                   </thead>
@@ -361,11 +368,27 @@ export function InventoryPage() {
                                 value={level}
                                 // The shared Progress does not forward `value` to Radix.
                                 aria-valuenow={level}
-                                aria-valuetext={`${formatQuantity(row.currentStock)} trên ngưỡng ${row.threshold ? formatQuantity(row.threshold) : '—'}`}
-                                aria-label={`Mức tồn ${row.code}`}
+                                aria-valuetext={t(
+                                  '{currentStock} trên ngưỡng {value}',
+                                  {
+                                    currentStock: formatQuantity(
+                                      row.currentStock,
+                                    ),
+                                    value: row.threshold
+                                      ? formatQuantity(row.threshold)
+                                      : '—',
+                                  },
+                                )}
+                                aria-label={t('Mức tồn {code}', {
+                                  code: row.code,
+                                })}
                                 title={
                                   row.threshold
-                                    ? `Ngưỡng cảnh báo: ${formatQuantity(row.threshold)}`
+                                    ? t('Ngưỡng cảnh báo: {threshold}', {
+                                        threshold: formatQuantity(
+                                          row.threshold,
+                                        ),
+                                      })
                                     : undefined
                                 }
                                 className={cn(
@@ -384,22 +407,24 @@ export function InventoryPage() {
                           </td>
                           <td>
                             {row.low ? (
-                              <Badge variant="warning">Sắp hết</Badge>
+                              <Badge variant="warning">{t('Sắp hết')}</Badge>
                             ) : (
-                              <Badge variant="success">Đủ hàng</Badge>
+                              <Badge variant="success">{t('Đủ hàng')}</Badge>
                             )}
                           </td>
                           <td className="cell-actions">
                             <Button
                               variant="ghost"
                               size="sm"
-                              aria-label={`Xem thẻ kho ${row.code}`}
+                              aria-label={t('Xem thẻ kho {code}', {
+                                code: row.code,
+                              })}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 choose(row.id, `${row.code} — ${row.name}`)
                               }}
                             >
-                              Thẻ kho
+                              {t('Thẻ kho')}
                             </Button>
                           </td>
                         </tr>
@@ -413,19 +438,20 @@ export function InventoryPage() {
               <div className="p-4">
                 <EmptyState
                   icon={<PackageSearch className="size-6" />}
-                  title="Chưa có mặt hàng."
+                  title={t('Chưa có mặt hàng.')}
                 />
               </div>
             )}
             {rows.length > 0 && !visible.length && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Không có mặt hàng khớp bộ lọc.
+                {t('Không có mặt hàng khớp bộ lọc.')}
               </p>
             )}
             {hasMore && (
               <p className="border-t px-4 py-3 text-xs text-muted-foreground">
-                Chỉ 100 mặt hàng đầu tiên theo thứ tự đang chọn · tra cứu thẻ
-                kho bên dưới cho mặt hàng khác.
+                {t(
+                  'Chỉ 100 mặt hàng đầu tiên theo thứ tự đang chọn · tra cứu thẻ kho bên dưới cho mặt hàng khác.',
+                )}
               </p>
             )}
           </>
@@ -434,13 +460,13 @@ export function InventoryPage() {
 
       <SectionCard
         as="h2"
-        title="Tra cứu thẻ kho"
-        description="Nhập – xuất – tồn theo thời gian."
+        title={t('Tra cứu thẻ kho')}
+        description={t('Nhập – xuất – tồn theo thời gian.')}
       >
         <div className="max-w-md">
           <EntityPicker
             resource="products"
-            label="Mặt hàng"
+            label={t('Mặt hàng')}
             value={selected}
             onChange={(productId, item) => choose(productId, item?.label ?? '')}
           />
@@ -456,7 +482,9 @@ export function InventoryPage() {
           <SourceStatement
             key={selected}
             path={`/products/${selected}/inventory-entries`}
-            title={`Thẻ kho: ${selectedLabel || `#${selected}`}`}
+            title={t('Thẻ kho: {value}', {
+              value: selectedLabel || `#${selected}`,
+            })}
             opening="openingStock"
             closing="closingStock"
           />

@@ -12,6 +12,8 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { t } from '../../lib/i18n/core'
 import { useEffect, useId, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ChartCard } from '../../components/blocks/ChartCard'
@@ -81,9 +83,9 @@ const varianceBadge: Record<
   Variance,
   { label: string; tone: 'success' | 'info' | 'danger' }
 > = {
-  match: { label: 'Khớp', tone: 'success' },
-  surplus: { label: 'Thừa', tone: 'info' },
-  shortage: { label: 'Thiếu', tone: 'danger' },
+  match: { label: t('Khớp'), tone: 'success' },
+  surplus: { label: t('Thừa'), tone: 'info' },
+  shortage: { label: t('Thiếu'), tone: 'danger' },
 }
 function varianceCounts(lines: CountLine[]) {
   const counts = { match: 0, surplus: 0, shortage: 0 }
@@ -119,21 +121,21 @@ const COUNT_DEFAULT_SORT = '-countedAt'
 const COUNT_STEPS: Record<'draft' | 'confirmed' | 'adjust', LifecycleStep> = {
   draft: {
     key: 'draft',
-    label: 'Đếm',
+    label: t('Đếm'),
     icon: ClipboardList,
-    hint: 'Biên bản nháp: còn sửa số đếm.',
+    hint: t('Biên bản nháp: còn sửa số đếm.'),
   },
   confirmed: {
     key: 'confirmed',
-    label: 'Xác nhận',
+    label: t('Xác nhận'),
     icon: ClipboardCheck,
-    hint: 'Đã chốt, không sửa được.',
+    hint: t('Đã chốt, không sửa được.'),
   },
   adjust: {
     key: 'adjust',
-    label: 'Điều chỉnh kho',
+    label: t('Điều chỉnh kho'),
     icon: Scale,
-    hint: 'Chênh lệch được ghi thành phiếu điều chỉnh kho.',
+    hint: t('Chênh lệch được ghi thành phiếu điều chỉnh kho.'),
   },
 }
 
@@ -261,7 +263,9 @@ function CountsScreen() {
     try {
       if (mode !== 'add' && mode !== 'line' && !validInstant(countedAt))
         throw new Error(
-          'Nhập thời điểm ISO 8601 đầy đủ múi giờ, ví dụ 2026-10-30T09:00:00+07:00.',
+          t(
+            'Nhập thời điểm ISO 8601 đầy đủ múi giờ, ví dụ 2026-10-30T09:00:00+07:00.',
+          ),
         )
       const ids = new Set<string>()
       if (mode !== 'header')
@@ -272,17 +276,19 @@ function CountsScreen() {
             !exact.quantity.test(line.countedQuantity)
           )
             throw new Error(
-              'Chọn mỗi mặt hàng một lần và nhập số đếm không âm, tối đa 3 chữ số lẻ.',
+              t(
+                'Chọn mỗi mặt hàng một lần và nhập số đếm không âm, tối đa 3 chữ số lẻ.',
+              ),
             )
           ids.add(line.productId)
         }
       if (mode === 'recount' && !reason.trim())
-        throw new Error('Cần lý do đếm lại.')
+        throw new Error(t('Cần lý do đếm lại.'))
       if (
         mode !== 'create' &&
         (!detail?.etag || detail.count.state !== 'DRAFT')
       )
-        throw new Error('Biên bản đã thay đổi. Hãy tải lại trước khi lưu.')
+        throw new Error(t('Biên bản đã thay đổi. Hãy tải lại trước khi lưu.'))
       let path = '/stock-counts'
       let body: unknown = {
         countedAt,
@@ -309,7 +315,13 @@ function CountsScreen() {
         ifMatch: mode === 'create' ? undefined : detail!.etag!,
       })
       setMode(null)
-      setNotice('Đã lưu số đếm kiểm kê.')
+      setNotice(t('Đã lưu số đếm kiểm kê.'))
+      notifyNextStep({
+        done: t('Đã lưu số đếm kiểm kê.'),
+        next: t(
+          'Bước tiếp: đếm đủ các mặt hàng, kiểm tra chênh lệch từng dòng rồi Xác nhận biên bản.',
+        ),
+      })
       invalidateCache('/stock-counts')
       reload()
     } catch (failure) {
@@ -333,7 +345,16 @@ function CountsScreen() {
       await mutation.run(`/stock-counts/${detail.count.id}/confirm`, {
         ifMatch: detail.etag,
       })
-      setNotice('Đã xác nhận biên bản kiểm kê.')
+      setNotice(t('Đã xác nhận biên bản kiểm kê.'))
+      notifyNextStep({
+        done: t('Đã xác nhận biên bản kiểm kê {code}.', {
+          code: detail.count.code,
+        }),
+        next: t(
+          'Chênh lệch đã được ghi sổ thành phiếu điều chỉnh kho; tồn kho đã khớp số đếm.',
+        ),
+        to: '/stock-adjustments',
+      })
       invalidateCache('/stock-counts')
       invalidateCache('/stock-adjustments')
       reload()
@@ -346,7 +367,7 @@ function CountsScreen() {
     }
   }
   if (!canCount)
-    return <Alert type="error">Bạn không có quyền kiểm kê kho.</Alert>
+    return <Alert type="error">{t('Bạn không có quyền kiểm kê kho.')}</Alert>
   // Recount and single-line edits keep the product fixed; show it by name.
   const knownLine = (productId: string) =>
     detail?.count.lines.find((line) => line.productId === productId)
@@ -371,30 +392,30 @@ function CountsScreen() {
   ).length
   const scope =
     data.page && (data.page.pagination.hasMore || cursors.length > 1)
-      ? 'Trang hiện tại'
-      : 'Toàn bộ kết quả'
+      ? t('Trang hiện tại')
+      : t('Toàn bộ kết quả')
   const lifecycle = detail ? countLifecycle(detail.count) : null
   const variances = detail ? varianceRows(detail.count.lines) : []
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Kho hàng"
-        title="Kiểm kê kho hàng"
-        description="Số đếm thực tế so với sổ kho."
+        eyebrow={t('Kho hàng')}
+        title={t('Kiểm kê kho hàng')}
+        description={t('Số đếm thực tế so với sổ kho.')}
         className="mb-0"
         actions={
           <Button
             icon={<Plus className="size-4" />}
             onClick={() => open('create')}
           >
-            Lập kiểm kê
+            {t('Lập kiểm kê')}
           </Button>
         }
       />
       {notice && <Alert type="success">{notice}</Alert>}
       <Card className="gap-0 p-3 shadow-xs sm:p-4">
         <form
-          aria-label="Bộ lọc kiểm kê"
+          aria-label={t('Bộ lọc kiểm kê')}
           className="flex flex-col gap-3 sm:flex-row sm:items-end"
           onSubmit={(event) => {
             event.preventDefault()
@@ -407,7 +428,7 @@ function CountsScreen() {
               htmlFor={searchId}
               className="text-[13px] text-foreground/85"
             >
-              Mã kiểm kê
+              {t('Mã kiểm kê')}
             </Label>
             <InputGroup className="bg-card">
               <InputGroupAddon>
@@ -423,29 +444,29 @@ function CountsScreen() {
             </InputGroup>
           </div>
           <Button type="submit" icon={<Filter className="size-4" />}>
-            Áp dụng bộ lọc
+            {t('Áp dụng bộ lọc')}
           </Button>
         </form>
       </Card>
       {data.page && items.length > 0 && (
         <section
-          aria-label="Tổng quan kiểm kê"
+          aria-label={t('Tổng quan kiểm kê')}
           className="grid gap-4 sm:grid-cols-3"
         >
           <KpiCard
-            label="Biên bản"
+            label={t('Biên bản')}
             value={<CountUp value={items.length} />}
             icon={<ClipboardList />}
             hint={scope}
           />
           <KpiCard
-            label="Đang nháp"
+            label={t('Đang nháp')}
             value={<CountUp value={pageDrafts} />}
             icon={<PencilLine />}
             hint={scope}
           />
           <KpiCard
-            label="Có chênh lệch"
+            label={t('Có chênh lệch')}
             value={<CountUp value={pageOff} />}
             icon={<FileWarning />}
             hint={scope}
@@ -457,7 +478,7 @@ function CountsScreen() {
           <span className="flex flex-wrap items-center gap-3">
             {data.error}
             <Button variant="outline" size="sm" onClick={data.reload}>
-              Thử lại
+              {t('Thử lại')}
             </Button>
           </span>
         </Alert>
@@ -465,10 +486,10 @@ function CountsScreen() {
       <Card className="gap-0 overflow-hidden py-0 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <SegmentedFilter
-            label="Trạng thái kiểm kê"
+            label={t('Trạng thái kiểm kê')}
             value={state}
             options={[
-              { value: '', label: 'Tất cả' },
+              { value: '', label: t('Tất cả') },
               { value: 'DRAFT', label: statusLabel('DRAFT') },
               { value: 'CONFIRMED', label: statusLabel('CONFIRMED') },
             ]}
@@ -488,12 +509,12 @@ function CountsScreen() {
           />
         </div>
         {data.loading && (
-          <TableSkeleton columns={6} label="Đang tải kiểm kê..." />
+          <TableSkeleton columns={6} label={t('Đang tải kiểm kê...')} />
         )}
         {data.page &&
           (data.page.items.length ? (
             <div className="overflow-x-auto">
-              <Table caption="Danh sách kiểm kê" className="min-w-[680px]">
+              <Table caption={t('Danh sách kiểm kê')} className="min-w-[680px]">
                 <thead>
                   <tr>
                     <SortableHeader
@@ -502,7 +523,7 @@ function CountsScreen() {
                       onSort={onSort}
                       firstDirection="desc"
                     >
-                      Mã
+                      {t('Mã')}
                     </SortableHeader>
                     <SortableHeader
                       field="countedAt"
@@ -510,14 +531,14 @@ function CountsScreen() {
                       onSort={onSort}
                       firstDirection="desc"
                     >
-                      Thời điểm đếm
+                      {t('Thời điểm đếm')}
                     </SortableHeader>
-                    <th>Trạng thái</th>
-                    <th className="cell-number">Số mặt hàng</th>
-                    <th>Đối chiếu</th>
-                    <th>Lý do</th>
+                    <th>{t('Trạng thái')}</th>
+                    <th className="cell-number">{t('Số mặt hàng')}</th>
+                    <th>{t('Đối chiếu')}</th>
+                    <th>{t('Lý do')}</th>
                     <th className="cell-actions">
-                      <span className="sr-only">Thao tác</span>
+                      <span className="sr-only">{t('Thao tác')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -544,9 +565,11 @@ function CountsScreen() {
                         <td className="cell-number">{count.lines.length}</td>
                         <td>
                           {off ? (
-                            <Badge variant="warning">{off} dòng lệch</Badge>
+                            <Badge variant="warning">
+                              {t('{off} dòng lệch', { off })}
+                            </Badge>
                           ) : (
-                            <Badge variant="success">Khớp sổ</Badge>
+                            <Badge variant="success">{t('Khớp sổ')}</Badge>
                           )}
                         </td>
                         <td className="max-w-56 truncate text-muted-foreground">
@@ -559,10 +582,12 @@ function CountsScreen() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            aria-label={`Chi tiết ${count.code}`}
+                            aria-label={t('Chi tiết {code}', {
+                              code: count.code,
+                            })}
                             onClick={() => openDetail(count.id)}
                           >
-                            Chi tiết
+                            {t('Chi tiết')}
                           </Button>
                         </td>
                       </tr>
@@ -575,7 +600,7 @@ function CountsScreen() {
             <div className="p-4">
               <EmptyState
                 icon={<ClipboardList className="size-6" />}
-                title="Chưa có biên bản kiểm kê phù hợp."
+                title={t('Chưa có biên bản kiểm kê phù hợp.')}
               />
             </div>
           ))}
@@ -594,7 +619,11 @@ function CountsScreen() {
       </Card>
       <Modal
         isOpen={!!selected && !mode}
-        title={detail ? `Biên bản ${detail.count.code}` : 'Biên bản kiểm kê'}
+        title={
+          detail
+            ? t('Biên bản {code}', { code: detail.count.code })
+            : t('Biên bản kiểm kê')
+        }
         maxWidth="xl"
         onClose={() => {
           if (!mutation.busy) setSelected(null)
@@ -603,12 +632,12 @@ function CountsScreen() {
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
               variant="ghost"
-              className="mr-auto"
+              className="me-auto"
               icon={<RefreshCw className="size-4" />}
               disabled={mutation.busy}
               onClick={reload}
             >
-              Tải lại
+              {t('Tải lại')}
             </Button>
             {detail && isDraft && (
               <>
@@ -618,7 +647,7 @@ function CountsScreen() {
                   disabled={!detail.etag || mutation.busy}
                   onClick={() => open('header')}
                 >
-                  Sửa thông tin kiểm kê
+                  {t('Sửa thông tin kiểm kê')}
                 </Button>
                 <Button
                   variant="outline"
@@ -626,7 +655,7 @@ function CountsScreen() {
                   disabled={!detail.etag || mutation.busy}
                   onClick={() => open('add')}
                 >
-                  Thêm mặt hàng
+                  {t('Thêm mặt hàng')}
                 </Button>
                 <Button
                   variant="outline"
@@ -634,14 +663,14 @@ function CountsScreen() {
                   disabled={!detail.etag || mutation.busy}
                   onClick={() => open('recount')}
                 >
-                  Đếm lại toàn bộ
+                  {t('Đếm lại toàn bộ')}
                 </Button>
                 <Button
                   icon={<ClipboardCheck className="size-4" />}
                   disabled={!detail.etag || !confirmable || mutation.busy}
                   onClick={() => setConfirming(true)}
                 >
-                  Xác nhận kiểm kê
+                  {t('Xác nhận kiểm kê')}
                 </Button>
               </>
             )}
@@ -652,7 +681,7 @@ function CountsScreen() {
           {error && <Alert type="error">{error}</Alert>}
           {!detail && !error && (
             <div role="status" className="space-y-4">
-              <span className="sr-only">Đang tải biên bản...</span>
+              <span className="sr-only">{t('Đang tải biên bản...')}</span>
               <Skeleton className="h-28 w-full rounded-xl" />
               <Skeleton className="h-40 w-full rounded-xl" />
             </div>
@@ -668,7 +697,7 @@ function CountsScreen() {
                 </div>
                 {lifecycle && (
                   <LifecycleSteps
-                    label="Vòng đời biên bản"
+                    label={t('Vòng đời biên bản')}
                     steps={lifecycle.steps}
                     current={lifecycle.current}
                     tone={
@@ -678,28 +707,41 @@ function CountsScreen() {
                 )}
                 <Separator />
                 <FactGrid className="lg:grid-cols-3">
-                  <Fact label="Thời điểm đếm">
+                  <Fact label={t('Thời điểm đếm')}>
                     <span className="tabular-nums">
                       {formatDateTime(detail.count.countedAt)}
                     </span>
                   </Fact>
-                  <Fact label="Phiếu điều chỉnh">
+                  <Fact label={t('Phiếu điều chỉnh')}>
                     {detail.count.adjustmentDocumentId
                       ? `#${detail.count.adjustmentDocumentId}`
-                      : 'Chưa có'}
+                      : t('Chưa có')}
                   </Fact>
-                  <Fact label="Đối chiếu">
+                  <Fact label={t('Đối chiếu')}>
                     <span
                       className="flex flex-wrap gap-1.5"
-                      aria-label={`${totals.match} khớp, ${totals.surplus} thừa, ${totals.shortage} thiếu`}
+                      aria-label={t(
+                        '{match} khớp, {surplus} thừa, {shortage} thiếu',
+                        {
+                          match: totals.match,
+                          surplus: totals.surplus,
+                          shortage: totals.shortage,
+                        },
+                      )}
                     >
-                      <Badge variant="success">Khớp: {totals.match}</Badge>
-                      <Badge variant="info">Thừa: {totals.surplus}</Badge>
-                      <Badge variant="danger">Thiếu: {totals.shortage}</Badge>
+                      <Badge variant="success">
+                        {t('Khớp: {match}', { match: totals.match })}
+                      </Badge>
+                      <Badge variant="info">
+                        {t('Thừa: {surplus}', { surplus: totals.surplus })}
+                      </Badge>
+                      <Badge variant="danger">
+                        {t('Thiếu: {shortage}', { shortage: totals.shortage })}
+                      </Badge>
                     </span>
                   </Fact>
                   {detail.count.reason && (
-                    <Fact label="Lý do" full>
+                    <Fact label={t('Lý do')} full>
                       {detail.count.reason}
                     </Fact>
                   )}
@@ -707,13 +749,13 @@ function CountsScreen() {
                 {detail.count.lines.length > 0 && (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Khớp sổ</span>
+                      <span>{t('Khớp sổ')}</span>
                       <span className="font-medium text-foreground tabular-nums">
                         {totals.match}/{detail.count.lines.length}
                       </span>
                     </div>
                     <SegmentedMeter
-                      label="Tỷ lệ dòng khớp sổ"
+                      label={t('Tỷ lệ dòng khớp sổ')}
                       ratio={totals.match / detail.count.lines.length}
                       segments={24}
                       color="var(--success)"
@@ -724,13 +766,13 @@ function CountsScreen() {
               </Card>
               {variances.length > 0 && (
                 <ChartCard
-                  title="Chênh lệch theo mặt hàng"
+                  title={t('Chênh lệch theo mặt hàng')}
                   table={
-                    <Table caption="Chênh lệch theo mặt hàng">
+                    <Table caption={t('Chênh lệch theo mặt hàng')}>
                       <thead>
                         <tr>
-                          <th>Mặt hàng</th>
-                          <th className="cell-number">Chênh lệch</th>
+                          <th>{t('Mặt hàng')}</th>
+                          <th className="cell-number">{t('Chênh lệch')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -755,12 +797,12 @@ function CountsScreen() {
                     series={[
                       {
                         key: 'surplus',
-                        label: 'Thừa',
+                        label: t('Thừa'),
                         color: 'var(--success)',
                       },
                       {
                         key: 'shortage',
-                        label: 'Thiếu',
+                        label: t('Thiếu'),
                         color: 'var(--destructive)',
                       },
                     ]}
@@ -772,20 +814,20 @@ function CountsScreen() {
               <Card className="gap-0 overflow-hidden py-0 shadow-xs">
                 <div className="overflow-x-auto">
                   <Table
-                    caption="Số đếm so với sổ kho"
+                    caption={t('Số đếm so với sổ kho')}
                     className="min-w-[640px]"
                   >
                     <thead>
                       <tr>
-                        <th>Mặt hàng</th>
-                        <th>Đơn vị</th>
-                        <th className="cell-number">Sổ kho</th>
-                        <th className="cell-number">Thực đếm</th>
-                        <th className="cell-number">Chênh lệch</th>
-                        <th>Kết quả</th>
+                        <th>{t('Mặt hàng')}</th>
+                        <th>{t('Đơn vị')}</th>
+                        <th className="cell-number">{t('Sổ kho')}</th>
+                        <th className="cell-number">{t('Thực đếm')}</th>
+                        <th className="cell-number">{t('Chênh lệch')}</th>
+                        <th>{t('Kết quả')}</th>
                         {isDraft && (
                           <th className="cell-actions">
-                            <span className="sr-only">Thao tác</span>
+                            <span className="sr-only">{t('Thao tác')}</span>
                           </th>
                         )}
                       </tr>
@@ -824,11 +866,13 @@ function CountsScreen() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                aria-label={`Sửa số đếm ${line.productCode}`}
+                                aria-label={t('Sửa số đếm {productCode}', {
+                                  productCode: line.productCode,
+                                })}
                                 disabled={!detail.etag || mutation.busy}
                                 onClick={() => open('line', line)}
                               >
-                                Sửa
+                                {t('Sửa')}
                               </Button>
                             </td>
                           )}
@@ -840,8 +884,9 @@ function CountsScreen() {
               </Card>
               {isDraft && (
                 <Hint>
-                  Chênh lệch thành phiếu điều chỉnh khi xác nhận (cần quyền ghi
-                  sổ điều chỉnh). Tồn kho đổi sau lúc đếm thì đếm lại.
+                  {t(
+                    'Chênh lệch thành phiếu điều chỉnh khi xác nhận (cần quyền ghi sổ điều chỉnh). Tồn kho đổi sau lúc đếm thì đếm lại.',
+                  )}
                 </Hint>
               )}
             </>
@@ -850,7 +895,7 @@ function CountsScreen() {
       </Modal>
       <Modal
         isOpen={confirming && !!detail}
-        title="Xác nhận biên bản kiểm kê"
+        title={t('Xác nhận biên bản kiểm kê')}
         maxWidth="sm"
         onClose={() => {
           if (!mutation.busy) setConfirming(false)
@@ -862,38 +907,40 @@ function CountsScreen() {
               disabled={mutation.busy}
               onClick={() => setConfirming(false)}
             >
-              Quay lại
+              {t('Quay lại')}
             </Button>
             <Button
               icon={<ClipboardCheck className="size-4" />}
               isLoading={mutation.busy}
               onClick={() => void confirm()}
             >
-              Xác nhận
+              {t('Xác nhận')}
             </Button>
           </>
         }
       >
         <p className="text-sm leading-relaxed text-foreground">
-          Xác nhận <strong>{detail?.count.code}</strong>?{' '}
+          {t('Xác nhận')} <strong>{detail?.count.code}</strong>?{' '}
           {totals && totals.surplus + totals.shortage > 0
-            ? `${totals.surplus + totals.shortage} dòng lệch sẽ được ghi thành phiếu điều chỉnh kho.`
-            : 'Mọi dòng khớp sổ kho, không sinh phiếu điều chỉnh.'}
+            ? t('{value} dòng lệch sẽ được ghi thành phiếu điều chỉnh kho.', {
+                value: totals.surplus + totals.shortage,
+              })
+            : t('Mọi dòng khớp sổ kho, không sinh phiếu điều chỉnh.')}
         </p>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Biên bản đã xác nhận không thể sửa.
+          {t('Biên bản đã xác nhận không thể sửa.')}
         </p>
       </Modal>
       <Modal
         isOpen={!!mode}
         title={
           mode === 'recount'
-            ? 'Đếm lại toàn bộ mặt hàng'
+            ? t('Đếm lại toàn bộ mặt hàng')
             : mode === 'header'
-              ? 'Sửa thông tin kiểm kê'
+              ? t('Sửa thông tin kiểm kê')
               : mode === 'create'
-                ? 'Lập kiểm kê'
-                : 'Ghi số đếm'
+                ? t('Lập kiểm kê')
+                : t('Ghi số đếm')
         }
         maxWidth="lg"
         onClose={() => {
@@ -909,18 +956,18 @@ function CountsScreen() {
         >
           {formError && <Alert type="error">{formError}</Alert>}
           <fieldset disabled={mutation.busy} className="min-w-0 space-y-4">
-            <legend className="sr-only">Số đếm kiểm kê</legend>
+            <legend className="sr-only">{t('Số đếm kiểm kê')}</legend>
             {mode !== 'add' && mode !== 'line' && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Thời điểm đếm (ISO 8601, có múi giờ)"
+                  label={t('Thời điểm đếm (ISO 8601, có múi giờ)')}
                   placeholder="2026-10-30T09:00:00+07:00"
                   className="tabular-nums"
                   value={countedAt}
                   onChange={(event) => setCountedAt(event.target.value)}
                 />
                 <Input
-                  label="Lý do kiểm kê"
+                  label={t('Lý do kiểm kê')}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                 />
@@ -939,7 +986,7 @@ function CountsScreen() {
                       {fixed ? (
                         <div className="grid min-w-0 gap-1.5">
                           <span className="text-[13px] font-medium text-foreground/85">
-                            Mặt hàng {index + 1}
+                            {t('Mặt hàng')} {index + 1}
                           </span>
                           <span className="flex h-9 items-center truncate rounded-md bg-muted/60 px-3 text-sm">
                             {known
@@ -951,7 +998,7 @@ function CountsScreen() {
                         <EntityPicker
                           id={`count-${index}-product`}
                           resource="products"
-                          label={`Mặt hàng ${index + 1}`}
+                          label={t('Mặt hàng {value}', { value: index + 1 })}
                           required
                           disabled={mutation.busy}
                           value={line.productId}
@@ -967,9 +1014,11 @@ function CountsScreen() {
                         />
                       )}
                       <Input
-                        label={`Số đếm thực tế ${index + 1}`}
+                        label={t('Số đếm thực tế {value}', {
+                          value: index + 1,
+                        })}
                         inputMode="decimal"
-                        className="text-right tabular-nums"
+                        className="text-end tabular-nums"
                         value={line.countedQuantity}
                         onChange={(event) =>
                           setObservations(
@@ -990,7 +1039,9 @@ function CountsScreen() {
                           variant="ghost"
                           size="sm"
                           className="size-9 p-0 text-muted-foreground hover:text-destructive"
-                          aria-label={`Xóa mặt hàng ${index + 1}`}
+                          aria-label={t('Xóa mặt hàng {value}', {
+                            value: index + 1,
+                          })}
                           disabled={observations.length === 1}
                           onClick={() =>
                             setObservations(
@@ -1022,7 +1073,7 @@ function CountsScreen() {
                       ])
                     }
                   >
-                    Thêm mặt hàng
+                    {t('Thêm mặt hàng')}
                   </Button>
                 )}
               </div>
@@ -1035,10 +1086,10 @@ function CountsScreen() {
               disabled={mutation.busy}
               onClick={() => setMode(null)}
             >
-              Đóng
+              {t('Đóng')}
             </Button>
             <Button type="submit" isLoading={mutation.busy}>
-              Lưu số đếm
+              {t('Lưu số đếm')}
             </Button>
           </div>
         </form>
