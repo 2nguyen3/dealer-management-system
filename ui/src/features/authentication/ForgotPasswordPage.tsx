@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { apiFetch } from '../../lib/api'
 import { AuthLayout } from './AuthLayout'
+import { t } from '@/lib/i18n/core'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -21,7 +22,7 @@ export function ForgotPasswordPage() {
     setEmailError(null)
 
     if (!email) {
-      setEmailError('Vui lòng nhập địa chỉ email.')
+      setEmailError(t('Vui lòng nhập địa chỉ email.'))
       return
     }
 
@@ -38,14 +39,16 @@ export function ForgotPasswordPage() {
       const errorObj = err as { code?: string; message?: string }
       if (errorObj.code === 'RATE_LIMITED') {
         setErrorMessage(
-          'Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng thử lại sau.',
+          t('Bạn đã gửi yêu cầu quá nhiều lần. Vui lòng thử lại sau.'),
         )
       } else {
         // Backend returns accepted message even if user does not exist,
         // but if SMTP is unavailable or error occurs, show safe feedback
         setErrorMessage(
           errorObj.message ||
-            'Không thể gửi yêu cầu đặt lại mật khẩu lúc này. Vui lòng thử lại sau.',
+            t(
+              'Không thể gửi yêu cầu đặt lại mật khẩu lúc này. Vui lòng thử lại sau.',
+            ),
         )
       }
     } finally {
@@ -55,8 +58,8 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title="Quên mật khẩu"
-      description="Nhập email tài khoản để nhận liên kết đặt lại mật khẩu"
+      title={t('Quên mật khẩu')}
+      description={t('Nhập email tài khoản để nhận liên kết đặt lại mật khẩu')}
       icon={<KeyRound />}
     >
       {isSubmitted ? (
@@ -66,14 +69,15 @@ export function ForgotPasswordPage() {
               <MailCheck className="size-6" />
             </span>
           </div>
-          <Alert type="success" title="Đã ghi nhận yêu cầu">
-            Nếu địa chỉ email tồn tại trên hệ thống, hướng dẫn đặt lại mật khẩu
-            đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra hộp thư đến.
+          <Alert type="success" title={t('Đã ghi nhận yêu cầu')}>
+            {t(
+              'Nếu địa chỉ email tồn tại trên hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra hộp thư đến.',
+            )}
           </Alert>
           <ShadcnButton asChild size="lg" className="w-full">
             <Link to="/login">
               <ArrowLeft aria-hidden="true" />
-              Quay lại Đăng nhập
+              {t('Quay lại Đăng nhập')}
             </Link>
           </ShadcnButton>
         </div>
@@ -103,7 +107,7 @@ export function ForgotPasswordPage() {
             isLoading={isLoading}
             icon={<Mail className="size-4" />}
           >
-            Gửi yêu cầu đặt lại
+            {t('Gửi yêu cầu đặt lại')}
           </Button>
           <div className="text-center">
             <Link
@@ -111,7 +115,7 @@ export function ForgotPasswordPage() {
               className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
-              Quay lại Đăng nhập
+              {t('Quay lại Đăng nhập')}
             </Link>
           </div>
         </form>

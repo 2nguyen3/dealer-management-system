@@ -6,6 +6,7 @@ import { Modal } from '../../components/ui/Modal'
 import { apiFetch } from '../../lib/api'
 import { PasswordToggle } from './PasswordToggle'
 import { useAuth } from './useAuth'
+import { t } from '@/lib/i18n/core'
 
 export interface ChangePasswordModalProps {
   isOpen: boolean
@@ -45,17 +46,17 @@ export function ChangePasswordModal({
     setErrorMessage(null)
 
     if (!currentPassword) {
-      setErrorMessage('Vui lòng nhập mật khẩu hiện tại.')
+      setErrorMessage(t('Vui lòng nhập mật khẩu hiện tại.'))
       return
     }
 
     if (!newPassword) {
-      setErrorMessage('Vui lòng nhập mật khẩu mới.')
+      setErrorMessage(t('Vui lòng nhập mật khẩu mới.'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setErrorMessage('Xác nhận mật khẩu mới không khớp.')
+      setErrorMessage(t('Xác nhận mật khẩu mới không khớp.'))
       return
     }
 
@@ -79,10 +80,10 @@ export function ChangePasswordModal({
         message?: string
       }
       if (errorObj.status === 401 || errorObj.code === 'INVALID_CREDENTIALS') {
-        setErrorMessage('Mật khẩu hiện tại không chính xác.')
+        setErrorMessage(t('Mật khẩu hiện tại không chính xác.'))
       } else {
         setErrorMessage(
-          errorObj.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.',
+          errorObj.message || t('Không thể đổi mật khẩu. Vui lòng thử lại.'),
         )
       }
     } finally {
@@ -94,13 +95,14 @@ export function ChangePasswordModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Đổi mật khẩu tài khoản"
+      title={t('Đổi mật khẩu tài khoản')}
       maxWidth="sm"
     >
       {isSuccess ? (
-        <Alert type="success" title="Đổi mật khẩu thành công">
-          Mật khẩu của bạn đã được cập nhật. Bạn sẽ được chuyển về màn hình đăng
-          nhập...
+        <Alert type="success" title={t('Đổi mật khẩu thành công')}>
+          {t(
+            'Mật khẩu của bạn đã được cập nhật. Bạn sẽ được chuyển về màn hình đăng nhập...',
+          )}
         </Alert>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -108,7 +110,7 @@ export function ChangePasswordModal({
 
           <Input
             id="current-password"
-            label="Mật khẩu hiện tại"
+            label={t('Mật khẩu hiện tại')}
             type={showCurrent ? 'text' : 'password'}
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
@@ -125,7 +127,7 @@ export function ChangePasswordModal({
 
           <Input
             id="new-pwd"
-            label="Mật khẩu mới"
+            label={t('Mật khẩu mới')}
             type={showNew ? 'text' : 'password'}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -141,7 +143,7 @@ export function ChangePasswordModal({
 
           <Input
             id="confirm-new-pwd"
-            label="Xác nhận mật khẩu mới"
+            label={t('Xác nhận mật khẩu mới')}
             type={showNew ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -156,10 +158,10 @@ export function ChangePasswordModal({
               onClick={handleClose}
               disabled={isLoading}
             >
-              Hủy
+              {t('Hủy')}
             </Button>
             <Button type="submit" variant="primary" isLoading={isLoading}>
-              Cập nhật
+              {t('Cập nhật')}
             </Button>
           </div>
         </form>

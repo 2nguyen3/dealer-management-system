@@ -7,7 +7,9 @@ import {
   CardDescription,
   CardHeader,
 } from '../../components/shadcn/card'
+import { LanguagePicker } from '../../components/i18n/LanguagePicker'
 import { ModeToggle } from '../../components/theme/ModeToggle'
+import { t } from '@/lib/i18n/core'
 
 export interface AuthLayoutProps {
   title: string
@@ -32,9 +34,9 @@ export function AuthLayout({
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <aside
-        aria-label="Giới thiệu Agentra"
+        aria-label={t('Giới thiệu Agentra')}
         data-testid="auth-intro"
-        className="relative hidden overflow-hidden border-r bg-linear-to-br from-primary/12 via-muted to-background lg:flex lg:flex-col lg:p-10 xl:p-12"
+        className="relative hidden overflow-hidden border-e bg-linear-to-br from-primary/12 via-muted to-background lg:flex lg:flex-col lg:p-10 xl:p-12"
       >
         <div
           aria-hidden="true"
@@ -43,20 +45,23 @@ export function AuthLayout({
         <BrandLogo className="relative h-14 self-start" />
         <div className="relative mt-10 max-w-lg space-y-3">
           <h2 className="text-3xl leading-tight font-semibold tracking-tight text-balance text-primary xl:text-4xl">
-            Từ nhà máy đến đại lý, trong một hệ thống.
+            {t('Từ nhà máy đến đại lý, trong một hệ thống.')}
           </h2>
           <p className="text-base text-muted-foreground">
-            Sản xuất, giao hàng và bán hàng của mạng lưới đại lý.
+            {t('Sản xuất, giao hàng và bán hàng của mạng lưới đại lý.')}
           </p>
         </div>
         <IllustratedFigure
           name="supplychain.html"
-          title="Minh họa động: nhà máy sản xuất, xe giao hàng và đại lý nhận hàng, bán hàng"
+          title={t(
+            'Minh họa động: nhà máy sản xuất, xe giao hàng và đại lý nhận hàng, bán hàng',
+          )}
           className="relative -mx-6 mt-6 min-h-80 flex-1"
         />
       </aside>
       <div className="relative flex min-w-0 items-center justify-center px-4 py-10 sm:px-8">
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+        <div className="absolute end-3 top-3 flex items-center gap-2 sm:end-4 sm:top-4">
+          <LanguagePicker compact />
           <ModeToggle />
         </div>
         <div className="w-full max-w-sm space-y-6">

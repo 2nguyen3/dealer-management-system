@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { AuthLayout } from './AuthLayout'
 import { PasswordToggle } from './PasswordToggle'
 import { useAuth } from './useAuth'
+import { t } from '@/lib/i18n/core'
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -43,12 +44,18 @@ export function LoginPage() {
     setFieldError(null)
 
     if (!email) {
-      setFieldError({ field: 'email', message: 'Vui lòng nhập địa chỉ email.' })
+      setFieldError({
+        field: 'email',
+        message: t('Vui lòng nhập địa chỉ email.'),
+      })
       return
     }
 
     if (!password) {
-      setFieldError({ field: 'password', message: 'Vui lòng nhập mật khẩu.' })
+      setFieldError({
+        field: 'password',
+        message: t('Vui lòng nhập mật khẩu.'),
+      })
       return
     }
 
@@ -65,20 +72,23 @@ export function LoginPage() {
         message?: string
       }
       if (errorObj.code === 'INVALID_CREDENTIALS') {
-        setErrorMessage('Email hoặc mật khẩu không chính xác.')
+        setErrorMessage(t('Email hoặc mật khẩu không chính xác.'))
       } else if (errorObj.code === 'ACCOUNT_LOCKED') {
-        setErrorMessage('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.')
+        setErrorMessage(
+          t('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.'),
+        )
       } else if (errorObj.status === 429 || errorObj.code === 'RATE_LIMITED') {
         setErrorMessage(
-          'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.',
+          t('Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.'),
         )
       } else if (errorObj.status === 0 || errorObj.code === 'NETWORK_ERROR') {
         setErrorMessage(
-          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.',
+          t('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.'),
         )
       } else {
         setErrorMessage(
-          errorObj.message || 'Đăng nhập không thành công. Vui lòng thử lại.',
+          errorObj.message ||
+            t('Đăng nhập không thành công. Vui lòng thử lại.'),
         )
       }
     } finally {
@@ -88,8 +98,8 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Đăng nhập"
-      description="Dùng tài khoản được cấp để tiếp tục."
+      title={t('Đăng nhập')}
+      description={t('Dùng tài khoản được cấp để tiếp tục.')}
       icon={<ShieldCheck />}
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -111,7 +121,7 @@ export function LoginPage() {
         />
         <Input
           id="login-password"
-          label="Mật khẩu"
+          label={t('Mật khẩu')}
           type={showPassword ? 'text' : 'password'}
           value={password}
           onChange={(e) => {
@@ -137,7 +147,7 @@ export function LoginPage() {
             to="/forgot-password"
             className="rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            Quên mật khẩu?
+            {t('Quên mật khẩu?')}
           </Link>
         </div>
         <Button
@@ -148,7 +158,7 @@ export function LoginPage() {
           isLoading={isLoading}
           icon={<LogIn className="size-4" />}
         >
-          Đăng nhập
+          {t('Đăng nhập')}
         </Button>
       </form>
     </AuthLayout>

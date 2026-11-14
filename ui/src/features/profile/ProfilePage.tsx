@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 import {
   DonutChart,
@@ -57,6 +57,13 @@ import {
 } from '@/app/navigation'
 import { navigationIcons } from '@/app/navigationIcons'
 import { ChangePasswordModal } from '../authentication/ChangePasswordModal'
+import { PageToolsContext } from '@/components/blocks/pageIconContext'
+import {
+  setHintsEnabled,
+  useHintsEnabled,
+} from '@/components/guide/preferences'
+import { Switch } from '@/components/shadcn/switch'
+import { LanguagePicker } from '@/components/i18n/LanguagePicker'
 import { useAuth } from '../authentication/useAuth'
 import {
   daysSince,
@@ -64,6 +71,7 @@ import {
   PERMISSION_AREAS,
   permissionCoverage,
 } from './profileModel'
+import { t } from '@/lib/i18n/core'
 
 export function ProfilePage() {
   const { user, allowedFunctions, hasPermission, logout } = useAuth()
@@ -71,6 +79,8 @@ export function ProfilePage() {
   const { theme = 'system', setTheme } = useTheme()
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [palette, setPalette] = usePalette()
+  const tools = useContext(PageToolsContext)
+  const hints = useHintsEnabled()
   const swatch =
     PALETTES.find((option) => option.value === palette)?.swatch ?? '#1857d1'
   if (!user) return null
@@ -91,7 +101,7 @@ export function ProfilePage() {
 
   return (
     <div className="page-container space-y-6">
-      <h1 className="sr-only">Hồ sơ cá nhân</h1>
+      <h1 className="sr-only">{t('Hồ sơ cá nhân')}</h1>
       {/* Identity hero */}
       <Card className="bg-water relative overflow-hidden py-0 shadow-xs">
         <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center">
@@ -115,7 +125,7 @@ export function ProfilePage() {
                 )}
               >
                 {user.status === 'ACTIVE' ? <Check /> : <X />}
-                {user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã khóa'}
+                {user.status === 'ACTIVE' ? t('Đang hoạt động') : t('Đã khóa')}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
@@ -126,14 +136,15 @@ export function ProfilePage() {
                 <UserRound className="size-4" /> {user.groupName}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="size-4" /> Từ{' '}
-                {formatDate(user.createdAt)}
+                <CalendarDays className="size-4" />{' '}
+                {t('Từ {createdAt}', { createdAt: formatDate(user.createdAt) })}
               </span>
             </div>
           </div>
-          <div className="flex gap-2 md:flex-col">
+          <div className="flex flex-wrap gap-2 md:flex-col">
+            {tools}
             <Button variant="outline" onClick={() => setPasswordOpen(true)}>
-              <KeyRound /> Đổi mật khẩu
+              <KeyRound /> {t('Đổi mật khẩu')}
             </Button>
             <Button
               variant="ghost"
@@ -142,7 +153,7 @@ export function ProfilePage() {
                 void logout().then(() => navigate('/login', { replace: true }))
               }
             >
-              <LogOut /> Đăng xuất
+              <LogOut /> {t('Đăng xuất')}
             </Button>
           </div>
         </CardContent>
@@ -152,25 +163,25 @@ export function ProfilePage() {
       <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           {
-            label: 'Quyền được cấp',
+            label: t('Quyền được cấp'),
             value: totalGranted,
             suffix: `/${totalCodes}`,
             icon: ShieldCheck,
           },
           {
-            label: 'Chức năng truy cập',
+            label: t('Chức năng truy cập'),
             value: modules.length,
             suffix: '',
             icon: LayoutGrid,
           },
           {
-            label: 'Số ngày tham gia',
+            label: t('Số ngày tham gia'),
             value: tenure ?? 0,
-            suffix: ' ngày',
+            suffix: t(' ngày'),
             icon: CalendarDays,
           },
           {
-            label: 'Mức phủ quyền',
+            label: t('Mức phủ quyền'),
             value: totalCodes
               ? Math.round((totalGranted / totalCodes) * 100)
               : 0,
@@ -198,13 +209,13 @@ export function ProfilePage() {
       <Tabs defaultValue="overview" className="gap-4">
         <TabsList>
           <TabsTrigger value="overview">
-            <LayoutGrid /> Tổng quan
+            <LayoutGrid /> {t('Tổng quan')}
           </TabsTrigger>
           <TabsTrigger value="permissions">
-            <ShieldCheck /> Quyền hạn
+            <ShieldCheck /> {t('Quyền hạn')}
           </TabsTrigger>
           <TabsTrigger value="appearance">
-            <Palette /> Giao diện
+            <Palette /> {t('Giao diện')}
           </TabsTrigger>
         </TabsList>
 
@@ -215,10 +226,10 @@ export function ProfilePage() {
           <Card className="shadow-xs">
             <CardHeader>
               <CardTitle className="text-sm">
-                Phủ quyền theo nghiệp vụ
+                {t('Phủ quyền theo nghiệp vụ')}
               </CardTitle>
               <CardDescription className="text-xs">
-                Tỉ lệ quyền đã cấp
+                {t('Tỉ lệ quyền đã cấp')}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid items-center gap-4 sm:grid-cols-2">
@@ -229,7 +240,7 @@ export function ProfilePage() {
                   ratio: area.ratio,
                 }))}
                 centerValue={`${totalGranted}`}
-                centerLabel="quyền"
+                centerLabel={t('quyền')}
                 height={200}
               />
               <LegendList
@@ -243,9 +254,9 @@ export function ProfilePage() {
           </Card>
           <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm">Truy cập nhanh</CardTitle>
+              <CardTitle className="text-sm">{t('Truy cập nhanh')}</CardTitle>
               <CardDescription className="text-xs">
-                {modules.length} chức năng khả dụng
+                {t('{count} chức năng khả dụng', { count: modules.length })}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -274,19 +285,21 @@ export function ProfilePage() {
           </Card>
           <Card className="shadow-xs lg:col-span-2">
             <CardHeader>
-              <CardTitle className="text-sm">Thông tin tài khoản</CardTitle>
+              <CardTitle className="text-sm">
+                {t('Thông tin tài khoản')}
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               {[
                 [
-                  'Mã người dùng',
+                  t('Mã người dùng'),
                   <code key="id" className="text-xs">
                     {user.id}
                   </code>,
                 ],
-                ['Nhóm', `${user.groupName} · ${user.groupCode}`],
-                ['Tạo lúc', formatDateTime(user.createdAt)],
-                ['Cập nhật lúc', formatDateTime(user.updatedAt)],
+                [t('Nhóm'), `${user.groupName} · ${user.groupCode}`],
+                [t('Tạo lúc'), formatDateTime(user.createdAt)],
+                [t('Cập nhật lúc'), formatDateTime(user.updatedAt)],
               ].map(([label, value]) => (
                 <div key={String(label)} className="min-w-0 space-y-0.5">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -303,7 +316,7 @@ export function ProfilePage() {
         >
           <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm">Cơ cấu quyền</CardTitle>
+              <CardTitle className="text-sm">{t('Cơ cấu quyền')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <DonutChart
@@ -315,28 +328,28 @@ export function ProfilePage() {
                     value: area.granted,
                     color: `var(--chart-${PERMISSION_AREAS.findIndex((a) => a.key === area.key) + 1})`,
                   }))}
-                centerLabel="đã cấp"
+                centerLabel={t('đã cấp')}
                 centerValue={String(totalGranted)}
-                valueFormatter={(value) => `${value} quyền`}
+                valueFormatter={(value) => t('{value} quyền', { value })}
                 height={200}
               />
               <div className="space-y-1.5">
                 <p className="flex justify-between text-xs text-muted-foreground">
-                  <span>Tổng mức phủ</span>
+                  <span>{t('Tổng mức phủ')}</span>
                   <span className="font-semibold text-foreground tabular-nums">
                     {totalGranted}/{totalCodes}
                   </span>
                 </p>
                 <SegmentedMeter
                   ratio={totalCodes ? totalGranted / totalCodes : 0}
-                  label="Mức phủ quyền"
+                  label={t('Mức phủ quyền')}
                 />
               </div>
             </CardContent>
           </Card>
           <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm">Chi tiết quyền</CardTitle>
+              <CardTitle className="text-sm">{t('Chi tiết quyền')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Accordion
@@ -358,7 +371,7 @@ export function ProfilePage() {
                           {area.label}
                           <Badge
                             variant="secondary"
-                            className="ml-auto tabular-nums"
+                            className="ms-auto tabular-nums"
                           >
                             {count}/{area.codes.length}
                           </Badge>
@@ -396,9 +409,9 @@ export function ProfilePage() {
         <TabsContent value="appearance">
           <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm">Chủ đề giao diện</CardTitle>
+              <CardTitle className="text-sm">{t('Chủ đề giao diện')}</CardTitle>
               <CardDescription className="text-xs">
-                Lưu trên trình duyệt này
+                {t('Lưu trên trình duyệt này')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -406,7 +419,7 @@ export function ProfilePage() {
                 value={theme}
                 onValueChange={setTheme}
                 className="grid gap-3 sm:grid-cols-3"
-                aria-label="Chủ đề giao diện"
+                aria-label={t('Chủ đề giao diện')}
               >
                 {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
                   <Label
@@ -425,13 +438,13 @@ export function ProfilePage() {
               </RadioGroup>
               <Separator className="my-5" />
               <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-                <Palette className="size-4" /> Màu chủ đạo
+                <Palette className="size-4" /> {t('Màu chủ đạo')}
               </p>
               <RadioGroup
                 value={palette}
                 onValueChange={(value) => isPalette(value) && setPalette(value)}
                 className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
-                aria-label="Màu chủ đạo"
+                aria-label={t('Màu chủ đạo')}
               >
                 {PALETTES.map((option) => (
                   <Label
@@ -468,6 +481,54 @@ export function ProfilePage() {
                   </Label>
                 ))}
               </RadioGroup>
+            </CardContent>
+          </Card>
+          <Card className="mt-4 shadow-xs" data-testid="language-settings">
+            <CardHeader>
+              <CardTitle className="text-sm">
+                {t('Ngôn ngữ giao diện')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t('Lưu trên trình duyệt này')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <LanguagePicker />
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'Chỉ chữ của phần mềm đổi theo ngôn ngữ. Dữ liệu nghiệp vụ như tên hàng hóa, tên đại lý, phường/xã, ghi chú và mã chứng từ luôn giữ nguyên tiếng Việt; tiền luôn tính bằng đồng (₫).',
+                )}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="mt-4 shadow-xs">
+            <CardHeader>
+              <CardTitle className="text-sm">
+                {t('Hướng dẫn thao tác')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t('Lưu trên trình duyệt này')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between gap-4">
+                <Label
+                  htmlFor="next-step-hints"
+                  className="grid cursor-pointer gap-1 leading-snug"
+                >
+                  <span>{t('Hiện gợi ý bước tiếp theo')}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {t(
+                      'Sau mỗi thao tác thành công, góc dưới màn hình hiện vài giây bước cần làm tiếp và nút Mở.',
+                    )}
+                  </span>
+                </Label>
+                <Switch
+                  id="next-step-hints"
+                  checked={hints}
+                  onCheckedChange={(checked) => setHintsEnabled(checked)}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
