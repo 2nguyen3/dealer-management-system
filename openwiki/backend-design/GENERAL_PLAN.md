@@ -1,5 +1,44 @@
 # General Plan
 
+## Đơn giản hóa 14/11/2026
+
+On 14/11/2026 the user decided to simplify the DMS business model; this supersedes the
+M14/M16/M19–M25/M27/M29 scope below. Plan history is kept unchanged; removed slices are
+marked **Bỏ theo yêu cầu 14/11/2026**. Owning plan and evidence:
+[simplification PLAN](plan/simplification/PLAN.md) and
+[VERIFICATION](plan/simplification/VERIFICATION.md) (exact commands/results live there).
+
+- **Schema:** [0011_simplified_schema.sql](../../backend/alembic/sql/0011_simplified_schema.sql)
+  drops and rebuilds schema `dms` with 16 tables; no downgrade (rollback = Neon branch backup).
+  Current balances are `agency.debt`, `product.stock` and `product.lastPurchasePrice`, changed
+  only by posting/cancel/correct. See [database design](../database-design/README.md).
+- **Documents:** only `STOCK_RECEIPT` (PN), `STOCK_ISSUE` (PX) and `PAYMENT_RECEIPT` (PT);
+  `DRAFT → POSTED → CANCELLED`. One shared `DocumentService` in `document_core`
+  (create/update/delete draft, post, cancel, correct). Cancel requires a reason; correction =
+  cancel + replacement document (`replacesDocumentId`) in one transaction; both only for
+  documents dated in the current month (`PERIOD_CLOSED`).
+- **Rules QĐ1–QĐ8:** `WARD_CAPACITY_EXCEEDED`, `PRODUCT_NOT_PRICED` (selling price =
+  round(lastPurchasePrice × sellingPriceRate)), `DEBT_LIMIT_EXCEEDED`, `PAYMENT_EXCEEDS_DEBT`,
+  `INSUFFICIENT_STOCK`, `PERIOD_CLOSED`, `REASON_REQUIRED`; new guard `AGENCY_HAS_DEBT` (409)
+  when terminating an agency that still owes money.
+- **VNPAY sandbox kept:** IPN creates an `ONLINE` payment receipt; debt may go negative only
+  through a late verified payment; no refunds.
+- **Removed backend modules (Bỏ theo yêu cầu 14/11/2026):** `inventory` (M14),
+  `settlement_core` (M16), `upfront_payments` (M19), `receivables` (M20),
+  `stock_adjustments` (M21), `stock_counts` (M22), `sales_returns` (M23), `agency_credit`
+  (M24), `credit_applications` (M25), `refunds` (M27), `document_corrections` (M29), plus the
+  durable idempotency-command infrastructure (`api_idempotency`, part of M02/0004).
+- **Rewritten:** M13 document_core, M15/M17/M18 document routers (issue `submit`/`PENDING`/
+  revisions removed), M26 online_payments (no refund), M28 document_history (replacement
+  chain instead of revisions), M30 reports, M31 dashboard, M05 permissions (22 functions),
+  M10–M12 rules/products/agencies fields.
+- **Runtime contract:** [API/openapi.json](API/openapi.json) regenerated, 90 operations.
+- **Data:** production reseeded with seed v2 (01/06/2026 → day before seed). M32 chatbot
+  remains unbuilt and must target the new schema.
+
+The checkpoints below are historical; operation counts such as 154 target operations no
+longer describe the runtime.
+
 ## Current M31 publication - 2026-10-29
 
 getDashboard is published with unchanged D09:153/154business+2health at0009, chatbot
@@ -200,7 +239,7 @@ slice; expand each into its owning detailed child plan before code.
 | Step | Module / slice | API scope / deliverable | Depends on | Completion gate |
 | --- | --- | --- | --- | --- |
 | M01 | `authentication` | Authentication: seven `/auth/*` operations, live bearer/session checks, reusable allOf/anyOf RBAC, safe errors/request IDs, auth throttling and reset delivery. | Existing baseline | Complete [PLAN](plan/authentication/PLAN.md), [TESTS](plan/authentication/TESTS.md), [CHECKLIST](plan/authentication/CHECKLIST.md) and evidence gates; real rotation/reset/invalidation races. |
-| M02 | `shared_api` | Reuse auth plumbing for business errors; exact numeric/ID/date serialization, cursor/sort validation, ETag/If-Match/If-None-Match, operation-aware idempotency and rate-limit interfaces. | M01 | Contract-compatible helpers; stale/missing preconditions and duplicate/conflicting retries tested; no writes or migrations at API startup. |
+| M02 | `shared_api` | Reuse auth plumbing for business errors; exact numeric/ID/date serialization, cursor/sort validation, ETag/If-Match/If-None-Match, operation-aware idempotency and rate-limit interfaces. Durable idempotency commands (`api_idempotency`): **Bỏ theo yêu cầu 14/11/2026.** | M01 | Contract-compatible helpers; stale/missing preconditions and duplicate/conflicting retries tested; no writes or migrations at API startup. |
 | M03 | `user_groups` | User Groups: group list/detail/create/update/delete. Atomic grant cleanup on eligible deletion. | M02 | Referenced ACTIVE or LOCKED users block deletion; unreferenced group/grant cleanup audited and atomic; concurrent assignment/deletion tested. |
 | M04 | `users` | Users: account list/detail/create/update, lock/unlock/group change, administrative password reset. | M03 | Case-insensitive unique email, hash-only credentials, group FK, ETags; all affected sessions invalidated in the write transaction; no implicit unlocking on password reset. |
 | M05 | `permissions` | Permissions: read-only function registry, group grant reads/set using source allOf/anyOf rules and create/update preconditions. | M03, M04 | Missing/false grants denied; updates affect next request without stale cache; MANAGEMENT has no bypass; audit and concurrency/precondition tests pass. |
@@ -230,13 +269,13 @@ transaction modules exist. Do not assume early catalogue work has an empty DB.
 | Step | Module / slice | API scope / deliverable | Depends on | Completion gate |
 | --- | --- | --- | --- | --- |
 | M13 | `document_core` | Shared identity/revision/line mappings and services; Document History draft-line CRUD foundation, parent ETags, snapshots, Decimal totals, creation keys, batch/reversal primitives and kind-to-permission dispatch. | M11, M12 | Correct parent/revision/line ownership; one product per revision; no changes to READY/POSTED content; financial documents reject goods lines; draft edits remain balance-neutral. |
-| M14 | `inventory` | Inventory: `/products/{productId}/inventory-entries` statement and reusable stock read service; product overview remains owned by products. | M13 | Business-date/order balances, effective/reversed entries and opening totals correct; inventory.read enforced; seeded fixtures can verify reads before new posting endpoints. |
+| M14 | `inventory` — **Bỏ theo yêu cầu 14/11/2026.** | Inventory: `/products/{productId}/inventory-entries` statement and reusable stock read service; product overview remains owned by products. | M13 | Business-date/order balances, effective/reversed entries and opening totals correct; inventory.read enforced; seeded fixtures can verify reads before new posting endpoints. |
 | M15 | `stock_receipts` — core | Stock Receipts: list/detail/create/draft update/post; draft cancellation. Add the STOCK_RECEIPT draft-line dispatcher in document_core. | M14 | Atomic positive inventory posting and latest-business-date purchase-price source; concurrent writes, snapshot/quantity validation, no success before commit. Posted corrections/cancellation close in M29. |
-| M16 | `settlement_core` | Internal receivable charges/FIFO allocations, AUTO_FROM_ISSUE and RECEIVED_UNAPPLIED receipt posting, credit provenance/lots, reserve/release/consume and chronological replay for supported kinds. No separate public allocation CRUD. | M15 | Real-PG fixtures prove same-agency/source integrity, historical no-overpay/FIFO, backdated-post downstream replay, nonnegative debt/credit, reservation exclusion and rollback; reusable primitives do not commit caller transactions. |
-| M17 | `stock_issues` — core | Stock Issues: list/detail/create/draft update/submit, pending revision replacement without received-money dependencies, zero-upfront posting, draft cancellation without money evidence. | M16 | ACTIVE agency/master rules; READY price snapshots fixed; post rechecks stock/current limit; no stock/debt reservation at submit. Money-dependent paths close in M19; posted correction/cancel close in M29. |
+| M16 | `settlement_core` — **Bỏ theo yêu cầu 14/11/2026.** | Internal receivable charges/FIFO allocations, AUTO_FROM_ISSUE and RECEIVED_UNAPPLIED receipt posting, credit provenance/lots, reserve/release/consume and chronological replay for supported kinds. No separate public allocation CRUD. | M15 | Real-PG fixtures prove same-agency/source integrity, historical no-overpay/FIFO, backdated-post downstream replay, nonnegative debt/credit, reservation exclusion and rollback; reusable primitives do not commit caller transactions. |
+| M17 | `stock_issues` — core | Đơn giản hóa 14/11/2026: submit/PENDING/revisions/upfront bỏ; rewritten on DocumentService. Historical scope: Stock Issues: list/detail/create/draft update/submit, pending revision replacement without received-money dependencies, zero-upfront posting, draft cancellation without money evidence. | M16 | ACTIVE agency/master rules; READY price snapshots fixed; post rechecks stock/current limit; no stock/debt reservation at submit. Money-dependent paths close in M19; posted correction/cancel close in M29. |
 | M18 | `payment_receipts` — core | Payment Receipts: list/detail/create/draft update/post; draft cancellation. Expose manual DEBT_COLLECTION, reuse internal posting for other receipt kinds. | M17 | FIFO at businessDate, no future invoice payment/manual overpay; no standalone edit/cancel of automatic or online receipts; posted correction/cancel close in M29. |
-| M19 | `upfront_payments` + stock-issue money integration | Upfront Payments: confirmation list/detail/verify/receive-separately; finish Stock Issues post with upfront payment and pending replacement after evidence separation. | M18 | Issue + automatic receipt + inventory/debt + CONSUMED atomic; VERIFIED alone balance-neutral; failed delivery retains evidence; separate receipt records full money and excess credit; retries cannot double count. |
-| M20 | `receivables` | Receivables: overview, agency balance, invoice balances, statements, document allocations; expose `/agencies/{agencyId}/balance` once as the shared Receivables/Agency Credit resource. | M19 | Original remainder differs from current outstanding; settled means obligation settled, not necessarily new cash; same-day atomic balance and effective-entry pagination correct. |
+| M19 | `upfront_payments` + stock-issue money integration — **Bỏ theo yêu cầu 14/11/2026.** | Upfront Payments: confirmation list/detail/verify/receive-separately; finish Stock Issues post with upfront payment and pending replacement after evidence separation. | M18 | Issue + automatic receipt + inventory/debt + CONSUMED atomic; VERIFIED alone balance-neutral; failed delivery retains evidence; separate receipt records full money and excess credit; retries cannot double count. |
+| M20 | `receivables` — **Bỏ theo yêu cầu 14/11/2026.** | Receivables: overview, agency balance, invoice balances, statements, document allocations; expose `/agencies/{agencyId}/balance` once as the shared Receivables/Agency Credit resource. | M19 | Original remainder differs from current outstanding; settled means obligation settled, not necessarily new cash; same-day atomic balance and effective-entry pagination correct. |
 
 **Avoid a circular dependency:** M16 supplies internal receipt/credit machinery;
 M17 supplies source invoices and READY issue records; M18 exposes manual receipts;
@@ -251,13 +290,13 @@ module's endpoint to complete an atomic operation.
 
 | Step | Module / slice | API scope / deliverable | Depends on | Completion gate |
 | --- | --- | --- | --- | --- |
-| M21 | `stock_adjustments` — core | Stock Adjustments: list/detail/create/draft update/post and internal draft cancellation; adjustment line seam. | M15 | Verified signed stock-only deltas/reason/zero price, historical stock and count-link protection; [owning plan](plan/stock_adjustments/PLAN.md), [evidence](plan/stock_adjustments/VERIFICATION.md). Posted paths M29. |
-| M22 | `stock_counts` | Stock Counts: headers/lines/recount/confirm; internal adjustment posting for nonzero differences. | M21 | Verified movement identity/fresh recount/zero lines/conditional atomic adjustment; [owning plan](plan/stock_counts/PLAN.md), [evidence](plan/stock_counts/VERIFICATION.md). |
-| M23 | `sales_returns` — core | Sales Returns: list/detail/create/draft update/post/internal draft cancel and immutable cumulative-rounding replay. | M20 | Verified cap/zero increments/backdating/original cash and reserved/paid sources, reviewed0007; [owning plan](plan/sales_returns/PLAN.md), [evidence](plan/sales_returns/VERIFICATION.md). Posted correction/cancel M29. |
-| M24 | `agency_credit` | Credit-lot/detail/entry reads and shared available-credit service; sole balance route stays M20-owned. | M23 | Verified separate/reserved/available balances, origin/reversal history and exact aggregate statements; [owning plan](plan/agency_credit/PLAN.md), [evidence](plan/agency_credit/VERIFICATION.md). |
-| M25 | `credit_applications` — core | Credit Applications: list/detail/create/draft update/post and draft cancellation. | M24 | Available unreserved same-agency credit + invoice FIFO; preserve source provenance; cashReceived=0; concurrent consumption/reservation tests; posted correction/cancel close in M29. |
+| M21 | `stock_adjustments` — core — **Bỏ theo yêu cầu 14/11/2026.** | Stock Adjustments: list/detail/create/draft update/post and internal draft cancellation; adjustment line seam. | M15 | Verified signed stock-only deltas/reason/zero price, historical stock and count-link protection; [owning plan](plan/stock_adjustments/PLAN.md), [evidence](plan/stock_adjustments/VERIFICATION.md). Posted paths M29. |
+| M22 | `stock_counts` — **Bỏ theo yêu cầu 14/11/2026.** | Stock Counts: headers/lines/recount/confirm; internal adjustment posting for nonzero differences. | M21 | Verified movement identity/fresh recount/zero lines/conditional atomic adjustment; [owning plan](plan/stock_counts/PLAN.md), [evidence](plan/stock_counts/VERIFICATION.md). |
+| M23 | `sales_returns` — core — **Bỏ theo yêu cầu 14/11/2026.** | Sales Returns: list/detail/create/draft update/post/internal draft cancel and immutable cumulative-rounding replay. | M20 | Verified cap/zero increments/backdating/original cash and reserved/paid sources, reviewed0007; [owning plan](plan/sales_returns/PLAN.md), [evidence](plan/sales_returns/VERIFICATION.md). Posted correction/cancel M29. |
+| M24 | `agency_credit` — **Bỏ theo yêu cầu 14/11/2026.** | Credit-lot/detail/entry reads and shared available-credit service; sole balance route stays M20-owned. | M23 | Verified separate/reserved/available balances, origin/reversal history and exact aggregate statements; [owning plan](plan/agency_credit/PLAN.md), [evidence](plan/agency_credit/VERIFICATION.md). |
+| M25 | `credit_applications` — core — **Bỏ theo yêu cầu 14/11/2026.** | Credit Applications: list/detail/create/draft update/post and draft cancellation. | M24 | Available unreserved same-agency credit + invoice FIFO; preserve source provenance; cashReceived=0; concurrent consumption/reservation tests; posted correction/cancel close in M29. |
 | M26 | `online_payments` | Online Payments: create/read/list/events/reconcile and provider-signature webhook; sandbox adapter only. | M24 | Commit PENDING before provider call; verified signature/amount/reference; duplicate and late success record one full receipt, FIFO debt and excess credit; browser return is not payment proof; no network under DB locks. |
-| M27 | `refunds` | Refunds: draft/read/list/update/submit/confirm-paid/cancel, reservations, online attempts/detail/reconcile; cash/bank first, online after adapter integration. | M25, M26 | One source receipt per refund; reserve before sending; UNKNOWN retains reservation; confirmed failure releases; success posts/debits/consumes once; refunded money cannot be canceled; retry uses source-defined fresh revision/attempt. |
+| M27 | `refunds` — **Bỏ theo yêu cầu 14/11/2026.** | Refunds: draft/read/list/update/submit/confirm-paid/cancel, reservations, online attempts/detail/reconcile; cash/bank first, online after adapter integration. | M25, M26 | One source receipt per refund; reserve before sending; UNKNOWN retains reservation; confirmed failure releases; success posts/debits/consumes once; refunded money cannot be canceled; retry uses source-defined fresh revision/attempt. |
 
 Stock adjustments/counts can proceed independently of cash workflows after M15.
 Returns and online payments both use M16 settlement primitives. Refunds are last in
@@ -269,7 +308,7 @@ also be consumed through credit applications or lose its source provenance.
 | Step | Module / slice | API scope / deliverable | Depends on | Completion gate |
 | --- | --- | --- | --- | --- |
 | M28 | `document_history` | Complete Document History search/revision/line reads, kind-specific draft-line CRUD and snapshot printing with HTML/PDF content negotiation. | M13, M22, M27 | Permissions filter by kind; explicit unauthorized kind rejected; historical revisions readable and immutable; print historical snapshots, clearly mark draft/canceled versions; all goods-kind dispatchers wired. |
-| M29 | `document_corrections` + owning-module completion | Shared replay orchestration and domain-specific posted corrections/cancel for stock receipts/issues, manual payment receipts, independent adjustments, returns and credit applications. Endpoints retain their owning API tags/modules. | M28 | Reverse old effects + new revision + downstream FIFO/return/credit replay atomic; full historical and current limits respected; preserve actual received/refunded money and reservations; corrections use original business period, not new sale/return fiction. |
+| M29 | `document_corrections` + owning-module completion — **Bỏ theo yêu cầu 14/11/2026.** Cancel/correct now live in DocumentService and each document router. | Shared replay orchestration and domain-specific posted corrections/cancel for stock receipts/issues, manual payment receipts, independent adjustments, returns and credit applications. Endpoints retain their owning API tags/modules. | M28 | Reverse old effects + new revision + downstream FIFO/return/credit replay atomic; full historical and current limits respected; preserve actual received/refunded money and reservations; corrections use original business period, not new sale/return fiction. |
 | M30 | `reports` | Reports: sales/debt/inventory/product-sales/cash-and-credit, JSON and full-filter XLSX/PDF exports. | M29 | Reconcile ledger and snapshot totals after corrections; original-period reversal, return period, cash vs credit distinguished; half-open dates, consistent totals/filter denominator; same permissions for JSON/export. |
 | M31 | `dashboard` | Dashboard: monthly authorized sections, current balances, pending/VERIFIED money, charts and top lists. | M30 | Per-section permissions/no leaks; no double-counting unreceipted upfront money; current balance not confused with period flow; source top-10 limits. |
 | M32 | `chatbot` | Chatbot: debt/inventory/sales query whitelist and agency disambiguation, using authorized read services. | M31 | Same debt.read/inventory.read/sales.read checks; no mutation/arbitrary SQL; duplicate names require code selection; unsupported vs clarification responses conform to API. |
@@ -280,6 +319,9 @@ above require integrated transaction/correction evidence. Chatbot reads services
 not dashboard HTTP; M31 is the recommended final integration/validation prerequisite.
 
 ## 4. Dependency graph
+
+Historical graph. Nodes marked "Bỏ 14/11/2026" were removed by the simplification;
+the current modules depend only on M01–M13, M15, M17, M18, M26, M28, M30–M32.
 
 Arrows mean "must pass before this slice can be completed." This graph is acyclic
 because split stock-issue/payment/correction work is assigned explicit later gates.
@@ -304,25 +346,25 @@ flowchart TD
   M10 --> M12
   M11 --> M13[Document core]
   M12 --> M13
-  M13 --> M14[Inventory reads]
+  M13 --> M14[Inventory reads - Bỏ 14/11/2026]
   M14 --> M15[Stock receipts core]
-  M15 --> M16[Settlement core]
+  M15 --> M16[Settlement core - Bỏ 14/11/2026]
   M16 --> M17[Stock issues core]
   M17 --> M18[Payment receipts core]
-  M18 --> M19[Upfront and issue integration]
-  M19 --> M20[Receivables]
-  M15 --> M21[Stock adjustments core verified]
-  M21 --> M22[Stock counts verified]
-  M20 --> M23[Sales returns core verified]
-  M23 --> M24[Agency credit verified]
-  M24 --> M25[Credit applications core]
+  M18 --> M19[Upfront and issue integration - Bỏ 14/11/2026]
+  M19 --> M20[Receivables - Bỏ 14/11/2026]
+  M15 --> M21[Stock adjustments - Bỏ 14/11/2026]
+  M21 --> M22[Stock counts - Bỏ 14/11/2026]
+  M20 --> M23[Sales returns - Bỏ 14/11/2026]
+  M23 --> M24[Agency credit - Bỏ 14/11/2026]
+  M24 --> M25[Credit applications - Bỏ 14/11/2026]
   M24 --> M26[Online payments]
-  M25 --> M27[Refunds]
+  M25 --> M27[Refunds - Bỏ 14/11/2026]
   M26 --> M27
   M13 --> M28[Document history]
   M22 --> M28
   M27 --> M28
-  M28 --> M29[Corrections and owning-module completion]
+  M28 --> M29[Corrections module - Bỏ 14/11/2026]
   M29 --> M30[Reports]
   M30 --> M31[Dashboard]
   M31 --> M32[Chatbot]
@@ -425,6 +467,7 @@ does not prove business API, concurrency or external sandbox behavior.
 
 | Area | Current state | Next action |
 | --- | --- | --- |
+| Đơn giản hóa 14/11/2026 | Schema 0011 (16 tables), three document kinds, DocumentService, 90 runtime operations, seed v2 | Evidence in [simplification VERIFICATION](plan/simplification/VERIFICATION.md). |
 | Runtime/database infrastructure | Implemented baseline | Preserve and rerun relevant checks during business work. |
 | Authentication M01 | Seven operations/RBAC implemented; 122 offline + 58 PostgreSQL/TLS tests, 100% scoped coverage and 4 direct/Nginx smoke cases | Preserve [evidence](plan/authentication/VERIFICATION.md); deploy migration/key/mail configuration explicitly. |
 | Whole-backend execution design | Prepared: 154-operation inventory, 32 work packages, 22 delivery packets, 17 gap decisions and verification plans | Use [full-backend package](plan/full_backend/PLAN.md) and [release handoffs](plan/full_backend/EXECUTION.md); resolve gap gates in their owning slices. |
@@ -434,20 +477,20 @@ does not prove business API, concurrency or external sandbox behavior.
 | M07–M09 catalogues | Fifteen operations locally complete; populated references, independent races and 0005 unit policy repair | Preserve [districts](plan/districts/VERIFICATION.md), [types](plan/agency_types/VERIFICATION.md), [units](plan/units/VERIFICATION.md); actual M10–M12 consumers/regressions now pass. |
 | M05/M06/M10/M11/M12 | Twenty full operations locally complete, D02/0006 and D16 resolved | Preserve [permissions](plan/permissions/VERIFICATION.md), [audit](plan/audit_logs/VERIFICATION.md), [rules](plan/business_rules/VERIFICATION.md), [products](plan/products/VERIFICATION.md), [agencies](plan/agencies/VERIFICATION.md). |
 | M13 document_core | Internal all-kind readers/draft/revision/line/snapshot/batch foundations locally verified | Preserve [evidence](plan/document_core/VERIFICATION.md); full history/line dispatch remains M28. |
-| M14 inventory | Full statement operation and stock/reversal helpers locally verified; D14 historical aggregate range resolved | Preserve [evidence](plan/inventory/VERIFICATION.md), including all seeded goods kinds and filter-independent atomic balances. |
+| M14 inventory | **Bỏ theo yêu cầu 14/11/2026.** Historical: Full statement operation and stock/reversal helpers locally verified; D14 historical aggregate range resolved | Preserve [evidence](plan/inventory/VERIFICATION.md), including all seeded goods kinds and filter-independent atomic balances. |
 | M15 stock_receipts | Core and posted correction/full cancellation published | [Core evidence](plan/stock_receipts/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
-| M16 settlement_core | E09/E10 internal FIFO/provenance/reservations and chronological replay locally verified | Preserve [evidence](plan/settlement_core/VERIFICATION.md), including existing return/credit/refund financial effects; owning later HTTP/rounding gates remain open. |
+| M16 settlement_core | **Bỏ theo yêu cầu 14/11/2026.** Historical: E09/E10 internal FIFO/provenance/reservations and chronological replay locally verified | Preserve [evidence](plan/settlement_core/VERIFICATION.md), including existing return/credit/refund financial effects; owning later HTTP/rounding gates remain open. |
 | M17 stock_issues | Core/M19 posting and full posted correction/cancel published | [Core evidence](plan/stock_issues/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
 | M18 payment_receipts | Core and full manual correction/cancel with protected special receipts | [Core evidence](plan/payment_receipts/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
-| M19 upfront_payments | Four operations and full-money issue integration/cancellation verified | [Core evidence](plan/upfront_payments/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
-| M20 receivables | Six complete read operations implemented; exact snapshots/atomic ledgers/historical aggregates verified | Preserve [evidence](plan/receivables/VERIFICATION.md); M24 reuses the sole balance route. |
-| M21/M22/M23/M24 | Owning plans/actual symbols and scoped state/rollback/race/coverage/deployment gates pass | [Adjustments](plan/stock_adjustments/VERIFICATION.md), [counts](plan/stock_counts/VERIFICATION.md), [returns](plan/sales_returns/VERIFICATION.md), [credit](plan/agency_credit/VERIFICATION.md); dependency edges unchanged. |
-| M25 credit_applications | Core plus full posted correction/cancel published; zero new cash/protected provenance | [Core evidence](plan/credit_applications/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
-| M26/M27/M28 | All27operations published with native VNPAY acceptance and exact owning coverage | [Payments](plan/online_payments/VERIFICATION.md), [refunds](plan/refunds/VERIFICATION.md), [history](plan/document_history/VERIFICATION.md); automatic IPN passes, external bank refund remains PENDING rather than paid. |
-| M29 corrections | All twelve owning operations verified/published, including reviewed historical-goods fix | [Current evidence](plan/document_corrections/VERIFICATION.md); whole R5/R6 remain separate. |
+| M19 upfront_payments | **Bỏ theo yêu cầu 14/11/2026.** Historical: Four operations and full-money issue integration/cancellation verified | [Core evidence](plan/upfront_payments/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
+| M20 receivables | **Bỏ theo yêu cầu 14/11/2026.** Historical: Six complete read operations implemented; exact snapshots/atomic ledgers/historical aggregates verified | Preserve [evidence](plan/receivables/VERIFICATION.md); M24 reuses the sole balance route. |
+| M21/M22/M23/M24 | **Bỏ theo yêu cầu 14/11/2026.** Historical: Owning plans/actual symbols and scoped state/rollback/race/coverage/deployment gates pass | [Adjustments](plan/stock_adjustments/VERIFICATION.md), [counts](plan/stock_counts/VERIFICATION.md), [returns](plan/sales_returns/VERIFICATION.md), [credit](plan/agency_credit/VERIFICATION.md); dependency edges unchanged. |
+| M25 credit_applications | **Bỏ theo yêu cầu 14/11/2026.** Historical: Core plus full posted correction/cancel published; zero new cash/protected provenance | [Core evidence](plan/credit_applications/VERIFICATION.md), [M29 closure](plan/document_corrections/VERIFICATION.md). |
+| M26/M27/M28 | M27 refunds: **Bỏ theo yêu cầu 14/11/2026**; M26/M28 rewritten for the simplified model. Historical: All27operations published with native VNPAY acceptance and exact owning coverage | [Payments](plan/online_payments/VERIFICATION.md), [refunds](plan/refunds/VERIFICATION.md), [history](plan/document_history/VERIFICATION.md); automatic IPN passes, external bank refund remains PENDING rather than paid. |
+| M29 corrections | **Bỏ theo yêu cầu 14/11/2026.** Historical: All twelve owning operations verified/published, including reviewed historical-goods fix | [Current evidence](plan/document_corrections/VERIFICATION.md); whole R5/R6 remain separate. |
 | M30 reports | All five JSON/full-filter XLSX/PDF operations verified and published | [Owning evidence](plan/reports/VERIFICATION.md); snapshot/oracle/read-only/101+export/resource gates pass. |
 | M31 dashboard | getDashboard verified/published, unchanged D09 and coherent authorized snapshots | [Owning evidence](plan/dashboard/VERIFICATION.md),161/24exact coverage. Full R6 separate. |
-| M32 chatbot | Only unpublished business operation | AI API selected by user; provider details and D10/owning plan/implementation/gates remain next. |
+| M32 chatbot | Only unpublished business operation; still unbuilt after the 14/11/2026 simplification | AI API selected by user; provider details and D10/owning plan/implementation/gates remain next. |
 
 Current dependencies are unchanged. M04 and M07–M09 table gates above have passed
 their linked child evidence: 207 offline + 217 PostgreSQL/TLS + 16 deployment

@@ -1,5 +1,33 @@
 # Business decision making — Các quyết định nghiệp vụ của DMS
 
+## 0. Đơn giản hóa nghiệp vụ — 14/11/2026 (quyết định hiện hành)
+
+Ngày 14/11/2026 người dùng chốt đơn giản hóa toàn bộ nghiệp vụ. Các quyết định dưới đây
+**thay thế** những lựa chọn tương ứng trong 15 câu hỏi interview ở các mục sau; phần
+interview được giữ nguyên làm lịch sử. Nguồn: [handoff](../../tmp/HANDOFF-don-gian-hoa-backend-frontend.md)
+mục 1–3; schema [0011](../../backend/alembic/sql/0011_simplified_schema.sql); mô tả ở
+[README.md](README.md); bằng chứng ở
+[simplification VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md).
+
+| Chủ đề | Quyết định 14/11/2026 |
+| --- | --- |
+| Chức năng bỏ hẳn | Trả hàng, điều chỉnh tồn kho, kiểm kê, thẻ kho/sổ tồn kho, xác nhận trả ngay, công nợ theo hóa đơn (receivables, FIFO), dư có, cấn trừ dư có, hoàn tiền; bỏ ngưỡng tồn thấp của mặt hàng; bỏ bảng lệnh idempotency (`api_idempotency`) |
+| Chứng từ | Chỉ còn 3 loại: phiếu nhập `PN`, phiếu xuất `PX`, phiếu thu `PT`; 3 trạng thái `DRAFT → POSTED → CANCELLED`; không còn phiên bản, `PENDING`/`READY` hay phiếu thu tự sinh |
+| Số dư | Hai cột `agency.debt` và `product.stock` (kèm `lastPurchasePrice`), chỉ đổi khi ghi sổ/hủy/sửa; thay toàn bộ ledger, batch, FIFO và replay hồi tố |
+| Hủy / sửa | Hủy bắt buộc lý do và đảo đúng ảnh hưởng; sửa có lý do = hủy phiếu cũ + lập phiếu thay thế (`replacesDocumentId`) trong một transaction; chỉ với chứng từ có ngày trong tháng hiện tại (`PERIOD_CLOSED`); ngày chứng từ không được sau hôm nay |
+| Phiếu thu | 0 < số tiền ≤ nợ hiện tại (`PAYMENT_EXCEEDS_DEBT`) nên không phát sinh dư có; đại lý trả ngay thì lập phiếu thu ngay sau phiếu xuất |
+| Giá bán | round(giá nhập gần nhất × `sellingPriceRate`), chốt khi ghi sổ phiếu xuất; mặt hàng chưa từng nhập không xuất được (`PRODUCT_NOT_PRICED`) |
+| Hạn mức, tồn | Nợ sau phiếu xuất ≤ `maxDebt` của loại (`DEBT_LIMIT_EXCEEDED`); SL xuất ≤ tồn (`INSUFFICIENT_STOCK`); hủy phiếu thu được phép dù đẩy nợ vượt hạn mức |
+| Đại lý | Tối đa `maxAgenciesPerWard` đại lý hoạt động mỗi phường (`WARD_CAPACITY_EXCEEDED`); không chấm dứt hợp tác khi đại lý còn nợ (`AGENCY_HAS_DEBT`, 409); phường/xã giữ danh mục 168 đơn vị của `0010` |
+| VNPAY | Giữ thanh toán sandbox; IPN thành công tạo phiếu thu `ONLINE`; nếu nợ đã giảm trước đó thì vẫn ghi nhận và nợ có thể âm (trả trước) — ngoại lệ duy nhất; không còn hoàn tiền |
+| Báo cáo | Tính trực tiếp từ chứng từ `POSTED`; nợ cuối báo cáo công nợ tháng hiện tại phải bằng `agency.debt` |
+| Dữ liệu | Production được xóa và seed lại toàn bộ (kể cả tài khoản) bằng dữ liệu trông như thật, lịch sử từ 01/06/2026; 4 thành viên nhóm giữ 4 vai trò Quản lý/Kinh doanh/Kho/Kế toán. Quyết định này thay các yêu cầu cũ "không reset/bảo toàn chứng từ thật" |
+| Phân quyền | 22 chức năng; bỏ `district.manage`, `inventory.read`, `cash.upfront.verify`, `stock.count`, `stock.adjustment.*`, `returns.*`, `cash.refund.*`, `credit.apply` |
+
+Các mục 1–9 dưới đây mô tả thiết kế ERP/SME 29 bảng trước ngày 14/11/2026.
+Những phần về phiên bản, ledger, FIFO, trả ngay, trả hàng, dư có, bù trừ, hoàn tiền và
+kiểm kê **không còn hiệu lực**.
+
 ## 1. Mục đích và cách đọc
 
 Tài liệu này ghi lại 15 câu hỏi đã interview khi thiết kế lại database DMS

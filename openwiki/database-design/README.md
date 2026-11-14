@@ -1,553 +1,252 @@
-# Database DMS — thiết kế ERP/SME
+# Database DMS — mô hình đơn giản hóa (revision 0011)
 
 ## 1. Trạng thái và tài liệu
 
-Đây là thiết kế PostgreSQL tham chiếu cho phạm vi ERP/SME đã được người dùng
-chốt qua 15 câu hỏi. DDL có thể thực thi, gồm 29 bảng, các domain, index,
-trigger toàn vẹn, view và hàm báo cáo. Transaction nghiệp vụ đầy đủ vẫn cần
-được triển khai ở backend services; DDL không tự thực hiện việc giao hàng,
-xác minh chữ ký cổng thanh toán hoặc gọi API hoàn tiền.
+Ngày **14/11/2026** người dùng chốt đơn giản hóa nghiệp vụ (xem
+[business_decision_making.md](business_decision_making.md) mục đầu và
+[handoff](../../tmp/HANDOFF-don-gian-hoa-backend-frontend.md)). Schema hiện hành là
+[0011_simplified_schema.sql](../../backend/alembic/sql/0011_simplified_schema.sql):
+**16 bảng** trong schema `dms`, 3 loại chứng từ, 3 trạng thái, số dư hiện tại là hai
+cột `agency.debt` và `product.stock`. Kế hoạch và bằng chứng kiểm tra:
+[simplification PLAN](../backend-design/plan/simplification/PLAN.md) và
+[VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md).
 
 | File | Mục đích |
 | --- | --- |
-| [business_decision_making.md](business_decision_making.md) | Toàn bộ interview, phương án, **✅ lựa chọn**, quy ước bổ sung |
-| [DMS.sql](DMS.sql) | Entry point psql; DDL PostgreSQL 16+ có version ở [0001_initial.sql](../../backend/alembic/sql/0001_initial.sql) |
-| [DMS.dbml](DMS.dbml) | Bản DBML; 29 bảng nghiệp vụ + hạ tầng command, cột, khóa/quan hệ, CHECK và ghi chú SQL |
-| [seed.example.sql](seed.example.sql) | 3 đơn vị, 5 hàng mẫu; tùy chọn cho demo (phường/xã do 0010 nạp) |
-| [hcmc_wards_2025.json](hcmc_wards_2025.json) | Nguồn 168 phường/xã/đặc khu TP.HCM 2025 (mã GSO) và ánh xạ 20 quận demo cũ → phường, dùng sinh revision 0010 |
-| [search-indexes.sql](search-indexes.sql) | GIN/pg_trgm cho tìm chứa chuỗi; tùy chọn |
-| [verify.sql](verify.sql) | Kiểm tra hồi quy SQL, fixture rollback |
-| [archive/DMS.legacy.sql](archive/DMS.legacy.sql) | Bảo toàn schema đầu vào để đối chiếu; không dùng triển khai |
-| [DMS_exploration.md](../BA/DMS_exploration.md) | BA đầu vào; các thay đổi cần đồng bộ được liệt kê ở mục 9 |
-| [CONTEXT.md](../../CONTEXT.md) | Thuật ngữ nghiệp vụ đã làm rõ |
+| [business_decision_making.md](business_decision_making.md) | Quyết định thiết kế; mục 14/11/2026 ở đầu, lịch sử interview giữ nguyên bên dưới |
+| [DMS.sql](DMS.sql) | Entry point psql: chạy snapshot `0011` (dựng lại toàn bộ schema `dms`) |
+| [DMS.dbml](DMS.dbml) | Bản DBML 16 bảng: cột, khóa/quan hệ, CHECK, index và ghi chú trigger |
+| [seed.example.sql](seed.example.sql) | Ví dụ tối thiểu 3 đơn vị, 3 mặt hàng cho schema trống; seed thật ở backend |
+| [hcmc_wards_2025.json](hcmc_wards_2025.json) | Nguồn 168 phường/xã/đặc khu TP.HCM 2025 (mã GSO), đã nạp sẵn trong `0010`/`0011` |
+| [search-indexes.sql](search-indexes.sql) | Ghi chú: index pg_trgm đã nằm trong `0011`, không cần chạy riêng |
+| [verify.sql](verify.sql) | Chạy bộ regression SQL trên schema `0011`, fixture luôn rollback |
+| [archive/DMS.legacy.sql](archive/DMS.legacy.sql) | Schema đầu vào gốc để đối chiếu; không dùng triển khai |
+| [DMS_exploration.md](../BA/DMS_exploration.md) | BA đầu vào |
 
-Checkpoint source M29 mới là **0008**, còn configured Supabase/runtime vẫn **0007**.
-[0008 historical receipt corrections](../../backend/alembic/sql/0008_historical_receipt_corrections.sql)
-chỉ cho phép correction receipt tái dùng product/unit đã POSTED trong chính chứng từ
-khi master hiện INACTIVE; lần post đầu và hàng inactive mới vẫn bị chặn. Đã kiểm
-chứng trên schema UUID tạm trong Supabase hiện có; chưa migrate schema dev.
-[M29 evidence](../backend-design/plan/document_corrections/VERIFICATION.md).
+Phạm vi: một doanh nghiệp, một kho; không nhà cung cấp/công nợ nhà cung cấp, đa kho,
+đa tiền tệ hay sổ cái kế toán. Không còn sổ kho/sổ phải thu/dư có dạng ledger.
 
-Checkpoint source/configured trước M29 là **0007**:
-[return lot successors](../../backend/alembic/sql/0007_return_lot_successors.sql)
-cho phép phiên bản POSTED hiện hành của cùng phiếu trả hàng tiếp tục nguồn credit lot
-gốc khi tính lại làm tròn; giữ nguyên sourceRevisionId/originReceiptId/lot và bằng chứng
-reservation/refund. Chỉ sửa guard, không ghi đè lịch sử/cache. Fresh/populated upgrade,
-seed lặp,54SQLchecks và down/up đã pass trong schema cô lập.
-[0006 eligible owner/history repair](../../backend/alembic/sql/0006_eligible_owner_deletion.sql)
-cho phép cascade cache0 chỉ khi xóa owner chưa dùng, vẫn chặn DELETE/UPDATE cache
-trực tiếp và mọi lịch sử nghiệp vụ. Khóa first-use product và revision/agency dates
-bảo toàn đơn vị/ngày tiếp nhận khi có concurrent writers.
-[unit policy](../../backend/alembic/sql/0005_unit_policy.sql)
-khóa đơn vị trước kiểm tra số lượng dòng/chỉ tiêu kiểm kê và bảo vệ chính sách phần
-lẻ sau khi có dòng ghi nhận; kiểm chứng cả hai thứ tự concurrent first-use.
-[0004 durable commands](../../backend/alembic/sql/0004_api_commands.sql)
-thêm `api_idempotency` cho actor/operation/resource retry. Tổng 30 bảng vật lý,
-60 timestamp bắt buộc; demo chỉ yêu cầu 29 bảng nghiệp vụ có dữ liệu. Triển khai
-head bằng Alembic; `DMS.sql` vẫn là entry point cho snapshot ban đầu, không phải
-thay thế migration trên database đang có dữ liệu.
+Để xem trên dbdiagram.io, tạo diagram mới và dán `DMS.dbml`. Domain, generated column,
+partial index, DEFERRABLE và trigger chỉ có ghi chú; triển khai bằng Alembic.
 
-Phạm vi: một doanh nghiệp, một kho; không nhà cung cấp/công nợ nhà cung cấp,
-đa kho, đa tiền tệ hoặc sổ cái kế toán tổng hợp. Sổ kho, phải thu và dư có là
-các **sổ phân hệ**, không được gọi là hệ thống kế toán kép hoàn chỉnh.
+## 2. Migration 0011
 
-Để xem trên dbdiagram.io, tạo diagram mới và dán nội dung `DMS.dbml` vào editor
-DBML. Domain, generated column, partial index, DEFERRABLE và trigger có ghi
-chú trong file; dùng `DMS.sql` để triển khai database. Không dùng bản SQL export
-từ sơ đồ thay cho các ràng buộc/routine của schema gốc.
+- `0011` chạy `DROP SCHEMA IF EXISTS dms CASCADE` rồi dựng lại toàn bộ: domain, 16 bảng,
+  index, hàm, trigger, 4 nhóm, 22 chức năng, phân quyền mặc định, 2 loại đại lý, quy định
+  singleton và danh mục 168 phường/xã chép nguyên từ `0010`; cuối cùng `REVOKE ... FROM PUBLIC`.
+- Từ DB trống (`0001 → 0011`) hay từ production `0010 → 0011` đều ra cùng một schema.
+  **Dữ liệu không được chuyển**: sau `0011` phải chạy seed v2 (mục 6).
+- **Không hỗ trợ downgrade**; `downgrade()` báo lỗi. Rollback là Neon branch backup tạo
+  trước khi migrate (tên branch ghi trong VERIFICATION).
+- Các snapshot `0001–0010` giữ nguyên, không sửa (quy ước snapshot bất biến).
 
-## 2. Đáp ứng ba tiêu chí thiết kế
-
-### 2.1. Tính đúng đắn
-
-- Phân biệt **chứng từ**, **phiên bản**, **bằng chứng nhận/hoàn tiền**, **bút toán**.
-- FK thực, CHECK trạng thái, khóa duy nhất, domain số chính xác; không dùng COMMENT thay ràng buộc.
-- Chứng từ đã ghi nhận và ledger bất biến. Chỉnh nội dung bằng phiên bản mới;
-  thay ledger bằng bút toán đảo + bút toán mới trong một transaction.
-- Số dư phải thu, dư có và tồn không âm; kiểm tra lịch sử theo các mốc nghiệp vụ,
-  không chỉ kiểm tra hiện tại. Kiểm tra theo phiếu phải thu và lô dư có còn
-  mạnh hơn chỉ kiểm tra tổng đại lý: không dùng nợ phiếu khác che phiếu bị thu quá.
-- Phiếu xuất + khoản thu tự sinh dùng cùng mốc để kiểm tra **kết quả atomic**,
-  không từ chối vì trạng thái trung gian chưa trừ khoản trả ngay.
-- Tổng tiền đối chiếu dòng; dòng theo giá/đơn vị snapshot; ledger đối chiếu
-  phiên bản hiện hành; phiên bản cũ phải được đảo hết ảnh hưởng.
-- Trả hàng là nghiệp vụ mới, không xóa giao dịch bán đúng; hoàn tiền chỉ ghi
-  giảm dư có khi thật sự thành công.
-- Callback/ghi sổ/refund có idempotency; tiền dư online không mất khỏi hệ thống.
-- Audit tự động ghi thay đổi, bất biến; không sao chép password/token hash.
-
-### 2.2. Tính tiến hóa
-
-- Mã nội bộ số và mã nghiệp vụ tách biệt; đổi tên không ảnh hưởng FK.
-- Số loại/mặt hàng/đơn vị là số record, không là tham số cần cập nhật thủ công.
-- Quy định số đại lý/tỷ lệ dùng bảng có kiểu rõ ràng; hạn mức nằm ở loại đại lý.
-- Danh mục có trạng thái ngừng dùng; FK RESTRICT bảo vệ các bản ghi đã được tham chiếu.
-- Trạng thái dùng TEXT + CHECK có thể đổi bằng migration; không dùng enum native
-  hoặc bảng EAV để né thiết kế thuộc tính nghiệp vụ.
-- Chứng từ dùng một cấu trúc định danh/phiên bản chung với kind hữu hạn và
-  kiểm tra theo từng loại, không dùng JSON làm chi tiết hàng hay quan hệ đa hình
-  không có FK. Thêm loại mới cần bổ sung constraint, kiểm tra và service.
-- Snapshot lưu điều kiện/giá tại lúc chốt; đổi quy định không viết lại phiếu cũ.
-- Đơn vị đã phát sinh không thay bản chất. Quy đổi nhiều đơn vị/đa kho nếu thêm
-  sau phải là migration và nghiệp vụ rõ ràng, không chỉ thêm cột tùy ý.
-
-### 2.3. Truy vấn và dung lượng
-
-- Danh mục tách chuẩn hóa; tiền không là float; không lưu dư nợ trên từng bản sao hồ sơ.
-- Cache tồn/giá và số dư đại lý phục vụ tra cứu thường xuyên, được SQL cập nhật
-  từ ledger. Không tổng hợp toàn bộ lịch sử mỗi lần mở danh sách đại lý/tồn.
-- Giá bán hiện tại là tính toán rẻ từ giá nhập cache và một tỷ lệ: không lưu
-  thêm cache phải cập nhật hàng loạt khi đổi tỷ lệ. Giá lịch sử vẫn lưu trên dòng.
-- Mã hiển thị sinh từ identity, FK dùng integer/bigint thay vì VARCHAR mã phiếu.
-- Index theo truy vấn ở mục 7; unique index đã phục vụ FK có cùng prefix không
-  cần tạo index trùng. Partial index cho hàng chờ, token sống và trạng thái hoạt động.
-- Generated amount và tổng header là phi chuẩn hóa có kiểm soát, giúp đọc/in
-  phiếu và tổng hợp doanh số không phải join hàng triệu dòng mỗi lần.
-- Không tạo bản sao báo cáo tháng, không lưu tỷ lệ doanh số hoặc phần nợ đầu/cuối
-  thành dữ liệu gốc; truy vấn lại theo trạng thái/ledger đúng sau chỉnh hồi tố.
-- Chỉ snapshot nội dung để tái in/giải thích chứng từ. Không lưu nguyên request,
-  token, header gateway hoặc full bản ghi nhạy cảm vào audit/webhook.
-- Chi phí lưu phiên bản/ledger đổi lại truy vết. Không sao chép cả danh mục theo
-  từng tháng, không tạo bảng chatbot/history hội thoại ngoài yêu cầu.
-
-**Trade-off có chủ đích:** kiểm tra lịch sử/FIFO có chi phí ghi lớn hơn CRUD
-đơn giản. Bản tham chiếu ưu tiên tính đúng; constraint deferred có thể lặp kiểm
-tra khi transaction nhiều dòng. Giao dịch mới ở mốc cuối kiểm tra số dư và
-chứng từ nguồn; sửa/đảo/hồi tố mới replay các nguồn thanh toán của đại lý.
-Không quảng cáo O(1) cho thao tác sửa hồi tố. Khi dữ liệu lớn, đo
-profiling rồi bổ sung checkpoint/dirty-set hoặc gom kiểm tra một lần mỗi
-đại lý/mặt hàng tại cổng ghi sổ; không bỏ kiểm tra lịch sử để tăng tốc.
-
-## 3. Quy ước dữ liệu
-
-### Khóa và thời gian
-
-- PK danh mục nhỏ: INTEGER; tài khoản/đại lý/hàng/chứng từ/ledger: BIGINT identity.
-- `DL-<id>`, `MH-<id>`, `PN-<id>`, `PX-<id>`… là mã sinh, không nhập tay, không
-  tái sử dụng. Không yêu cầu số chứng từ liên tục; rollback có thể tạo khoảng trống.
-- Mọi bảng có **`"createdAt"`, `"updatedAt"` TIMESTAMPTZ NOT NULL**. Trigger đặt
-  hai giá trị bằng nhau khi insert, giữ createdAt và cập nhật updatedAt khi sửa.
-  Ledger/audit bất biến nên hai cột giữ nguyên bằng nhau suốt vòng đời.
-- `businessDate` là DATE cho kỳ báo cáo. `readyAt`, `postedAt`, `receivedAt`,
-  `paymentTime`, `completedAt` là thời điểm sự kiện khác nhau.
-- `businessOrder` sinh một lần khi ghi nhận ban đầu và giữ qua các phiên bản;
-  phá hòa trong cùng ngày. Không lấy updatedAt làm thứ tự nghiệp vụ.
-- Lưu instant UTC; lúc chuyển từ instant sang ngày Việt Nam dùng
-  `(instant AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`, không phụ thuộc timezone máy chạy.
-- Tên bảng snake_case; tên cột nhiều từ camelCase có quote để giữ chính xác
-  createdAt/updatedAt theo yêu cầu. ORM phải map tên SQL được quote tương ứng.
-
-### Tiền và số lượng
-
-| Domain | Giới hạn và tính chất |
-| --- | --- |
-| `money_vnd` | NUMERIC nguyên, trị tuyệt đối < 10^18; chặn phần lẻ, NaN/infinity |
-| `quantity_value` | NUMERIC tối đa 3 số lẻ có nghĩa, trị tuyệt đối < 10^15; chặn NaN/infinity |
-| `price_rate` | NUMERIC > 0, < 1000, tối đa 6 số lẻ có nghĩa |
-
-Domain dùng NUMERIC không typmod rồi CHECK để **từ chối** đầu vào 1,5đ hoặc
-1,0001 đơn vị, thay vì NUMERIC(18,0)/(18,3) âm thầm làm tròn. API cũng kiểm tra
-Decimal và chuẩn hóa tiền thành số nguyên trước khi gửi SQL.
-
-```text
-giá xuất = round(giá nhập snapshot × tỷ lệ snapshot, 0)
-thành tiền dòng = round(số lượng × giá xuất, 0)
-tổng phiếu = tổng các thành tiền dòng đã làm tròn
-```
-
-PostgreSQL NUMERIC round: nửa đơn vị làm tròn ra xa 0; số tiền kinh doanh ở đây
-không âm nên tương đương HALF_UP. Không tính tổng từ float phía trình duyệt.
-
-**Trả từng phần:** không dùng phép làm tròn độc lập gây hoàn vượt tiền gốc.
-
-```text
-tiền lần trả này
- = round(tổng lượng đã trả gồm lần này × giá bán gốc, 0)
- − tổng tiền những lần trả trước
-```
-
-`returnAmount` là số dẫn xuất phục vụ trường hợp này. SQL kiểm tra lũy kế,
-giá/đơn vị dòng gốc và lượng trả không vượt lượng bán. Dòng trả có thể 0đ do
-làm tròn nhưng vẫn phải ghi nhận hàng thực tế; không tạo bút toán tiền 0.
-
-## 4. Mô hình và danh sách 29 bảng
+## 3. Mười sáu bảng
 
 ```mermaid
 erDiagram
   user_group ||--o{ app_user : contains
   user_group ||--o{ group_permission : grants
   app_function ||--o{ group_permission : identifies
+  app_function ||--o{ audit_log : labels
   app_user ||--o{ auth_token : owns
   app_user o|--o{ audit_log : performs
   agency_type ||--o{ agency : classifies
   ward ||--o{ agency : locates
-  agency ||--|| agency_balance : caches
   unit ||--o{ product : measures
-  product ||--|| inventory_balance : caches
   agency o|--o{ document : participates
-  document ||--|{ document_revision : versions
-  document_revision ||--o{ document_line : contains
+  document ||--o{ document_line : contains
+  document o|--o| document : replaces
   product ||--o{ document_line : references
-  document_revision ||--o{ posting_batch : posts
-  posting_batch ||--o{ inventory_entry : records
-  posting_batch ||--o{ receivable_entry : allocates
-  posting_batch ||--o{ credit_entry : records
-  document ||--o{ receivable_entry : target_invoice
-  agency ||--o{ credit_lot : owns
-  credit_lot ||--o{ credit_entry : traces
-  credit_lot ||--o{ refund_reservation : reserves
-  document_revision ||--o| upfront_confirmation : verifies
   agency ||--o{ online_payment : pays
+  online_payment o|--o| document : creates_receipt
   online_payment ||--o{ payment_event : receives
-  online_payment ||--o{ refund_attempt : refunds
-  stock_count ||--|{ stock_count_line : observes
-  product ||--o{ stock_count_line : counts
-  document o|--o| stock_count : adjusts
 ```
 
-ERD giản lược; các liên kết origin, currentRevision, reversal và FK composite
-được mô tả chính xác trong DDL. Có thể chưa có line khi đang nháp.
-
-| Nhóm | Bảng | Dữ liệu chính/quan hệ |
+| Nhóm | Bảng | Dữ liệu chính |
 | --- | --- | --- |
-| RBAC | `user_group` | Code/tên nhóm; seed 4 nhóm, có thể thêm |
-| RBAC | `app_function` | Code chức năng ổn định; seed quyền theo thao tác |
-| RBAC | `app_user` | Email login unique không phân biệt hoa thường, passwordHash, groupId, status, authVersion |
-| RBAC | `group_permission` | UNIQUE(groupId,functionId), isAllowed BOOLEAN |
-| Auth | `auth_token` | Digest SHA-256, loại refresh/reset, hết hạn/thu hồi, issuance authVersion và sessionId; không lưu token thô |
-| Quy định | `business_rule` | Một record true: maxAgenciesPerWard, sellingPriceRate |
-| Danh mục | `ward` | Revision 0010: 168 phường/xã/đặc khu TP.HCM sau 01/7/2025 (mã GSO, kind WARD/COMMUNE/SPECIAL_ZONE); chỉ đọc, không trạng thái. Thay bảng `district` đã bỏ |
-| Danh mục | `agency_type` | Code/tên, maxDebt, trạng thái |
-| Danh mục | `unit` | Code/tên, allowsFraction, trạng thái |
-| Đại lý | `agency` | Hồ sơ, type/ward FK, ngày nhận, ACTIVE/TERMINATED, người/lý do ngừng |
-| Đại lý | `agency_balance` | Cache phải thu và dư có, 1:1 đại lý |
-| Hàng | `product` | Tên, đơn vị FK, ngưỡng cảnh báo, trạng thái |
-| Hàng | `inventory_balance` | Cache tồn, giá nhập hiện tại và dòng nguồn giá |
-| Chứng từ | `document` | Kind, mã sinh, creationKey unique để retry tạo phiếu, đại lý không đổi, origin FK, currentRevision, status, thứ tự ban đầu, thông tin hủy |
-| Chứng từ | `document_revision` | revisionNo, ngày nghiệp vụ, tổng, trả ngay, snapshot tỷ lệ/hạn mức/liên hệ, tác nhân và thời điểm chốt/xác nhận |
-| Chứng từ | `document_line` | STT, product/unit FK + tên snapshot, quantity, unitPrice, giá nhập gốc, dòng trả gốc, generated amount |
-| Trả ngay | `upfront_confirmation` | Xác nhận tiền thật gắn đúng phiên bản chờ xuất, số tiền/phương thức, kết quả gắn phiếu thu |
-| Online | `online_payment` | Đại lý, provider/reference, idempotency, amount, trạng thái, thời hạn, thời điểm trả, receipt FK unique |
-| Online | `payment_event` | Callback đã xác minh, eventKey unique theo payment; payload tối thiểu |
-| Ghi sổ | `posting_batch` | POST/REVERSE/REALLOCATE gắn revision, idempotency; một POST mỗi revision |
-| Kho | `inventory_entry` | Delta có dấu, line/product/unit FK, ngày/thứ tự hiệu lực, reversal unique |
-| Phải thu | `receivable_entry` | Charge/payment/return/credit có dấu, nguồn batch và phiếu đích cùng đại lý; đồng thời là phân bổ thanh toán |
-| Dư có | `credit_lot` | Lô dư có: nguồn revision và nguồn tiền phiếu thu cùng đại lý |
-| Dư có | `credit_entry` | Tạo/hoàn/bù có dấu, FK lô, ngày/thứ tự hiệu lực, reversal unique |
-| Refund | `refund_reservation` | Lô/số tiền dành cho refund đang chờ; ACTIVE/RELEASED/CONSUMED |
-| Refund | `refund_attempt` | Yêu cầu API online, idempotency, provider proof, PENDING/UNKNOWN/SUCCESS/FAILED |
-| Kiểm kê | `stock_count` | Ngày đếm, người lập/duyệt, trạng thái và chứng từ điều chỉnh |
-| Kiểm kê | `stock_count_line` | Book/count/difference, product/unit, last-entry snapshot để phát hiện số liệu đã đổi |
-| Audit | `audit_log` | Tác nhân/chức năng/thao tác, đối tượng, trước/sau, requestId và timestamp |
+| RBAC | `user_group` | 4 nhóm: Quản lý, Kinh doanh, Kho, Kế toán |
+| RBAC | `app_function` | 22 chức năng (mục 4) |
+| RBAC | `app_user` | Email duy nhất không phân biệt hoa/thường, Argon2id hash, nhóm, ACTIVE/LOCKED, authVersion |
+| RBAC | `group_permission` | UNIQUE(groupId, functionId), isAllowed |
+| Auth | `auth_token` | Digest SHA-256 refresh/reset, hết hạn/thu hồi, authVersion, sessionId |
+| Quy định | `business_rule` | Singleton: `maxAgenciesPerWard` (mặc định 4), `sellingPriceRate` (1.02) |
+| Danh mục | `ward` | 168 phường/xã/đặc khu TP.HCM 2025, chỉ đọc |
+| Danh mục | `agency_type` | Mã/tên, `maxDebt` (Loại 1: 50.000.000đ, Loại 2: 20.000.000đ), trạng thái |
+| Danh mục | `unit` | Mã/tên, `allowsFraction`, trạng thái |
+| Đại lý | `agency` | Hồ sơ, loại/phường, ngày tiếp nhận, **`debt`**, ACTIVE/TERMINATED + lý do |
+| Hàng | `product` | Tên, đơn vị, **`stock`**, **`lastPurchasePrice`**, trạng thái (bỏ `lowStockThreshold`) |
+| Chứng từ | `document` | kind, mã sinh, đại lý, receiptType, businessDate, status, totalAmount, tỷ lệ chốt, `replacesDocumentId`, người/giờ lập-ghi sổ-hủy, lý do hủy |
+| Chứng từ | `document_line` | Gắn thẳng vào `document`; mặt hàng/đơn vị + tên snapshot, SL, đơn giá, `lineAmount` generated |
+| Online | `online_payment` | Giao dịch VNPAY: đại lý, merchantReference, idempotencyKey, mã giao dịch nhà cung cấp, số tiền, PENDING/SUCCESS/FAILED/EXPIRED, phiếu thu |
+| Online | `payment_event` | Callback đã xác minh, append-only, UNIQUE(paymentId, eventKey) |
+| Audit | `audit_log` | Tác nhân, chức năng, thao tác, trước/sau, requestId; append-only |
 
-### Các loại chứng từ chung
+**Đã bỏ** (so với 0001–0010): `upfront_confirmation`, `credit_lot`, `credit_entry`,
+`refund_reservation`, `refund_attempt`, `stock_count`, `stock_count_line`, `posting_batch`,
+`receivable_entry`, `agency_balance`, `inventory_entry`, `inventory_balance`,
+`document_revision`, `api_idempotency` (bảng command 0004). VNPAY tự chống trùng bằng
+`online_payment.idempotencyKey` và `UNIQUE(provider, providerTransactionId)`.
 
-| kind | Dòng hàng | Đại lý | Nguồn/liên kết | Ghi sổ |
+### 3.1 Chứng từ
+
+| kind | Mã | Đại lý | Dòng hàng | Ảnh hưởng khi POSTED |
 | --- | --- | --- | --- | --- |
-| STOCK_RECEIPT | Có, quantity > 0 | Không | — | Kho +q |
-| STOCK_ISSUE | Có, quantity > 0 | Có | Phiếu thu tự sinh nếu trả ngay | Kho -q, phải thu +tổng |
-| PAYMENT_RECEIPT | Không | Có | AUTO_FROM_ISSUE / DEBT_COLLECTION / RECEIVED_UNAPPLIED | Phải thu -phần phân bổ, dư có +phần dư được phép |
-| STOCK_ADJUSTMENT | Có, delta có dấu, price 0 | Không | Có thể từ kiểm kê | Kho ±q, không doanh số |
-| SALES_RETURN | Có, tham chiếu dòng bán và giá gốc | Có | Phiếu xuất gốc | Kho +q, giảm nợ phần chưa trả, tăng dư có phần đã trả |
-| CREDIT_APPLICATION | Không | Có | Dùng lô dư có và FIFO phiếu đích | Phải thu -a, dư có -a, tiền thu mới 0 |
-| REFUND | Không | Có | Phiếu thu nguồn, lô dư có, attempt nếu online | Dư có -a khi tiền thực sự đã trả |
+| `STOCK_RECEIPT` | `PN-<id>` | không | có (SL, đơn giá nhập) | `product.stock += SL`; cập nhật `lastPurchasePrice` |
+| `STOCK_ISSUE` | `PX-<id>` | có | có (đơn giá xuất chốt khi ghi sổ) | `product.stock −= SL`; `agency.debt += tổng` |
+| `PAYMENT_RECEIPT` | `PT-<id>` | có | không (chỉ số tiền) | `agency.debt −= số tiền` |
 
-Không tạo bảng PAYMENT_ALLOCATION trùng dữ liệu: `receivable_entry` đã có
-source batch → receipt/credit revision, target invoice, amount và lịch sử đảo.
-Một phiếu thu trả nhiều phiếu, một phiếu xuất nhận nhiều khoản thu.
+- `receiptType`: `CASH | BANK_TRANSFER | ONLINE`; `ONLINE` chỉ do IPN VNPAY tạo.
+- Trạng thái `DRAFT → POSTED → CANCELLED`. Nháp sửa/xóa tự do (không cần lý do). Đã ghi sổ
+  thì nội dung bất biến, chỉ được **hủy** (bắt buộc lý do, đảo đúng ảnh hưởng).
+- **Sửa có lý do** = hủy phiếu cũ + tạo phiếu mới `POSTED` có `replacesDocumentId` trỏ về phiếu
+  cũ, trong một transaction; phiếu mới vi phạm quy định thì rollback, phiếu cũ còn `POSTED`.
+- Chỉ hủy/sửa chứng từ có ngày trong **tháng hiện tại** (`PERIOD_CLOSED`); ngày chứng từ không
+  được sau hôm nay.
 
-## 5. Transaction bắt buộc ở business services
+### 3.2 Quy định và nơi thực thi
 
-Ràng buộc deferred được kiểm tra ở COMMIT. Backend không được gửi HTTP thành
-công trước khi commit thành công. Trước khi trả số dư mới, gọi
-`SET CONSTRAINTS ALL IMMEDIATE`; sau đó đọc cache, commit, rồi trả response.
-Cache chưa được refresh giữa các INSERT khi constraint còn deferred.
+| Mã | Quy định | Lỗi API | Database |
+| --- | --- | --- | --- |
+| QĐ1 | Đại lý ACTIVE mỗi phường ≤ `maxAgenciesPerWard` | `WARD_CAPACITY_EXCEEDED` | `guard_agency` (`ck_agency_ward_capacity`) |
+| QĐ2 | Đơn giá xuất = round(`lastPurchasePrice` × `sellingPriceRate`); hàng chưa nhập không xuất được | `PRODUCT_NOT_PRICED` | service; `ck_document_rate_shape` |
+| QĐ3 | Nợ sau ghi sổ phiếu xuất ≤ `maxDebt` | `DEBT_LIMIT_EXCEEDED` | `guard_agency` (`ck_agency_debt_limit`) khi `stock.issue.post` |
+| QĐ4 | Phiếu thu thủ công 0 < số tiền ≤ nợ hiện tại | `PAYMENT_EXCEEDS_DEBT` | service; `guard_payment` (`ck_online_payment_debt`) cho VNPAY |
+| QĐ5 | SL xuất ≤ tồn; hủy phiếu nhập không làm tồn âm | `INSUFFICIENT_STOCK` | `ck_product_stock_nonnegative` |
+| QĐ6 | Đại lý TERMINATED, hàng/đơn vị INACTIVE không dùng cho chứng từ mới | mã hiện có | service; `lock_line_policy` |
+| QĐ7 | Hủy phiếu thu có thể đẩy nợ vượt hạn mức: cho phép, có audit | — | — |
+| QĐ8 | Chỉ hủy/sửa chứng từ trong tháng hiện tại; hủy/sửa bắt buộc lý do | `PERIOD_CLOSED`, `REASON_REQUIRED` | `ck_document_cancel_shape` (lý do khác rỗng) |
+| — | Không chấm dứt đại lý còn nợ | `AGENCY_HAS_DEBT` (409) | service |
 
-### 5.1. Giao thức ghi chung
+### 3.3 Số dư và VNPAY
 
-1. Xác thực người dùng/quyền API, không chỉ ẩn menu. Đặt transaction-local
-   `set_config('dms.actor_id', user_id, true)` và `dms.request_id`; webhook/worker
-   là SYSTEM, lưu bằng chứng xác minh ở payment_event/refund_attempt. Đặt
-   `dms.function_code` theo chức năng đã được xác thực (ví dụ stock.issue.post,
-   documents.cancel) để audit cùng transaction mang đúng ý định thao tác;
-   nếu không đặt, trigger dùng mã mặc định của bảng cho script/bootstrap.
-2. Khóa dữ liệu dùng chung theo thứ tự nhất quán: rule/type khi cần; agency
-   balance (theo id); inventory balance (theo productId); documents nguồn/đích
-   (theo id); credit lots (theo id); payment/refund records. Khi sửa hồ sơ cũng
-   khóa agency/balance trước khi đọc số dư để đổi loại/ngừng hợp tác.
-3. Đọc lại trạng thái hiện hành dưới khóa; tính Decimal, ngày và các dòng liên quan.
-4. Chốt revision, status/currentRevision/order; tạo batch idempotent; append
-   ledger và thông tin liên kết trong cùng transaction.
-5. Khi sửa/hủy hồi tố, đảo **mọi ảnh hưởng còn hiệu lực** của version cũ. Chỉ
-   đảo entry nguyên bản chưa được đảo; không đảo một reversal. Batch REVERSE
-   gắn revision cũ; batch POST gắn revision mới; REALLOCATE gắn source receipt
-   hiện hành. Đảo giữ đúng date/order/key và đối dấu giá trị.
-6. Replay FIFO và return split từ mốc bị ảnh hưởng, cập nhật cả các nguồn sau
-   đó có phân bổ thay đổi. Không chỉ sửa tổng dư nợ hoặc một receipt đầu tiên.
-7. Force constraints, đọc cache, commit. UNIQUE/idempotency retry trả kết quả
-   cũ; deadlock/serialization retry toàn transaction với cùng business key.
+- `agency.debt` = Σ phiếu xuất POSTED − Σ phiếu thu POSTED; `product.stock` = Σ nhập − Σ xuất.
+  Hai cột (và `lastPurchasePrice`) chỉ đổi khi `dms.posting_context()` đúng, tức
+  `dms.function_code` là một trong `stock.receipt.post`, `stock.issue.post`, `cash.receipt.post`,
+  `documents.cancel`, `documents.correct`, `payments.online`. API danh mục không sửa được.
+- Ghi sổ/hủy khóa `agency` rồi các `product` theo id tăng dần (`FOR UPDATE`) để tránh deadlock.
+- VNPAY sandbox: tạo giao dịch với số tiền ≤ nợ; IPN thành công tạo phiếu thu `ONLINE` `POSTED`
+  (`postedBy` NULL = hệ thống). Nếu nợ đã giảm vì phiếu khác, tiền vẫn được ghi nhận và **nợ có
+  thể âm** (trả trước) — ngoại lệ duy nhất của QĐ4. Không còn hoàn tiền.
 
-Không giữ transaction/row lock trong lúc người dùng nhập phiếu hoặc chờ API
-cổng thanh toán. Transaction chỉ bao quanh bước dữ liệu ngắn.
+### 3.4 Trigger, guard và đồng hồ nghiệp vụ
 
-### 5.2. Nhập và xuất
-
-- Nhập: DRAFT → POSTED, ít nhất một dòng, master/unit đang dùng; append kho +q.
-- Xuất: DRAFT → READY (document PENDING), chốt giá/nguồn/tỷ lệ/hạn mức và liên hệ;
-  nếu sửa nội dung chờ tạo revision mới, xác nhận trả ngay lại theo phiên bản đó.
-- READY → POSTED: kiểm tra lại master/agency, tổng lượng và hạn mức hiện tại;
-  không đổi giá đã chốt. Chưa dành tồn cho phiếu chờ, nên có thể bị từ chối
-  tại bước thực xuất nếu người khác đã sử dụng tồn.
-- Nếu trả ngay > 0, cần upfront_confirmation; tạo/ghi phiếu thu tự sinh trong
-  cùng transaction. Receivable của issue và auto receipt có cùng date/order.
-- Tiền trước xuất đã nhận nhưng xuất thất bại: giữ bằng chứng VERIFIED, xử lý
-  bằng receipt RECEIVED_UNAPPLIED và state RECEIVED_SEPARATELY; FIFO phần có
-  thể trả nợ, phần dư thành credit. Dashboard phải hiển thị khoản VERIFIED
-  chưa gắn receipt, tránh bỏ sót tiền nhận đang chờ.
-- Sau khi đã ghi nhận, số tiền trả ngay thực nhận là bất biến khi sửa phiếu.
-  Sửa số lượng/giá hợp lệ giữ chứng từ tiền gốc; thay đổi tiền thực tế là thu
-  thêm/refund/bù. Hủy giao dịch ghi sai mà tiền thực tế vẫn đã nhận phải chuyển
-  bằng chứng sang receipt riêng, không làm biến mất tiền.
-
-### 5.3. Thu tiền/FIFO
-
-Thu công nợ thủ công > 0 và không vượt nợ **tại ngày nghiệp vụ** có thể phân
-bổ. SQL chặn thu vào tương lai, chặn overpay và kiểm tra FIFO. Thu được cho
-đại lý ngừng hợp tác. Không dùng phần dư có để coi là tiền mặt/chuyển khoản.
-
-Online: TX1 tạo PENDING với tiền ≤ nợ hiện tại và merchant key; gọi cổng sau
-commit. Callback xác minh provider/reference/amount/signature, giữ payment và
-agency dưới khóa; TX2 ghi event SUCCESS, receipt đầy đủ, FIFO phần nợ và credit
-phần dư. Local hết hạn không được phủ nhận verified late success; SUCCESS
-bất biến. Không receipt/nợ thay đổi cho FAILED/EXPIRED.
-
-### 5.4. Trả hàng, bù và refund
-
-- Trả hàng: nhận toàn bộ/một phần, dùng giá bán gốc, cumulative rounding.
-  `t = giá trị trả`, `u = nợ phiếu ngay trước trả`:
-  giảm phải thu `min(t,u)`; dư có `max(t-u,0)`; kho tăng lượng thực nhận.
-- Service xác định các nguồn tiền đã thanh toán phiếu và chia lô dư có theo
-  nguồn đó, kể cả nguồn bù trước đây. FK đảm bảo cùng đại lý/phiếu thu; việc
-  chọn đúng chuỗi provenance của khoản đã trả là trách nhiệm service.
-- Bù: kế toán chọn số tiền ≤ credit khả dụng và ≤ công nợ hợp lệ; tiêu lô credit,
-  FIFO invoice. Không thêm PAYMENT_RECEIPT vì không có cash mới.
-- Refund: một chứng từ liên kết một receipt nguồn; nhiều nguồn dùng nhiều
-  chứng từ. Tổng đã hoàn + đang dành không vượt tiền receipt nguồn.
-- Online refund: TX1 reserve lô credit, tạo attempt PENDING, commit; gọi provider
-  với idempotency. SUCCESS: TX2 post refund, debit credit, consume reservation
-  cùng transaction. Failure đã chắc chắn: đánh FAILED và release. Timeout/
-  kết quả chưa biết: UNKNOWN, **giữ reservation**, query trạng thái trước retry.
-- Cash/bank refund: xác minh tiền thật đã trả rồi post; nếu có bước chờ thì
-  cũng reserve trước. Refund đã trả không được hủy để giả tiền chưa từng ra.
-
-### 5.5. Kiểm kê
-
-Lưu cả dòng có chênh lệch 0. Capture bookQuantity + last-entry id, nhập số đếm.
-Lúc xác nhận kiểm tra không có biến động từ snapshot; nếu có, đối chiếu/đếm
-lại. Chênh lệch khác 0 cần adjustment có lý do, dòng đúng difference, ghi sổ
-trong cùng transaction. Chênh lệch 0 không tạo adjustment rỗng. Bằng chứng
-kiểm kê đã xác nhận bất biến; muốn điều chỉnh tiếp dùng chứng từ mới.
-
-## 6. Phân chia trách nhiệm SQL và backend
-
-| Quy tắc | Database thực thi | Backend cần thực hiện |
-| --- | --- | --- |
-| Domain/status/FK/unique | CHECK, domain, FK composite, unique index | Thông báo lỗi dễ hiểu, validate sớm |
-| Giá/số lượng/tổng/snapshot | Generated, trigger theo kind, đối chiếu total | Capture master/contact, Decimal trước submit |
-| Mã/đại lý không đổi, version bất biến | Guard document/revision/line | Tạo revision mới và workflow xác nhận |
-| Tồn/nợ/dư có không âm lịch sử | Deferred ledger checks | Lập đúng bút toán và replay các nguồn phụ thuộc |
-| FIFO, split return, hiệu lực source | SQL kiểm tra phân bổ/kết quả nguồn | Thuật toán tạo/replay phân bổ |
-| Limit/capacity/type mới | SQL guard + lock + final debt | Lock theo protocol, báo các đại lý gây chặn |
-| Online một receipt, refund/provenance/reservation | FK, CHECK, unique, deferred reconciliation | Xác minh provider, ký/kiểm callback, gọi/query API |
-| Audit bất biến, bỏ hash | Trigger tự ghi, chống UPDATE/DELETE | Đặt actor/request đúng và quyền chức năng |
-| Email login unique, authVersion | Unique lower(email), auto bump | Argon2id/hash, kiểm locked/version, revoke token và RBAC |
-| Chatbot | Read models và bảng quyền | Chỉ công cụ read có whitelist, kiểm quyền giống API, chọn đại lý theo mã |
-
-Trigger là lớp bảo toàn dữ liệu, không thay xác thực người dùng. Tài khoản DB
-owner có quyền quản trị; runtime nên dùng non-owner login có grants rõ ràng.
-Do internal trigger gọi các hàm assert, runtime cần EXECUTE các hàm liên quan
-cùng DML cần thiết; không cấp DDL/TRUNCATE, không cho trình duyệt truy cập DB.
-Read-only reporting role chỉ được SELECT phù hợp và EXECUTE sales/debt_report.
-
-### Authentication revision 0003
-
-Reviewed additive DDL: [`0003_auth_sessions.sql`](../../backend/alembic/sql/0003_auth_sessions.sql).
-It adds required positive `authVersion` and nullable UUID `sessionId` to `auth_token`;
-the session UUID is present exactly for REFRESH. One unrevoked refresh per session
-is enforced by a partial unique index. A guard makes owner/purpose/digest/version/
-session/expiry immutable and revocation irreversible. No new table is introduced.
-
-Upgrade assigns distinct session UUIDs to historical refresh rows, snapshots each
-owner's version and revokes previously live tokens; existing revocation timestamps
-and account/business data are preserved. Downgrade revokes tokens before removing
-new metadata/guards. Stop the auth API before downgrade; re-upgrade requires re-login.
-Initial SQL snapshots remain immutable. New demo seed runs require head `0003`.
-
-Backend authentication and RBAC now enforce these checks on every protected request.
-Fresh/populated migration, ORM autogeneration with no deltas, downgrade/re-upgrade,
-seed twice and the 54 baseline regressions passed in disposable PostgreSQL 16.
-The historical Supabase `0002` verification below is separate from this local
-`0003` evidence; deployment to the configured external database is still explicit.
-See [auth verification](../backend-design/plan/authentication/VERIFICATION.md).
-
-## 7. Truy vấn, index và phân trang
-
-| Nhu cầu | Index/read model |
+| Hàm/trigger | Vai trò |
 | --- | --- |
-| Mã chính xác | Unique agency/product/document code |
-| Loại/phường-xã/đại lý đang dùng | agency type/ward + partial active ward |
-| Tên prefix, phone | lower(name) text_pattern_ops, phone B-tree |
-| Tên chứa chuỗi | search-indexes.sql GIN pg_trgm; lọc >= 3 ký tự có ích nhất |
-| Kho hiện tại/giá bán | inventory_overview + product/balance PK |
-| Kho/nợ lịch sử | owner, businessDate, businessOrder index |
-| Nợ trong khoảng | agency_balance(currentDebt,agencyId) |
-| Hàng chờ xử lý | document(kind,status,id) partial |
-| Phiếu trong khoảng ngày | posted revision(businessDate,documentId) + current revision unique |
-| Detail và phiên bản | Unique(documentId,revisionNo), unique(revisionId,lineNo/productId) |
-| Callback/refund retry | Merchant/idempotency/provider reference unique, pending index |
-| Audit | Time/id, actor/time, entity/key/id |
+| `app_now()`, `business_today()` | Thời điểm = `dms.clock` nếu được đặt (chỉ seed), ngược lại `clock_timestamp()`; ngày theo `Asia/Ho_Chi_Minh` |
+| `stamp_row` (`z_stamp`, mọi bảng) | Đặt `createdAt`/`updatedAt` theo `app_now()` |
+| `audit_change` (11 bảng) | Ghi `audit_log` trước/sau theo `dms.actor_id`, `dms.request_id`, `dms.function_code`; bỏ `passwordHash`/`tokenDigest` |
+| `deny_change` | `payment_event`, `audit_log` append-only |
+| `guard_auth_version`, `guard_auth_token` | Tăng authVersion khi đổi mật khẩu/nhóm/trạng thái; token bất biến, thu hồi một chiều |
+| `guard_agency`, `guard_agency_history_date` | QĐ1, QĐ3, debt bảo vệ, TERMINATED không mở lại, ngày tiếp nhận không sau lịch sử |
+| `guard_rules` | Không xóa quy định; không giảm giới hạn phường/hạn mức xuống dưới hiện trạng |
+| `guard_product`, `guard_recorded_unit_policy`, `lock_line_policy` | Stock/giá bảo vệ; đơn vị và chính sách số lẻ bất biến sau khi đã dùng |
+| `guard_eligible_owner_deletion` | Chỉ xóa đại lý/mặt hàng chưa có lịch sử và số dư 0 |
+| `guard_document`, `guard_line` | Máy trạng thái chứng từ, khớp tổng dòng, phiếu thu không dòng, chỉ dòng của nháp được đổi, phiếu thay thế cùng loại/đại lý |
+| `guard_payment`, `check_online_payment` (deferred) | QĐ4 cho VNPAY; SUCCESS cần event đã xác minh và đúng một phiếu thu ONLINE khớp số tiền |
 
-Ví dụ keyset pagination (không bọc tùy ý mọi điều kiện trong `OR :param IS NULL`):
+## 4. Chức năng phân quyền (22)
 
-```sql
-SELECT * FROM dms.agency_overview
-WHERE id > :last_id AND "wardId" = :ward_id
-ORDER BY id LIMIT :page_size;
+`users.manage`, `groups.manage`, `permissions.manage`, `rules.manage`, `agency_type.manage`,
+`unit.manage`, `product.manage`, `agency.read`, `agency.manage`, `stock.receipt.prepare`,
+`stock.receipt.post`, `stock.issue.prepare`, `stock.issue.post`, `cash.receipt.prepare`,
+`cash.receipt.post`, `documents.correct`, `documents.cancel`, `sales.read`, `debt.read`,
+`reports.read`, `audit.read`, `payments.online` ("Thanh toán trực tuyến").
 
-SELECT * FROM dms.current_document
-WHERE status = 'POSTED' AND kind = 'STOCK_ISSUE'
-  AND "businessDate" >= :from_date AND "businessDate" < :to_date
-  AND ("businessDate", id) > (:last_date, :last_id)
-ORDER BY "businessDate", id LIMIT :page_size;
+Mặc định: Quản lý có mọi quyền; Kinh doanh `agency.read/manage`, `stock.issue.prepare`,
+`sales.read`, `debt.read`; Kho `agency.read`, `unit.manage`, `product.manage`, lập + ghi sổ
+phiếu nhập, ghi sổ phiếu xuất; Kế toán `agency.read`, `debt.read`, `sales.read`, `reports.read`,
+lập + ghi sổ phiếu thu, `payments.online`. Đã bỏ: `district.manage`, `inventory.read`,
+`cash.upfront.verify`, `stock.count`, `stock.adjustment.*`, `returns.*`, `cash.refund.*`,
+`credit.apply`.
 
-SELECT * FROM dms.sales_report(DATE '2026-06-01', DATE '2026-07-01');
-SELECT * FROM dms.debt_report(DATE '2026-06-01', DATE '2026-07-01');
+## 5. Quy ước dữ liệu
+
+- PK danh mục nhỏ: INTEGER; tài khoản/đại lý/hàng/chứng từ: BIGINT identity. `DL-<id>`,
+  `MH-<id>`, `PN-/PX-/PT-<id>` là cột generated, không nhập tay, không tái sử dụng.
+- Mọi bảng có `"createdAt"`/`"updatedAt"` TIMESTAMPTZ NOT NULL (32 cột timestamp).
+- Tên bảng snake_case; cột nhiều từ camelCase có quote.
+- Domain: `money_vnd` (VNĐ nguyên, |x| < 10^18), `quantity_value` (≤ 3 số lẻ, |x| < 10^15),
+  `price_rate` (0 < x < 1000, ≤ 6 số lẻ); NUMERIC không typmod + CHECK để từ chối thay vì làm tròn.
+
+```text
+giá xuất = round(giá nhập gần nhất × tỷ lệ, 0)   (chốt vào dòng khi ghi sổ)
+thành tiền dòng = round(số lượng × đơn giá, 0)
+tổng phiếu = Σ thành tiền dòng
 ```
 
-Dùng khoảng nửa mở `[đầu tháng, đầu tháng sau)`, không EXTRACT(month/year) trên
-cột lọc làm mất khả năng dùng range index. Parameters phải được bind, tên
-sort/filter có whitelist. Đếm phiếu từ header hiện hành, không join detail rồi
-COUNT(*) gây nhân số phiếu.
+### Báo cáo (truy vấn trực tiếp `document`/`document_line` POSTED)
 
-### Ý nghĩa báo cáo
-
-- BM6.1: gross sales, số phiếu xuất, tỷ lệ trên tổng gross; thêm returns/net
-  riêng. Đại lý chỉ có trả hàng cũng xuất hiện với 0 phiếu xuất và net âm.
-  Nếu tổng gross 0, tỷ lệ 0; không chia tỷ lệ theo net có thể âm.
-- BM6.2: tăng là charge; giảm tách cash applied, returns applied, credit applied.
-  `closing = opening + increase - decreases`. Phần tiền thu thành dư có không
-  giảm nợ, phải xuất ở báo cáo dư có/thu tiền riêng.
-- `remainingAtIssue` là BM3 remainder lúc xuất; `invoice_balance.outstandingAmount`
-  là nợ hiện tại. SETTLED nghĩa nghĩa vụ đã tất toán, có thể bằng tiền/bù/trả
-  hàng, không tự kết luận toàn bộ giá trị là tiền thực thu.
-- Tiền thực thu: tổng current PAYMENT_RECEIPT POSTED, không cộng CREDIT_APPLICATION.
-  Khoản upfront VERIFIED chưa có receipt trình bày riêng để không bỏ sót hoặc
-  đếm hai lần. Tiền hoàn là current REFUND POSTED, không là SALES_RETURN.
-- Nhập–xuất–tồn/thẻ kho tổng hợp inventory_entry theo ngày; đảo nguyên bản giữ
-  date/order nên chỉnh hồi tố không bị ghi sai là lượt nhập/xuất tháng sửa.
-- `EXPLAIN (ANALYZE, BUFFERS)` trên data đại diện mới kết luận hiệu năng; bộ
-  smoke test không chứng minh SLA, phân trang triệu bản ghi hay concurrency.
-
-## 8. Tiến hóa, lưu trữ và migration
-
-29 bảng là phạm vi chức năng đã chọn, không phải tạo 29 module enterprise.
-Không phân vùng sớm. Khi audit/ledger rất lớn, có thể BRIN theo thời gian và
-partition; phải xử lý PK/unique/FK/self-reversal trước khi chuyển partition.
-Không thêm GIN mọi cột JSONB: chưa có truy vấn justify chi phí ghi/dung lượng.
-
-Không xóa/TTL ledger, audit, version hoặc payment evidence đang là nguồn nghiệp
-vụ. Token hết hạn có thể purge theo chính sách; audit không lưu token/password.
-Snapshot được lưu ở revision, không nhân metadata người dùng trong mọi entry.
-
-Nâng cấp bằng Alembic reviewed migrations, không chạy lại DMS.sql lên schema
-đã tồn tại. Backend có migration `0001` cho đầy đủ object và `0002` cho search
-index; ORM models cho business API chưa được map. Xem lại autogenerate vì
-Alembic không tự hiểu mọi domain/routine. DDL snapshot đã triển khai không
-được sửa; thay đổi schema phải tạo revision mới.
-Nếu có dữ liệu legacy, lập migration riêng: chuẩn hóa dialect/status, map mã
-cũ → PK mới, tạo version/batch/ledger mở đầu từ chứng từ thực, đối chiếu stock,
-debt, credit, totals trước cutover. Không coi cached debt/stock cũ là nguồn duy
-nhất để dựng lại lịch sử.
-
-## 9. Độ phủ BA và thay đổi phải đồng bộ
-
-| BM/QĐ | Cách đáp ứng / bổ sung |
+| Báo cáo | Công thức |
 | --- | --- |
-| 1 | agency/type/ward; cap active, duplicate name, không mở lại terminated, thu nợ vẫn được |
-| 2 | STOCK_RECEIPT + version/line; draft/post, giá mới nhất theo ngày nghiệp vụ |
-| 3 | STOCK_ISSUE, snapshot giá/tỷ lệ, READY, upfront + auto receipt atomic |
-| 4 | agency_overview và indexes; không gộp đại lý theo tên |
-| 5 | PAYMENT_RECEIPT và receivable allocations; bổ sung ngoại lệ tiền online thực nhận vượt nợ |
-| 6 | sales_report/debt_report; tính lại kỳ gốc khi sửa; mở rộng cột return/credit/net |
-| 7 | business_rule + agency_type; audit; chặn hạ limit/capacity dưới hiện trạng |
-| 8 | Loại active/inactive, FK ngăn xóa đang tham chiếu |
-| 9 | product/unit active, unit policy, snapshot, không lưu nhóm hàng ngoài BA |
-| 10 | Giữ phiên bản, ledger đảo, lý do, atomic replay; phân biệt tiền thật/return/refund |
-| 11 | app_user, email CI unique, passwordHash, status/authVersion/token |
-| 12 | user_group, bốn seed groups, FK ngăn xóa nhóm có user |
-| 13 | app_function + group_permission; quyền chi tiết chuẩn bị/xác nhận/điều chỉnh |
-| 14 | audit tự động trước/sau, actor/request, append-only; không lộ hash |
-| 15 | online_payment + verified events; idempotency, success receipt, excess credit, refund attempts |
-| 16 | Chỉ read có quyền; read models; tên trùng trả mã–tên–phường/xã; không lưu hội thoại bắt buộc |
-| Phần mở rộng | stock_count/adjustment, FIFO allocations, return, credit, refund và quy trình trách nhiệm |
+| Doanh số tháng (BM5.1) | Theo đại lý: số phiếu xuất, tổng trị giá, tỷ lệ % trên tổng tháng |
+| Công nợ tháng (BM5.2) | Nợ đầu = Σ xuất − Σ thu trước ngày 1; phát sinh = Σ xuất trong tháng; đã trả = Σ thu trong tháng; nợ cuối = đầu + phát sinh − trả. Nợ cuối tháng hiện tại = `agency.debt` |
+| Tồn kho | Tồn đầu, nhập, xuất, tồn cuối theo mặt hàng; tồn cuối kỳ hiện tại = `product.stock` |
+| Thu tiền | Theo `receiptType` và ngày |
 
-BA cần cập nhật đặc biệt: thêm nháp/chờ/xác nhận; mốc chốt giá; quy tắc phân
-bổ; phạm vi sửa sai so với trả hàng thực; dư có và refund; BM6 giảm nợ không
-chỉ là tiền mới thu; snapshot lịch sử; một mặt hàng một dòng; hạn chế đổi
-đơn vị và khoản trả ngay thực nhận. Các thay đổi này được ghi minh bạch trong
-business_decision_making, không âm thầm diễn giải schema là y hệt 17 bảng cũ.
+Dùng khoảng nửa mở `[đầu tháng, đầu tháng sau)` để giữ index range.
 
-## 10. Chạy và kiểm chứng
+## 6. Seed v2
 
-**Triển khai backend/Supabase bằng Alembic**, từ `backend/`:
+[`backend/app/db/seed.py`](../../backend/app/db/seed.py) và
+[`seed_data.py`](../../backend/app/db/seed_data.py):
+
+- Một transaction dưới advisory lock; yêu cầu DB trống sau `0011`, chạy lại thì chỉ verify.
+- Mọi chứng từ đi qua `DocumentService` (cùng quy định, số dư và audit như API); không chèn
+  thẳng `debt`/`stock`. Mỗi thao tác đặt `dms.clock` để `createdAt/postedAt/cancelledAt` và audit
+  mang đúng giờ nghiệp vụ (giờ hành chính, không ngày lễ 1–2/9).
+- Lịch sử từ **01/06/2026 đến ngày làm việc trước ngày seed**; `random.Random(20261114)` cố định.
+- Dữ liệu trông như thật, không chứa "mẫu/demo/test/thử"…: 11 tài khoản `@agentra.vn`
+  (4 thành viên nhóm giữ 4 vai trò, 1 tài khoản LOCKED), 8 đơn vị tính, ≥ 24 mặt hàng có nhãn
+  hiệu thật (1–2 ngừng kinh doanh, 1 mặt hàng chưa nhập lần nào), ≥ 30 đại lý hư cấu ở khoảng
+  20 phường (có phường đủ 4/4, cặp trùng tên khác phường, 2 TERMINATED, đại lý mới chưa giao
+  dịch, nợ sát hạn mức, nợ 0, 1 nợ âm do VNPAY về muộn), phiếu nhập/xuất/thu có hủy và sửa
+  có lý do, nháp cả 3 loại, 15–25 giao dịch VNPAY SUCCESS/FAILED/EXPIRED (không PENDING).
+- Bảng tài khoản, mật khẩu và số lượng thật từng bảng nằm ở [README root](../../README.md);
+  tài liệu thiết kế không ghi mật khẩu.
+
+## 7. Chạy và kiểm chứng
+
+**Triển khai bằng Alembic**, từ `backend/`:
 
 ```sh
 uv sync --frozen
-uv run alembic upgrade head
+uv run alembic upgrade head      # 0011 xóa và dựng lại schema dms — backup trước!
 uv run python -m app.db.seed
 uv run python -m app.db.verify --seeded --regression
 ```
 
-DDL đầy đủ và search indexes là snapshot trong `backend/alembic/sql/` để
-revision luôn tự chứa, kể cả trong Docker. `DMS.sql`, `search-indexes.sql` và
-`verify.sql` ở thư mục này là entry point psql dùng `\ir` trỏ tới các file đó
-và bộ regression trong backend. Bộ seed đầy đủ ở `backend/app/db/seed.py`;
-[README root](../../README.md#database-và-dữ-liệu-demo) có độ phủ và tài khoản mẫu.
+- `verify` kiểm tra 16 bảng, timestamp, `debt`/`stock`/`lastPurchasePrice`/tổng phiếu khớp
+  chứng từ POSTED, chuỗi thay thế trỏ tới phiếu CANCELLED, phiếu thu ONLINE khớp giao dịch,
+  sức chứa phường, 168 phường, 22 chức năng và audit không lộ hash.
+- `--seeded` thêm: mật khẩu từng tài khoản khớp hash Argon2id, khối lượng/tình huống seed,
+  replay theo thời gian (tồn không âm, QĐ2/QĐ3 tại thời điểm ghi sổ), nợ cuối báo cáo tháng
+  hiện tại = `agency.debt`, quét từ cấm trên mọi cột text, giờ hành chính, số điện thoại/địa chỉ.
+- `--regression` chạy [`regression.sql`](../../backend/app/db/sql/regression.sql)
+  (**83 kiểm tra** assert/expected rejection) trên một schema cô lập dựng từ snapshot `0011`
+  (mọi token `dms` được đổi tên) và luôn rollback; cần quyền tạo schema.
 
-Để thực thi tham chiếu độc lập bằng psql, từ `openwiki/database-design/`,
-với PostgreSQL trống và connection được cấu
-hình qua các biến PG* hoặc service của psql:
+Kết quả chạy thật (local, Neon branch tạm, production) ghi ở
+[simplification VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md).
+
+**psql độc lập**, từ `openwiki/database-design/`, với connection qua biến PG*:
 
 ```sh
-psql -v ON_ERROR_STOP=1 -f DMS.sql
-psql -v ON_ERROR_STOP=1 -f search-indexes.sql   # optional substring search
-psql -v ON_ERROR_STOP=1 -f seed.example.sql    # optional demo, fresh schema
-psql -v ON_ERROR_STOP=1 -f verify.sql          # expects demo seed; all fixtures rollback
+psql -v ON_ERROR_STOP=1 -f DMS.sql            # dựng schema dms từ 0011 (XÓA schema dms cũ)
+psql -v ON_ERROR_STOP=1 -f seed.example.sql   # tùy chọn, schema trống
+psql -v ON_ERROR_STOP=1 -f verify.sql         # regression trên schema 0011; luôn ROLLBACK
 ```
 
-DMS.sql tạo schema `dms` trong một transaction; thất bại nếu schema đã có để
-không ghi đè dữ liệu. Không tự chạy migrations lúc API startup. Không chứa
-credential hoặc tài khoản/mật khẩu mặc định. Seed core chỉ gồm quy định, hai
-loại và bốn nhóm/quyền; tên hàng/đơn vị demo không phải dữ liệu BA chính thức.
+`DMS.sql` không ghi Alembic version; trên database do backend quản lý luôn dùng Alembic.
+Không chạy `DMS.sql` lên database có dữ liệu cần giữ.
 
-**Kiểm chứng thực hiện trong phiên này:** PostgreSQL 18.3 qua PGlite 0.5.8,
-thực thi DMS.sql, extension search indexes, seed và verify.sql; 29/29 bảng có
-hai timestamp, 54 assertions/expected rejections qua. Bài kiểm tra bao gồm
-precision/NaN, capacity, hạn mức, version bất biến, FIFO, cross-agency,
-online excess/idempotency, return, bù, refund reservation/success, kỳ báo cáo,
-upfront atomic/fallback tiền đã nhận, làm tròn trả từng phần, tái phân bổ khi
-hủy phiếu, đơn vị lịch sử, kiểm kê không chênh lệch và chỉnh kho/nợ làm âm
-lịch sử dù hiện tại hợp lệ.
+## 8. Lịch sử
 
-**Kiểm chứng bổ sung trên Supabase PostgreSQL 17.6:** Alembic lên revision `0002`,
-seed đủ 29 bảng (410 chứng từ, 30 đại lý, 24 hàng, 8 tài khoản), đối chiếu
-ledger/cache/audit/report và 54 kiểm tra SQL trong schema riêng rollback.
-Tài khoản app được hash Argon2id, không phải Supabase Auth users.
+- `0001`–`0009` (2026-10): mô hình 29 bảng + bảng command — chứng từ có phiên bản, ledger kho/
+  phải thu/dư có, FIFO, trả ngay, trả hàng, bù trừ, hoàn tiền, kiểm kê, điều chỉnh kho.
+- `0010`: thay `district` bằng danh mục 168 phường/xã TP.HCM 2025.
+- `0011` (14/11/2026): đơn giản hóa như trên; production được xóa và seed lại theo quyết định
+  của người dùng.
 
-Các lần kiểm chứng database ban đầu chưa gọi cổng sandbox hoặc đo hiệu năng dữ
-liệu lớn. Authentication sau đó đã có kiểm thử nhiều connection trên PostgreSQL
-và TLS riêng, xem evidence ở mục 6; business services/API vẫn chưa triển khai.
-Kế hoạch triển khai đầy đủ và các gap schema/API được ghi ở
-[Full Backend Plan](../backend-design/plan/full_backend/PLAN.md), gồm idempotency
-bền vững, xóa đại lý/mặt hàng chưa sử dụng và khả năng tương thích seed/verifier
-khi thêm migration. Đây là kế hoạch; chưa thay đổi DDL hiện hành.
+Mô tả chi tiết thiết kế 29 bảng cũ (transaction FIFO, trả hàng, refund, kiểm kê, 54 regression
+cũ) còn trong lịch sử git của file này và trong các snapshot `backend/alembic/sql/0001–0010`;
+không còn là thiết kế hiện hành.

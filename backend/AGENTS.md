@@ -1,5 +1,20 @@
 # Backend project context
 
+## Business simplification checkpoint - 2026-11-14
+
+Head 0011 rebuilds schema `dms` (16 tables, 22 function codes). Modules now: auth,
+users, user_groups, permissions, audit_logs, business_rules, wards, agency_types,
+units, products, agencies, document_core (shared DocumentService + router factory),
+stock_receipts, stock_issues, payment_receipts, online_payments (VNPAY sandbox),
+document_history, reports, dashboard, health — 90 operations. Removed (Bỏ theo yêu cầu
+14/11/2026): agency_credit, credit_applications, document_corrections, inventory,
+receivables, refunds, sales_returns, settlement_core, stock_adjustments, stock_counts,
+upfront_payments, durable commands/idempotency. Seed v2 (`app/db/seed.py` +
+`seed_data.py`) replays history through DocumentService (`embedded=True`). Regenerate
+the contract with `uv run python -m scripts.gen_openapi`. Gates and numbers:
+`../openwiki/backend-design/plan/simplification/VERIFICATION.md`. Everything below is
+historical pre-0011 context unless it describes tooling still present.
+
 ## Source review checkpoint - 2026-10-30
 
 1088offline pass; reports/dashboard/API/responses717stmt140branches exact100%.
@@ -220,29 +235,16 @@ DMS/
 │   │   │   ├── __init__.py
 │   │   │   └── router.py       # Aggregate health/auth/admin/catalogue feature routers
 │   │   ├── modules/
-│   │   │   ├── auth/           # Router, schemas, dependencies, models/repository/service
-│   │   │   ├── user_groups/    # Router, schemas, models/repository/service/dependencies
-│   │   │   ├── users/          # AppUser mapping and five administration operations
-│   │   │   ├── permissions/    # Registry and live conditional group grants
-│   │   │   ├── audit_logs/     # Immutable exact redacted reads
-│   │   │   ├── business_rules/ # Locked singleton capacity/rate policy
-│   │   │   ├── products/       # Exact quotes/source and eligible deletion
-│   │   │   ├── agencies/       # Admission/profile and keyed permanent termination
-│   │   │   ├── wards/          # Read-only HCMC 2025 ward catalogue (0010) and capacity counts
-│   │   │   ├── agency_types/   # Exact limits/current-debt blocker guards
-│   │   │   ├── units/          # Recorded fraction policy/reference/state guards
-│   │   │   ├── document_core/  # SQL-owned mappings, exact snapshots/revisions/draft lines/batches
-│   │   │   ├── inventory/      # Atomic checkpoint statements and ordered append/reversal helpers
-│   │   │   ├── stock_receipts/ # Neutral keyed drafts and atomic snapshot/stock/price posting
-│   │   │   ├── settlement_core/ # Internal FIFO/provenance/reservations/financial replay
-│   │   │   ├── stock_issues/   # READY snapshots and atomic issue/upfront posting
-│   │   │   ├── payment_receipts/ # Manual debt collection and internal real-cash receipts
-│   │   │   ├── upfront_payments/ # Verification/full-money consumption/separation
-│   │   │   ├── receivables/    # Sole shared balance, invoice and atomic statements
-│   │   │   ├── stock_adjustments/ # Signed stock-only drafts/post and M22 internal seam
-│   │   │   ├── stock_counts/   # Movement-identity snapshots/recount/atomic confirmation
-│   │   │   ├── sales_returns/  # Origin snapshots/cumulative rounding/successor replay
-│   │   │   ├── agency_credit/  # Credit lots/statements and locked available-credit seam
+│   │   │   ├── auth/           # Login/refresh/logout/me/password, permissions dependencies
+│   │   │   ├── users/ user_groups/ permissions/ audit_logs/  # Administration
+│   │   │   ├── business_rules/ # maxAgenciesPerWard, sellingPriceRate
+│   │   │   ├── wards/          # Read-only HCMC 2025 ward catalogue and capacity counts
+│   │   │   ├── agency_types/ units/ products/ agencies/  # Master data (stock/price/debt columns)
+│   │   │   ├── document_core/  # DocumentService: draft/post/cancel/correct for PN/PX/PT
+│   │   │   ├── stock_receipts/ stock_issues/ payment_receipts/  # Thin routers per kind
+│   │   │   ├── online_payments/ # VNPAY sandbox checkout, signed IPN/Return, query
+│   │   │   ├── document_history/ # /documents search, detail, chain, print
+│   │   │   ├── reports/ dashboard/  # Σ over POSTED documents; PDF/XLSX exports
 │   │   │   └── health/         # Public health router and response schema
 │   │   ├── common/             # Schemas/responses/transport, values/dates/cursors/commands
 │   │   ├── core/
@@ -257,9 +259,10 @@ DMS/
 │   │       ├── __init__.py
 │   │       ├── base.py         # Declarative Base and constraint naming conventions
 │   │       ├── session.py      # Engine builder and request-scoped get_session
-│   │       ├── seed.py         # Complete transactional demo seed
-│   │       ├── verify.py       # Live integrity checks and isolated regression
-│   │       └── sql/            # Session-local seed helpers and SQL regression
+│   │       ├── seed.py         # Seed v2 time simulation through DocumentService
+│   │       ├── seed_data.py    # Accounts, catalogue, agencies and scenarios of seed v2
+│   │       ├── verify.py       # Live integrity, --seeded checks and isolated regression
+│   │       └── sql/            # SQL regression (83 checks)
 │   └── tests/
 │       ├── auth/               # Offline crypto/schema/HTTP/adapter/limiter tests
 │       ├── integration/auth/   # Isolated real PostgreSQL races/migration/TLS/seed tests
@@ -454,23 +457,16 @@ quoted camelCase SQL column names. Register models in `alembic/env.py`.
 Domains, triggers, functions and views need explicit reviewed SQL; Alembic cannot
 infer their full behavior. Downgrading `0001` removes the schema and all its data.
 
-## Demo seed conventions
+## Seed conventions
 
-`app/db/seed.py` seeds all 29 tables transactionally with a stable dataset marker
-and an advisory lock. A first run requires empty application data; a repeat run
-verifies demo v1 and leaves its row counts/passwords unchanged. Session-local
-`pg_temp` helpers in `app/db/sql/seed_helpers.sql` are not business API services.
-
-Keep the seed realistic and internally reconciled: include multi-line documents,
-historical price snapshots, FIFO payments, upfront evidence, returns, credit,
-refund states/reservations, counts, corrections, cancellations and audit. Never
-disable constraints/triggers or write caches directly to make seed data pass.
-Force deferred constraints at business boundaries and report success after commit.
-
-Use Argon2id for app passwords. Seed token digests are random and revoked; raw
-tokens are discarded. Payment/refund evidence is explicitly simulated under
-`DEMO_SANDBOX`; no real provider calls. These users belong to `dms.app_user`, not
-Supabase Auth. Root README lists all 8 credentials, including one locked user.
+`app/db/seed.py` (seed v2) requires the 0011 head and an empty migrated schema, then
+replays business days from 01/06/2026 to the day before seeding, setting `dms.clock`
+per action and calling `DocumentService(embedded=True)` so every posting goes through
+the same rules and triggers as the API. A rerun prints "already present; verification
+only" and changes nothing. Data must look real: Vietnamese names, addresses, phones,
+office hours, no "mẫu/demo/test" words (checked by `verify --seeded`). Accounts and
+passwords are in `seed_data.USERS` and the root README; passwords use Argon2id.
+Never disable triggers or write balances directly.
 
 ## Docker deployment
 
