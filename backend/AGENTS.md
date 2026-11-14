@@ -6,7 +6,8 @@ Head 0011 rebuilds schema `dms` (16 tables, 22 function codes). Modules now: aut
 users, user_groups, permissions, audit_logs, business_rules, wards, agency_types,
 units, products, agencies, document_core (shared DocumentService + router factory),
 stock_receipts, stock_issues, payment_receipts, online_payments (VNPAY sandbox),
-document_history, reports, dashboard, health — 90 operations. Removed (Bỏ theo yêu cầu
+document_history, reports, dashboard, health — 91 operations (incl. printOnlinePayment:
+payment request PDF/HTML with the VNPAY QR; receipt PDFs add amount in words + signatures). Removed (Bỏ theo yêu cầu
 14/11/2026): agency_credit, credit_applications, document_corrections, inventory,
 receivables, refunds, sales_returns, settlement_core, stock_adjustments, stock_counts,
 upfront_payments, durable commands/idempotency. Seed v2 (`app/db/seed.py` +

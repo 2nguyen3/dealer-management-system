@@ -6,7 +6,9 @@ Features in `src/features/`: authentication, home, portal, guide, profile, dashb
 reports, agencies, products, agency_types, units, wards, business_rules, master_data,
 stock_receipts, stock_issues, payment_receipts, online_payments, document_history,
 users, user_groups, permissions, audit_logs, chatbot (placeholder, not built). The menu
-has 18 entries (`src/app/navigation.ts`) gated by the 22 backend function codes.
+has 14 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
+Catalogue (agency types/units/rules) and Users & Permissions (users/groups/permissions)
+are one entry each with route-backed sub-tabs (`navigationSections`, `SectionTabs.tsx`).
 Removed (Bỏ theo yêu cầu 14/11/2026): receivables, stock_counts, upfront_payments,
 inventory, agency_credit, refunds, sales_returns, stock_adjustments,
 credit_applications, document_corrections. Portal decks saved in localStorage drop
@@ -15,7 +17,9 @@ REASON_REQUIRED, AGENCY_HAS_DEBT, PAYMENT_EXCEEDS_DEBT, DEBT_LIMIT_EXCEEDED,
 INSUFFICIENT_STOCK, PRODUCT_NOT_PRICED, WARD_CAPACITY_EXCEEDED…). Switching the
 interface language reloads behind the `index.html` boot splash (`showLoadingSplash`
 in `src/lib/i18n/runtime.ts`) instead of a blank page. Contract:
-`../openwiki/backend-design/API/openapi.json` (90 operations). Evidence:
+`../openwiki/backend-design/API/openapi.json` (91 operations). Payment receipts: every
+receipt exports a PDF (`PdfButton`); a new receipt by "Chuyển khoản (VNPAY)" creates a pending
+online payment with QR + payment request PDF (`TransferHandoff`) instead of a document. Evidence:
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page
 description below is historical.
 

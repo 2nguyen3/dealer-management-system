@@ -60,8 +60,11 @@ import {
   allowsNavigation,
   navigationGroups,
   routePermissions,
+  sectionOf,
 } from './navigation'
 import { navigationIcons } from './navigationIcons'
+import { SectionTabs } from './SectionTabs'
+import { sidebarGroups } from './sidebarEntries'
 import { getLocale, t } from '@/lib/i18n/core'
 import { localeDirection } from '@/lib/i18n/locales'
 
@@ -85,19 +88,7 @@ function WorkspaceSidebar({
   const { pathname } = useLocation()
   const [query, setQuery] = useState('')
   const search = query.trim().toLocaleLowerCase('vi')
-  const groups = navigationGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) =>
-          allowsNavigation(hasPermission, routePermissions[item.path]) &&
-          (!search ||
-            `${group.title} ${item.label}`
-              .toLocaleLowerCase('vi')
-              .includes(search)),
-      ),
-    }))
-    .filter((group) => group.items.length > 0)
+  const groups = sidebarGroups(hasPermission, search)
 
   return (
     <Sidebar
@@ -148,19 +139,21 @@ function WorkspaceSidebar({
       <SidebarContent>
         <nav aria-label={t('Điều hướng nghiệp vụ')}>
           {groups.map((group) => (
-            <SidebarGroup key={group.title}>
+            <SidebarGroup key={group.key}>
               <SidebarGroupLabel className="text-[11px] tracking-wider text-sidebar-foreground/55 uppercase">
                 {group.title}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items.map((item) => {
-                    const Icon = navigationIcons[item.path]
+                  {group.entries.map((item) => {
+                    const Icon = item.icon
                     return (
-                      <SidebarMenuItem key={item.path}>
+                      <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           asChild
-                          isActive={isRouteActive(pathname, item.path)}
+                          isActive={item.paths.some((path) =>
+                            isRouteActive(pathname, path),
+                          )}
                           tooltip={item.label}
                           className="data-[active=true]:bg-sidebar-primary data-[active=true]:font-medium data-[active=true]:text-sidebar-primary-foreground"
                         >
@@ -291,6 +284,7 @@ export function ShellLayout() {
           )
           .sort(([a], [b]) => b.length - a.length)[0]?.[1] ??
         null)
+  const currentSection = sectionOf(location.pathname)
   const pageLabel =
     current?.item.label ??
     (location.pathname === '/profile'
@@ -355,7 +349,7 @@ export function ShellLayout() {
                 {current && (
                   <>
                     <BreadcrumbItem className="hidden md:block">
-                      {current.group.title}
+                      {currentSection?.label ?? current.group.title}
                     </BreadcrumbItem>
                     <BreadcrumbSeparator className="hidden md:block" />
                   </>
@@ -397,6 +391,7 @@ export function ShellLayout() {
                   </>
                 }
               >
+                <SectionTabs pathname={location.pathname} />
                 <PageTransition key={location.pathname}>
                   <Outlet />
                 </PageTransition>

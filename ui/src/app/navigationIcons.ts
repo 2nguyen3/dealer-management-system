@@ -5,6 +5,7 @@ import {
   History,
   House,
   LayoutDashboard,
+  Library,
   Package,
   PackageMinus,
   PackagePlus,
@@ -15,10 +16,12 @@ import {
   ShieldCheck,
   Store,
   Tags,
+  UserCog,
   Users,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
+import type { NavigationSectionKey } from './navigation'
 
 /** Sidebar icon for each workspace route. */
 export const navigationIcons: Record<string, LucideIcon> = {
@@ -40,4 +43,10 @@ export const navigationIcons: Record<string, LucideIcon> = {
   '/audit-logs': ScrollText,
   '/document-history': History,
   '/chatbot': Bot,
+}
+
+/** Sidebar icon of each merged entry (its pages keep their own icons). */
+export const sectionIcons: Record<NavigationSectionKey, LucideIcon> = {
+  catalogue: Library,
+  access: UserCog,
 }

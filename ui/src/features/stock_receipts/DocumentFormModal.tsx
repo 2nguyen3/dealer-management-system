@@ -1,4 +1,4 @@
-import { BookCheck, Info, Save, Undo2 } from 'lucide-react'
+import { BookCheck, Info, QrCode, Save, Undo2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { DateField } from '../../components/blocks/DateField'
 import { Separator } from '../../components/shadcn/separator'
@@ -36,6 +36,9 @@ import { t } from '@/lib/i18n/core'
 
 export type FormMode = 'create' | 'edit' | 'correct'
 
+/** "Hình thức thu" of a new receipt: a manual type, or a VNPAY transfer. */
+const TRANSFER = 'VNPAY'
+
 /**
  * Create / edit-draft / correct form of any document kind. Corrections keep
  * the agency, require a reason and post the replacement immediately. Amounts
@@ -50,7 +53,9 @@ export function DocumentFormModal({
   error,
   failure,
   canPostNow,
+  canTransfer = false,
   onSubmit,
+  onTransfer,
   onClose,
 }: {
   kind: DocumentKind
@@ -64,15 +69,24 @@ export function DocumentFormModal({
   /** Offer "Lưu & ghi sổ" (create/edit only). */
   canPostNow: boolean
   onSubmit: (form: DocumentForm, post: boolean) => void
+  /** May create a VNPAY transfer (payments.online) from a new receipt. */
+  canTransfer?: boolean
+  /** New receipt paid by transfer: create a pending VNPAY payment instead. */
+  onTransfer?: (form: DocumentForm) => void
   onClose: () => void
 }) {
   const reasonId = useId()
+  const methodId = useId()
   const [form, setForm] = useState<DocumentForm>(initial)
   const [localError, setLocalError] = useState<string | null>(null)
   const today = vietnamToday()
   const correct = mode === 'correct'
   const payment = kind === 'PAYMENT_RECEIPT'
   const goods = kind !== 'PAYMENT_RECEIPT'
+  // Transfers go through VNPAY; old manual transfers stay editable/correctable.
+  const newReceipt = payment && mode === 'create'
+  const [transfer, setTransfer] = useState(false)
+  const viaVnpay = newReceipt && transfer && canTransfer && !!onTransfer
   const agencyId = form.agencyId
   const agency = useAgencyBalance(kind === 'STOCK_RECEIPT' ? '' : agencyId)
   const quotes = useProductQuotes(
@@ -112,7 +126,8 @@ export function DocumentFormModal({
         return
       }
     }
-    onSubmit(form, post)
+    if (viaVnpay) onTransfer(form)
+    else onSubmit(form, post)
   }
   const heading = correct
     ? t('Sửa có lý do {code}', { code: doc?.code ?? '' })
@@ -196,20 +211,46 @@ export function DocumentFormModal({
                 ))}
               {payment && (
                 <>
-                  <Select
-                    label={t('Hình thức thu')}
-                    value={form.receiptType}
-                    disabled={busy}
-                    onChange={(event) =>
-                      set({
-                        receiptType: event.target.value as ManualReceiptType,
-                      })
-                    }
-                    options={MANUAL_RECEIPT_TYPES.map((value) => ({
-                      value,
-                      label: methodLabel(value),
-                    }))}
-                  />
+                  <div className="space-y-1.5">
+                    <Select
+                      id={methodId}
+                      label={t('Hình thức thu')}
+                      value={viaVnpay ? TRANSFER : form.receiptType}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setTransfer(value === TRANSFER)
+                        if (value !== TRANSFER)
+                          set({ receiptType: value as ManualReceiptType })
+                        else setLocalError(null)
+                      }}
+                      options={
+                        newReceipt
+                          ? [
+                              { value: 'CASH', label: methodLabel('CASH') },
+                              ...(canTransfer && onTransfer
+                                ? [
+                                    {
+                                      value: TRANSFER,
+                                      label: t('Chuyển khoản (VNPAY)'),
+                                    },
+                                  ]
+                                : []),
+                            ]
+                          : MANUAL_RECEIPT_TYPES.map((value) => ({
+                              value,
+                              label: methodLabel(value),
+                            }))
+                      }
+                    />
+                    {newReceipt && !canTransfer && (
+                      <p className="text-xs text-muted-foreground">
+                        {t(
+                          'Thu chuyển khoản cần quyền Thanh toán trực tuyến để tạo mã QR VNPAY.',
+                        )}
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-1.5">
                     <Input
                       label={t('Số tiền thu (VNĐ)')}
@@ -290,15 +331,41 @@ export function DocumentFormModal({
               quotes={quotes}
             />
           )}
-          {!goods && (
-            <FormButtons
-              mode={mode}
-              busy={busy}
-              canPostNow={canPostNow}
-              onPost={() => submit(true)}
-              onClose={onClose}
-            />
+          {viaVnpay && (
+            <Alert type="info" title={t('Thu qua chuyển khoản VNPAY')}>
+              {t(
+                'Hệ thống tạo giao dịch chờ thanh toán kèm mã QR và phiếu báo PDF cho đại lý. Phiếu thu chỉ được lập và ghi sổ tự động khi VNPAY xác nhận tiền về.',
+              )}
+            </Alert>
           )}
+          {!goods &&
+            (viaVnpay ? (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="submit"
+                  isLoading={busy}
+                  icon={<QrCode className="size-4" />}
+                >
+                  {t('Tạo thanh toán & mã QR')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={onClose}
+                >
+                  {t('Đóng')}
+                </Button>
+              </div>
+            ) : (
+              <FormButtons
+                mode={mode}
+                busy={busy}
+                canPostNow={canPostNow}
+                onPost={() => submit(true)}
+                onClose={onClose}
+              />
+            ))}
         </div>
         {goods && summary && (
           <aside

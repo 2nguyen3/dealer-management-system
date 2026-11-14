@@ -9,7 +9,8 @@ QĐ1–QĐ8 + AGENCY_HAS_DEBT. Revision 0011 drops and rebuilds schema `dms` (16
 22 function codes, no downgrade); seed v2 replays 01/06/2026 → day before seeding with
 11 real team accounts. Removed (Bỏ theo yêu cầu 14/11/2026): upfront, refunds, credit,
 receivables/FIFO, counts, returns, adjustments, revisions, idempotency commands.
-Runtime contract 90 operations (`backend/scripts/gen_openapi.py`). Exact gates and the
+Runtime contract 91 operations (`backend/scripts/gen_openapi.py`; +printOnlinePayment
+14/11/2026). Exact gates and the
 production reset/backup evidence are in that plan's VERIFICATION. Everything dated
 below this checkpoint is historical and describes the pre-0011 application.
 
@@ -146,7 +147,7 @@ dealer distribution, incoming/outgoing goods, inventory, payments, debt, and
 business reports. After the 14/11/2026 simplification the runtime offers
 authentication/administration, master data (agency types, units, products, agencies,
 wards, business rules), stock receipts, stock issues, payment receipts, VNPAY sandbox
-online payments, document history, five reports and a dashboard (90 operations). The
+online payments, document history, five reports and a dashboard (91 operations). The
 React UI covers all of them in 24 interface languages with a GUIDE and Portal. The
 chatbot (M32) is not built. Older M-numbered checkpoints and plans are history.
 

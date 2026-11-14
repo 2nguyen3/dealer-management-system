@@ -8,6 +8,7 @@ from reportlab.pdfbase import pdfmetrics
 from app.core.exceptions import ApiError
 from app.modules.document_history.printing import (
     FONT,
+    amount_in_words,
     document_rows,
     negotiate,
     number,
@@ -200,3 +201,48 @@ def test_rows_tolerate_missing_optional_names():
     assert labels["Đại lý"] == document["agencyName"]
     assert "Người lập" not in labels and "Người hủy" not in labels
     assert labels["Lý do hủy"] == "Giao sai số lượng"
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (0, "Không đồng"),
+        (5, "Năm đồng"),
+        (10, "Mười đồng"),
+        (15, "Mười lăm đồng"),
+        (21, "Hai mươi mốt đồng"),
+        (24, "Hai mươi tư đồng"),
+        (105, "Một trăm lẻ năm đồng"),
+        (110, "Một trăm mười đồng"),
+        ("1250000", "Một triệu hai trăm năm mươi nghìn đồng"),
+        (1005000, "Một triệu không trăm lẻ năm nghìn đồng"),
+        (2000001, "Hai triệu không trăm lẻ một đồng"),
+        ("10200.00", "Mười nghìn hai trăm đồng"),
+        (1_000_000_000, "Một tỷ đồng"),
+        (2_000_500_000, "Hai tỷ năm trăm nghìn đồng"),
+        (1_000_000_000_000, "Một nghìn tỷ đồng"),
+    ],
+)
+def test_amount_in_words(value, expected):
+    assert amount_in_words(value) == expected
+
+
+@pytest.mark.parametrize("value", [-1, "1.5", "abc", None])
+def test_amount_in_words_rejects_non_whole_amounts(value):
+    with pytest.raises(ValueError):
+        amount_in_words(value)
+
+
+def test_payment_receipt_has_amount_words_and_signature_lines():
+    payment = issue(
+        kind="PAYMENT_RECEIPT", code="PT-8", receiptType="CASH", totalAmount="1250000", lines=[]
+    )
+    labels = dict(document_rows(payment)[1])
+    assert labels["Số tiền bằng chữ"] == "Một triệu hai trăm năm mươi nghìn đồng"
+    html = print_document(payment, "text/html")[0].decode()
+    assert "Người nộp tiền" in html and "Người thu tiền" in html
+    text = pdf_text(print_document(payment, "application/pdf")[0])
+    for expected in ("Một triệu hai trăm", "Người nộp tiền", "Người thu tiền", "Ký, ghi rõ"):
+        assert expected in text
+    goods = dict(document_rows(issue())[1])
+    assert "Số tiền bằng chữ" not in goods

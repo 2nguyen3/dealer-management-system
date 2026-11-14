@@ -24,10 +24,16 @@ export const moneyGuides: readonly GuideContent[] = [
         'Chọn Đại lý và Ngày nghiệp vụ; xem Nợ hiện tại của đại lý ngay trên form.',
       ),
       msg(
-        'Nhập Số tiền (VND nguyên, không vượt nợ hiện tại), chọn Hình thức: Tiền mặt hoặc Chuyển khoản, thêm Ghi chú nếu cần.',
+        'Nhập Số tiền (VND nguyên, không vượt nợ hiện tại), chọn Hình thức thu: Tiền mặt hoặc Chuyển khoản (VNPAY), thêm Ghi chú nếu cần.',
       ),
       msg('Bấm Lưu nháp. Phiếu nháp sửa hoặc xóa được tự do.'),
       msg('Mở Chi tiết, bấm Ghi sổ và xác nhận.'),
+      msg(
+        'Chuyển khoản (VNPAY): bấm Tạo thanh toán & mã QR, gửi mã QR hoặc PDF phiếu báo cho đại lý. Phiếu thu tự lập và ghi sổ khi VNPAY xác nhận tiền về.',
+      ),
+      msg(
+        'Xuất PDF cho khách: mở Chi tiết phiếu thu và bấm Xuất PDF phiếu thu (có số tiền bằng chữ và chỗ ký).',
+      ),
       msg(
         'Phát hiện sai sau khi ghi sổ: bấm Hủy hoặc Sửa có lý do và nhập lý do.',
       ),

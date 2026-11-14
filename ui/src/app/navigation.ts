@@ -165,6 +165,39 @@ export const navigationGroups: {
   },
 ]
 
+/** Stable keys of the sidebar entries that merge several pages behind tabs. */
+export type NavigationSectionKey = 'catalogue' | 'access'
+
+/**
+ * A sidebar entry that groups several routes: the sidebar shows one item and
+ * each page renders a horizontal tab bar to switch between the member routes.
+ * The routes themselves stay separate so deep links, the GUIDE, the Portal and
+ * error actions keep working.
+ */
+export interface NavigationSection {
+  key: NavigationSectionKey
+  label: string
+  paths: readonly string[]
+}
+
+export const navigationSections: readonly NavigationSection[] = [
+  {
+    key: 'catalogue',
+    label: t('Danh mục & Quy định'),
+    paths: ['/agency-types', '/units', '/business-rules'],
+  },
+  {
+    key: 'access',
+    label: t('Người dùng & Phân quyền'),
+    paths: ['/users', '/user-groups', '/permissions'],
+  },
+]
+
+/** Section that holds a route, if the route sits behind a tab bar. */
+export function sectionOf(path: string): NavigationSection | undefined {
+  return navigationSections.find((section) => section.paths.includes(path))
+}
+
 /** Translated page name of a workspace route (falls back to the path). */
 export function routeLabel(path: string): string {
   if (path === '/profile') return t('Hồ sơ cá nhân')

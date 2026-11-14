@@ -55,6 +55,15 @@ import {
   postEffect,
 } from '../document_history/workflow'
 import { usePathAllowed } from '../guide/usePathAllowed'
+import { payment as onlinePayment } from '../online_payments/paymentFlow'
+import {
+  id,
+  Intent,
+  positiveMoney,
+  type Row,
+} from '../payment_receipts/contracts'
+import { PdfButton } from '../payment_receipts/PdfButton'
+import { TransferHandoff } from '../payment_receipts/TransferHandoff'
 import { DocumentFormModal, type FormMode } from './DocumentFormModal'
 import { DocumentSnapshot } from './DocumentSnapshot'
 
@@ -135,6 +144,11 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
   const canPrepare = hasPermission(config.prepare)
   const canPost = hasPermission(config.post)
   const canCollect = hasPermission('cash.receipt.prepare')
+  const canTransfer =
+    kind === 'PAYMENT_RECEIPT' && hasPermission('payments.online')
+  const [handoff, setHandoff] = useState<Row | null>(null)
+  const [transferIntent] = useState(() => new Intent())
+  const [transferBusy, setTransferBusy] = useState(false)
   const [version, setVersion] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
   const [detail, setDetail] = useState<{
@@ -354,6 +368,40 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
     }
   }
 
+  /** New receipt by transfer: a pending VNPAY payment, not a document. */
+  async function transfer(values: DocumentForm) {
+    if (!form || mutation.busy) return
+    setFormError(null)
+    setFormFailure(null)
+    setTransferBusy(true)
+    try {
+      const result = await transferIntent.send<unknown>('/online-payments', {
+        method: 'POST',
+        body: {
+          agencyId: id(values.agencyId),
+          provider: 'VNPAY',
+          amount: positiveMoney(values.amount.trim()),
+        },
+      })
+      const created = onlinePayment(result.data)
+      setForm(null)
+      setHandoff(created)
+      for (const prefix of ['/online-payments', '/agencies'])
+        invalidateCache(prefix)
+      notifyNextStep({
+        done: t('Đã tạo giao dịch chuyển khoản VNPAY.'),
+        next: t(
+          'Bước tiếp: gửi mã QR hoặc phiếu báo PDF cho đại lý. Phiếu thu được lập tự động khi tiền về.',
+        ),
+      })
+    } catch (error) {
+      setFormError(errorMessage(error))
+      setFormFailure(error)
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
   async function runPost(then: 'stay' | 'collect') {
     if (!detail?.etag || mutation.busy || !canPost) return
     setDetailError(null)
@@ -448,6 +496,15 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
       >
         {t('Tải lại')}
       </Button>
+      {kind === 'PAYMENT_RECEIPT' && (
+        <PdfButton
+          path={`/documents/${doc.id}/print`}
+          filename={`${doc.code}.pdf`}
+          disabled={mutation.busy}
+        >
+          {t('Xuất PDF phiếu thu')}
+        </PdfButton>
+      )}
       {draft && canPrepare && (
         <>
           <Button
@@ -703,15 +760,20 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
           mode={form.mode}
           initial={form.initial}
           doc={form.doc}
-          busy={mutation.busy}
+          busy={mutation.busy || transferBusy}
           error={formError}
           failure={formFailure}
           canPostNow={form.mode !== 'correct' && canPost}
+          canTransfer={canTransfer}
+          onTransfer={(values) => void transfer(values)}
           onSubmit={(values, postNow) => void save(values, postNow)}
           onClose={() => {
             if (!mutation.busy) setForm(null)
           }}
         />
+      )}
+      {handoff && (
+        <TransferHandoff payment={handoff} onClose={() => setHandoff(null)} />
       )}
       {cancelOpen && doc && (
         <CancelDialog

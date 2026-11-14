@@ -296,5 +296,29 @@ def test_published_routes_and_operation_ids(api):
         "getOnlinePayment",
         "listPaymentEvents",
         "reconcileOnlinePayment",
+        "printOnlinePayment",
     }
     assert not any("webhook" in path or "refund" in path for path in paths)
+
+
+def test_print_route_returns_pdf_or_html_for_readers(api):
+    client, fake, allowed = api
+    fake.get.return_value = payment()
+    pdf = client.get("/api/v1/online-payments/7/print", headers={"Accept": "application/pdf"})
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert 'filename="payment-7.pdf"' in pdf.headers["content-disposition"]
+    fake.get.assert_called_with(7)
+    fake.session.rollback.assert_called()
+    html = client.get("/api/v1/online-payments/7/print")
+    assert html.status_code == 200 and html.headers["content-type"].startswith("text/html")
+    assert "<svg" in html.text and "Phiếu báo thanh toán #7" in html.text
+    rejected = client.get("/api/v1/online-payments/7/print", headers={"Accept": "image/png"})
+    assert rejected.status_code == 406
+    allowed[:] = ["debt.read"]
+    assert client.get("/api/v1/online-payments/7/print").status_code == 200
+    allowed[:] = ["cash.receipt.prepare"]
+    assert client.get("/api/v1/online-payments/7/print").status_code == 403
+    allowed[:] = ["payments.online"]
+    fake.get.side_effect = ApiError(404, "NOT_FOUND", "Online payment not found")
+    assert client.get("/api/v1/online-payments/8/print").status_code == 404
