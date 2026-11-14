@@ -5,6 +5,8 @@ import {
   ShieldOff,
   ShieldQuestion,
 } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { t } from '../../lib/i18n/core'
 import { useRef, useState, type ReactNode } from 'react'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { SortableHeader, SortMenu } from '../../components/data/SortControls'
@@ -68,15 +70,15 @@ function grant(value: unknown): Row {
 
 /** Contract sort fields of GET /functions. */
 const FUNCTION_SORTS = [
-  { field: 'code', label: 'Mã chức năng' },
-  { field: 'name', label: 'Tên chức năng' },
-  { field: 'id', label: 'Thứ tự đăng ký' },
+  { field: 'code', label: t('Mã chức năng') },
+  { field: 'name', label: t('Tên chức năng') },
+  { field: 'id', label: t('Thứ tự đăng ký') },
 ] as const
 
 /** Contract sort fields of GET /user-groups/{groupId}/permissions. */
 const GRANT_SORTS = [
-  { field: 'functionId', label: 'Chức năng' },
-  { field: 'id', label: 'Thứ tự cấp quyền' },
+  { field: 'functionId', label: t('Chức năng') },
+  { field: 'id', label: t('Thứ tự cấp quyền') },
 ] as const
 
 export function PermissionsPage() {
@@ -184,8 +186,14 @@ export function PermissionsPage() {
       invalidateCache(`/user-groups/${pair.group}/permissions`)
       setGrantsVersion((value) => value + 1)
       setNotice(
-        'Máy chủ đã cập nhật quyền. Đang tải lại quyền của phiên hiện tại.',
+        t('Máy chủ đã cập nhật quyền. Đang tải lại quyền của phiên hiện tại.'),
       )
+      notifyNextStep({
+        done: t('Đã cập nhật quyền của nhóm.'),
+        next: t(
+          'Quyền có hiệu lực ở thao tác tiếp theo của mọi tài khoản trong nhóm; menu của họ đổi theo quyền mới.',
+        ),
+      })
       await refreshProfile()
     } catch (failure) {
       setError(message(failure))
@@ -199,22 +207,23 @@ export function PermissionsPage() {
       size="sm"
       variant="outline"
       disabled={busy || !group}
-      title={group ? undefined : 'Chọn nhóm người dùng trước khi kiểm tra'}
+      title={group ? undefined : t('Chọn nhóm người dùng trước khi kiểm tra')}
       icon={<ShieldQuestion className="size-4" />}
       onClick={() => inspect(fn)}
     >
-      Kiểm tra quyền
+      {t('Kiểm tra quyền')}
     </Button>
   )
   return (
     <div className="space-y-6">
       <PageHeader
         className="mb-0"
-        title="Phân quyền chức năng"
+        title={t('Phân quyền chức năng')}
         actions={
-          <InfoHint label="Cách phân quyền">
-            Chọn nhóm người dùng, rồi nhấn Kiểm tra quyền ở chức năng cần xem
-            hoặc thay đổi.
+          <InfoHint label={t('Cách phân quyền')}>
+            {t(
+              'Chọn nhóm người dùng, rồi nhấn Kiểm tra quyền ở chức năng cần xem hoặc thay đổi.',
+            )}
           </InfoHint>
         }
       />
@@ -251,11 +260,11 @@ export function PermissionsPage() {
             </h2>
             <p>
               {pair.absent ? (
-                <Badge variant="neutral">Chưa được cấp</Badge>
+                <Badge variant="neutral">{t('Chưa được cấp')}</Badge>
               ) : pair.allowed ? (
-                <Badge variant="success">Được phép</Badge>
+                <Badge variant="success">{t('Được phép')}</Badge>
               ) : (
-                <Badge variant="danger">Không được phép</Badge>
+                <Badge variant="danger">{t('Không được phép')}</Badge>
               )}
             </p>
           </div>
@@ -272,7 +281,7 @@ export function PermissionsPage() {
               )
             }
           >
-            {pair.allowed ? 'Thu hồi' : 'Cho phép'}
+            {pair.allowed ? t('Thu hồi') : t('Cho phép')}
           </Button>
         </section>
       )}
@@ -282,8 +291,8 @@ export function PermissionsPage() {
             <EntityPicker
               id="permissions-group"
               resource="user-groups"
-              label="Nhóm người dùng"
-              placeholder="Gõ tên nhóm để chọn…"
+              label={t('Nhóm người dùng')}
+              placeholder={t('Gõ tên nhóm để chọn…')}
               value={group}
               onChange={(value, item) => {
                 setGroup(value)
@@ -297,11 +306,11 @@ export function PermissionsPage() {
           <TabsList>
             <TabsTrigger value="functions">
               <LayoutGrid aria-hidden="true" />
-              Chức năng
+              {t('Chức năng')}
             </TabsTrigger>
             <TabsTrigger value="grants" disabled={!group}>
               <ListChecks aria-hidden="true" />
-              Quyền của nhóm
+              {t('Quyền của nhóm')}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -311,8 +320,8 @@ export function PermissionsPage() {
               <>
                 <SearchField
                   id="permissions-search"
-                  label="Tìm chức năng"
-                  placeholder="Mã hoặc tên chức năng…"
+                  label={t('Tìm chức năng')}
+                  placeholder={t('Mã hoặc tên chức năng…')}
                   value={q}
                   onChange={setQ}
                 />
@@ -336,15 +345,18 @@ export function PermissionsPage() {
             }
           >
             {list.loading ? (
-              <TableSkeleton columns={3} label="Đang tải danh mục chức năng…" />
+              <TableSkeleton
+                columns={3}
+                label={t('Đang tải danh mục chức năng…')}
+              />
             ) : !list.items.length ? (
               !list.error && (
                 <div className="p-4">
-                  <EmptyState title="Không tìm thấy chức năng phù hợp." />
+                  <EmptyState title={t('Không tìm thấy chức năng phù hợp.')} />
                 </div>
               )
             ) : (
-              <Table caption="Danh mục chức năng">
+              <Table caption={t('Danh mục chức năng')}>
                 <thead>
                   <tr>
                     <SortableHeader
@@ -352,17 +364,17 @@ export function PermissionsPage() {
                       sort={functionSort.sort}
                       onSort={functionSort.toggle}
                     >
-                      Mã
+                      {t('Mã')}
                     </SortableHeader>
                     <SortableHeader
                       field="name"
                       sort={functionSort.sort}
                       onSort={functionSort.toggle}
                     >
-                      Tên chức năng
+                      {t('Tên chức năng')}
                     </SortableHeader>
-                    <th scope="col" className="cell-actions text-right">
-                      Thao tác
+                    <th scope="col" className="cell-actions text-end">
+                      {t('Thao tác')}
                     </th>
                   </tr>
                 </thead>
@@ -377,7 +389,7 @@ export function PermissionsPage() {
                         {String(fn.code)}
                       </td>
                       <td className="font-medium">{String(fn.name)}</td>
-                      <td className="cell-actions text-right">
+                      <td className="cell-actions text-end">
                         {inspectButton(fn)}
                       </td>
                     </tr>
@@ -425,27 +437,32 @@ function GroupGrants({
       {list.error && <Alert type="error">{list.error}</Alert>}
       {list.items.length > 0 && (
         <SummaryGrid
-          label="Tổng quan quyền của nhóm"
+          label={t('Tổng quan quyền của nhóm')}
           partial={list.hasMore || list.hasPrevious}
         >
-          <StatTile label="Được phép" value={allowed} icon={<ShieldCheck />} />
           <StatTile
-            label="Không được phép"
+            label={t('Được phép')}
+            value={allowed}
+            icon={<ShieldCheck />}
+          />
+          <StatTile
+            label={t('Không được phép')}
             value={list.items.length - allowed}
             icon={<ShieldOff />}
           />
           <DonutTile
-            title="Tỷ lệ cấp quyền"
-            centerLabel="quyền"
-            head={['Trạng thái', 'Số chức năng']}
+            title={t('Tỷ lệ cấp quyền')}
+            centerLabel={t('quyền')}
+            head={[t('Trạng thái'), t('Số chức năng')]}
             data={partsBy(
               list.items,
               (item) => (item.isAllowed ? 0 : 1),
-              (item) => (item.isAllowed ? 'Được phép' : 'Không được phép'),
+              (item) =>
+                item.isAllowed ? t('Được phép') : t('Không được phép'),
             ).map((part) => ({
               ...part,
               color:
-                part.label === 'Được phép'
+                part.label === t('Được phép')
                   ? 'var(--success)'
                   : 'var(--destructive)',
             }))}
@@ -456,12 +473,12 @@ function GroupGrants({
         toolbar={
           <>
             <ToggleFilter
-              label="Trạng thái quyền"
+              label={t('Trạng thái quyền')}
               value={isAllowed}
               onChange={setIsAllowed}
               options={[
-                { value: 'true', label: 'Được phép' },
-                { value: 'false', label: 'Không được phép' },
+                { value: 'true', label: t('Được phép') },
+                { value: 'false', label: t('Không được phép') },
               ]}
             />
             <SortMenu
@@ -488,15 +505,15 @@ function GroupGrants({
         }
       >
         {list.loading ? (
-          <TableSkeleton columns={4} label="Đang tải quyền của nhóm…" />
+          <TableSkeleton columns={4} label={t('Đang tải quyền của nhóm…')} />
         ) : !list.items.length ? (
           !list.error && (
             <div className="p-4">
-              <EmptyState title="Nhóm chưa có quyền nào được lưu." />
+              <EmptyState title={t('Nhóm chưa có quyền nào được lưu.')} />
             </div>
           )
         ) : (
-          <Table caption="Quyền của nhóm">
+          <Table caption={t('Quyền của nhóm')}>
             <thead>
               <tr>
                 <SortableHeader
@@ -504,12 +521,12 @@ function GroupGrants({
                   sort={sort.sort}
                   onSort={sort.toggle}
                 >
-                  Chức năng
+                  {t('Chức năng')}
                 </SortableHeader>
-                <th scope="col">Mã</th>
-                <th scope="col">Trạng thái</th>
-                <th scope="col" className="cell-actions text-right">
-                  Thao tác
+                <th scope="col">{t('Mã')}</th>
+                <th scope="col">{t('Trạng thái')}</th>
+                <th scope="col" className="cell-actions text-end">
+                  {t('Thao tác')}
                 </th>
               </tr>
             </thead>
@@ -533,12 +550,12 @@ function GroupGrants({
                     </td>
                     <td>
                       {item.isAllowed ? (
-                        <Badge variant="success">Được phép</Badge>
+                        <Badge variant="success">{t('Được phép')}</Badge>
                       ) : (
-                        <Badge variant="danger">Không được phép</Badge>
+                        <Badge variant="danger">{t('Không được phép')}</Badge>
                       )}
                     </td>
-                    <td className="cell-actions text-right">
+                    <td className="cell-actions text-end">
                       {renderAction(fn)}
                     </td>
                   </tr>
