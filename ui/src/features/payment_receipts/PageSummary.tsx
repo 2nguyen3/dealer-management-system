@@ -4,6 +4,7 @@ import { Stagger, StaggerItem } from '@/components/motion/Motion'
 import { Badge } from '@/components/shadcn/badge'
 import { Card } from '@/components/shadcn/card'
 import { formatCompactVND } from '@/lib/chart'
+import { t } from '@/lib/i18n/core'
 
 export interface SummaryGroup {
   key: string
@@ -38,9 +39,9 @@ export function PageSummary({
         <Badge
           variant="outline"
           className="border-info/30 bg-info/10 text-info"
-          title="Chỉ tính các dòng đang hiển thị trên trang này"
+          title={t('Chỉ tính các dòng đang hiển thị trên trang này')}
         >
-          Trang hiện tại · {total} {noun}
+          {t('Trang hiện tại · {total} {noun}', { total, noun })}
         </Badge>
       </div>
       <Stagger className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.5fr)]">

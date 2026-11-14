@@ -1,13 +1,19 @@
 import { useSyncExternalStore } from 'react'
+import { t } from '@/lib/i18n/core'
 
 /** Selectable colour palettes; light/dark is chosen separately (next-themes). */
 export const PALETTES = [
-  { value: 'thuy', label: 'Thủy', hint: 'Xanh đại dương', swatch: '#1857d1' },
-  { value: 'moc', label: 'Mộc', hint: 'Xanh rừng', swatch: '#24483d' },
-  { value: 'kim', label: 'Kim', hint: 'Bạc than chì', swatch: '#475569' },
-  { value: 'hoa', label: 'Hỏa', hint: 'Đỏ san hô', swatch: '#d1432b' },
-  { value: 'tho', label: 'Thổ', hint: 'Hổ phách', swatch: '#c27407' },
-  { value: 'tim', label: 'Tím', hint: 'Oải hương', swatch: '#6a43e8' },
+  {
+    value: 'thuy',
+    label: t('Thủy'),
+    hint: t('Xanh đại dương'),
+    swatch: '#1857d1',
+  },
+  { value: 'moc', label: t('Mộc'), hint: t('Xanh rừng'), swatch: '#24483d' },
+  { value: 'kim', label: 'Kim', hint: t('Bạc than chì'), swatch: '#475569' },
+  { value: 'hoa', label: t('Hỏa'), hint: t('Đỏ san hô'), swatch: '#d1432b' },
+  { value: 'tho', label: t('Thổ'), hint: t('Hổ phách'), swatch: '#c27407' },
+  { value: 'tim', label: t('Tím'), hint: t('Oải hương'), swatch: '#6a43e8' },
 ] as const
 
 export type Palette = (typeof PALETTES)[number]['value']

@@ -1,5 +1,6 @@
 from typing import Literal, get_args
 
+# The 22 functions of the simplified model (0011, handoff 4.3).
 FunctionCode = Literal[
     "users.manage",
     "groups.manage",
@@ -10,22 +11,12 @@ FunctionCode = Literal[
     "product.manage",
     "agency.read",
     "agency.manage",
-    "inventory.read",
     "stock.receipt.prepare",
     "stock.receipt.post",
     "stock.issue.prepare",
     "stock.issue.post",
     "cash.receipt.prepare",
     "cash.receipt.post",
-    "cash.upfront.verify",
-    "stock.count",
-    "stock.adjustment.prepare",
-    "stock.adjustment.post",
-    "returns.prepare",
-    "returns.post",
-    "cash.refund.prepare",
-    "cash.refund.post",
-    "credit.apply",
     "documents.correct",
     "documents.cancel",
     "sales.read",
@@ -35,8 +26,6 @@ FunctionCode = Literal[
     "payments.online",
 ]
 FUNCTION_CODES = frozenset(get_args(FunctionCode))
-# Retired codes stay valid only as historical audit_log references (FK RESTRICT). They are
-# never granted, listed or authorized; 0010 retired district.manage with the district level.
-RetiredFunctionCode = Literal["district.manage"]
-RETIRED_FUNCTION_CODES = frozenset(get_args(RetiredFunctionCode))
-AuditFunctionCode = Literal[(*get_args(FunctionCode), *get_args(RetiredFunctionCode))]
+# 0011 rebuilt the schema, so no retired code survives in audit_log; kept for typing.
+RETIRED_FUNCTION_CODES: frozenset[str] = frozenset()
+AuditFunctionCode = FunctionCode

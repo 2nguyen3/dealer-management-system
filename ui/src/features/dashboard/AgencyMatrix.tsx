@@ -12,6 +12,7 @@ import {
   type MatrixColumn,
   type MatrixRow,
 } from './model'
+import { t } from '@/lib/i18n/core'
 
 function display(kind: 'money' | 'count', value: string | undefined) {
   if (value === undefined) return '—'
@@ -36,7 +37,7 @@ export function AgencyMatrix({
   onSelect: (row: MatrixRow) => void
 }) {
   const columns = matrixColumns.filter((column) => sources[column.source])
-  const fallback: MatrixColumn = columns[0]?.key ?? 'netSalesAmount'
+  const fallback: MatrixColumn = columns[0]?.key ?? 'salesAmount'
   // Client-side order of the fully loaded agency rows; default: first column ↓.
   const [sort, setSort] = useState<SortValue>(`-${fallback}`)
   const field = sort.replace(/^-/, '')
@@ -51,11 +52,11 @@ export function AgencyMatrix({
   ) as Record<MatrixColumn, (value: string | undefined) => number>
 
   return (
-    <Table caption="Ma trận đại lý theo chỉ số" className="min-w-[760px]">
+    <Table caption={t('Ma trận đại lý theo chỉ số')} className="min-w-[760px]">
       <thead className="sticky top-0 z-[1]">
         <tr>
-          <th scope="col" className="text-left">
-            Đại lý
+          <th scope="col" className="text-start">
+            {t('Đại lý')}
           </th>
           {columns.map((column) => (
             <SortableHeader
@@ -87,14 +88,17 @@ export function AgencyMatrix({
             >
               <th
                 scope="row"
-                className="min-w-44 px-3 py-2 text-left font-normal"
+                className="min-w-44 px-3 py-2 text-start font-normal"
               >
                 <button
                   type="button"
                   onClick={() => onSelect(row)}
                   aria-pressed={selected}
-                  aria-label={`Lọc theo đại lý ${row.agencyCode} — ${row.agencyName}`}
-                  className="grid rounded-sm text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  aria-label={t('Lọc theo đại lý {agencyCode} — {agencyName}', {
+                    agencyCode: row.agencyCode,
+                    agencyName: row.agencyName,
+                  })}
+                  className="grid rounded-sm text-start focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <span className="font-medium text-foreground hover:underline">
                     {row.agencyName}
@@ -110,7 +114,7 @@ export function AgencyMatrix({
                 return (
                   <td key={column.key} className="cell-number relative">
                     <span
-                      className="absolute inset-y-2 left-1 rounded-full bg-gradient-to-r from-chart-1/25 to-chart-2/20 transition-[width] duration-500"
+                      className="absolute inset-y-2 start-1 rounded-full bg-gradient-to-r rtl:bg-gradient-to-l from-chart-1/25 to-chart-2/20 transition-[width] duration-500"
                       style={{ width: `calc(${ratio * 100}% - 8px)` }}
                       aria-hidden="true"
                     />
@@ -127,8 +131,8 @@ export function AgencyMatrix({
       {(totals.sales || totals.debt) && (
         <tfoot>
           <tr className="border-t-2 bg-muted/40 font-semibold">
-            <th scope="row" className="px-3 py-2.5 text-left">
-              Tổng cộng
+            <th scope="row" className="px-3 py-2.5 text-start">
+              {t('Tổng cộng')}
             </th>
             {columns.map((column) => {
               const source =

@@ -1,8 +1,7 @@
--- PostgreSQL reference entry point. The reviewed snapshot is versioned with Alembic.
--- Backend/Supabase deployment: cd backend && uv run alembic upgrade head.
--- psql standalone, NEW schema only:
+-- PostgreSQL reference entry point. The reviewed snapshots are versioned with Alembic.
+-- Backend/Neon deployment: cd backend && uv run alembic upgrade head.
+-- psql standalone: revision 0011 DROPS and rebuilds the whole dms schema (16 tables,
+-- simplified 2026-11-14 model). It records no Alembic version and keeps no data.
 BEGIN;
-\ir ../../backend/alembic/sql/0001_initial.sql
--- Revision 0010 replaces district with the read-only HCMC 2025 ward catalogue.
-\ir ../../backend/alembic/sql/0010_hcmc_wards.sql
+\ir ../../backend/alembic/sql/0011_simplified_schema.sql
 COMMIT;

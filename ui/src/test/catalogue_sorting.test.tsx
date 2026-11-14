@@ -51,7 +51,9 @@ const agencies = [
     wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
-    currentDebt: '45000000',
+    debt: '45000000',
+    maxDebt: '50000000',
+    remainingCreditLimit: '5000000',
     acceptedDate: '2026-06-01',
     status: 'ACTIVE',
   },
@@ -64,7 +66,9 @@ const agencies = [
     wardName: 'Phường Xuân Hòa',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
-    currentDebt: '5000000',
+    debt: '5000000',
+    maxDebt: '50000000',
+    remainingCreditLimit: '45000000',
     acceptedDate: '2026-07-01',
     status: 'ACTIVE',
   },
@@ -96,17 +100,19 @@ describe('AgenciesPage sort and debt usage', { timeout: 20000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
     await waitFor(() => expect(last(fetch, '/agencies')).toContain('cursor=c2'))
 
-    const debt = await screen.findByRole('columnheader', { name: /Dư nợ/ })
+    const debt = await screen.findByRole('columnheader', {
+      name: /Nợ hiện tại/,
+    })
     fireEvent.click(within(debt).getByRole('button'))
     await waitFor(() => {
       const target = last(fetch, '/agencies')
-      expect(target).toContain('sort=-currentDebt')
+      expect(target).toContain('sort=-debt')
       expect(target).not.toContain('cursor=')
     })
     expect(
-      (await screen.findByRole('columnheader', { name: /Dư nợ/ })).getAttribute(
-        'aria-sort',
-      ),
+      (
+        await screen.findByRole('columnheader', { name: /Nợ hiện tại/ })
+      ).getAttribute('aria-sort'),
     ).toBe('descending')
 
     fireEvent.click(

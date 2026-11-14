@@ -1,5 +1,6 @@
 import { apiDownload } from '../../lib/api'
 import { reportPath, type ReportQuery } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 export const reportMedia = {
   pdf: 'application/pdf',
@@ -20,7 +21,7 @@ export async function downloadReport(
     response.data.type.split(';')[0] !== reportMedia[format] ||
     response.data.size === 0
   )
-    throw new Error('Tệp xuất không đúng định dạng hoặc rỗng.')
+    throw new Error(t('Tệp xuất không đúng định dạng hoặc rỗng.'))
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url

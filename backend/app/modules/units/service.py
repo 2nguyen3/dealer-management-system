@@ -18,5 +18,4 @@ class UnitService(CatalogueService):
         ("23505", "unit_name_key"): ("DUPLICATE", "Unit name already exists"),
         ("23503", "product_unitId_fkey"): ("RESOURCE_IN_USE", "Unit has products"),
         ("23503", "document_line_unitId_fkey"): ("RESOURCE_IN_USE", "Unit has lines"),
-        ("23503", "stock_count_line_unitId_fkey"): ("RESOURCE_IN_USE", "Unit has counts"),
     }

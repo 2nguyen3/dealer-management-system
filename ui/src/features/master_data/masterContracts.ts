@@ -1,7 +1,6 @@
 import {
   businessDate,
   catalog,
-  decimal,
   id,
   money,
   quantity,
@@ -32,10 +31,10 @@ export function product(value: unknown): Row {
   text(data.code)
   text(data.name)
   text(data.unitName)
-  quantity(data.currentStock)
-  quantity(data.lowStockThreshold)
-  money(data.currentPurchasePrice)
-  decimal(data.currentSellingPrice)
+  quantity(data.stock)
+  // Both prices stay null until the product's first posted receipt.
+  if (data.lastPurchasePrice !== null) money(data.lastPurchasePrice)
+  if (data.sellingPrice !== null) money(data.sellingPrice)
   if (!['ACTIVE', 'INACTIVE'].includes(text(data.status)))
     throw new Error('Invalid product status')
   return data
@@ -48,14 +47,21 @@ export function agency(value: unknown): Row {
   catalog(data.wardId)
   text(data.code)
   text(data.name)
-  text(data.email)
   businessDate(data.acceptedDate)
-  money(data.currentDebt)
-  money(data.currentCredit)
-  money(data.remainingCreditLimit)
+  // Debt is negative only after a late verified online payment (prepaid).
+  signedMoney(data.debt)
+  money(data.maxDebt)
+  signedMoney(data.remainingCreditLimit)
   if (!['ACTIVE', 'TERMINATED'].includes(text(data.status)))
     throw new Error('Invalid agency status')
   return data
+}
+
+function signedMoney(value: unknown): string {
+  const result = text(value)
+  if (!/^-?(0|[1-9][0-9]{0,17})$/.test(result))
+    throw new Error('Invalid signed VND amount')
+  return result
 }
 
 export function user(value: unknown): Row {

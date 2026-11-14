@@ -1,4 +1,6 @@
 import { Eye, KeyRound, Plus, RefreshCw, Trash2, UserX } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { masterNotice } from '../guide/workflows'
 import {
   useEffect,
   useMemo,
@@ -62,6 +64,7 @@ import {
   ToggleFilter,
 } from './listParts'
 import { SummaryGrid } from './summaryParts'
+import { t } from '@/lib/i18n/core'
 
 /** How an id-valued field/filter is chosen: searchable picker or small list. */
 export type Lookup =
@@ -125,7 +128,10 @@ export interface MasterConfig {
   summary?: (items: Row[]) => ReactNode
 }
 
-const booleanLabels: Record<string, string> = { true: 'Có', false: 'Không' }
+const booleanLabels: Record<string, string> = {
+  true: t('Có'),
+  false: t('Không'),
+}
 const numericKinds = new Set<ColumnKind | undefined>([
   'money',
   'quantity',
@@ -254,7 +260,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
           continue
         }
         if (!raw.trim() && field.type !== 'password')
-          throw new Error(`Cần nhập ${field.label}.`)
+          throw new Error(t('Cần nhập {label}.', { label: field.label }))
         body[field.key] =
           field.type === 'catalog'
             ? catalog(raw)
@@ -270,7 +276,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       ? raw
                       : raw.trim()
         if (field.type === 'password' && raw === '')
-          throw new Error('Mật khẩu không được rỗng.')
+          throw new Error(t('Mật khẩu không được rỗng.'))
       }
       setBusy(true)
       await intent.current.send(
@@ -282,7 +288,8 @@ export function MasterPage({ config }: { config: MasterConfig }) {
         },
         false,
       )
-      setNotice(creating ? 'Đã thêm mới.' : 'Đã lưu thay đổi.')
+      setNotice(creating ? t('Đã thêm mới.') : t('Đã lưu thay đổi.'))
+      notifyNextStep(masterNotice(config.path, creating))
       setCreating(false)
       setSelected('')
       setDetail(null)
@@ -299,7 +306,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
     if (
       name === 'delete' &&
       !window.confirm(
-        'Xóa bản ghi này? Chỉ xóa được khi bản ghi chưa được sử dụng.',
+        t('Xóa bản ghi này? Chỉ xóa được khi bản ghi chưa được sử dụng.'),
       )
     )
       return
@@ -322,8 +329,10 @@ export function MasterPage({ config }: { config: MasterConfig }) {
       )
       setNotice(
         name === 'password-reset'
-          ? 'Đã đặt lại mật khẩu và đăng xuất các phiên cũ. Tài khoản đang khóa vẫn giữ trạng thái khóa.'
-          : 'Đã thực hiện thao tác.',
+          ? t(
+              'Đã đặt lại mật khẩu và đăng xuất các phiên cũ. Tài khoản đang khóa vẫn giữ trạng thái khóa.',
+            )
+          : t('Đã thực hiện thao tác.'),
       )
       setSelected('')
       setDetail(null)
@@ -509,7 +518,9 @@ export function MasterPage({ config }: { config: MasterConfig }) {
         actions={
           <>
             {config.description && (
-              <InfoHint label={`Giới thiệu ${config.title}`}>
+              <InfoHint
+                label={t('Giới thiệu {title}', { title: config.title })}
+              >
                 {config.description}
               </InfoHint>
             )}
@@ -519,7 +530,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                 onClick={openCreate}
                 icon={<Plus className="size-4" />}
               >
-                Thêm mới
+                {t('Thêm mới')}
               </Button>
             )}
           </>
@@ -528,7 +539,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
       {pageAlerts.length > 0 && <div className="space-y-3">{pageAlerts}</div>}
       {config.summary && summaryRows.length > 0 && (
         <SummaryGrid
-          label={`Tổng quan ${config.title}`}
+          label={t('Tổng quan {title}', { title: config.title })}
           partial={list.hasMore || list.hasPrevious}
         >
           {summary}
@@ -540,12 +551,12 @@ export function MasterPage({ config }: { config: MasterConfig }) {
             <SearchField
               id="master-filter-search"
               value={filters.q ?? ''}
-              placeholder="Mã, tên…"
+              placeholder={t('Mã, tên…')}
               onChange={(q) => setFilters({ ...filters, q })}
             />
             {config.statuses && (
               <ToggleFilter
-                label="Trạng thái"
+                label={t('Trạng thái')}
                 value={filters.status ?? ''}
                 onChange={(status) => setFilters({ ...filters, status })}
                 options={config.statuses.map((value) => ({
@@ -566,7 +577,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       id={id}
                       resource={lookup.picker}
                       label={label}
-                      placeholder="Tất cả — gõ để tìm"
+                      placeholder={t('Tất cả — gõ để tìm')}
                       value={value}
                       onChange={(next) => update(next)}
                     />
@@ -575,7 +586,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       id={id}
                       label={label}
                       path={lookup.options}
-                      emptyLabel="Tất cả"
+                      emptyLabel={t('Tất cả')}
                       value={value}
                       onChange={update}
                     />
@@ -586,7 +597,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       value={value}
                       onChange={(event) => update(event.target.value)}
                       options={[
-                        { value: '', label: 'Tất cả' },
+                        { value: '', label: t('Tất cả') },
                         { value: 'true', label: lookup.boolean[0] },
                         { value: 'false', label: lookup.boolean[1] },
                       ]}
@@ -621,7 +632,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
               onClick={list.reload}
               icon={<RefreshCw className="size-4" />}
             >
-              Tải lại
+              {t('Tải lại')}
             </Button>
           </>
         }
@@ -641,8 +652,8 @@ export function MasterPage({ config }: { config: MasterConfig }) {
           !list.error && (
             <div className="p-4">
               <EmptyState
-                title="Không có kết quả"
-                description="Thử đổi từ khóa hoặc bộ lọc."
+                title={t('Không có kết quả')}
+                description={t('Thử đổi từ khóa hoặc bộ lọc.')}
               />
             </div>
           )
@@ -660,7 +671,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       onSort={sort.toggle}
                       firstDirection={option.firstDirection}
                       align={numericKinds.has(kind) ? 'right' : 'left'}
-                      className={cn(numericKinds.has(kind) && 'text-right')}
+                      className={cn(numericKinds.has(kind) && 'text-end')}
                     >
                       {label}
                     </SortableHeader>
@@ -670,7 +681,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       key={key}
                       className={cn(
                         cellClass(kind),
-                        numericKinds.has(kind) && 'text-right',
+                        numericKinds.has(kind) && 'text-end',
                       )}
                     >
                       {label}
@@ -678,8 +689,8 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                   )
                 })}
 
-                <th scope="col" className="cell-actions w-16 text-right">
-                  <span className="sr-only">Thao tác</span>
+                <th scope="col" className="cell-actions w-16 text-end">
+                  <span className="sr-only">{t('Thao tác')}</span>
                 </th>
               </tr>
             </thead>
@@ -691,7 +702,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       key={key}
                       className={cn(
                         cellClass(kind),
-                        numericKinds.has(kind) && 'text-right tabular-nums',
+                        numericKinds.has(kind) && 'text-end tabular-nums',
                         key === 'code' &&
                           'font-mono text-xs font-medium text-foreground/80',
                         (key === 'name' || key === 'fullName') &&
@@ -701,10 +712,12 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       {displayCell(item[key], key, kind)}
                     </td>
                   ))}
-                  <td className="cell-actions text-right">
+                  <td className="cell-actions text-end">
                     <IconAction
-                      label="Chi tiết"
-                      tooltip={canManage ? 'Xem và chỉnh sửa' : 'Xem chi tiết'}
+                      label={t('Chi tiết')}
+                      tooltip={
+                        canManage ? t('Xem và chỉnh sửa') : t('Xem chi tiết')
+                      }
                       disabled={busy}
                       onClick={() => openDetail(item)}
                     >
@@ -722,13 +735,15 @@ export function MasterPage({ config }: { config: MasterConfig }) {
         onClose={closeModal}
         title={
           creating
-            ? `Thêm ${config.title}`
-            : `Chi tiết ${String(
-                detail?.item.code ??
-                  detail?.item.name ??
-                  detail?.item.fullName ??
-                  '',
-              )}`.trim()
+            ? t('Thêm {title}', { title: config.title })
+            : t('Chi tiết {code}', {
+                code: String(
+                  detail?.item.code ??
+                    detail?.item.name ??
+                    detail?.item.fullName ??
+                    '',
+                ),
+              }).trim()
         }
         maxWidth="lg"
       >
@@ -747,13 +762,13 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                     setVersion((value) => value + 1)
                   }}
                 >
-                  Thử tải lại
+                  {t('Thử tải lại')}
                 </Button>
               </div>
             ) : (
               <div
                 role="status"
-                aria-label="Đang tải chi tiết"
+                aria-label={t('Đang tải chi tiết')}
                 className="grid gap-4 sm:grid-cols-2"
               >
                 {Array.from({ length: 4 }, (_, index) => (
@@ -781,8 +796,9 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                   </div>
                   {!creating && !detail?.etag && (
                     <Alert type="warning">
-                      Chưa thể lưu vì thiếu thông tin phiên bản. Hãy tải lại chi
-                      tiết rồi sửa lại.
+                      {t(
+                        'Chưa thể lưu vì thiếu thông tin phiên bản. Hãy tải lại chi tiết rồi sửa lại.',
+                      )}
                     </Alert>
                   )}
                   <div className="flex flex-wrap justify-end gap-2">
@@ -792,14 +808,14 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                       onClick={closeModal}
                       disabled={busy}
                     >
-                      Đóng
+                      {t('Đóng')}
                     </Button>
                     <Button
                       type="submit"
                       disabled={disabled || unchanged}
                       isLoading={busy}
                     >
-                      {creating ? 'Tạo mới' : 'Lưu thay đổi'}
+                      {creating ? t('Tạo mới') : t('Lưu thay đổi')}
                     </Button>
                   </div>
                 </form>
@@ -820,7 +836,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                         setVersion((value) => value + 1)
                       }}
                     >
-                      Tải lại chi tiết
+                      {t('Tải lại chi tiết')}
                     </Button>
                     {canDelete && (
                       <Button
@@ -830,7 +846,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                         icon={<Trash2 className="size-4" />}
                         onClick={() => action('delete')}
                       >
-                        Xóa
+                        {t('Xóa')}
                       </Button>
                     )}
                   </div>
@@ -838,10 +854,10 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                     <section className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
                       <h3 className="flex items-center gap-2 text-sm font-semibold text-destructive">
                         <UserX className="size-4" aria-hidden="true" />
-                        Ngừng hợp tác
+                        {t('Ngừng hợp tác')}
                       </h3>
                       <Input
-                        label="Lý do ngừng hợp tác"
+                        label={t('Lý do ngừng hợp tác')}
                         value={reason}
                         onChange={(event) => setReason(event.target.value)}
                       />
@@ -850,7 +866,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                         disabled={disabled || !reason.trim()}
                         onClick={() => action('terminate')}
                       >
-                        Ngừng hợp tác vĩnh viễn
+                        {t('Ngừng hợp tác vĩnh viễn')}
                       </Button>
                     </section>
                   )}
@@ -858,12 +874,12 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                     <section className="space-y-3 rounded-lg border bg-muted/30 p-4">
                       <h3 className="flex items-center gap-2 text-sm font-semibold">
                         <KeyRound className="size-4" aria-hidden="true" />
-                        Đặt lại mật khẩu
+                        {t('Đặt lại mật khẩu')}
                       </h3>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div className="min-w-0 flex-1">
                           <Input
-                            label="Mật khẩu mới"
+                            label={t('Mật khẩu mới')}
                             type="password"
                             autoComplete="new-password"
                             value={password}
@@ -877,7 +893,7 @@ export function MasterPage({ config }: { config: MasterConfig }) {
                           disabled={disabled || !password}
                           onClick={() => action('password-reset')}
                         >
-                          Đặt lại mật khẩu
+                          {t('Đặt lại mật khẩu')}
                         </Button>
                       </div>
                     </section>

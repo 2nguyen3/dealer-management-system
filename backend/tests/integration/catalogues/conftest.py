@@ -15,13 +15,13 @@ from tests.integration.user_groups.conftest import (  # noqa: F401
 CASES = {
     "agency-types": (
         AgencyTypeService,
-        "AgencyType",
+        "AgencyTypeResponse",
         {"code": "NEW", "name": "New", "maxDebt": "0"},
     ),
-    "units": (UnitService, "Unit", {"code": "NEW", "name": "New"}),
+    "units": (UnitService, "UnitResponse", {"code": "NEW", "name": "New"}),
     "users": (
         UserAdministrationService,
-        "User",
+        "UserResponse",
         {"fullName": "New", "email": "new@example.com", "password": "x", "groupId": 2},
     ),
 }

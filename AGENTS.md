@@ -1,5 +1,18 @@
 # Agentra project instructions
 
+## Business simplification checkpoint - 2026-11-14
+
+User-requested simplification (owning plan: openwiki/backend-design/plan/simplification/).
+Three document kinds (PN/PX/PT) DRAFT→POSTED→CANCELLED, cancel/correct with reason in
+the current month only; `agency.debt`, `product.stock`, `lastPurchasePrice` columns;
+QĐ1–QĐ8 + AGENCY_HAS_DEBT. Revision 0011 drops and rebuilds schema `dms` (16 tables,
+22 function codes, no downgrade); seed v2 replays 01/06/2026 → day before seeding with
+11 real team accounts. Removed (Bỏ theo yêu cầu 14/11/2026): upfront, refunds, credit,
+receivables/FIFO, counts, returns, adjustments, revisions, idempotency commands.
+Runtime contract 90 operations (`backend/scripts/gen_openapi.py`). Exact gates and the
+production reset/backup evidence are in that plan's VERIFICATION. Everything dated
+below this checkpoint is historical and describes the pre-0011 application.
+
 ## Database move / performance checkpoint - 2026-11-10
 
 Production database moved from Supabase Sydney to Neon Singapore (PG18, pooled host);
@@ -130,17 +143,12 @@ successors; immutable original SQL snapshots and real-money evidence remain prot
 
 Agentra is a Dealer Management System (DMS) software engineering course project for managing
 dealer distribution, incoming/outgoing goods, inventory, payments, debt, and
-business reports. The implementation includes FastAPI health endpoints, database
-configuration, reviewed Alembic migrations for the complete DMS schema, full demo
-seed/live SQL verification, and a React starter page. Backend authentication and
-reusable authorization, shared API foundations, full administration/audit and
-master-data APIs through M12, M13 document foundations, M14 inventory and M15 receipt
-core, M16 internal settlement and M17–M20 issue/manual-receipt/upfront/receivable APIs
-are implemented. M17–M20 owning80-case/exact100% and22direct/Nginx gates pass;
-all370retained PG/TLS and308offline cases pass; affected33-file production coverage
-is exact100%(1285/306) at that historical checkpoint. M21–M24 now pass their scopes;
-M25–M32/frontend auth and
-M28/M29 deferred gates are future work.
+business reports. After the 14/11/2026 simplification the runtime offers
+authentication/administration, master data (agency types, units, products, agencies,
+wards, business rules), stock receipts, stock issues, payment receipts, VNPAY sandbox
+online payments, document history, five reports and a dashboard (90 operations). The
+React UI covers all of them in 24 interface languages with a GUIDE and Portal. The
+chatbot (M32) is not built. Older M-numbered checkpoints and plans are history.
 
 ## Project map
 
@@ -287,28 +295,27 @@ plans and agent guidance aligned with actual implementation progress.
 
 ## Database workflow
 
-- Schema authority: immutable reviewed DDL in `backend/alembic/sql/`; migrations
-  `0001` (complete DMS/core RBAC), `0002` (search indexes), `0003` (auth sessions),
-  `0004` (durable scoped API commands), `0005` (recorded-unit policy/first-use locks),
-  `0006` (eligible owner deletion/product first-use/agency history-date guards),
-  `0007` (same-return successor credit-lot provenance), `0008` (historical receipt
-  goods admission), `0009` (historical issue goods/agency admission) and `0010`
-  (read-only HCMC 2025 ward catalogue replaces district; production upgrade is manual).
+- Schema authority: immutable reviewed DDL in `backend/alembic/sql/`. Head is `0011`
+  (`0011_simplified_schema.sql`): it drops and rebuilds schema `dms` with 16 tables,
+  22 function codes, `dms.clock`/`dms.app_now()`, posting-context balance guards and
+  search indexes, and cannot be downgraded. Revisions `0001`–`0010` remain as history.
   `openwiki/database-design/*.sql` are psql entry points, not duplicate DDL copies.
 - From `backend/`: `uv sync --frozen`, `uv run alembic upgrade head`, then
-  `uv run python -m app.db.seed` for the complete demo.
+  `uv run python -m app.db.seed` for seed v2.
 - Verify database work with `uv run python -m app.db.verify --seeded --regression`.
-  The 54 regression checks use a separate schema and roll back all fixtures.
-- The demo covers all 29 domain tables, 30 agencies, 24 products, 410 documents and
-  June–September 2026 history. Account credentials and exact counts are in README.
-  The command infrastructure table may legitimately have zero rows; source head is0010.
-  Current live includes the authorized extra receipt774 (411documents); never reset it.
-- Seed v1 is atomic and repeatable; it verifies existing demo data on rerun.
-  It does not reset a populated database, disable triggers or write balance caches.
+  The 83 regression checks use a separate schema and roll back all fixtures.
+- Seed v2 replays business history from 01/06/2026 to the day before seeding through
+  `DocumentService` (11 accounts, 34 agencies, 30 products, about 470 documents, VNPAY
+  payments, audit). It refuses a non-head or partially populated schema; a rerun only
+  verifies. Exact counts and account passwords are in README. Production data was reset
+  by the 0011 upgrade per decision D4 after a backup; there is no older data to preserve.
+  On 14/11/2026 production got seed v2 by seeding a local PG18 DB and restoring schema
+  `dms` onto Neon in one transaction (seeding over the network takes ~70 min); verify ran on Neon.
+- Seed v2 never disables triggers or writes balances directly; texts must stay realistic
+  (`verify --seeded` scans for forbidden placeholder words).
 - Add new revisions for schema changes; do not edit deployed SQL snapshots or
-  rerun initial DDL over an existing schema. Five identity/access, three catalogue and
-  one command-infrastructure ORM tables are mapped;
-  autogeneration only compares explicitly mapped tables.
+  rerun initial DDL over an existing schema. Only explicitly mapped ORM tables are
+  compared by autogeneration (`alembic check` must stay clean).
 
 ## Runtime context
 

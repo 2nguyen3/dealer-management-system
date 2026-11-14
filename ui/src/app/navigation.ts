@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/core'
 import type { FunctionCode } from '../lib/types'
 
 export interface NavigationPolicy {
@@ -12,19 +13,32 @@ export interface NavigationItem {
   unavailable?: boolean
 }
 
+/** Route gates, mirroring the read (`GET`) `x-permissions` of the API contract. */
 export const routePermissions: Record<string, NavigationPolicy> = {
   '/agencies': { anyOf: ['agency.read', 'agency.manage'] },
-  '/products': { anyOf: ['product.manage', 'inventory.read'] },
+  '/products': {
+    anyOf: [
+      'product.manage',
+      'stock.receipt.prepare',
+      'stock.receipt.post',
+      'stock.issue.prepare',
+      'stock.issue.post',
+      'sales.read',
+      'reports.read',
+    ],
+  },
   '/agency-types': {
     anyOf: ['agency_type.manage', 'agency.read', 'agency.manage'],
   },
-  '/units': { anyOf: ['unit.manage', 'product.manage', 'inventory.read'] },
+  '/units': {
+    anyOf: ['unit.manage', 'product.manage', 'stock.receipt.prepare'],
+  },
   '/business-rules': {
     anyOf: [
       'rules.manage',
       'agency.manage',
       'stock.issue.prepare',
-      'inventory.read',
+      'stock.issue.post',
     ],
   },
   '/users': { allOf: ['users.manage'] },
@@ -33,59 +47,53 @@ export const routePermissions: Record<string, NavigationPolicy> = {
   },
   '/permissions': { allOf: ['permissions.manage'] },
   '/audit-logs': { allOf: ['audit.read'] },
-  '/inventory': { allOf: ['inventory.read'] },
   '/stock-receipts': {
-    anyOf: ['stock.receipt.prepare', 'stock.receipt.post', 'inventory.read'],
+    anyOf: [
+      'stock.receipt.prepare',
+      'stock.receipt.post',
+      'documents.correct',
+      'documents.cancel',
+      'product.manage',
+      'reports.read',
+    ],
   },
   '/stock-issues': {
     anyOf: [
       'stock.issue.prepare',
       'stock.issue.post',
+      'documents.correct',
+      'documents.cancel',
       'debt.read',
       'sales.read',
+      'reports.read',
     ],
   },
   '/payment-receipts': {
-    anyOf: ['cash.receipt.prepare', 'cash.receipt.post', 'debt.read'],
-  },
-  '/upfront-payments': {
-    anyOf: ['cash.upfront.verify', 'cash.receipt.post', 'stock.issue.post'],
-  },
-  '/online-payments': { anyOf: ['payments.online', 'debt.read'] },
-  '/receivables': { allOf: ['debt.read'] },
-  '/sales-returns': {
-    anyOf: ['returns.prepare', 'returns.post', 'debt.read', 'sales.read'],
-  },
-  '/credit-applications': { anyOf: ['credit.apply', 'debt.read'] },
-  '/refunds': {
-    anyOf: ['cash.refund.prepare', 'cash.refund.post', 'debt.read'],
-  },
-  '/stock-adjustments': {
     anyOf: [
-      'stock.adjustment.prepare',
-      'stock.adjustment.post',
-      'inventory.read',
+      'cash.receipt.prepare',
+      'cash.receipt.post',
+      'documents.correct',
+      'documents.cancel',
+      'debt.read',
+      'payments.online',
+      'reports.read',
     ],
   },
-  '/stock-counts': { allOf: ['stock.count'] },
-  '/agency-credit': {
-    anyOf: ['debt.read', 'credit.apply', 'cash.refund.post'],
-  },
-  '/reports': {
-    allOf: ['reports.read'],
-    anyOf: ['sales.read', 'debt.read', 'inventory.read'],
-  },
+  '/online-payments': { anyOf: ['payments.online', 'debt.read'] },
+  '/reports': { allOf: ['reports.read'] },
   '/dashboard': {
     anyOf: [
       'agency.read',
-      'inventory.read',
       'sales.read',
       'debt.read',
+      'stock.receipt.prepare',
+      'stock.receipt.post',
+      'stock.issue.prepare',
       'stock.issue.post',
-      'cash.upfront.verify',
+      'cash.receipt.prepare',
+      'cash.receipt.post',
     ],
   },
-  '/document-corrections': { anyOf: ['documents.correct', 'documents.cancel'] },
 }
 
 export function allowsNavigation(
@@ -98,63 +106,70 @@ export function allowsNavigation(
   )
 }
 
-export const navigationGroups: { title: string; items: NavigationItem[] }[] = [
+/** Stable group keys; labels are translated, so code never matches on text. */
+export type NavigationGroupKey =
+  'overview' | 'agencies' | 'documents' | 'catalogue' | 'admin'
+
+export const navigationGroups: {
+  key: NavigationGroupKey
+  title: string
+  items: NavigationItem[]
+}[] = [
   {
-    title: 'Tổng quan',
+    key: 'overview',
+    title: t('Tổng quan'),
     items: [
-      { path: '/', label: 'Bàn làm việc' },
-      { path: '/dashboard', label: 'Bảng điều khiển' },
-      { path: '/reports', label: 'Báo cáo kinh doanh' },
+      { path: '/', label: t('Cổng quản lý') },
+      { path: '/dashboard', label: t('Bảng điều khiển') },
+      { path: '/reports', label: t('Báo cáo kinh doanh') },
     ],
   },
   {
-    title: 'Đại lý & Hàng hóa',
+    key: 'agencies',
+    title: t('Đại lý & Hàng hóa'),
     items: [
-      { path: '/agencies', label: 'Hồ sơ đại lý' },
-      { path: '/products', label: 'Danh mục mặt hàng' },
-      { path: '/inventory', label: 'Tồn kho & Thẻ kho' },
-      { path: '/agency-credit', label: 'Hạn mức & Dư có' },
+      { path: '/agencies', label: t('Hồ sơ đại lý') },
+      { path: '/products', label: t('Danh mục mặt hàng') },
     ],
   },
   {
-    title: 'Giao dịch kho',
+    key: 'documents',
+    title: t('Chứng từ'),
     items: [
-      { path: '/stock-receipts', label: 'Phiếu nhập hàng' },
-      { path: '/stock-issues', label: 'Phiếu xuất hàng' },
-      { path: '/sales-returns', label: 'Phiếu trả hàng' },
-      { path: '/stock-adjustments', label: 'Điều chỉnh kho' },
-      { path: '/stock-counts', label: 'Kiểm kê kho' },
+      { path: '/stock-receipts', label: t('Phiếu nhập hàng') },
+      { path: '/stock-issues', label: t('Phiếu xuất hàng') },
+      { path: '/payment-receipts', label: t('Phiếu thu tiền') },
+      { path: '/online-payments', label: t('Thanh toán trực tuyến') },
     ],
   },
   {
-    title: 'Thu tiền & Công nợ',
+    key: 'catalogue',
+    title: t('Danh mục & Quy định'),
     items: [
-      { path: '/receivables', label: 'Công nợ đại lý' },
-      { path: '/payment-receipts', label: 'Phiếu thu tiền' },
-      { path: '/upfront-payments', label: 'Xác nhận trả ngay' },
-      { path: '/credit-applications', label: 'Bù trừ dư có' },
-      { path: '/online-payments', label: 'Thanh toán trực tuyến' },
-      { path: '/refunds', label: 'Hoàn tiền đại lý' },
+      { path: '/agency-types', label: t('Loại đại lý') },
+      { path: '/units', label: t('Đơn vị tính') },
+      { path: '/business-rules', label: t('Thay đổi quy định') },
     ],
   },
   {
-    title: 'Danh mục & Quy định',
+    key: 'admin',
+    title: t('Quản trị & Lịch sử'),
     items: [
-      { path: '/agency-types', label: 'Loại đại lý' },
-      { path: '/units', label: 'Đơn vị tính' },
-      { path: '/business-rules', label: 'Thay đổi quy định' },
-    ],
-  },
-  {
-    title: 'Quản trị & Lịch sử',
-    items: [
-      { path: '/users', label: 'Tài khoản người dùng' },
-      { path: '/user-groups', label: 'Nhóm người dùng' },
-      { path: '/permissions', label: 'Phân quyền chức năng' },
-      { path: '/audit-logs', label: 'Nhật ký hệ thống' },
-      { path: '/document-history', label: 'Lịch sử chứng từ' },
-      { path: '/document-corrections', label: 'Sửa sai & Hủy chứng từ' },
-      { path: '/chatbot', label: 'Trợ lý AI', unavailable: true },
+      { path: '/users', label: t('Tài khoản người dùng') },
+      { path: '/user-groups', label: t('Nhóm người dùng') },
+      { path: '/permissions', label: t('Phân quyền chức năng') },
+      { path: '/audit-logs', label: t('Nhật ký hệ thống') },
+      { path: '/document-history', label: t('Lịch sử chứng từ') },
+      { path: '/chatbot', label: t('Trợ lý AI'), unavailable: true },
     ],
   },
 ]
+
+/** Translated page name of a workspace route (falls back to the path). */
+export function routeLabel(path: string): string {
+  if (path === '/profile') return t('Hồ sơ cá nhân')
+  const item = navigationGroups
+    .flatMap((group) => group.items)
+    .find((entry) => entry.path === path)
+  return item ? item.label : path
+}

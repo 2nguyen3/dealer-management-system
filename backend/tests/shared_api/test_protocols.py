@@ -5,25 +5,17 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
-from uuid import uuid4
 
 import pytest
 from jsonschema import ValidationError as SchemaValidationError
+from sqlalchemy import column
 from sqlalchemy.exc import DBAPIError
 from starlette.requests import Request
 
-from app.common.commands import (
-    CommandRepository,
-    CommandResult,
-    CommandScope,
-    internal_substep_key,
-    request_fingerprint,
-    validate_safe_result,
-)
 from app.common.pagination import CursorCodec, SortSpec, build_page, literal_search
 from app.common.preconditions import canonical_etag, parse_preconditions, read_preconditions
 from app.core.exceptions import ApiError
-from app.core.transactions import TransactionRunner, translate_database_error
+from app.core.transactions import translate_database_error
 from tests.support.contract import SOURCE, assert_schema, transport_matrix
 from tests.support.database import guarded_test_url
 
@@ -139,70 +131,19 @@ def test_page_sort_and_search():
         literal_search(" \t")
     with pytest.raises(ApiError):
         SortSpec.parse("name; DROP TABLE x", {"name": ("name", "id")})
-    for values in ([], [None, 1]):
+    for values in ([], ["a"], ["a", None]):
         with pytest.raises(ApiError):
             SortSpec(("name", "id"), False).after({}, values)
-
-
-def test_command_identity_and_safe_results():
-    one = uuid4()
-    assert internal_substep_key(one, "receipt") == internal_substep_key(one, "receipt")
-    assert internal_substep_key(one, "receipt") != internal_substep_key(one, "batch")
-    assert internal_substep_key(one, "receipt") != internal_substep_key(uuid4(), "receipt")
-    assert request_fingerprint({"a": Decimal("1.00"), "b": None}) == request_fingerprint(
-        {"b": None, "a": Decimal("1")}
-    )
-    assert request_fingerprint({}) != request_fingerprint({"a": None})
-    assert request_fingerprint([1, 2]) != request_fingerprint([2, 1])
-    with pytest.raises(ValueError):
-        internal_substep_key(one, "")
-    assert CommandScope(1, "postStockIssue", "document:1", one)
-    for values in (
-        (0, "op", "r", one),
-        (True, "op", "r", one),
-        (2**63, "op", "r", one),
-        (1, "bad-op", "r", one),
-        (1, "op", "", one),
-        (1, "op", "r", "x"),
+    # Nullable leading fields follow PostgreSQL order: NULL last ascending, first descending.
+    columns = {"name": column("name"), "id": column("id")}
+    for descending, value, expected in (
+        (False, None, "false"),
+        (True, None, "name IS NOT NULL"),
+        (False, "a", "name IS NULL"),
+        (True, "a", "name < :name_1"),
     ):
-        with pytest.raises(ValueError):
-            CommandScope(*values)
-    for body in (
-        {"password": "sentinel"},
-        {"nested": [{"tokenDigest": "sentinel"}]},
-        {1: "x"},
-        {"amount": 1.0},
-    ):
-        with pytest.raises(ValueError):
-            validate_safe_result(body)
-    for result in (
-        CommandResult(status=500),
-        CommandResult(status=204, body={}),
-        CommandResult(status=200, headers={"Authorization": "x"}),
-        CommandResult(status=200, headers={"Location": "x\r\ny"}),
-    ):
-        with pytest.raises(ValueError):
-            result.checked()
-    assert CommandResult(status=204).checked().body is None
-    validate_safe_result([{"id": "1"}, None])
-    validate_safe_result([])
-    assert CommandResult(status=201, body={"id": "1"}, headers={"Location": "/x"}).checked()
-
-
-def test_missing_command_and_retry_budget():
-    repository = CommandRepository(Mock())
-    repository.find = Mock(return_value=None)
-    scope = CommandScope(1, "probeUpdate", "probe:1", uuid4())
-    with pytest.raises(RuntimeError, match="vanished"):
-        repository.claim(scope, request_fingerprint({}))
-    session = Mock()
-    for state in ("40P01", "40001"):
-        authorize = Mock(side_effect=db_error(state))
-        with pytest.raises(ApiError, match="RESOURCE_BUSY"):
-            TransactionRunner(session, max_attempts=2).run(
-                scope, {}, authorize=authorize, work=Mock()
-            )
-        assert authorize.call_count == 2
+        sql = str(SortSpec(("name", "id"), descending).after(columns, [value, 1]))
+        assert expected in sql and "IS NOT DISTINCT FROM" in sql
 
 
 def db_error(state=None, constraint=None, *, invalidated=False):
@@ -223,15 +164,12 @@ def test_transaction_error_translation():
         {("23505", "unique_name"): ("CODE_TAKEN", "Code already used")},
     )
     assert mapped.code == "CODE_TAKEN"
-    for budget in (0, 6):
-        with pytest.raises(ValueError):
-            TransactionRunner(Mock(), max_attempts=budget)
 
 
 def test_shared_harness_and_contract(monkeypatch):
     matrix = transport_matrix()
-    # 0010 replaced five district operations with read-only listWards/getWard.
-    assert len(matrix) == 151 and len({item["operationId"] for item in matrix}) == 151
+    # 0011 simplification: 90 runtime operations (three document kinds, VNPAY, reads).
+    assert len(matrix) == 90 and len({item["operationId"] for item in matrix}) == 90
     for item in matrix:
         assert item["responses"] and item["method"] in ("GET", "POST", "PATCH", "PUT", "DELETE")
     assert any(item["bodyRequired"] for item in matrix)
@@ -270,17 +208,7 @@ def test_duplicate_header_and_create_transport():
     assert caught.value.status == 428
 
 
-def test_command_result_is_json_safe_before_commit():
-    result = CommandResult(
-        status=200,
-        body={
-            "amount": Decimal("1.250"),
-            "when": date(2026, 1, 1),
-            "key": uuid4(),
-        },
-    ).checked()
-    assert result.body["amount"] == "1.25" and result.body["when"] == "2026-01-01"
-    assert json.loads(json.dumps(result.body)) == result.body
+def test_contract_instants_require_rfc3339_format_checker():
     with patch("tests.support.contract.FormatChecker", return_value=Mock(checkers={})):
         with pytest.raises(RuntimeError, match="RFC3339"):
             assert_schema("2026-01-01T00:00:00Z", "NullableInstant")

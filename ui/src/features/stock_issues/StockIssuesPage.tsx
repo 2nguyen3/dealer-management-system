@@ -1,4 +1,4 @@
-import { GoodsDocumentsPage } from '../stock_receipts/GoodsDocumentsPage'
+import { DocumentWorkbench } from '../stock_receipts/GoodsDocumentsPage'
 export function StockIssuesPage() {
-  return <GoodsDocumentsPage kind="STOCK_ISSUE" />
+  return <DocumentWorkbench kind="STOCK_ISSUE" />
 }

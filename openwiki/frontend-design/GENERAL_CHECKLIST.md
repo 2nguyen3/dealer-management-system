@@ -1,5 +1,26 @@
 # Frontend General Checklist
 
+## Đơn giản hóa 14/11/2026
+
+The 14/11/2026 simplification removes F15, F19–F25, F27 and the separate F29 feature; their
+items below are marked **Bỏ theo yêu cầu 14/11/2026** and kept as history. Plan:
+[simplification PLAN](../backend-design/plan/simplification/PLAN.md); actual commands/results:
+[VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md).
+
+- [ ] Removed features, routes (`src/app/App.tsx`), menu entries (`src/app/navigation.ts`), guide
+  workflows, i18n keys in every language and Portal catalogue entries deleted; saved Portal
+  favourites with removed routes are filtered out without crashing.
+- [ ] 18-item menu; agencies show debt/max debt; products show stock, last purchase price and
+  selling price; no low-stock threshold or `maxAgenciesPerDistrict`.
+- [ ] Stock receipt/issue/payment receipt pages: Hủy and Sửa có lý do (reason required),
+  replacement links, issue debt preview and "Ghi sổ & lập phiếu thu"; payment amount ≤ current debt.
+- [ ] Online payments without refunds; document history shows replacement chains; reports and
+  dashboard follow the new formulas; error catalogue matches QĐ1–QĐ8 and `AGENCY_HAS_DEBT`.
+- [ ] `npm run lint`, `typecheck`, `format:check`, `test`, `build` and a browser walk-through per
+  role recorded in VERIFICATION.
+
+Tick these only against recorded evidence in the simplification VERIFICATION.
+
 Backend availability update2026-10-25: M26/M27/M28 APIs are published,135target+2health.
 Native VNPAY automatic IPN created receipt774 for10200VND; signed external refund
 request/query remains PENDING. F26/F27/F28 may consume these contracts after their own
@@ -108,41 +129,41 @@ the complete document workbench; line and posted-cancel gates extend to R5.
 
 - [x] F14 `document_workbench` — draft header/lines/kind permissions/preview vs
   posted data/parent ETags/stable intent keys pass.
-- [x] F15 `inventory` — stock/ledger/date/effective-entry views show authoritative
+- [x] F15 `inventory` — **Bỏ theo yêu cầu 14/11/2026.** Historical: stock/ledger/date/effective-entry views show authoritative
   opening/running balances and safe empty/error states (`src/features/inventory/`).
 - [x] F16 `stock_receipts` core — draft/header/lines/post/draft cancel and posted
   snapshots pass (`src/features/stock_receipts/`).
-- [x] F17 `stock_issues` core — draft/READY/zero-upfront post/no-money pending
+- [x] F17 `stock_issues` core — (READY/pending replacement **Bỏ theo yêu cầu 14/11/2026**.) draft/READY/zero-upfront post/no-money pending
   replacement pass (`src/features/stock_issues/`).
 - [x] F18 `payment_receipts` core — manual debt draft/post/draft cancel and server
   allocation results pass (`src/features/payment_receipts/`).
-- [x] F19 `upfront_payments` + issue integration — evidence/consume/separate
+- [x] F19 `upfront_payments` + issue integration — **Bỏ theo yêu cầu 14/11/2026.** Historical: evidence/consume/separate
   receipt states preserve received-money outcomes (`src/features/upfront_payments/`).
-- [x] F20 `receivables` — overview/balance/settlement/statements/allocations
+- [x] F20 `receivables` — **Bỏ theo yêu cầu 14/11/2026.** Historical: overview/balance/settlement/statements/allocations
   distinguish original remainder and current outstanding (`src/features/receivables/`).
 
 ### Wave D — Counts, returns, credit and providers
 
-- [x] F21 `stock_adjustments` core — signed-delta/reason/draft/post/cancel UI
+- [x] F21 `stock_adjustments` core — **Bỏ theo yêu cầu 14/11/2026.** Historical: signed-delta/reason/draft/post/cancel UI
   shows stock-only outcomes without sales/new price (`src/features/stock_adjustments/`).
-- [x] F22 `stock_counts` — snapshot/actual observations/recount/confirm/zero
+- [x] F22 `stock_counts` — **Bỏ theo yêu cầu 14/11/2026.** Historical: snapshot/actual observations/recount/confirm/zero
   differences and conditional permission pass (`src/features/stock_counts/`).
-- [x] F23 `sales_returns` core — source lines/quantities/original price/rounding/
+- [x] F23 `sales_returns` core — **Bỏ theo yêu cầu 14/11/2026.** Historical: source lines/quantities/original price/rounding/
   debt-credit outcomes pass (`src/features/sales_returns/`).
-- [x] F24 `agency_credit` — lot/source/statements/available-vs-reserved/shared
+- [x] F24 `agency_credit` — **Bỏ theo yêu cầu 14/11/2026.** Historical: lot/source/statements/available-vs-reserved/shared
   balances pass (`src/features/agency_credit/`).
-- [x] F25 `credit_applications` core — draft/post/unreserved-credit/debt results
+- [x] F25 `credit_applications` core — **Bỏ theo yêu cầu 14/11/2026.** Historical: draft/post/unreserved-credit/debt results
   show zero new cash (`src/features/credit_applications/`).
 - [x] F26 `online_payments` — checkout/poll/reconcile/events/late full success
   display (`src/features/online_payments/`).
-- [x] F27 `refunds` — source/draft/reserve/manual-confirm/attempt/reconcile/
+- [x] F27 `refunds` — **Bỏ theo yêu cầu 14/11/2026.** Historical: source/draft/reserve/manual-confirm/attempt/reconcile/
   retry/cancel UI preserves UNKNOWN reserved money (`src/features/refunds/`).
 
 ### Wave E — History, corrections and read products
 
 - [x] F28 `document_history` — kind-aware search/versions/lines/source navigation
   and authorized historical HTML/PDF print pass (`src/features/document_history/`).
-- [x] F29 `document_corrections` + owning-module completion — reasons/full
+- [x] F29 `document_corrections` + owning-module completion — **Bỏ theo yêu cầu 14/11/2026.** Hủy/Sửa có lý do moved into each document page. Historical: reasons/full
   replacement/blocked-dependency/posted flows pass (`src/features/document_corrections/`).
 - [x] F30 `reports` — five reports/filters/totals/pages and authorized full-filter
   exports pass (`src/features/reports/`).
@@ -151,19 +172,28 @@ the complete document workbench; line and posted-cancel gates extend to R5.
 - [x] F32 `chatbot` — read-only queries/agency selection/clarification/unsupported/
   forbidden/unavailable states pass (`src/features/chatbot/`).
 
+### Wave F — Guidance, interface languages and Portal (2026-11-14)
+
+- [x] `workflow_guide` — GUIDE button on every page, workflow rails, locked-step reasons,
+  next-step toasts and the translated error catalogue ([plan](plan/workflow_guide/PLAN.md)).
+- [x] `i18n` — 24 interface languages, Vietnamese default, lazy catalogues, RTL `ar`/`ur`,
+  locale-aware formats with VND ([plan](plan/i18n/PLAN.md)).
+- [x] `portal` — "Cổng quản lý" with the favourites deck and the business-function
+  catalogue ([plan](plan/portal/PLAN.md)).
+
 ## 3. Deferred integration and full-module closure
 
 - [ ] Stock receipts close after F16 + F29 and M15 + M29; correction/cancel and
   dependent stock/price refresh tested.
-- [ ] Stock issues close after F17 + F19 + F29 and M17 + M19 + M29: upfront,
+- [ ] (F19/upfront/pending parts **Bỏ theo yêu cầu 14/11/2026**.) Stock issues close after F17 + F19 + F29 and M17 + M19 + M29: upfront,
   evidence separation, pending replacement and posted correction/cancel.
-- [ ] Manual receipts/independent adjustments/returns/credit applications close
+- [ ] (Adjustment/return/credit parts **Bỏ theo yêu cầu 14/11/2026**.) Manual receipts/independent adjustments/returns/credit applications close
   after F29/M29 posted paths and affected-reader refresh tests.
-- [ ] Agency credit's reserved/source/available displays tested with F27/M27
+- [ ] **Bỏ theo yêu cầu 14/11/2026.** Historical: Agency credit's reserved/source/available displays tested with F27/M27
   refund UNKNOWN/failure/success/repeated reconciliation.
 - [ ] Workbench/history supports all goods kinds/parent ETags; financial documents
   and historical versions cannot be edited as goods drafts.
-- [ ] Confirmed count adjustments/paid refunds have no invalid edit/cancel action;
+- [ ] (Count/refund parts **Bỏ theo yêu cầu 14/11/2026**.) Confirmed count adjustments/paid refunds have no invalid edit/cancel action;
   stale buttons and direct navigation cannot bypass state/permission rules.
 - [ ] Later integrations invalidate all affected list/detail/balance/history/
   report reads; stale money/stock/debt never presented as current.
@@ -241,12 +271,13 @@ or invented browser results. Marking "mocked" never closes a live slice checkbox
 
 | Slice / module | Delivery level/scope | Child evidence / exact command result | Backend gate / blocker |
 | --- | --- | --- | --- |
+| Đơn giản hóa 14/11/2026 | Removals, 18-item menu, document cancel/correct, new fields | [Simplification VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md) | See VERIFICATION. |
 | F01 frontend_foundations | Core transport & UI primitives verified | [Handoff evidence](HANDOFF.md): apiFetch, formatters, cache, modal focus; Vitest 72/72 pass | Complete |
 | F02–F07 Wave A (Auth & Admin) | Full authentication, RBAC, users, groups, permissions, audit | Vitest `session.test.ts`, `auth_components.test.tsx`, `shell_and_navigation.test.tsx` + Live Docker Nginx proxy test pass | Backend M01–M06 mounted & verified |
 | F08–F13 Wave B (Master Data) | Districts, types, units, rules, products, agencies screens | Vitest `agencies.test.tsx`, `products.test.tsx`, live Docker 200 OK across master data APIs | Backend M07–M12 mounted & verified |
-| F14–F20 Wave C (Workbench & Core) | Stock receipts, stock issues, payment receipts, upfront, receivables, inventory | Vitest `stock_documents.test.tsx`, `receivables_payments.test.tsx`, live Docker 200 OK | Backend M13–M20 mounted & verified |
-| F21–F25 Wave D (Counts, Returns, Credit) | Stock adjustments, counts, sales returns, agency credit, credit applications | Vitest `credit_applications.test.tsx`, live Docker 200 OK on adjustments, counts, returns, credit-lots | Backend M21–M25 mounted & verified |
-| F26–F28 Wave D & E | Online payments, refunds, document history | Vitest `online_payments.test.tsx`, `refunds.test.tsx`, `document_history.test.tsx` pass | Backend M26–M28 verified in isolated composition; held by D07 external sandbox |
-| F29–F32 Wave E | Document corrections, reports, dashboard, chatbot | Vitest `document_corrections.test.tsx`, `reports.test.tsx`, `dashboard.test.tsx`, `chatbot.test.tsx` pass | Backend M29–M32 planned |
+| F14–F20 Wave C (Workbench & Core) | F15/F19/F20 **Bỏ theo yêu cầu 14/11/2026**. Historical: Stock receipts, stock issues, payment receipts, upfront, receivables, inventory | Vitest `stock_documents.test.tsx`, `receivables_payments.test.tsx`, live Docker 200 OK | Backend M13–M20 mounted & verified |
+| F21–F25 Wave D (Counts, Returns, Credit) | **Bỏ theo yêu cầu 14/11/2026.** Historical: Stock adjustments, counts, sales returns, agency credit, credit applications | Vitest `credit_applications.test.tsx`, live Docker 200 OK on adjustments, counts, returns, credit-lots | Backend M21–M25 mounted & verified |
+| F26–F28 Wave D & E | F27 **Bỏ theo yêu cầu 14/11/2026**. Historical: Online payments, refunds, document history | Vitest `online_payments.test.tsx`, `refunds.test.tsx`, `document_history.test.tsx` pass | Backend M26–M28 verified in isolated composition; held by D07 external sandbox |
+| F29–F32 Wave E | F29 **Bỏ theo yêu cầu 14/11/2026**. Historical: Document corrections, reports, dashboard, chatbot | Vitest `document_corrections.test.tsx`, `reports.test.tsx`, `dashboard.test.tsx`, `chatbot.test.tsx` pass | Backend M29–M32 planned |
 
 Current next action: Backend to complete D07 external sandbox inputs for M26/M27 publication, and implement M29 full posted correction/replay. Frontend F01–F32 is fully implemented and tested.

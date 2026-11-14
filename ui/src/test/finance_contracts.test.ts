@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  businessDate,
+  catalog,
   dateRangeParams,
+  decimal,
+  id,
+  message,
+  money,
   nextDay,
+  page,
+  positiveMoney,
+  quantity,
+  queryPath,
+  record,
+  text,
   vietnamInstant,
 } from '../features/payment_receipts/contracts'
-import {
-  agingBuckets,
-  balanceSeries,
-} from '../features/receivables/statementModel'
-import { readyIssue } from '../features/upfront_payments/readyIssue'
 
 describe('finance date helpers', () => {
   it('nextDay crosses month, year and leap-day boundaries', () => {
@@ -62,125 +69,102 @@ describe('finance date helpers', () => {
   })
 })
 
-describe('statement model', () => {
-  const entry = (id: string, balanceAfter: string, isEffective = true) => ({
-    id,
-    sourceDocumentCode: `PX-${id}`,
-    businessDate: '2026-09-15',
-    balanceAfter,
-    isEffective,
+describe('finance value validators', () => {
+  it('record and text accept only objects and strings', () => {
+    expect(record({ a: 1 })).toEqual({ a: 1 })
+    expect(text('')).toBe('')
+    for (const bad of [null, undefined, [], 'x', 1])
+      expect(() => record(bad)).toThrow()
+    expect(() => text(1)).toThrow()
   })
 
-  it('balanceSeries keeps effective entries in order with exact raw values', () => {
-    expect(
-      balanceSeries([
-        entry('1', '1000'),
-        entry('2', '500', false),
-        entry('3', '2500.5'),
-      ]),
-    ).toEqual([
+  it('decimal keeps signed exact strings', () => {
+    expect(decimal('-12.50')).toBe('-12.50')
+    expect(decimal('0')).toBe('0')
+    for (const bad of ['01', '1.', '+1', '', 1])
+      expect(() => decimal(bad)).toThrow()
+  })
+
+  it('positiveMoney admits 1..18-digit whole VND only', () => {
+    expect(positiveMoney('1')).toBe('1')
+    expect(positiveMoney('9'.repeat(18))).toBe('9'.repeat(18))
+    for (const bad of ['0', '-1', '1.5', '01', '1'.repeat(19), ''])
+      expect(() => positiveMoney(bad)).toThrow(
+        /Số tiền phải là số nguyên dương/,
+      )
+  })
+
+  it('money admits zero and rejects negatives/decimals', () => {
+    expect(money('0')).toBe('0')
+    expect(money('9'.repeat(18))).toBe('9'.repeat(18))
+    for (const bad of ['-1', '1.0', '1'.repeat(19), 5])
+      expect(() => money(bad)).toThrow()
+  })
+
+  it('id is a positive bigint up to int64 max', () => {
+    expect(id('1')).toBe('1')
+    expect(id('9223372036854775807')).toBe('9223372036854775807')
+    for (const bad of ['0', '9223372036854775808', '01', 1, ''])
+      expect(() => id(bad)).toThrow()
+  })
+
+  it('catalog accepts int32 ids as numbers or digit strings', () => {
+    expect(catalog(1)).toBe(1)
+    expect(catalog('2147483647')).toBe(2147483647)
+    for (const bad of [0, 2147483648, 1.5, '0', 'x', null])
+      expect(() => catalog(bad)).toThrow()
+  })
+
+  it('quantity keeps up to three decimals', () => {
+    expect(quantity('0')).toBe('0')
+    expect(quantity('12.125')).toBe('12.125')
+    for (const bad of ['1.1234', '-1', '01', ''])
+      expect(() => quantity(bad)).toThrow()
+  })
+
+  it('businessDate rejects impossible calendar dates', () => {
+    expect(businessDate('2028-02-29')).toBe('2028-02-29')
+    for (const bad of ['2026-02-29', '0000-01-01', '2026-1-01', 20260101])
+      expect(() => businessDate(bad)).toThrow()
+  })
+
+  it('page validates pagination and decodes items', () => {
+    const result = page(
       {
-        key: '1',
-        date: '15/09/2026',
-        code: 'PX-1',
-        balance: 1000,
-        raw: '1000',
+        items: ['1', '2'],
+        pagination: { limit: 2, hasMore: true, nextCursor: 'c' },
       },
-      {
-        key: '3',
-        date: '15/09/2026',
-        code: 'PX-3',
-        balance: 2500.5,
-        raw: '2500.5',
-      },
-    ])
-    expect(balanceSeries([])).toEqual([])
-  })
-
-  it('agingBuckets groups outstanding amounts by day boundaries', () => {
-    const buckets = agingBuckets(
-      [
-        { businessDate: '2026-11-11', outstanding: '100' },
-        { businessDate: '2026-10-12', outstanding: '200' },
-        { businessDate: '2026-10-11', outstanding: '300' },
-        { businessDate: '2026-08-13', outstanding: '400' },
-        { businessDate: '2026-08-12', outstanding: '500' },
-        { businessDate: '2026-01-01', outstanding: '0' },
-        { businessDate: '2026-12-01', outstanding: '50' },
-      ],
-      '2026-11-11',
+      id,
     )
-    expect(
-      buckets.map((bucket) => [bucket.key, bucket.amount, bucket.count]),
-    ).toEqual([
-      ['0-30', 350, 3],
-      ['31-60', 300, 1],
-      ['61-90', 400, 1],
-      ['90+', 500, 1],
-    ])
-  })
-})
-
-describe('readyIssue', () => {
-  const issue = (overrides: Record<string, unknown> = {}) => ({
-    id: '301',
-    code: 'PX-301',
-    status: 'PENDING',
-    upfrontConfirmationId: null,
-    currentRevision: {
-      id: '3010',
-      revisionNo: 2,
-      state: 'READY',
-      immediatePayment: '1250000',
-      agencySnapshot: { name: 'Đại lý Minh Phát' },
-    },
-    ...overrides,
-  })
-
-  it('returns the current READY revision with no problem', () => {
-    expect(readyIssue(issue())).toEqual({
-      documentId: '301',
-      code: 'PX-301',
-      agencyName: 'Đại lý Minh Phát',
-      revisionId: '3010',
-      revisionNo: '2',
-      revisionState: 'READY',
-      immediatePayment: '1250000',
-      problem: null,
-    })
-  })
-
-  it('reports why a revision cannot be verified', () => {
-    expect(readyIssue(issue({ status: 'POSTED' })).problem).toMatch(/Sẵn sàng/)
-    expect(readyIssue(issue({ upfrontConfirmationId: '9' })).problem).toMatch(
-      /đã có khoản thực nhận/,
-    )
-    expect(
-      readyIssue(
-        issue({
-          currentRevision: {
-            ...issue().currentRevision,
-            immediatePayment: '0',
-          },
-        }),
-      ).problem,
-    ).toMatch(/không có khoản trả ngay/)
-  })
-
-  it('rejects malformed server data', () => {
-    expect(() => readyIssue(null)).toThrow()
+    expect(result.items).toEqual(['1', '2'])
+    expect(result.pagination.nextCursor).toBe('c')
+    const empty = {
+      items: [],
+      pagination: { limit: 1, hasMore: false, nextCursor: null },
+    }
+    expect(page(empty, id).items).toEqual([])
     expect(() =>
-      readyIssue(issue({ currentRevision: { id: 'x', state: 'READY' } })),
-    ).toThrow()
-    expect(() =>
-      readyIssue(
-        issue({
-          currentRevision: {
-            ...issue().currentRevision,
-            immediatePayment: 'abc',
-          },
-        }),
+      page(
+        {
+          items: [],
+          pagination: { limit: 1, hasMore: true, nextCursor: null },
+        },
+        id,
       ),
     ).toThrow()
+    expect(() => page({ items: {}, pagination: {} }, id)).toThrow()
+    expect(() => page({ ...empty, items: ['x'] }, id)).toThrow()
+  })
+
+  it('queryPath drops empty filters and encodes values', () => {
+    expect(queryPath('/x', { a: '1', b: '', c: 'á b' })).toBe(
+      '/x?a=1&c=%C3%A1+b',
+    )
+    expect(queryPath('/x', {})).toBe('/x?')
+  })
+
+  it('message prefers the error text and falls back otherwise', () => {
+    expect(message(new Error('boom'))).toBe('boom')
+    expect(message('nope')).toBe('Yêu cầu thất bại.')
   })
 })

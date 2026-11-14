@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../features/home/HomePage'
@@ -11,25 +11,33 @@ vi.mock('../features/authentication/useAuth', () => ({
   }),
 }))
 
+const openCatalogue = () =>
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /Chức năng nghiệp vụ/ }))
+
 describe('HomePage', () => {
   beforeEach(() => {
     access.granted = []
   })
 
   it('shows a task directory with only permitted work links', () => {
-    access.granted = ['inventory.read']
+    access.granted = ['stock.receipt.prepare']
     render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Bàn làm việc' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Cổng quản lý' })).toBeDefined()
+    openCatalogue()
     expect(screen.getByRole('heading', { name: 'Nghiệp vụ' })).toBeDefined()
     expect(
       screen.getByRole('link', { name: /Danh mục mặt hàng/ }),
     ).toBeDefined()
+    expect(screen.getByRole('link', { name: /Phiếu nhập hàng/ })).toBeDefined()
     expect(screen.queryByRole('link', { name: /Phiếu thu tiền/ })).toBeNull()
+    // Pages removed by the simplification never appear in the directory.
+    for (const name of [/Tồn kho/, /Công nợ đại lý/, /Kiểm kê/, /Hoàn tiền/])
+      expect(screen.queryByRole('link', { name }), String(name)).toBeNull()
     expect(screen.getByRole('link', { name: /Xem tổng quan/ })).toBeDefined()
     expect(screen.queryByRole('link', { name: /Mở báo cáo/ })).toBeNull()
   })
@@ -40,6 +48,7 @@ describe('HomePage', () => {
         <HomePage />
       </MemoryRouter>,
     )
+    openCatalogue()
 
     expect(
       screen.getByRole('heading', {

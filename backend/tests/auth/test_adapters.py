@@ -151,10 +151,10 @@ def test_smtp_deadline_capacity_and_worker_failure(settings):
     [
         (["agency.read"], ("agency.read",), (), True),
         ([], ("agency.read",), (), False),
-        (["agency.read"], (), ("agency.read", "inventory.read"), True),
+        (["agency.read"], (), ("agency.read", "sales.read"), True),
         ([], (), ("agency.read",), False),
-        (["agency.read"], ("agency.read",), ("inventory.read",), False),
-        (["agency.read", "inventory.read"], ("agency.read",), ("inventory.read",), True),
+        (["agency.read"], ("agency.read",), ("sales.read",), False),
+        (["agency.read", "sales.read"], ("agency.read",), ("sales.read",), True),
     ],
 )
 def test_permission_truth_table(allowed, all_of, any_of, success):

@@ -5,7 +5,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Select } from '../../components/ui/Select'
-import { reports, type ReportQuery } from './contracts'
+import { RECEIPT_TYPES, reports, type ReportQuery } from './contracts'
+import { enumOptions, methodLabel } from '@/lib/labels'
 import { filterLabels, sortLabel } from './display'
 import {
   matchingPreset,
@@ -14,6 +15,7 @@ import {
   shiftDate,
   type PeriodPreset,
 } from './periods'
+import { t } from '@/lib/i18n/core'
 
 const pickerResource = {
   agencyId: 'agencies',
@@ -56,7 +58,7 @@ export function ReportFilters({
     <form
       className="space-y-3 rounded-xl border bg-card/95 p-4 shadow-xs"
       onSubmit={submit}
-      aria-label="Bộ lọc báo cáo"
+      aria-label={t('Bộ lọc báo cáo')}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm font-semibold">
@@ -64,7 +66,7 @@ export function ReportFilters({
             className="size-4 text-muted-foreground"
             aria-hidden="true"
           />
-          Bộ lọc
+          {t('Bộ lọc')}
         </p>
         <ToggleGroup
           type="single"
@@ -78,7 +80,7 @@ export function ReportFilters({
               ...presetPeriod(value as PeriodPreset, month),
             })
           }
-          aria-label="Kỳ báo cáo nhanh"
+          aria-label={t('Kỳ báo cáo nhanh')}
           className="flex-wrap"
         >
           {periodPresets.map(({ value, label }) => (
@@ -91,7 +93,7 @@ export function ReportFilters({
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <DateField
           id="report-from"
-          label="Từ ngày"
+          label={t('Từ ngày')}
           required
           value={draft.fromDate}
           max={draft.toDate ? shiftDate(draft.toDate, -1) : undefined}
@@ -99,26 +101,39 @@ export function ReportFilters({
         />
         <DateField
           id="report-to"
-          label="Đến trước ngày"
+          label={t('Đến trước ngày')}
           required
           value={draft.toDate}
           min={draft.fromDate ? shiftDate(draft.fromDate, 1) : undefined}
           onChange={(toDate) => onChange({ ...draft, toDate })}
         />
-        {reports[kind].filters.map((filter) => (
-          <EntityPicker
-            key={`${kind}-${filter}`}
-            id={`report-${filter}`}
-            resource={pickerResource[filter as keyof typeof pickerResource]}
-            label={filterLabels[filter] ?? filter}
-            placeholder={filter === 'wardId' ? 'Tất cả phường/xã' : 'Tất cả'}
-            value={draft.filters[filter] || ''}
-            onChange={(value) => setFilter(filter, value)}
-          />
-        ))}
+        {reports[kind].filters.map((filter) =>
+          filter === 'receiptType' ? (
+            <Select
+              key={`${kind}-${filter}`}
+              id={`report-${filter}`}
+              label={filterLabels[filter] ?? filter}
+              value={draft.filters[filter] || ''}
+              onChange={(e) => setFilter(filter, e.target.value)}
+              options={enumOptions(RECEIPT_TYPES, methodLabel, t('Tất cả'))}
+            />
+          ) : (
+            <EntityPicker
+              key={`${kind}-${filter}`}
+              id={`report-${filter}`}
+              resource={pickerResource[filter as keyof typeof pickerResource]}
+              label={filterLabels[filter] ?? filter}
+              placeholder={
+                filter === 'wardId' ? t('Tất cả phường/xã') : t('Tất cả')
+              }
+              value={draft.filters[filter] || ''}
+              onChange={(value) => setFilter(filter, value)}
+            />
+          ),
+        )}
         <Select
           id="report-sort"
-          label="Sắp xếp"
+          label={t('Sắp xếp')}
           value={draft.sort}
           onChange={(e) => onChange({ ...draft, sort: e.target.value })}
           options={reports[kind].sorts.map((sort) => ({
@@ -128,12 +143,12 @@ export function ReportFilters({
         />
         <Select
           id="report-limit"
-          label="Số dòng mỗi trang"
+          label={t('Số dòng mỗi trang')}
           value={draft.limit}
           onChange={(e) => onChange({ ...draft, limit: e.target.value })}
           options={limitOptions.map((value) => ({
             value,
-            label: `${value} dòng`,
+            label: t('{value} dòng', { value }),
           }))}
         />
       </div>
@@ -145,10 +160,10 @@ export function ReportFilters({
           disabled={!canReset}
           onClick={onReset}
         >
-          Xóa bộ lọc
+          {t('Xóa bộ lọc')}
         </Button>
         <Button type="submit" disabled={applyDisabled}>
-          Áp dụng
+          {t('Áp dụng')}
         </Button>
       </div>
     </form>

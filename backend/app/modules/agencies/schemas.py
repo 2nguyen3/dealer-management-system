@@ -12,6 +12,7 @@ from app.common.schemas import (
     Money,
     NonEmptyText,
     Pagination,
+    SignedMoney,
 )
 from app.modules.auth.schemas import EmailRequest, NonEmpty
 
@@ -28,7 +29,7 @@ class AgencyCreate(EmailRequest):
     wardId: CatalogId
     phone: NonEmptyText | None = None
     address: NullableText = None
-    email: Email
+    email: Email | None = None
     acceptedDate: BusinessDate
 
 
@@ -38,7 +39,7 @@ class AgencyUpdate(PatchModel, EmailRequest):
     wardId: CatalogId = None
     phone: NonEmptyText | None = None
     address: NullableText = None
-    email: Email = None
+    email: Email | None = None
     acceptedDate: BusinessDate = None
 
 
@@ -56,17 +57,19 @@ class AgencyResponse(ApiModel):
     wardName: str
     phone: NullableText
     address: NullableText
-    email: Email
+    email: Email | None
     acceptedDate: BusinessDate
     status: Literal["ACTIVE", "TERMINATED"]
     terminatedAt: NullableInstant
     terminationReason: NullableText
     createdBy: Id | None
     updatedBy: Id | None
-    currentDebt: Money = Field(json_schema_extra={"readOnly": True})
-    currentCredit: Money = Field(json_schema_extra={"readOnly": True})
+    debt: SignedMoney = Field(
+        json_schema_extra={"readOnly": True},
+        description="Current debt; negative only after a late verified online payment.",
+    )
     maxDebt: Money
-    remainingCreditLimit: Money
+    remainingCreditLimit: SignedMoney
     createdAt: Instant = Field(json_schema_extra={"readOnly": True})
     updatedAt: Instant = Field(json_schema_extra={"readOnly": True})
 

@@ -12,6 +12,7 @@ from html import escape
 from io import BytesIO
 from itertools import zip_longest
 from pathlib import Path
+from threading import Lock
 from urllib.parse import quote
 
 import xlsxwriter
@@ -20,7 +21,9 @@ from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     CondPageBreak,
@@ -35,22 +38,28 @@ from reportlab.platypus import (
 
 from app.common.dates import VIETNAM
 from app.core.exceptions import ApiError
-from app.modules.document_history.printing import FONT, register_font
+from app.modules.reports.queries import IDENTITIES
 
 JSON_MEDIA = "application/json"
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PDF_MEDIA = "application/pdf"
 MEDIA = (JSON_MEDIA, XLSX_MEDIA, PDF_MEDIA)
-IDENTITIES = {
-    "sales": "agencyId",
-    "debt": "agencyId",
-    "inventory": "productId",
-    "product-sales": "productId",
-    "cash-and-credit": "agencyId",
-}
 KINDS = set(IDENTITIES)
 XLSX_ROWS = 1048576
-COUNT_FIELDS = {"numberOfIssues"}
+COUNT_FIELDS = {"numberOfIssues", "receiptCount"}
+
+# Vietnamese glyphs: the bundled OFL Noto Sans (shared with document printing; Vercel
+# includeFiles ships app/modules/document_history/fonts). Same name, same file.
+FONT = "AgentraNotoSans"
+FONT_PATH = Path(__file__).parents[1] / "document_history" / "fonts" / "NotoSans-Regular.ttf"
+FONT_LOCK = Lock()
+
+
+def register_font():
+    with FONT_LOCK:
+        if FONT not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(FONT, str(FONT_PATH)))
+
 
 # Branding. Assets ship inside the package: Docker copies app/, Vercel lists them
 # in vercel.json includeFiles next to the bundled NotoSans font.
@@ -64,10 +73,10 @@ FILTER_LABELS = {
     "productId": "Mặt hàng (ID)",
     "typeId": "Loại đại lý (ID)",
     "wardId": "Phường/xã (ID)",
+    "receiptType": "Hình thức thu",
 }
 NOTES = (
-    "Tín dụng đầu kỳ/cuối kỳ tính theo kỳ báo cáo; các cột tín dụng hiện tại tính tại "
-    "thời điểm lập báo cáo.",
+    "Chỉ tính chứng từ đã ghi sổ theo ngày chứng từ; phiếu nháp và phiếu đã hủy không được tính.",
     "Mã, số tiền, số lượng và tỷ lệ trong bảng là giá trị chính xác, không làm tròn; "
     "biểu đồ chỉ làm tròn để hiển thị.",
     "Giá trị dài được tách thành dòng tiếp nối (ví dụ 3.2), luôn lặp lại mã bản ghi.",
@@ -85,61 +94,51 @@ EMPTY_NOTE = "Không có dữ liệu"
 SUMMARY_SHEET = "Tổng quan"
 MONEY_FIELDS = {
     "salesAmount",
-    "returnAmount",
-    "netSalesAmount",
-    "companyGrossSales",
+    "companySalesAmount",
     "openingDebt",
     "debtIncrease",
-    "debtDecrease",
+    "paidAmount",
     "closingDebt",
-    "cashReceived",
-    "cashRefunded",
-    "openingCredit",
-    "closingCredit",
-    "currentAvailableCredit",
+    "cashAmount",
+    "bankTransferAmount",
+    "onlineAmount",
+    "totalAmount",
 }
 FIELD_LABELS = {
-    "salesAmount": "Doanh số bán",
-    "returnAmount": "Hàng trả",
-    "netSalesAmount": "Doanh số thuần",
-    "companyGrossSales": "Doanh số toàn công ty",
+    "salesAmount": "Doanh số",
+    "companySalesAmount": "Doanh số toàn công ty",
     "numberOfIssues": "Số phiếu xuất",
     "openingDebt": "Nợ đầu kỳ",
-    "debtIncrease": "Phát sinh tăng",
-    "debtDecrease": "Giảm nợ",
+    "debtIncrease": "Phát sinh",
+    "paidAmount": "Đã trả",
     "closingDebt": "Nợ cuối kỳ",
     "openingStock": "Tồn đầu kỳ",
     "closingStock": "Tồn cuối kỳ",
     "receiptQuantity": "Nhập",
     "issueQuantity": "Xuất",
-    "cashReceived": "Tiền thu",
-    "cashRefunded": "Tiền hoàn",
-    "openingCredit": "Tín dụng đầu kỳ",
-    "closingCredit": "Tín dụng cuối kỳ",
-    "currentAvailableCredit": "Tín dụng khả dụng hiện tại",
+    "soldQuantity": "Số lượng bán",
+    "receiptCount": "Số phiếu thu",
+    "cashAmount": "Tiền mặt",
+    "bankTransferAmount": "Chuyển khoản",
+    "onlineAmount": "Trực tuyến",
+    "totalAmount": "Tổng tiền thu",
     "__rows": "Số mặt hàng",
     "__inStock": "Mặt hàng còn tồn",
     "__outOfStock": "Mặt hàng hết tồn",
 }
 VISUALS = {
     "sales": {
-        "kpis": (
-            "salesAmount",
-            "returnAmount",
-            "netSalesAmount",
-            "numberOfIssues",
-            "companyGrossSales",
-        ),
+        "kpis": ("salesAmount", "numberOfIssues", "companySalesAmount"),
         "charts": (
-            ("Top đại lý theo doanh số thuần (VND)", ("netSalesAmount",)),
-            ("Doanh số bán và hàng trả theo đại lý (VND)", ("salesAmount", "returnAmount")),
+            ("Top đại lý theo doanh số (VND)", ("salesAmount",)),
+            ("Số phiếu xuất theo đại lý", ("numberOfIssues",)),
         ),
     },
     "debt": {
-        "kpis": ("openingDebt", "debtIncrease", "debtDecrease", "closingDebt"),
+        "kpis": ("openingDebt", "debtIncrease", "paidAmount", "closingDebt"),
         "charts": (
             ("Top đại lý theo nợ cuối kỳ (VND)", ("closingDebt",)),
-            ("Nợ đầu kỳ và nợ cuối kỳ theo đại lý (VND)", ("openingDebt", "closingDebt")),
+            ("Phát sinh và đã trả theo đại lý (VND)", ("debtIncrease", "paidAmount")),
         ),
     },
     "inventory": {
@@ -150,17 +149,20 @@ VISUALS = {
         ),
     },
     "product-sales": {
-        "kpis": ("salesAmount", "returnAmount", "netSalesAmount", "__rows"),
+        "kpis": ("salesAmount", "__rows"),
         "charts": (
-            ("Top mặt hàng theo doanh số thuần (VND)", ("netSalesAmount",)),
-            ("Doanh số bán và hàng trả theo mặt hàng (VND)", ("salesAmount", "returnAmount")),
+            ("Top mặt hàng theo doanh số (VND)", ("salesAmount",)),
+            ("Top mặt hàng theo số lượng bán (đơn vị của mặt hàng)", ("soldQuantity",)),
         ),
     },
-    "cash-and-credit": {
-        "kpis": ("cashReceived", "cashRefunded", "closingCredit", "currentAvailableCredit"),
+    "collections": {
+        "kpis": ("totalAmount", "cashAmount", "bankTransferAmount", "onlineAmount", "receiptCount"),
         "charts": (
-            ("Top đại lý theo tiền thu (VND)", ("cashReceived",)),
-            ("Tín dụng đầu kỳ và cuối kỳ theo đại lý (VND)", ("openingCredit", "closingCredit")),
+            ("Top ngày theo tổng tiền thu (VND)", ("totalAmount",)),
+            (
+                "Tiền thu theo hình thức và ngày (VND)",
+                ("cashAmount", "bankTransferAmount", "onlineAmount"),
+            ),
         ),
     },
 }
@@ -222,7 +224,7 @@ def _metadata(dataset):
         + list(dataset["period"].items())
         + [("Filter " + key, value) for key, value in dataset["filters"].items()]
         + [
-            ("Credit labels", "opening/closing: historical period; current fields: generatedAt"),
+            ("Scope", "POSTED documents by businessDate; drafts and cancelled excluded"),
             ("Exact values", "IDs, amounts, quantities and percentages are text; no rounding"),
             ("Continuation", "XLSX: concatenate field Parts by Record; PDF: identity repeats"),
         ]
@@ -331,6 +333,8 @@ def _kpis(dataset):
 
 
 def _chart_label(kind, row):
+    if IDENTITIES[kind] == "businessDate":
+        return f"{_business_date(row['businessDate']):%d/%m/%Y}"
     product = IDENTITIES[kind] == "productId"
     name = " ".join(_text(row.get("productName" if product else "agencyName")).split())
     label = name or _text(row.get(IDENTITIES[kind]))

@@ -1,10 +1,20 @@
+import { ArrowLeftRight } from 'lucide-react'
 import { Card } from '../../components/shadcn/card'
 import { Separator } from '../../components/shadcn/separator'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Table } from '../../components/ui/Table'
-import { formatDate, formatQuantity, formatVND } from '../../lib/formatters'
-import { kindLabel, statusLabel } from '../../lib/labels'
-import type { DocumentDetail } from '../document_history/documentContracts'
+import {
+  formatDate,
+  formatDateTime,
+  formatQuantity,
+  formatVND,
+} from '../../lib/formatters'
+import { kindLabel, methodLabel, statusLabel } from '../../lib/labels'
+import { DebtPanel } from '../document_history/DebtPanel'
+import type {
+  DocumentDetail,
+  DocumentReference,
+} from '../document_history/documentContracts'
 import { DocumentLifecycle } from '../document_history/DocumentLifecycle'
 import {
   Fact,
@@ -12,18 +22,64 @@ import {
   InfoTip,
   SectionCard,
 } from '../document_history/DocumentParts'
+import { t } from '@/lib/i18n/core'
 
-const money = (value: string | null | undefined) =>
-  value === null || value === undefined ? '—' : formatVND(value)
+function ReferenceLink({
+  label,
+  reference,
+  onOpen,
+}: {
+  label: string
+  reference: DocumentReference
+  onOpen?: (id: string) => void
+}) {
+  const text = t('{label} {code} ({status})', {
+    label,
+    code: reference.code,
+    status: statusLabel(reference.status),
+  })
+  return (
+    <p className="flex flex-wrap items-center gap-1.5 text-[13px]">
+      <ArrowLeftRight
+        className="size-3.5 text-muted-foreground"
+        aria-hidden="true"
+      />
+      {onOpen ? (
+        <button
+          type="button"
+          className="cursor-pointer font-medium text-primary underline-offset-4 hover:underline"
+          onClick={() => onOpen(reference.id)}
+        >
+          {text}
+        </button>
+      ) : (
+        <span className="font-medium">{text}</span>
+      )}
+    </p>
+  )
+}
 
 /**
- * Read-only document view: a header card (code, status, total and key facts)
- * followed by the line items. All values are the server's exact strings.
+ * Read-only document view: a header card (code, status, total, key facts and
+ * replacement links) followed by the line items of goods documents. All
+ * values are the server's exact strings.
  */
-export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
-  const revision = doc.currentRevision
-  const agency = revision.agencySnapshot
-  const isReturn = doc.kind === 'SALES_RETURN'
+export function DocumentSnapshot({
+  doc,
+  onOpenDocument,
+}: {
+  doc: DocumentDetail
+  /** Opens a linked (replaced/replacing) document. */
+  onOpenDocument?: (id: string) => void
+}) {
+  const payment = doc.kind === 'PAYMENT_RECEIPT'
+  const draftIssue = doc.kind === 'STOCK_ISSUE' && doc.status === 'DRAFT'
+  const draftPayment = payment && doc.status === 'DRAFT'
+  const change = draftIssue
+    ? BigInt(doc.totalAmount)
+    : draftPayment
+      ? -BigInt(doc.totalAmount)
+      : null
   return (
     <div className="space-y-4">
       <Card className="gap-4 p-4 shadow-xs">
@@ -39,153 +95,166 @@ export function DocumentSnapshot({ doc }: { doc: DocumentDetail }) {
               <StatusBadge status={doc.status} />
             </div>
           </div>
-          <div className="text-left sm:text-right">
+          <div className="text-start sm:text-end">
             <p className="text-xs font-medium text-muted-foreground">
-              Tổng tiền
+              {payment ? t('Số tiền') : t('Tổng tiền')}
             </p>
             <p className="text-xl font-semibold text-foreground tabular-nums">
-              {formatVND(revision.totalAmount)}
+              {formatVND(doc.totalAmount)}
             </p>
           </div>
         </div>
-        <DocumentLifecycle kind={doc.kind} status={doc.status} />
+        <DocumentLifecycle status={doc.status} />
+        {(doc.replaces || doc.replacedBy) && (
+          <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
+            {doc.replaces && (
+              <ReferenceLink
+                label={t('Thay thế cho')}
+                reference={doc.replaces}
+                onOpen={onOpenDocument}
+              />
+            )}
+            {doc.replacedBy && (
+              <ReferenceLink
+                label={t('Đã được thay bằng')}
+                reference={doc.replacedBy}
+                onOpen={onOpenDocument}
+              />
+            )}
+          </div>
+        )}
         <Separator />
         <FactGrid>
-          <Fact label="Phiên bản">
-            v{revision.revisionNo} · {statusLabel(revision.state)}
+          <Fact label={t('Ngày chứng từ')}>
+            <span className="tabular-nums">{formatDate(doc.businessDate)}</span>
           </Fact>
-          <Fact label="Ngày chứng từ">
-            <span className="tabular-nums">
-              {formatDate(revision.businessDate)}
-            </span>
-          </Fact>
-          {doc.kind === 'STOCK_ISSUE' && (
-            <>
-              <Fact label="Trả ngay">
-                <span className="tabular-nums">
-                  {formatVND(revision.immediatePayment)}
-                </span>
-              </Fact>
-              <Fact label="Còn nợ lúc xuất">
-                <span className="tabular-nums">
-                  {money(doc.remainingAtIssue)}
-                </span>
-              </Fact>
-              <Fact label="Còn nợ hiện tại">
-                <span className="tabular-nums">
-                  {money(doc.invoiceBalance?.outstandingAmount)}
-                </span>
-              </Fact>
-              <Fact label="Thanh toán trước">
-                {doc.upfrontConfirmationId ? 'Đã xác nhận' : 'Không có'}
-              </Fact>
-              <Fact label="Phiếu thu kèm">
-                {doc.autoReceiptId ? 'Đã lập' : 'Không có'}
-              </Fact>
-            </>
-          )}
-          {isReturn && (
-            <>
-              <Fact label="Phiếu xuất gốc">
-                {doc.originDocumentId ? `#${doc.originDocumentId}` : '—'}
-              </Fact>
-              <Fact label="Giảm công nợ">
-                <span className="tabular-nums">
-                  {money(doc.debtReducedAmount)}
-                </span>
-              </Fact>
-              <Fact label="Ghi có cho đại lý">
-                <span className="inline-flex items-center gap-1 tabular-nums">
-                  {money(doc.creditCreatedAmount)}
-                  <InfoTip label="Về khoản ghi có">
-                    Phần tiền vượt công nợ được ghi có cho đại lý, không tự động
-                    hoàn tiền.
-                  </InfoTip>
-                </span>
-              </Fact>
-            </>
-          )}
-          {doc.kind === 'STOCK_ADJUSTMENT' && (
-            <Fact label="Nguồn">
-              {doc.stockCountId
-                ? `Từ biên bản kiểm kê #${doc.stockCountId}`
-                : 'Điều chỉnh độc lập'}
-            </Fact>
-          )}
-          {agency && (
-            <Fact label="Đại lý" full>
-              <span className="font-medium">{agency.name}</span>
-              {(agency.address || agency.phone) && (
+          {doc.agencyId && (
+            <Fact label={t('Đại lý')}>
+              <span className="font-medium">
+                {doc.agencyName ?? `#${doc.agencyId}`}
+              </span>
+              {doc.agencyCode && (
                 <span className="block text-xs text-muted-foreground">
-                  {[agency.address, agency.phone].filter(Boolean).join(' · ')}
+                  {doc.agencyCode}
                 </span>
               )}
             </Fact>
           )}
-          {revision.reason && (
-            <Fact label="Lý do" full>
-              {revision.reason}
+          {payment && (
+            <Fact label={t('Hình thức thu')}>
+              {methodLabel(doc.receiptType)}
             </Fact>
           )}
-          {revision.note && (
-            <Fact label="Ghi chú" full>
-              {revision.note}
+          {doc.kind === 'STOCK_ISSUE' && doc.sellingPriceRate && (
+            <Fact label={t('Tỷ lệ giá bán')}>
+              <span className="inline-flex items-center gap-1 tabular-nums">
+                × {formatQuantity(doc.sellingPriceRate)}
+                <InfoTip label={t('Về đơn giá xuất')}>
+                  {t(
+                    'Đơn giá xuất = giá nhập gần nhất × tỷ lệ này, chốt khi ghi sổ.',
+                  )}
+                </InfoTip>
+              </span>
+            </Fact>
+          )}
+          <Fact label={t('Người lập')}>
+            {doc.createdByName ?? '—'}
+            <span className="block text-xs text-muted-foreground tabular-nums">
+              {formatDateTime(doc.createdAt)}
+            </span>
+          </Fact>
+          {doc.postedAt && (
+            <Fact label={t('Ghi sổ')}>
+              {doc.postedByName ?? '—'}
+              <span className="block text-xs text-muted-foreground tabular-nums">
+                {formatDateTime(doc.postedAt)}
+              </span>
+            </Fact>
+          )}
+          {doc.cancelledAt && (
+            <Fact label={t('Hủy')}>
+              {doc.cancelledByName ?? '—'}
+              <span className="block text-xs text-muted-foreground tabular-nums">
+                {formatDateTime(doc.cancelledAt)}
+              </span>
+            </Fact>
+          )}
+          {doc.cancelReason && (
+            <Fact label={t('Lý do hủy/sửa')} full>
+              {doc.cancelReason}
+            </Fact>
+          )}
+          {doc.note && (
+            <Fact label={t('Ghi chú')} full>
+              {doc.note}
             </Fact>
           )}
         </FactGrid>
+        {doc.agencyDebt !== null && doc.agencyMaxDebt !== null && (
+          <DebtPanel
+            debt={doc.agencyDebt}
+            maxDebt={doc.agencyMaxDebt}
+            change={change}
+            afterLabel={draftPayment ? t('Nợ sau khi thu') : t('Nợ sau phiếu')}
+          />
+        )}
       </Card>
-      <SectionCard
-        title={
-          <>
-            Dòng hàng
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-              {revision.lines.length}
-            </span>
-          </>
-        }
-        contentClassName="px-0"
-      >
-        <div className="overflow-x-auto border-t">
-          <Table caption="Dòng hàng của chứng từ" className="min-w-[560px]">
-            <thead>
-              <tr>
-                <th className="w-10">#</th>
-                <th>Mặt hàng</th>
-                <th className="cell-number">Số lượng</th>
-                <th>Đơn vị</th>
-                <th className="cell-number">Đơn giá</th>
-                <th className="cell-number">Thành tiền</th>
-                {isReturn && <th>Dòng gốc</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {revision.lines.map((line, index) => (
-                <tr key={line.id}>
-                  <td className="text-muted-foreground tabular-nums">
-                    {index + 1}
-                  </td>
-                  <td className="font-medium text-foreground">
-                    {line.productName}
-                  </td>
-                  <td className="cell-number">
-                    {formatQuantity(line.quantity)}
-                  </td>
-                  <td className="text-muted-foreground">{line.unitName}</td>
-                  <td className="cell-number">{formatVND(line.unitPrice)}</td>
-                  <td className="cell-number font-medium">
-                    {formatVND(line.lineAmount)}
-                  </td>
-                  {isReturn && (
-                    <td className="text-muted-foreground">
-                      {line.originLineId ? `#${line.originLineId}` : '—'}
-                    </td>
-                  )}
+      {!payment && (
+        <SectionCard
+          title={
+            <>
+              {t('Dòng hàng')}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                {doc.lines.length}
+              </span>
+            </>
+          }
+          contentClassName="px-0"
+        >
+          <div className="overflow-x-auto border-t">
+            <Table
+              caption={t('Dòng hàng của chứng từ')}
+              className="min-w-[560px]"
+            >
+              <thead>
+                <tr>
+                  <th className="w-10">#</th>
+                  <th>{t('Mặt hàng')}</th>
+                  <th className="cell-number">{t('Số lượng')}</th>
+                  <th>{t('Đơn vị')}</th>
+                  <th className="cell-number">{t('Đơn giá')}</th>
+                  <th className="cell-number">{t('Thành tiền')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
-        </div>
-      </SectionCard>
+              </thead>
+              <tbody>
+                {doc.lines.map((line, index) => (
+                  <tr key={line.id}>
+                    <td className="text-muted-foreground tabular-nums">
+                      {index + 1}
+                    </td>
+                    <td className="font-medium text-foreground">
+                      {line.productName}
+                      {line.productCode && (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {line.productCode}
+                        </span>
+                      )}
+                    </td>
+                    <td className="cell-number">
+                      {formatQuantity(line.quantity)}
+                    </td>
+                    <td className="text-muted-foreground">{line.unitName}</td>
+                    <td className="cell-number">{formatVND(line.unitPrice)}</td>
+                    <td className="cell-number font-medium">
+                      {formatVND(line.lineAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </SectionCard>
+      )}
     </div>
   )
 }

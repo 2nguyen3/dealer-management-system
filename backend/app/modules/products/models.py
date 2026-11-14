@@ -6,18 +6,11 @@ PRODUCT = table(
     column("code", String),
     column("name", String),
     column("unitId", Integer),
-    column("lowStockThreshold", Numeric),
+    column("stock", Numeric),
+    column("lastPurchasePrice", Numeric),
     column("status", String),
     column("createdAt", DateTime(timezone=True)),
     column("updatedAt", DateTime(timezone=True)),
-    schema="dms",
-)
-BALANCE = table(
-    "inventory_balance",
-    column("productId", BigInteger),
-    column("currentStock", Numeric),
-    column("currentPurchasePrice", Numeric),
-    column("priceSourceLineId", BigInteger),
     schema="dms",
 )
 RULE = table(

@@ -51,7 +51,7 @@ def test_rules_contract_validation_state_rollback(client, engine, actor):
     path = "/api/v1/business-rules"
     original = client.get(path)
     assert original.status_code == 200
-    assert_schema(original.json(), "BusinessRule")
+    assert_schema(original.json(), "BusinessRuleResponse")
     for body in (
         {},
         {"sellingPriceRate": None},
@@ -75,7 +75,7 @@ def test_rules_contract_validation_state_rollback(client, engine, actor):
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["sellingPriceRate"] == "2"
-    assert_schema(updated.json(), "BusinessRule")
+    assert_schema(updated.json(), "BusinessRuleResponse")
     assert (
         client.patch(
             path, json={"sellingPriceRate": "3"}, headers={"If-Match": original.headers["ETag"]}

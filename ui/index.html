@@ -20,11 +20,168 @@
         var p = localStorage.getItem('agentra-palette')
         if (/^(thuy|moc|kim|hoa|tho|tim)$/.test(p || ''))
           document.documentElement.dataset.palette = p
+        var l = localStorage.getItem('agentra-locale')
+        if (/^[a-z]{2,3}(-[A-Z]{2})?$/.test(l || '')) {
+          document.documentElement.lang = l
+          if (/^(ar|ur)$/.test(l)) document.documentElement.dir = 'rtl'
+        }
+        var m = localStorage.getItem('agentra-theme')
+        if (
+          m === 'dark' ||
+          (m !== 'light' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches)
+        )
+          document.documentElement.classList.add('dark')
       } catch (e) {}
     </script>
+    <style>
+      /* Start-up / language-switch splash, painted before the app bundle loads
+         (colours mirror --background/--primary of each palette in styles.css). */
+      html {
+        --boot-bg: #f5f8fc;
+        --boot-accent: #1857d1;
+      }
+      html.dark {
+        --boot-bg: #050a14;
+        --boot-accent: #4d9bff;
+      }
+      html[data-palette='moc'] {
+        --boot-bg: #f6f7f5;
+        --boot-accent: #24483d;
+      }
+      html.dark[data-palette='moc'] {
+        --boot-bg: #060d0a;
+        --boot-accent: #6cc59a;
+      }
+      html[data-palette='kim'] {
+        --boot-bg: #f6f7f9;
+        --boot-accent: #334155;
+      }
+      html.dark[data-palette='kim'] {
+        --boot-bg: #08090c;
+        --boot-accent: #cbd5e1;
+      }
+      html[data-palette='hoa'] {
+        --boot-bg: #fbf8f7;
+        --boot-accent: #d1432b;
+      }
+      html.dark[data-palette='hoa'] {
+        --boot-bg: #0d0706;
+        --boot-accent: #ff7a5c;
+      }
+      html[data-palette='tho'] {
+        --boot-bg: #faf8f4;
+        --boot-accent: #a35a07;
+      }
+      html.dark[data-palette='tho'] {
+        --boot-bg: #0c0905;
+        --boot-accent: #f2ac3d;
+      }
+      html[data-palette='tim'] {
+        --boot-bg: #f8f7fc;
+        --boot-accent: #6a43e8;
+      }
+      html.dark[data-palette='tim'] {
+        --boot-bg: #08060f;
+        --boot-accent: #a78bfa;
+      }
+      html,
+      body {
+        background: var(--boot-bg);
+      }
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        background: var(--boot-bg);
+      }
+      body > .boot-splash {
+        animation: boot-fade-in 160ms ease-out both;
+      }
+      .boot-splash__mark {
+        position: relative;
+        width: 72px;
+        height: 72px;
+      }
+      .boot-splash__mark img {
+        position: absolute;
+        inset: 14px;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+      }
+      .boot-splash__ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 3px solid
+          color-mix(in srgb, var(--boot-accent) 18%, transparent);
+        border-top-color: var(--boot-accent);
+        animation: boot-spin 0.9s linear infinite;
+      }
+      .boot-splash__bar {
+        width: 132px;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--boot-accent) 15%, transparent);
+      }
+      .boot-splash__bar::after {
+        content: '';
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--boot-accent);
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes boot-slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      @keyframes boot-fade-in {
+        from {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash,
+        .boot-splash__ring,
+        .boot-splash__bar::after {
+          animation-duration: 2.4s;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        class="boot-splash"
+        role="status"
+        aria-busy="true"
+        aria-label="Agentra"
+      >
+        <div class="boot-splash__mark" aria-hidden="true">
+          <span class="boot-splash__ring"></span>
+          <img src="/assets/brand/agentra-icon.png" alt="" />
+        </div>
+        <div class="boot-splash__bar" aria-hidden="true"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

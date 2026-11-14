@@ -14,6 +14,7 @@ import {
 } from '@/components/shadcn/chart'
 import { CHART_AXIS, CHART_GRID, formatCompact } from '../../lib/chart'
 import { flowRoles, type ChartDatum, type FlowRole } from './insights'
+import { t } from '@/lib/i18n/core'
 
 export interface ChartSeries {
   key: string
@@ -82,7 +83,7 @@ function DatumTooltip({ config }: { config: ChartConfig }) {
                 <span className="text-muted-foreground">
                   {config[key]?.label ?? key}
                 </span>
-                <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
+                <span className="ms-auto ps-3 font-semibold text-foreground tabular-nums">
                   {row.display[key] ?? String(value)}
                 </span>
               </div>
@@ -225,7 +226,7 @@ export function GroupedBarChart({
 
 /** Balance/increase/decrease components of a period, coloured by role. */
 export function FlowChart({ data }: { data: ChartDatum[] }) {
-  const config: ChartConfig = { value: { label: 'Giá trị' } }
+  const config: ChartConfig = { value: { label: t('Giá trị') } }
   const roles = Object.keys(flowRoles) as FlowRole[]
   const hover = useHover()
   return (
@@ -302,14 +303,14 @@ export function ChartDataTable({
     <table className="w-full text-xs">
       <thead className="sticky top-0 bg-card">
         <tr className="border-b text-muted-foreground">
-          <th scope="col" className="py-2 pr-3 text-left font-medium">
+          <th scope="col" className="py-2 pe-3 text-start font-medium">
             {nameHeader}
           </th>
           {columns.map((column) => (
             <th
               key={column.key}
               scope="col"
-              className="py-2 pl-3 text-right font-medium"
+              className="py-2 ps-3 text-end font-medium"
             >
               {column.label}
             </th>
@@ -322,13 +323,13 @@ export function ChartDataTable({
             key={d.id}
             className="border-b transition-colors last:border-0 hover:bg-muted/50"
           >
-            <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+            <th scope="row" className="py-1.5 pe-3 text-start font-normal">
               {d.name}
             </th>
             {columns.map((column) => (
               <td
                 key={column.key}
-                className="py-1.5 pl-3 text-right whitespace-nowrap tabular-nums"
+                className="py-1.5 ps-3 text-end whitespace-nowrap tabular-nums"
               >
                 {d.display[column.key] ?? '—'}
               </td>

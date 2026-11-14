@@ -1,5 +1,6 @@
 import { formatQuantity, formatVND } from '../../lib/formatters'
 import { wardKindLabel } from '../../lib/labels'
+import { t } from '@/lib/i18n/core'
 
 /** List resources the picker can search through `GET /{resource}?q=&limit=`. */
 export type PickerResource =
@@ -40,18 +41,22 @@ export function describeItem(
   let label = code && name ? `${code} — ${name}` : (code ?? name ?? `#${id}`)
   let detail: string | undefined
   if (resource === 'products') {
-    const stock = text(row.currentStock)
+    const stock = text(row.stock)
     if (stock !== undefined)
-      detail = `Tồn ${formatQuantity(stock)} ${text(row.unitName) ?? ''}`.trim()
+      detail = t('Tồn {stock} {text}', {
+        stock: formatQuantity(stock),
+        text: text(row.unitName) ?? '',
+      }).trim()
   } else if (resource === 'agencies') {
-    const debt = text(row.currentDebt)
-    if (debt !== undefined) detail = `Dư nợ ${formatVND(debt)}`
+    const debt = text(row.debt)
+    if (debt !== undefined)
+      detail = t('Nợ hiện tại {debt}', { debt: formatVND(debt) })
   } else if (resource === 'wards') {
     // Ward names already carry their kind ("Phường …", "Xã …", "Đặc khu …").
     label = name ?? code ?? `#${id}`
     const kind = text(row.kind)
     detail =
-      [kind && wardKindLabel(kind), code && `Mã ${code}`]
+      [kind && wardKindLabel(kind), code && t('Mã {code}', { code })]
         .filter(Boolean)
         .join(' · ') || undefined
   } else if (resource === 'stock-issues' || resource === 'payment-receipts') {

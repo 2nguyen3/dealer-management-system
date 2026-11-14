@@ -1,53 +1,29 @@
-from typing import Annotated, Literal
+"""Cross-kind document history contract: search, detail, replacement chain."""
 
-from pydantic import Field
+from typing import Literal
 
-from app.common.schemas import (
-    ApiModel,
-    Id,
-    NonZeroQuantity,
-    Pagination,
-    PositiveMoney,
-    PositiveQuantity,
-)
-from app.modules.document_core.schemas import DocumentLine, Revision
+from app.common.schemas import ApiModel, NullableText
+from app.modules.document_core.schemas import DocumentSummary
 
-
-class ReceiptLine(ApiModel):
-    kind: Literal["STOCK_RECEIPT"]
-    productId: Id
-    quantity: PositiveQuantity
-    unitPrice: PositiveMoney
-
-
-class IssueLine(ApiModel):
-    kind: Literal["STOCK_ISSUE"]
-    productId: Id
-    quantity: PositiveQuantity
-
-
-class AdjustmentLine(ApiModel):
-    kind: Literal["STOCK_ADJUSTMENT"]
-    productId: Id
-    quantity: NonZeroQuantity
-
-
-class ReturnLine(ApiModel):
-    kind: Literal["SALES_RETURN"]
-    originLineId: Id
-    quantity: PositiveQuantity
-
-
-GoodsLine = Annotated[
-    ReceiptLine | IssueLine | AdjustmentLine | ReturnLine, Field(discriminator="kind")
+HistorySort = Literal[
+    "id",
+    "-id",
+    "businessDate",
+    "-businessDate",
+    "totalAmount",
+    "-totalAmount",
+    "createdAt",
+    "-createdAt",
+    "postedAt",
+    "-postedAt",
 ]
 
 
-class RevisionList(ApiModel):
-    items: list[Revision]
-    pagination: Pagination
+class ChainItem(DocumentSummary):
+    cancelReason: NullableText
 
 
-class LineList(ApiModel):
-    items: list[DocumentLine]
-    pagination: Pagination
+class DocumentChain(ApiModel):
+    """Replacement chain ordered from the original document to the latest replacement."""
+
+    items: list[ChainItem]

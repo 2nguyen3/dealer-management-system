@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '../../components/shadcn/button'
+import { t } from '@/lib/i18n/core'
 
 export interface PasswordToggleProps {
   visible: boolean
@@ -20,8 +21,8 @@ export function PasswordToggle({
       size="icon-sm"
       className="cursor-pointer text-muted-foreground hover:text-foreground"
       onClick={onToggle}
-      aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-      title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+      aria-label={visible ? t('Ẩn mật khẩu') : t('Hiện mật khẩu')}
+      title={visible ? t('Ẩn mật khẩu') : t('Hiện mật khẩu')}
       aria-controls={controls}
     >
       {visible ? (

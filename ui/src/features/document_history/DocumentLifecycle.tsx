@@ -1,18 +1,16 @@
-import type { DocumentKind, DocumentSummary } from './documentContracts'
+import type { DocumentSummary } from './documentContracts'
 import { lifecycleSteps } from './insightsModel'
 import { LifecycleSteps } from './DocumentParts'
 
-/** Draft → (pending) → posted → corrected/cancelled, as a compact step rail. */
+/** Draft → posted → cancelled/corrected, as a compact step rail. */
 export function DocumentLifecycle({
-  kind,
   status,
   className,
 }: {
-  kind: DocumentKind
   status: DocumentSummary['status']
   className?: string
 }) {
-  const { steps, current } = lifecycleSteps(kind, status)
+  const { steps, current } = lifecycleSteps(status)
   return (
     <LifecycleSteps
       steps={steps}

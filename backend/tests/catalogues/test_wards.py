@@ -40,7 +40,7 @@ ITEM = {
 def test_ward_response_kind_code_and_no_status():
     item = WardResponse.model_validate(ITEM)
     assert item.kind == "WARD" and item.code == "26740"
-    assert_schema(item.model_dump(mode="json"), "Ward")
+    assert_schema(item.model_dump(mode="json"), "WardResponse")
     for kind in ("COMMUNE", "SPECIAL_ZONE"):
         assert WardResponse.model_validate({**ITEM, "kind": kind}).kind == kind
     for bad in (
@@ -69,8 +69,9 @@ def test_ward_repository_projection_and_service_policy():
 
 
 def test_retired_district_function_code_is_audit_only():
+    # 0011 rebuilds the audit log, so no retired code survives the simplification.
     assert "district.manage" not in FUNCTION_CODES
-    assert RETIRED_FUNCTION_CODES == {"district.manage"}
+    assert RETIRED_FUNCTION_CODES == frozenset()
     assert set(AuditFunctionCode.__args__) == FUNCTION_CODES | RETIRED_FUNCTION_CODES
     source = SOURCE["components"]["schemas"]
     assert set(source["FunctionCode"]["enum"]) == FUNCTION_CODES
@@ -177,6 +178,6 @@ def test_runtime_openapi_matches_source_ward_contract(harness):
         assert set(actual["responses"]) == set(expected["responses"])
     names = {p["name"] for p in runtime["paths"]["/api/v1/wards"]["get"]["parameters"]}
     assert names == {"limit", "cursor", "q", "code", "kind", "sort"}
-    for path in ("/agencies", "/receivables", "/reports/debt"):
+    for path in ("/agencies", "/reports/debt"):
         names = {p["name"] for p in runtime["paths"]["/api/v1" + path]["get"]["parameters"]}
         assert "wardId" in names and "districtId" not in names

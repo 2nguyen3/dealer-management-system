@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './Button'
+import { t } from '@/lib/i18n/core'
 
 export interface PaginationProps {
   onNext?: () => void
@@ -27,19 +28,19 @@ export function Pagination({
       <div className="flex flex-wrap items-center gap-4">
         {totalShowing !== undefined && (
           <span>
-            Đang hiển thị{' '}
+            {t('Đang hiển thị')}{' '}
             <strong className="font-semibold text-foreground tabular-nums">
               {totalShowing}
             </strong>{' '}
-            kết quả
+            {t('kết quả')}
           </span>
         )}
         {limit !== undefined && onLimitChange && (
           <div className="flex items-center gap-2">
             <label htmlFor="pagination-limit-select" className="sr-only">
-              Số dòng mỗi trang
+              {t('Số dòng mỗi trang')}
             </label>
-            <span aria-hidden="true">Mỗi trang:</span>
+            <span aria-hidden="true">{t('Mỗi trang:')}</span>
             <select
               id="pagination-limit-select"
               className="h-8 rounded-md border bg-card px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
@@ -64,7 +65,7 @@ export function Pagination({
           disabled={!hasPrevious || isLoading}
           icon={<ChevronLeft className="size-4" />}
         >
-          Trang trước
+          {t('Trang trước')}
         </Button>
         <Button
           variant="outline"

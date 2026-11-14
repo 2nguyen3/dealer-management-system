@@ -103,7 +103,13 @@ describe('apiFetch Transport', () => {
       const apiErr = err as ApiError
       expect(apiErr.status).toBe(412)
       expect(apiErr.code).toBe('PRECONDITION_FAILED')
-      expect(apiErr.message).toBe('Dữ liệu đã bị thay đổi bởi người khác')
+      // Known codes use the translated catalogue text (message + hint).
+      expect(apiErr.message).toBe(
+        'Dữ liệu đã được người khác thay đổi. Tải lại để xem phiên bản mới nhất rồi thực hiện lại.',
+      )
+      expect(apiErr.hint).toBe(
+        'Tải lại để xem phiên bản mới nhất rồi thực hiện lại.',
+      )
       expect(apiErr.requestId).toBe('req-412')
     }
   })

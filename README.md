@@ -26,6 +26,13 @@ Hệ thống giúp quản lý thông tin đại lý, quá trình nhập và xu�
 
 ## Development setup
 
+Business simplification 2026-11-14: three document kinds (stock receipt, stock issue,
+payment receipt), agency debt/product stock columns, VNPAY sandbox, five reports and a
+dashboard — 90 API operations. Revision 0011 rebuilt schema `dms` and seed v2 replaced
+all data (accounts below). Plan and exact evidence:
+[simplification](openwiki/backend-design/plan/simplification/VERIFICATION.md). The dated
+paragraphs that follow describe the earlier application and are historical.
+
 Backend review2026-10-30:1088offline tests pass; report/dashboard/API/response scope
 is717statements/140branches exact100%. Fixed test-artifact isolation, early invalid-JWT
 rejection and large-value sales-rate rounding; isolated PostgreSQL boundary and PDF
@@ -208,111 +215,75 @@ Prerequisites: Python 3.12, uv, Node.js 24 LTS, and a Supabase project.
 Open http://localhost:5173. API docs are at http://localhost:8000/api/docs.
 Environment files are ignored by Git; commit only the example templates.
 
-### Database và dữ liệu demo
+### Database và dữ liệu
 
-Schema `dms` trên Supabase hiện cùng source/runtime ở head`0009`. Live verifier
-đối chiếu411chứng từ/30đại lý/24mặt hàng; gồm410chứng từ seed gốc và phiếu thu VNPAY
-đã được chấp thuận, không reset dữ liệu về số seed cũ. Thiết kế ở
-[openwiki/database-design](openwiki/database-design/README.md);
-DDL có version nằm trong `backend/alembic/sql/`. Migration tạo đầy đủ 29 bảng,
-3 domain số chính xác, sequence, FK/CHECK/index, trigger toàn vẹn/audit,
-5 view và các hàm báo cáo; revision `0002` thêm index tìm kiếm `pg_trgm`,
-revision `0003` thêm version/session cho token và thu hồi token lịch sử;
-revision `0004` thêm bảng hạ tầng lưu command/retry (tổng 30 bảng vật lý);
-revision `0005` khóa chính sách đơn vị trước khi kiểm tra số lượng, bảo vệ lịch sử.
-Revision `0006` sửa xóa hồ sơ/hàng chưa dùng cùng cache0, khóa first-use mặt hàng
-và ngày tiếp nhận/lịch sử đại lý. Migration không tự chạy khi khởi động API.
-Revision `0007` giữ credit lot gốc khi tạo successor để tính lại làm tròn cùng phiếu trả,
-bảo toàn reservation/refund đã trả và nguồn phiếu thu.
-Revisions `0008`/`0009` bổ sung chính sách master lịch sử cho sửa phiếu nhập/xuất.
-Revision `0010` (source head) bỏ cấp quận: nạp danh mục chỉ đọc 168 phường/xã/đặc khu
-TP.HCM 2025 (`dms.ward`), chuyển `agency."wardId"` theo ánh xạ 20 quận demo → phường,
-đổi hậu tố địa chỉ, đổi quy định thành `maxAgenciesPerWard`, gỡ quyền `district.manage`.
-Production chỉ lên `0010` sau khi backup và chạy upgrade có kiểm soát.
+Từ 14/11/2026 ứng dụng dùng mô hình đã đơn giản hóa
+([kế hoạch](openwiki/backend-design/plan/simplification/PLAN.md),
+[bằng chứng](openwiki/backend-design/plan/simplification/VERIFICATION.md)).
+Revision `0011` (`backend/alembic/sql/0011_simplified_schema.sql`) xóa và dựng lại
+schema `dms` gồm 16 bảng, 22 chức năng phân quyền, đồng hồ nghiệp vụ `dms.clock`,
+trigger bảo vệ số dư (`agency.debt`, `product.stock`, `product."lastPurchasePrice"` chỉ
+đổi khi ghi sổ/hủy chứng từ) và index tìm kiếm. Revision này không downgrade được; dữ
+liệu cũ trên production đã được backup trước khi nâng cấp (xem VERIFICATION). Production
+14/11/2026: seed v2 chạy trên PostgreSQL local rồi chép schema `dms` lên Neon bằng
+`pg_dump`/`pg_restore` trong một transaction, sau đó `verify --seeded --regression` chạy
+trực tiếp trên Neon (seed qua mạng tới Neon mất ~70 phút). Thiết kế
+ở [openwiki/database-design](openwiki/database-design/README.md). Migration không tự
+chạy khi khởi động API.
 
-Backend M01–M14, M15 core và M16 settlement nội bộ đã qua gate cục bộ:
-58/154 operation mục tiêu +2health;247 offline +370 PostgreSQL/TLS,
-scoped100% (4096 statements/830 branches).20 direct/Nginx là bằng chứng M15 trước
-đó, không chạy lại trong M16 nội bộ. Đã có FIFO, provenance, reservation và replay
-tài chính. M17–M20 hiện đã thêm22operation xuất hàng/phiếu thu/trả ngay/công nợ:
-80/154operation+2health. Gate riêng80case/exact100%(808statements/98branches)
-và22direct/Nginx đã pass;370casePG/TLS regression trước cũng pass qua các lần chạy
-checkpoint/resume. Tổng mới308offline+397PG/TLS=705case ngoài deployment; scope33file
-production bị ảnh hưởng đạt100%(1285statements/306branches). Đây là checkpoint lịch sử M17–M20.
-Ngày2026-10-18, M21 điều chỉnh kho, M22 kiểm kê, M23 trả hàng core và M24 dư có đã có
-implementation/owning plan và pass59case riêng. Packet338offline+84PG+24direct/Nginx pass,
-scope30file production1162statements/162branches exact100%. Runtime103/154operation+2health,
-source/Supabase0007. Docker Desktop/backend/frontend healthy, API trực tiếp
-và qua Nginx readiness200; live integrity giữ410chứng từ/30đại lý/24mặt hàng.
-Các số liệu M17–M24 ở trên là lịch sử. M25–M30 hiện đã được triển khai; đầy đủ
-API sửa/hủy và dòng/lịch sử đã có evidence riêng. Tiếp theo M31/M32; các gate
-release tổng thể R5/R6 và terminal bank refund vẫn tách riêng, chưa đóng.
-[Trạng thái operation](openwiki/backend-design/plan/full_backend/AVAILABILITY.md)
-và [mục tiêu đang chạy](openwiki/backend-design/plan/full_backend/GOAL.md) là nguồn
-handoff hiện tại. UI nghiệp vụ vẫn cần kế hoạch/implementation/test riêng.
-
-Từ `backend/`, sử dụng môi trường ảo và dependency lockfile:
+Từ `backend/`:
 
 ```powershell
 uv sync --frozen
-. .\.venv\Scripts\Activate.ps1
-alembic upgrade head
-python -m app.db.seed
-python -m app.db.verify --seeded --regression
+uv run alembic upgrade head
+uv run python -m app.db.seed
+uv run python -m app.db.verify --seeded --regression
 ```
 
-Có thể dùng `uv run` thay cho activate, ví dụ `uv run python -m app.db.seed`.
-Seed chạy trong **một transaction**, không tắt trigger và không sửa cache tồn/nợ
-trực tiếp. Chạy lại bộ demo v1 chỉ kiểm tra dữ liệu hiện có, không tạo trùng hay
-ghi đè mật khẩu. Lần seed đầu yêu cầu các bảng dữ liệu ứng dụng còn trống; bộ
-seed không tự xóa database đã có dữ liệu khác.
+Seed v2 mô phỏng hoạt động thật của công ty từ **01/06/2026 đến hôm trước ngày seed**:
+mỗi thao tác đặt giờ hành chính trên `dms.clock` rồi đi qua chính `DocumentService`
+như API (không tắt trigger, không ghi số dư trực tiếp). Lần đầu cần schema `0011` còn
+trống; chạy lại chỉ kiểm tra, không tạo trùng hay đổi mật khẩu. `verify --seeded` đối
+chiếu tài khoản/hash mật khẩu, khối lượng, replay tồn kho/nợ/giá, báo cáo khớp số nợ,
+giờ hành chính, số điện thoại/địa chỉ và quét từ cấm (không có "mẫu/demo/test");
+`--regression` chạy thêm 83 kiểm tra PostgreSQL trong schema riêng rồi rollback.
 
-**Dữ liệu đã seed và kiểm chứng trên Supabase PostgreSQL 17.6:**
+**Số liệu seed v2 (seed ngày 14/11/2026, kiểm tra trên PostgreSQL 18):**
 
-| Nội dung | Số lượng / độ phủ |
+| Nội dung | Số lượng |
 |---|---|
-| Nhóm / chức năng / phân quyền | 4 nhóm, 32 chức năng, 128 phân quyền (seed mới ở `0010`) |
-| Tài khoản / token | 8 tài khoản; 16 token digest đã thu hồi, không có session demo đang sống |
-| Quy định / danh mục | 1 quy định, 2 loại đại lý, 168 phường/xã (đại lý ở 20 phường), 6 đơn vị |
-| Đại lý | 30; có đại lý mới chưa giao dịch, trùng tên khác phường/xã và ngừng hợp tác |
-| Mặt hàng | 24; có đơn vị lẻ, hàng ngừng bán, tồn thấp và hàng chưa nhập |
-| Chứng từ | 410 chứng từ, 411 phiên bản, 766 dòng; đủ 7 loại chứng từ |
-| Sổ kho / phải thu / dư có | 753 / 486 / 5 bút toán; cache đối chiếu được với ledger |
-| Thu tiền | Tiền mặt, chuyển khoản, online; FIFO, trả ngay và tiền online dư thành dư có |
-| Thanh toán online | 20 payment, 19 event mô phỏng; PENDING / SUCCESS / FAILED / EXPIRED |
-| Trả hàng / bù / hoàn tiền | Giảm nợ chưa trả, dư có từ hàng đã trả tiền, bù nợ, hoàn cash/online |
-| Hoàn tiền online | 4 attempt: SUCCESS / PENDING / UNKNOWN / FAILED; 5 reservation giữ/tiêu/giải phóng tiền |
-| Kiểm kê | 3 biên bản, 36 dòng; có chênh lệch, không chênh lệch và nháp |
-| Audit | 3.740 bản ghi khi seed ở `0009` (3.723 khi seed mới ở `0010`), không chứa password/token hash |
+| Nhóm / chức năng / phân quyền | 4 nhóm, 22 chức năng, 88 dòng phân quyền |
+| Tài khoản | 11 (10 hoạt động, 1 bị khóa) |
+| Quy định / danh mục | Tối đa 4 đại lý/phường, tỷ lệ giá bán 1,02; 2 loại đại lý (hạn mức 50.000.000đ và 20.000.000đ); 168 phường/xã; 8 đơn vị tính |
+| Đại lý | 34 (3 đã chấm dứt hợp tác); có một phường đã đủ 4 đại lý |
+| Mặt hàng | 30 (2 ngừng bán, 1 chưa từng nhập nên chưa có giá) |
+| Chứng từ | 468: phiếu nhập 90, phiếu xuất 255, phiếu thu 123 (nháp 8, đã hủy 13, sửa thay thế 5); 1.270 dòng hàng |
+| Phiếu thu | Tiền mặt 65, chuyển khoản 47, VNPAY 11 |
+| Thanh toán VNPAY | 19 giao dịch: 11 thành công, 5 thất bại, 3 hết hạn; một đại lý có nợ âm do tiền VNPAY về muộn |
+| Nhật ký | 4.020 bản ghi, không chứa mật khẩu/token |
 
-Lịch sử nghiệp vụ trải từ **01/06/2026 đến 30/09/2026**, đủ dữ liệu xem báo cáo
-tháng và so sánh tồn/công nợ/doanh số nhiều kỳ. Chứng từ có nháp, chờ xác nhận,
-đã ghi nhận, đã hủy; có sửa phiên bản và bút toán đảo. Các callback/refund đều
-là bằng chứng **mô phỏng** có đánh dấu `demo`, không gọi cổng thanh toán thật.
-Phường/xã là danh mục thật TP.HCM sau 01/7/2025 (NQ 1685/NQ-UBTVQH15, mã GSO); 20 phường
-đại diện thay cho 20 quận demo cũ theo `openwiki/database-design/hcmc_wards_2025.json`.
+### Tài khoản đăng nhập
 
-### Tài khoản đăng nhập mẫu
+Tài khoản ứng dụng trong `dms.app_user` (không phải tài khoản PostgreSQL). Mật khẩu
+lưu dạng **Argon2id**. Bốn thành viên nhóm giữ bốn vai trò chính.
 
-Đây là tài khoản **demo của ứng dụng** trong `dms.app_user`, không phải tài khoản
-Supabase Auth hoặc tài khoản kết nối PostgreSQL. Mật khẩu được lưu dưới dạng
-**Argon2id**. Backend đã có API đăng nhập; UI vẫn là trang starter, chưa có màn hình
-đăng nhập. Có thể sử dụng các tài khoản sau qua Swagger hoặc API client.
+| Email | Mật khẩu | Họ tên | Nhóm | Trạng thái |
+|---|---|---|---|---|
+| `thaonguyen@agentra.vn` | `Agentra@2026#QuanLy1` | Nguyễn Trần Thảo Nguyên | Quản lý | ACTIVE |
+| `minhtuan@agentra.vn` | `Agentra@2026#KinhDoanh1` | Nguyễn Hà Minh Tuấn | Kinh doanh | ACTIVE |
+| `giaphuc@agentra.vn` | `Agentra@2026#Kho1` | Huỳnh Gia Phúc | Kho | ACTIVE |
+| `thuyngan@agentra.vn` | `Agentra@2026#KeToan1` | Nguyễn Thúy Ngân | Kế toán | ACTIVE |
+| `hoangnam@agentra.vn` | `Agentra@2026#KinhDoanh2` | Lê Hoàng Nam | Kinh doanh | ACTIVE |
+| `myduyen@agentra.vn` | `Agentra@2026#KinhDoanh3` | Võ Thị Mỹ Duyên | Kinh doanh | ACTIVE |
+| `thuha@agentra.vn` | `Agentra@2026#Kho2` | Phạm Thu Hà | Kho | ACTIVE |
+| `quocbao@agentra.vn` | `Agentra@2026#Kho3` | Đặng Quốc Bảo | Kho | ACTIVE |
+| `ngochan@agentra.vn` | `Agentra@2026#KeToan2` | Trần Ngọc Hân | Kế toán | ACTIVE |
+| `thanhtung@agentra.vn` | `Agentra@2026#KeToan3` | Bùi Thanh Tùng | Kế toán | ACTIVE |
+| `vanluc@agentra.vn` | `Agentra@2026#KinhDoanh4` | Phan Văn Lực | Kinh doanh | LOCKED (đăng nhập bị từ chối) |
 
-| Email | Mật khẩu demo | Nhóm | Trạng thái |
-|---|---|---|---|
-| `quanly@agentra.demo` | `AgentraDemo!2026#QL` | Quản lý | ACTIVE |
-| `kinhdoanh@agentra.demo` | `AgentraDemo!2026#KD` | Kinh doanh | ACTIVE |
-| `kho@agentra.demo` | `AgentraDemo!2026#KHO` | Kho | ACTIVE |
-| `ketoan@agentra.demo` | `AgentraDemo!2026#KT` | Kế toán | ACTIVE |
-| `kinhdoanh2@agentra.demo` | `AgentraDemo!2026#KD2` | Kinh doanh | ACTIVE |
-| `kho2@agentra.demo` | `AgentraDemo!2026#KHO2` | Kho | ACTIVE |
-| `ketoan2@agentra.demo` | `AgentraDemo!2026#KT2` | Kế toán | ACTIVE |
-| `locked@agentra.demo` | `AgentraDemo!2026#LOCK` | Kinh doanh | LOCKED — kiểm thử từ chối đăng nhập |
-
-`python -m app.db.verify --seeded` kiểm tra các hash mật khẩu mẫu, số liệu
-ledger/cache/chứng từ và báo cáo. `--regression` chạy thêm 54 assertions/rejections
-PostgreSQL trong schema kiểm thử riêng rồi rollback toàn bộ fixture.
+Quyền mặc định: Quản lý có toàn bộ 22 chức năng (gồm hủy/sửa chứng từ); Kinh doanh
+tiếp nhận đại lý và lập phiếu xuất; Kho quản lý mặt hàng/đơn vị, lập và ghi sổ phiếu
+nhập, ghi sổ phiếu xuất; Kế toán lập/ghi sổ phiếu thu, VNPAY và xem báo cáo.
 
 ### Backend authentication
 

@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input'
 import { apiFetch } from '../../lib/api'
 import { AuthLayout } from './AuthLayout'
 import { PasswordToggle } from './PasswordToggle'
+import { t } from '@/lib/i18n/core'
 
 export function ResetPasswordPage() {
   const [token] = useState<string | null>(() => {
@@ -46,7 +47,7 @@ export function ResetPasswordPage() {
     }
     return extracted
       ? null
-      : 'Không tìm thấy mã đặt lại mật khẩu hoặc liên kết đã hết hiệu lực.'
+      : t('Không tìm thấy mã đặt lại mật khẩu hoặc liên kết đã hết hiệu lực.')
   })
 
   const [fieldError, setFieldError] = useState<{
@@ -66,20 +67,20 @@ export function ResetPasswordPage() {
     setErrorMessage(null)
 
     if (!token) {
-      setErrorMessage('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.')
+      setErrorMessage(t('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.'))
       return
     }
 
     setFieldError(null)
     if (!newPassword) {
-      setFieldError({ field: 'new', message: 'Vui lòng nhập mật khẩu mới.' })
+      setFieldError({ field: 'new', message: t('Vui lòng nhập mật khẩu mới.') })
       return
     }
 
     if (newPassword !== confirmPassword) {
       setFieldError({
         field: 'confirm',
-        message: 'Xác nhận mật khẩu mới không khớp.',
+        message: t('Xác nhận mật khẩu mới không khớp.'),
       })
       return
     }
@@ -100,11 +101,15 @@ export function ResetPasswordPage() {
         errorObj.code === 'INVALID_TOKEN' ||
         errorObj.code === 'EXPIRED_TOKEN'
       ) {
-        setErrorMessage('Mã đặt lại mật khẩu đã hết hạn hoặc đã được sử dụng.')
+        setErrorMessage(
+          t('Mã đặt lại mật khẩu đã hết hạn hoặc đã được sử dụng.'),
+        )
       } else {
         setErrorMessage(
           errorObj.message ||
-            'Không thể đặt lại mật khẩu. Vui lòng thử lại hoặc yêu cầu liên kết mới.',
+            t(
+              'Không thể đặt lại mật khẩu. Vui lòng thử lại hoặc yêu cầu liên kết mới.',
+            ),
         )
       }
     } finally {
@@ -114,8 +119,8 @@ export function ResetPasswordPage() {
 
   return (
     <AuthLayout
-      title="Đặt lại mật khẩu"
-      description="Tạo mật khẩu mới cho tài khoản của bạn"
+      title={t('Đặt lại mật khẩu')}
+      description={t('Tạo mật khẩu mới cho tài khoản của bạn')}
       icon={<LockKeyhole />}
     >
       {isSuccess ? (
@@ -125,14 +130,15 @@ export function ResetPasswordPage() {
               <CircleCheck className="size-6" />
             </span>
           </div>
-          <Alert type="success" title="Đặt lại mật khẩu thành công">
-            Mật khẩu mới của bạn đã được cập nhật thành công. Vui lòng đăng nhập
-            bằng mật khẩu mới.
+          <Alert type="success" title={t('Đặt lại mật khẩu thành công')}>
+            {t(
+              'Mật khẩu mới của bạn đã được cập nhật thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+            )}
           </Alert>
           <ShadcnButton asChild size="lg" className="w-full">
             <Link to="/login">
               <LogIn aria-hidden="true" />
-              Đăng nhập ngay
+              {t('Đăng nhập ngay')}
             </Link>
           </ShadcnButton>
         </div>
@@ -141,7 +147,7 @@ export function ResetPasswordPage() {
           {errorMessage && <Alert type="error">{errorMessage}</Alert>}
           <Input
             id="new-password"
-            label="Mật khẩu mới"
+            label={t('Mật khẩu mới')}
             type={showPassword ? 'text' : 'password'}
             value={newPassword}
             onChange={(e) => {
@@ -163,7 +169,7 @@ export function ResetPasswordPage() {
           />
           <Input
             id="confirm-password"
-            label="Xác nhận mật khẩu mới"
+            label={t('Xác nhận mật khẩu mới')}
             type={showPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => {
@@ -186,7 +192,7 @@ export function ResetPasswordPage() {
             disabled={!token}
             icon={<Lock className="size-4" />}
           >
-            Cập nhật mật khẩu
+            {t('Cập nhật mật khẩu')}
           </Button>
           <div className="text-center">
             <Link
@@ -194,7 +200,7 @@ export function ResetPasswordPage() {
               className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
-              Quay lại Đăng nhập
+              {t('Quay lại Đăng nhập')}
             </Link>
           </div>
         </form>

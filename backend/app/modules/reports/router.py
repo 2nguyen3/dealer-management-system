@@ -10,10 +10,11 @@ from app.modules.auth.service import Principal
 from app.modules.reports.dependencies import get_report_service
 from app.modules.reports.exporting import negotiate_report_media, render_report
 from app.modules.reports.schemas import (
-    CashCreditReportResponse,
+    CollectionsReportResponse,
     DebtReportResponse,
     InventoryReportResponse,
     ProductSalesReportResponse,
+    ReceiptType,
     SalesReportResponse,
 )
 from app.modules.reports.service import ReportService
@@ -26,14 +27,13 @@ SalesReader = Annotated[
 DebtReader = Annotated[
     Principal, Depends(require_permissions(all_of=("reports.read", "debt.read")))
 ]
-InventoryReader = Annotated[
-    Principal, Depends(require_permissions(all_of=("reports.read", "inventory.read")))
-]
+# inventory.read was merged into product viewing (0011); reports.read alone admits it.
+InventoryReader = Annotated[Principal, Depends(require_permissions(all_of=("reports.read",)))]
 
 
-def report_contract(permission, sorts, default):
+def report_contract(permissions, sorts, default):
     return {
-        "x-permissions": {"allOf": ["reports.read", permission]},
+        "x-permissions": {"allOf": ["reports.read", *permissions]},
         "parameters": [
             {"name": "cursor", "in": "query", "schema": {"type": "string", "minLength": 1}},
             {
@@ -109,14 +109,14 @@ def read_report(kind, request, response, service, start, end, filters):
     response_model=SalesReportResponse,
     responses=report_responses(),
     openapi_extra=report_contract(
-        "sales.read",
+        ("sales.read",),
         [
             "agencyId",
             "-agencyId",
             "salesAmount",
             "-salesAmount",
-            "netSalesAmount",
-            "-netSalesAmount",
+            "numberOfIssues",
+            "-numberOfIssues",
         ],
         "agencyId",
     ),
@@ -148,7 +148,9 @@ def get_sales_report(
     response_model=DebtReportResponse,
     responses=report_responses(),
     openapi_extra=report_contract(
-        "debt.read", ["agencyId", "-agencyId", "closingDebt", "-closingDebt"], "agencyId"
+        ("debt.read",),
+        ["agencyId", "-agencyId", "closingDebt", "-closingDebt", "debtIncrease", "-debtIncrease"],
+        "agencyId",
     ),
 )
 def get_debt_report(
@@ -179,7 +181,7 @@ def get_debt_report(
     response_model=InventoryReportResponse,
     responses=report_responses(),
     openapi_extra=report_contract(
-        "inventory.read", ["productId", "-productId", "closingStock", "-closingStock"], "productId"
+        (), ["productId", "-productId", "closingStock", "-closingStock"], "productId"
     ),
 )
 def get_inventory_report(
@@ -202,7 +204,7 @@ def get_inventory_report(
     response_model=ProductSalesReportResponse,
     responses=report_responses(),
     openapi_extra=report_contract(
-        "sales.read",
+        ("sales.read",),
         ["productId", "-productId", "salesAmount", "-salesAmount", "soldQuantity", "-soldQuantity"],
         "-salesAmount",
     ),
@@ -229,24 +231,17 @@ def get_product_sales_report(
 
 
 @router.get(
-    "/cash-and-credit",
-    operation_id="getCashAndCreditReport",
-    response_model=CashCreditReportResponse,
+    "/collections",
+    operation_id="getCollectionsReport",
+    response_model=CollectionsReportResponse,
     responses=report_responses(),
     openapi_extra=report_contract(
-        "debt.read",
-        [
-            "agencyId",
-            "-agencyId",
-            "cashReceived",
-            "-cashReceived",
-            "closingCredit",
-            "-closingCredit",
-        ],
-        "agencyId",
+        ("debt.read",),
+        ["businessDate", "-businessDate", "totalAmount", "-totalAmount"],
+        "businessDate",
     ),
 )
-def get_cash_and_credit_report(
+def get_collections_report(
     request: Request,
     response: Response,
     principal: DebtReader,
@@ -254,7 +249,14 @@ def get_cash_and_credit_report(
     fromDate: BusinessDate,
     toDate: BusinessDate,
     agencyId: Id | None = None,
+    receiptType: ReceiptType | None = None,
 ):
     return read_report(
-        "cash-and-credit", request, response, service, fromDate, toDate, {"agencyId": agencyId}
+        "collections",
+        request,
+        response,
+        service,
+        fromDate,
+        toDate,
+        {"agencyId": agencyId, "receiptType": receiptType},
     )

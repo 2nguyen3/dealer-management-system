@@ -31,21 +31,33 @@ describe('ProductsPage Component', () => {
 
   const mockAuthContext: AuthContextValue = {
     user: mockUser,
-    allowedFunctions: ['product.manage', 'inventory.read'],
+    allowedFunctions: ['product.manage', 'reports.read'],
     isAuthenticated: true,
     isLoading: false,
     hasPermission: (perm) =>
       Array.isArray(perm)
-        ? perm.some((p) => ['product.manage', 'inventory.read'].includes(p))
-        : ['product.manage', 'inventory.read'].includes(perm),
+        ? perm.some((p) => ['product.manage', 'reports.read'].includes(p))
+        : ['product.manage', 'reports.read'].includes(perm),
     login: vi.fn(),
     logout: vi.fn(),
     refreshProfile: vi.fn(),
   }
 
   const sampleUnits: Unit[] = [
-    { id: 1, name: 'Cái', allowFraction: false, status: 'ACTIVE' },
-    { id: 2, name: 'Hộp', allowFraction: false, status: 'ACTIVE' },
+    {
+      id: 1,
+      code: 'DVT-1',
+      name: 'Cái',
+      allowsFraction: false,
+      status: 'ACTIVE',
+    },
+    {
+      id: 2,
+      code: 'DVT-2',
+      name: 'Hộp',
+      allowsFraction: false,
+      status: 'ACTIVE',
+    },
   ]
 
   const sampleProducts: Product[] = [
@@ -55,10 +67,10 @@ describe('ProductsPage Component', () => {
       name: 'Bút bi Thiên Long',
       unitId: 1,
       unitName: 'Cái',
-      lowStockThreshold: '10',
-      currentStock: '150',
-      currentPurchasePrice: '4000',
-      currentSellingPrice: '5000',
+      allowsFraction: false,
+      stock: '150',
+      lastPurchasePrice: '4000',
+      sellingPrice: '5000',
       status: 'ACTIVE',
     },
     {
@@ -67,10 +79,22 @@ describe('ProductsPage Component', () => {
       name: 'Tập 96 trang',
       unitId: 2,
       unitName: 'Hộp',
-      lowStockThreshold: '5',
-      currentStock: '3',
-      currentPurchasePrice: '70000',
-      currentSellingPrice: '85000',
+      allowsFraction: false,
+      stock: '3',
+      lastPurchasePrice: '70000',
+      sellingPrice: '85000',
+      status: 'ACTIVE',
+    },
+    {
+      id: '203',
+      code: 'SP-203',
+      name: 'Bìa hồ sơ',
+      unitId: 1,
+      unitName: 'Cái',
+      allowsFraction: false,
+      stock: '0',
+      lastPurchasePrice: null,
+      sellingPrice: null,
       status: 'ACTIVE',
     },
   ]
@@ -146,7 +170,17 @@ describe('ProductsPage Component', () => {
     expect(screen.getByText('70.000 ₫')).toBeDefined()
     expect(
       screen.getAllByText('Đang hoạt động', { selector: '[data-status]' }),
-    ).toHaveLength(2)
+    ).toHaveLength(3)
+    // Stock, last purchase price and selling price columns from the contract.
+    for (const name of [/Tồn hiện tại/, /Giá nhập gần nhất/, /^Giá bán/])
+      expect(
+        screen.getByRole('columnheader', { name }),
+        String(name),
+      ).toBeDefined()
+    // A never-received product has no prices yet and counts as out of stock.
+    const unpriced = table.getByText('Bìa hồ sơ').closest('tr')!
+    expect(unpriced.textContent).not.toContain('₫')
+    expect(screen.queryByText(/currentStock|lowStockThreshold/)).toBeNull()
     expect(screen.queryByText('ACTIVE')).toBeNull()
     expect(screen.queryByLabelText(/ID đơn vị/)).toBeNull()
     const unit = screen.getByLabelText('Đơn vị tính', { selector: 'select' })

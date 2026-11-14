@@ -1,14 +1,14 @@
-import { BookCheck, FilePen, Send, Undo2, XCircle } from 'lucide-react'
+import { BookCheck, FilePen, Undo2, XCircle } from 'lucide-react'
 import { toNumber } from '../../lib/chart'
 import { formatDate } from '../../lib/formatters'
 import { statusLabel } from '../../lib/labels'
-import type { DocumentKind, DocumentSummary } from './documentContracts'
+import type { DocumentSummary } from './documentContracts'
 import type { LifecycleStep } from './DocumentParts'
+import { t } from '@/lib/i18n/core'
 
-const STATUS_ORDER = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
+const STATUS_ORDER = ['DRAFT', 'POSTED', 'CANCELLED'] as const
 const STATUS_COLORS: Record<(typeof STATUS_ORDER)[number], string> = {
   DRAFT: 'var(--chart-4)',
-  PENDING: 'var(--warning)',
   POSTED: 'var(--success)',
   CANCELLED: 'var(--destructive)',
 }
@@ -58,50 +58,44 @@ export function valueByDay(items: readonly DocumentSummary[]) {
 
 const DRAFT: LifecycleStep = {
   key: 'draft',
-  label: 'Lập phiếu',
+  label: t('Lập phiếu'),
   icon: FilePen,
-  hint: 'Bản nháp: còn sửa được, chưa tác động sổ sách.',
-}
-const PENDING: LifecycleStep = {
-  key: 'pending',
-  label: 'Chờ xuất',
-  icon: Send,
-  hint: 'Đã nộp và chốt giá; tồn kho được kiểm tra lại khi ghi sổ.',
+  hint: t('Bản nháp: còn sửa được, chưa tác động sổ sách.'),
 }
 const POSTED: LifecycleStep = {
   key: 'posted',
-  label: 'Ghi sổ',
+  label: t('Ghi sổ'),
   icon: BookCheck,
-  hint: 'Đã ghi vào sổ kho và công nợ.',
+  hint: t('Đã ghi vào sổ: tồn kho và công nợ đã cập nhật.'),
 }
 const CHANGE: LifecycleStep = {
   key: 'change',
-  label: 'Sửa sai/Hủy',
+  label: t('Hủy/Sửa có lý do'),
   icon: Undo2,
-  hint: 'Chỉ bằng phiên bản mới có lý do; lịch sử giữ nguyên.',
+  hint: t(
+    'Chỉ trong tháng hiện tại, bắt buộc lý do; sửa sẽ hủy phiếu cũ và lập phiếu thay thế.',
+  ),
 }
 const CANCELLED: LifecycleStep = {
   key: 'cancelled',
-  label: 'Hủy',
+  label: t('Hủy'),
   icon: XCircle,
-  hint: 'Chứng từ đã hủy; tác động sổ sách được đảo lại.',
+  hint: t('Chứng từ đã hủy; tác động sổ sách được đảo lại.'),
 }
 
-/** Steps a document of this kind passes through; only issues wait in PENDING. */
-export function lifecycleSteps(
-  kind: DocumentKind,
-  status: DocumentSummary['status'],
-): { steps: LifecycleStep[]; current: number } {
-  const main =
-    kind === 'STOCK_ISSUE' ? [DRAFT, PENDING, POSTED] : [DRAFT, POSTED]
-  if (status === 'CANCELLED')
-    return { steps: [...main, CANCELLED], current: main.length }
-  const steps = [...main, CHANGE]
-  const current =
-    status === 'POSTED'
-      ? main.indexOf(POSTED)
-      : status === 'PENDING'
-        ? main.indexOf(PENDING)
-        : 0
-  return { steps, current: Math.max(0, current) }
+/** Draft → posted → cancelled/corrected; the same rail for every kind. */
+export function lifecycleSteps(status: DocumentSummary['status']): {
+  steps: LifecycleStep[]
+  current: number
+} {
+  const main = [DRAFT, POSTED]
+  if (status === 'CANCELLED') return { steps: [...main, CANCELLED], current: 2 }
+  return { steps: [...main, CHANGE], current: status === 'POSTED' ? 1 : 0 }
+}
+
+/** Replacement marker shown next to the status of a corrected document. */
+export function replacementSuffix(row: DocumentSummary): string | undefined {
+  if (row.replacedByDocumentId) return t('đã thay thế')
+  if (row.replacesDocumentId) return t('phiếu thay thế')
+  return undefined
 }

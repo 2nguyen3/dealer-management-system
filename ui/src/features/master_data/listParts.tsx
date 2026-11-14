@@ -18,6 +18,7 @@ import {
 } from '@/components/shadcn/tooltip'
 import { FilterIcon } from '@/components/ui/FilterIcon'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n/core'
 
 /** Card shell shared by list pages: toolbar on top, table, footer. */
 export function ListCard({
@@ -49,10 +50,10 @@ export function ListCard({
 /** Search box: shadcn InputGroup with a leading search icon and a label. */
 export function SearchField({
   id,
-  label = 'Tìm kiếm',
+  label = t('Tìm kiếm'),
   value,
   onChange,
-  placeholder = 'Nhập từ khóa…',
+  placeholder = t('Nhập từ khóa…'),
   className,
 }: {
   id: string
@@ -89,7 +90,7 @@ export function ToggleFilter({
   value,
   onChange,
   options,
-  allLabel = 'Tất cả',
+  allLabel = t('Tất cả'),
 }: {
   label: string
   value: string
@@ -148,11 +149,11 @@ export function FilterReset({
       className="h-9 gap-1.5 text-muted-foreground hover:text-foreground lg:self-end"
     >
       <FilterX className="size-4" aria-hidden="true" />
-      Xóa lọc
+      {t('Xóa lọc')}
       <ShadcnBadge
         variant="secondary"
         className="h-5 min-w-5 rounded-full px-1.5 tabular-nums"
-        aria-label={`${count} bộ lọc đang dùng`}
+        aria-label={t('{count} bộ lọc đang dùng', { count })}
       >
         {count}
       </ShadcnBadge>
@@ -162,7 +163,7 @@ export function FilterReset({
 
 /** Small "i" button whose tooltip carries the explanation instead of prose. */
 export function InfoHint({
-  label = 'Giải thích',
+  label = t('Giải thích'),
   children,
 }: {
   label?: string
@@ -200,15 +201,15 @@ export function ResultCount({
 }) {
   return (
     <p
-      className="text-sm text-muted-foreground tabular-nums lg:ml-auto lg:self-center"
+      className="text-sm text-muted-foreground tabular-nums lg:ms-auto lg:self-center"
       aria-live="polite"
     >
       {loading ? (
-        'Đang tải…'
+        t('Đang tải…')
       ) : (
         <>
-          <span className="font-semibold text-foreground">{count}</span> kết quả
-          trên trang
+          <span className="font-semibold text-foreground">{count}</span>{' '}
+          {t('kết quả trên trang')}
         </>
       )}
     </p>
@@ -261,7 +262,7 @@ export function IconAction({
 export function TableSkeleton({
   columns,
   rows = 6,
-  label = 'Đang tải danh sách…',
+  label = t('Đang tải danh sách…'),
 }: {
   columns: number
   rows?: number

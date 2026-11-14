@@ -6,15 +6,17 @@ import {
   sumAmounts,
 } from '../features/document_history/lineMath'
 import {
-  canEstimate,
+  debtAfter,
   estimateLine,
+  estimatePrice,
+  issueLineWarning,
+  paymentLimit,
   summarizeLines,
 } from '../features/stock_receipts/lineEstimates'
-import type { DocumentLine } from '../features/document_history/documentContracts'
+import type { ProductQuote } from '../features/document_history/useRecords'
 
-const line = (quantity: string, unitPrice = '', originLineId = '') => ({
+const line = (quantity: string, unitPrice = '') => ({
   productId: '1',
-  originLineId,
   quantity,
   unitPrice,
 })
@@ -51,41 +53,68 @@ describe('exact document line arithmetic', () => {
   })
 })
 
+const quote = (overrides: Partial<ProductQuote> = {}): ProductQuote => ({
+  id: '1',
+  code: 'SP-1',
+  name: 'Bút',
+  unitName: 'Cây',
+  stock: '10',
+  lastPurchasePrice: '1000',
+  sellingPrice: '1020',
+  ...overrides,
+})
+
 describe('goods editor estimates', () => {
-  const origin = [
-    { id: '201', unitPrice: '1000' } as DocumentLine,
-    { id: '202', unitPrice: '333' } as DocumentLine,
-  ]
-  it('estimates receipts from the entered price and returns from the origin line', () => {
-    expect(canEstimate('STOCK_RECEIPT')).toBe(true)
-    expect(canEstimate('SALES_RETURN', null)).toBe(false)
-    expect(canEstimate('SALES_RETURN', origin)).toBe(true)
-    expect(canEstimate('STOCK_ISSUE')).toBe(false)
-    expect(estimateLine('STOCK_RECEIPT', line('2', '150'))).toBe(300n)
-    expect(estimateLine('SALES_RETURN', line('1.5', '', '202'), origin)).toBe(
-      500n,
+  it('estimates receipts from the entered price and issues from the quote', () => {
+    expect(estimatePrice('STOCK_RECEIPT', line('2', ' 150 '))).toBe('150')
+    expect(estimatePrice('STOCK_RECEIPT', line('2', ''))).toBeNull()
+    expect(estimatePrice('STOCK_ISSUE', line('2'), { '1': quote() })).toBe(
+      '1020',
     )
-    expect(estimateLine('SALES_RETURN', line('1', '', '999'), origin)).toBe(
-      null,
+    expect(estimatePrice('STOCK_ISSUE', line('2'))).toBeNull()
+    expect(
+      estimatePrice('STOCK_ISSUE', line('2'), {
+        '1': quote({ sellingPrice: null }),
+      }),
+    ).toBeNull()
+    expect(estimateLine('STOCK_RECEIPT', line('2', '150'))).toBe(300n)
+    expect(estimateLine('STOCK_ISSUE', line('1.5'), { '1': quote() })).toBe(
+      1530n,
     )
     expect(estimateLine('STOCK_ISSUE', line('1', '100'))).toBeNull()
   })
-  it('summarizes counts, priced lines and adjustment directions', () => {
+  it('summarizes counts, priced lines and the exact subtotal', () => {
     expect(
       summarizeLines('STOCK_RECEIPT', [line('2', '150'), line('', '1')]),
-    ).toEqual({
-      lineCount: 2,
-      pricedLines: 1,
-      subtotal: 300n,
-      increases: 1,
-      decreases: 0,
+    ).toEqual({ lineCount: 2, pricedLines: 1, subtotal: 300n })
+    expect(summarizeLines('STOCK_ISSUE', [])).toEqual({
+      lineCount: 0,
+      pricedLines: 0,
+      subtotal: 0n,
     })
-    const adjustment = summarizeLines('STOCK_ADJUSTMENT', [
-      line('-1'),
-      line('2'),
-      line('0'),
-    ])
-    expect([adjustment.increases, adjustment.decreases]).toEqual([1, 1])
-    expect(adjustment.subtotal).toBe(0n)
+  })
+  it('computes debt after a change exactly, including negative debt', () => {
+    expect(debtAfter('500000', 600000n)).toBe(1100000n)
+    expect(debtAfter('-1', 1n)).toBe(0n)
+    expect(debtAfter('900719925474099301', 1n)).toBe(900719925474099302n)
+  })
+  it('warns about unpriced products and quantities above stock', () => {
+    expect(issueLineWarning(line('1'), undefined)).toBeNull()
+    expect(
+      issueLineWarning(line('1'), quote({ sellingPrice: null })),
+    ).toContain('chưa có giá bán')
+    expect(issueLineWarning(line('10'), quote())).toBeNull()
+    expect(issueLineWarning(line('10.001'), quote())).toBe(
+      'Vượt tồn hiện tại (10 Cây).',
+    )
+    expect(issueLineWarning(line('bad'), quote())).toBeNull()
+  })
+  it('limits a payment to the current debt plus a reversed amount', () => {
+    expect(paymentLimit('500000')).toBe(500000n)
+    expect(paymentLimit('-20000')).toBe(-20000n)
+    expect(paymentLimit('200000', 300000n)).toBe(500000n)
+    expect(paymentLimit('0')).toBe(0n)
+    for (const bad of [null, undefined, '', '1.5', 'abc', '01'])
+      expect(paymentLimit(bad)).toBeNull()
   })
 })

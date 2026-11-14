@@ -31,10 +31,7 @@ class UnitRepository(CatalogueRepository):
     def recorded(self, identifier: int) -> bool:
         return bool(
             self.session.scalar(
-                text(
-                    'SELECT EXISTS (SELECT 1 FROM dms.document_line WHERE "unitId"=:id) '
-                    'OR EXISTS (SELECT 1 FROM dms.stock_count_line WHERE "unitId"=:id)'
-                ),
+                text('SELECT EXISTS (SELECT 1 FROM dms.document_line WHERE "unitId"=:id)'),
                 {"id": identifier},
             )
         )

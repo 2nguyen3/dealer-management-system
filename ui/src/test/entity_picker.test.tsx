@@ -6,8 +6,8 @@ import { describeItem, type PickerItem } from '../components/ui/pickerItems'
 import * as apiModule from '../lib/api'
 
 const agencies = [
-  { id: '70', code: 'DL-70', name: 'Đại lý An Phát', currentDebt: '0' },
-  { id: '71', code: 'DL-71', name: 'Đại lý Minh Châu', currentDebt: '500064' },
+  { id: '70', code: 'DL-70', name: 'Đại lý An Phát', debt: '0' },
+  { id: '71', code: 'DL-71', name: 'Đại lý Minh Châu', debt: '500064' },
 ]
 
 function ok(data: unknown) {
@@ -44,14 +44,14 @@ describe('describeItem', () => {
     expect(describeItem('agencies', agencies[1])).toEqual({
       id: '71',
       label: 'DL-71 — Đại lý Minh Châu',
-      detail: 'Dư nợ 500.064 ₫',
+      detail: 'Nợ hiện tại 500.064 ₫',
     })
     expect(
       describeItem('products', {
         id: 5,
         code: 'SP-5',
         name: 'Bút',
-        currentStock: '1500',
+        stock: '1500',
         unitName: 'Cái',
       }),
     ).toEqual({ id: '5', label: 'SP-5 — Bút', detail: 'Tồn 1.500 Cái' })
@@ -161,7 +161,7 @@ describe('EntityPicker long options', () => {
   it('shows the full option text in a wrapping list and exposes the chosen label as a title', async () => {
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(() =>
       ok({
-        items: [{ id: '90', code: 'DL-90', name: longName, currentDebt: '0' }],
+        items: [{ id: '90', code: 'DL-90', name: longName, debt: '0' }],
       }),
     )
     render(<Harness />)

@@ -18,54 +18,52 @@ export function reportFixture(
     unitId: 1,
     unitName: 'Kg',
   }
-  const sales = { salesAmount: huge, returnAmount: '1', netSalesAmount: '-1' }
   const debt = {
-    openingDebt: huge,
-    debtIncrease: '0',
-    cashApplied: '0',
-    returnsApplied: '0',
-    creditApplied: '0',
-    debtDecrease: '0',
+    openingDebt: '-5',
+    debtIncrease: huge,
+    paidAmount: '1',
     closingDebt: huge,
   }
-  const cash = {
-    cashReceived: huge,
-    cashRefunded: '1',
-    verifiedUnreceiptedAmount: '2',
-    openingCredit: '3',
-    creditCreated: '4',
-    creditApplied: '5',
-    creditRefunded: '6',
-    closingCredit: '7',
-    currentReservedCredit: '8',
-    currentAvailableCredit: '9',
+  const collections = {
+    receiptCount: 3,
+    cashAmount: '1',
+    bankTransferAmount: '2',
+    onlineAmount: '0',
+    totalAmount: '3',
   }
   const rows = {
-    sales: { ...agency, ...sales, numberOfIssues: 2, salesRate: '0.0001' },
+    sales: {
+      ...agency,
+      numberOfIssues: 2,
+      salesAmount: huge,
+      salesRate: '0.0001',
+    },
     debt: { ...agency, ...debt },
     inventory: {
       ...product,
-      openingStock: '0',
+      openingStock: '-0.001',
       receiptQuantity: '0.001',
       issueQuantity: '0',
-      returnQuantity: '0',
-      adjustmentQuantity: '-0.001',
       closingStock: '0',
     },
     'product-sales': {
       ...product,
-      ...sales,
+      numberOfIssues: 4,
       soldQuantity: '0.001',
-      returnedQuantity: '2.003',
+      salesAmount: huge,
     },
-    'cash-and-credit': { ...agency, ...cash },
+    collections: { businessDate: '2026-10-05', ...collections },
   }
   const totals = {
-    sales: { ...sales, numberOfIssues: 999, companyGrossSales: huge + '00' },
+    sales: {
+      numberOfIssues: 999,
+      salesAmount: huge,
+      companySalesAmount: huge + '00',
+    },
     debt,
     inventory: undefined,
-    'product-sales': sales,
-    'cash-and-credit': cash,
+    'product-sales': { salesAmount: huge },
+    collections,
   }
   return {
     fromDate,
@@ -92,7 +90,9 @@ export function reportQuery(kind: ReportKind = 'sales'): ReportQuery {
         ? 'productId'
         : kind === 'product-sales'
           ? '-salesAmount'
-          : 'agencyId',
+          : kind === 'collections'
+            ? 'businessDate'
+            : 'agencyId',
     limit: '25',
   }
 }
@@ -102,35 +102,37 @@ export function dashboardFixture() {
     month: '2026-10',
     asOf: '2026-10-30T07:39:22+00:00',
     agencies: { total: 30, active: 29 },
-    inventory: {
-      productCount: 24,
-      lowStockProductCount: 2,
-      receivedAmount: huge,
-    },
     sales: {
-      gross: huge,
-      returns: '1',
-      net: '-1',
+      salesAmount: huge,
+      issueCount: 7,
       monthlyTrend: [
-        { month: '2026-10', gross: huge, returns: '1', net: '-1' },
+        { month: '2026-09', salesAmount: '100', issueCount: 4 },
+        { month: '2026-10', salesAmount: '150', issueCount: 2 },
       ],
       topProducts: reportFixture('product-sales').items,
     },
-    receivables: {
-      currentDebt: huge,
-      currentCredit: '1',
-      cashReceived: '2',
-      cashRefunded: '3',
+    collections: {
+      receiptCount: 5,
+      totalAmount: '600',
+      cashAmount: '100',
+      bankTransferAmount: '200',
+      onlineAmount: '300',
+    },
+    debt: {
+      totalDebt: huge,
+      prepaidAmount: '0',
+      agenciesInDebt: 12,
       topAgencies: [
         {
           agencyId: '1',
           agencyCode: 'DL-101',
           agencyName: 'Đại lý nguồn',
-          currentDebt: '999999999999999999',
+          debt: '999999999999999999',
+          maxDebt: '999999999999999999',
+          debtRatio: '99.99',
         },
       ],
     },
-    pendingIssueCount: 0,
-    verifiedUnreceiptedAmount: '0',
+    drafts: { stockReceipts: 1, stockIssues: 2, paymentReceipts: 3 },
   }
 }

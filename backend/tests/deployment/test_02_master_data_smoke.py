@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.db.seed import DEMO_USERS
+from app.db.seed_data import USERS as SEED_USERS
 from tests.support.wards import open_ward
 
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
@@ -15,7 +15,7 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
     base = os.environ.get(variable)
     if not base or not base.startswith("http://127.0.0.1:"):
         pytest.fail("Deployment smoke requires explicit disposable loopback URL")
-    email, _, _, password, _ = DEMO_USERS[0]
+    email, _, _, password, _ = SEED_USERS[0]
     with httpx.Client(
         base_url=base, timeout=float(os.getenv("AUTH_SMOKE_TIMEOUT_SECONDS", "10"))
     ) as client:
@@ -23,7 +23,7 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
         assert login.status_code == 200
         client.headers["Authorization"] = "Bearer " + login.json()["accessToken"]
         functions = client.get("/api/v1/functions", params={"limit": 100})
-        assert functions.status_code == 200 and len(functions.json()["items"]) == 33
+        assert functions.status_code == 200 and len(functions.json()["items"]) == 22
         code = "SMOKE_" + uuid4().hex
         group = client.post("/api/v1/user-groups", json={"code": code, "name": code})
         permission_path = group.headers["Location"] + "/permissions/1"
@@ -63,7 +63,7 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
             == 200
         )
         product = client.post("/api/v1/products", json={"name": code, "unitId": 1})
-        assert product.status_code == 201 and product.json()["currentStock"] == "0"
+        assert product.status_code == 201 and product.json()["stock"] == "0"
         assert (
             client.delete(
                 product.headers["Location"], headers={"If-Match": product.headers["ETag"]}
@@ -81,18 +81,18 @@ def test_permissions_audit_rules_products_agencies_direct_and_nginx(variable):
                 "acceptedDate": "2026-10-04",
             },
         )
-        assert agency.status_code == 201 and agency.json()["currentDebt"] == "0"
-        headers = {"If-Match": agency.headers["ETag"], "Idempotency-Key": str(uuid4())}
+        assert agency.status_code == 201 and agency.json()["debt"] == "0"
+        headers = {"If-Match": agency.headers["ETag"]}
         terminated = client.post(
             agency.headers["Location"] + "/terminate", json={"reason": "Smoke"}, headers=headers
         )
         assert terminated.status_code == 200 and terminated.json()["status"] == "TERMINATED"
-        assert (
-            client.post(
-                agency.headers["Location"] + "/terminate", json={"reason": "Smoke"}, headers=headers
-            ).json()
-            == terminated.json()
+        repeated = client.post(
+            agency.headers["Location"] + "/terminate",
+            json={"reason": "Smoke"},
+            headers={"If-Match": terminated.headers["ETag"]},
         )
+        assert repeated.status_code == 409 and repeated.json()["code"] == "STATE_CONFLICT"
         assert (
             client.delete(
                 agency.headers["Location"], headers={"If-Match": terminated.headers["ETag"]}

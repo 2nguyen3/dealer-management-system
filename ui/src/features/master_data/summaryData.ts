@@ -1,5 +1,6 @@
 import type { PartDatum } from '@/components/charts/MebiusCharts'
 import { toNumber } from '@/lib/chart'
+import { t } from '@/lib/i18n/core'
 
 /** Display-only number of a server value (exact strings stay untouched elsewhere). */
 export function num(value: unknown): number {
@@ -55,7 +56,11 @@ export function partsBy<T>(
   const rest = parts.slice(MAX_PARTS - 1)
   return [
     ...kept,
-    { key: 'other', label: 'Khác', value: sumBy(rest, (part) => part.value) },
+    {
+      key: 'other',
+      label: t('Khác'),
+      value: sumBy(rest, (part) => part.value),
+    },
   ]
 }
 

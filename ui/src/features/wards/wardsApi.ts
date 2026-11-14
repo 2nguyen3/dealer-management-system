@@ -9,6 +9,7 @@ import {
   text,
   type Page,
 } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 export { WARD_KIND_LABELS, wardKindLabel } from '../../lib/labels'
 
@@ -65,9 +66,9 @@ export function wardListPath(query: WardListQuery = {}): string {
     limit !== undefined &&
     (!Number.isInteger(limit) || limit < 1 || limit > 100)
   )
-    throw new Error('Số dòng mỗi trang phải từ 1 đến 100.')
+    throw new Error(t('Số dòng mỗi trang phải từ 1 đến 100.'))
   if (kind !== undefined && !isWardKind(kind))
-    throw new Error('Loại đơn vị hành chính không hợp lệ.')
+    throw new Error(t('Loại đơn vị hành chính không hợp lệ.'))
   return queryPath('/wards', {
     q: q?.trim() ?? '',
     code: query.code?.trim() ?? '',
@@ -113,5 +114,5 @@ export async function listAllWards(signal?: AbortSignal): Promise<Ward[]> {
     if (!result.pagination.hasMore || !next) return items
     cursor = next
   }
-  throw new Error('Danh mục phường/xã vượt quá số trang cho phép.')
+  throw new Error(t('Danh mục phường/xã vượt quá số trang cho phép.'))
 }

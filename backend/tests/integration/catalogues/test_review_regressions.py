@@ -105,7 +105,7 @@ def test_grant_revoked_while_type_waits_for_balance(client, engine):
     detail = client.get(created.headers["Location"])
     with Session(engine) as blocker:
         blocker.execute(
-            text('SELECT "agencyId" FROM dms.agency_balance WHERE "agencyId"=:id FOR UPDATE'),
+            text("SELECT id FROM dms.agency WHERE id=:id FOR UPDATE"),
             {"id": agency_id},
         )
         with ThreadPoolExecutor(1) as pool:
@@ -122,7 +122,7 @@ def test_grant_revoked_while_type_waits_for_balance(client, engine):
                         if observer.scalar(
                             text(
                                 "SELECT pid FROM pg_stat_activity WHERE datname=:db "
-                                "AND wait_event_type='Lock' AND query LIKE '%agency_balance%'"
+                                "AND wait_event_type='Lock' AND query LIKE '%FOR UPDATE OF a%'"
                             ),
                             {"db": engine.url.database},
                         ):

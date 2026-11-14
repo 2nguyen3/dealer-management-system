@@ -1,62 +1,45 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
 import { formatQuantity, formatVND } from '../../lib/formatters'
-import type {
-  DocumentLine,
-  GoodsKind,
-  LineInput,
+import {
+  emptyLine,
+  type GoodsKind,
+  type LineInput,
 } from '../document_history/documentContracts'
-import { quantitySign } from '../document_history/lineMath'
-import { canEstimate, emptyLine, estimateLine } from './lineEstimates'
+import type { ProductQuote } from '../document_history/useRecords'
+import { estimateLine, estimatePrice, issueLineWarning } from './lineEstimates'
+import { t } from '@/lib/i18n/core'
 
 // Static class strings so Tailwind can see every column template.
-const GRID: Record<GoodsKind, { base: string; priced?: string }> = {
-  STOCK_RECEIPT: {
-    base: 'md:grid-cols-[2rem_minmax(0,1fr)_8.5rem_10rem_9.5rem_2.25rem]',
-  },
-  STOCK_ISSUE: { base: 'md:grid-cols-[2rem_minmax(0,1fr)_10rem_2.25rem]' },
-  STOCK_ADJUSTMENT: {
-    base: 'md:grid-cols-[2rem_minmax(0,1fr)_10rem_5.5rem_2.25rem]',
-  },
-  SALES_RETURN: {
-    base: 'md:grid-cols-[2rem_minmax(0,1fr)_9rem_2.25rem]',
-    priced: 'md:grid-cols-[2rem_minmax(0,1fr)_9rem_9.5rem_2.25rem]',
-  },
+const GRID: Record<GoodsKind, string> = {
+  STOCK_RECEIPT:
+    'md:grid-cols-[2rem_minmax(0,1fr)_8.5rem_10rem_9.5rem_2.25rem]',
+  STOCK_ISSUE: 'md:grid-cols-[2rem_minmax(0,1fr)_8.5rem_9rem_9.5rem_2.25rem]',
 }
 
 /**
- * Line editor shared by create, pending replacement and corrections, laid out
- * as an editable table on desktop and stacked cards on phones. Product lines
- * use a searchable picker; return lines choose from the original issue's lines
- * when they are loaded (`originLines`), otherwise fall back to a code box. The
- * submitted values stay the exact server id strings.
+ * Line editor of receipts and issues, laid out as an editable table on
+ * desktop and stacked cards on phones. Receipts enter the purchase price;
+ * issue prices are quoted by the server (shown as an estimate from the
+ * product's current selling price). Values stay exact server strings.
  */
 export function GoodsLineEditor({
   kind,
   lines,
   onChange,
   disabled = false,
-  originLines,
+  quotes = {},
 }: {
   kind: GoodsKind
   lines: LineInput[]
   onChange: (lines: LineInput[]) => void
   disabled?: boolean
-  /** Original issue lines for a sales return; null while none is chosen. */
-  originLines?: DocumentLine[] | null
+  quotes?: Record<string, ProductQuote>
 }) {
-  const isReturn = kind === 'SALES_RETURN'
-  const isAdjustment = kind === 'STOCK_ADJUSTMENT'
-  const priced = canEstimate(kind, originLines)
-  const quantityLabel = `Số lượng${isAdjustment ? ' (+/-)' : ''}`
-  // Adjustments may write off discontinued goods; new receipts/issues need active goods.
-  const productParams = isAdjustment ? undefined : { status: 'ACTIVE' }
-  const grid = (priced && GRID[kind].priced) || GRID[kind].base
+  const issue = kind === 'STOCK_ISSUE'
   function update(index: number, patch: Partial<LineInput>) {
     onChange(
       lines.map((item, position) =>
@@ -71,123 +54,113 @@ export function GoodsLineEditor({
     >
       <legend className="float-left flex w-full items-center justify-between gap-3 border-b px-4 py-3">
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          Danh sách dòng hàng
+          {t('Danh sách dòng hàng')}
           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
             {lines.length}
           </span>
         </span>
-        {isAdjustment && (
-          <span className="text-xs text-muted-foreground">+ tăng · − giảm</span>
+        {issue && (
+          <span className="text-xs text-muted-foreground">
+            {t('Đơn giá do hệ thống tính khi ghi sổ')}
+          </span>
         )}
       </legend>
       <div className="clear-both space-y-3 p-3 md:space-y-0 md:p-0">
-        {isReturn && originLines === null && (
-          <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-[13px] text-muted-foreground md:m-3">
-            Chọn phiếu xuất gốc trước.
-          </p>
-        )}
         <div
           className={cn(
             'hidden gap-3 border-b bg-muted/60 px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase md:grid',
-            grid,
+            GRID[kind],
           )}
           aria-hidden="true"
         >
           <span>#</span>
-          <span>{isReturn ? 'Dòng bán gốc' : 'Mặt hàng'}</span>
-          <span className="text-right">{quantityLabel}</span>
-          {kind === 'STOCK_RECEIPT' && (
-            <span className="text-right">Đơn giá nhập</span>
-          )}
-          {isAdjustment && <span>Hướng</span>}
-          {priced && <span className="text-right">Tạm tính</span>}
+          <span>{t('Mặt hàng')}</span>
+          <span className="text-end">{t('Số lượng')}</span>
+          <span className="text-end">
+            {issue ? t('Giá bán dự kiến') : t('Đơn giá nhập')}
+          </span>
+          <span className="text-end">{t('Tạm tính')}</span>
           <span />
         </div>
         {lines.map((line, index) => {
-          const amount = priced ? estimateLine(kind, line, originLines) : null
-          const sign = isAdjustment ? quantitySign(line.quantity) : null
+          const quote = quotes[line.productId]
+          const amount = estimateLine(kind, line, quotes)
+          const price = issue ? estimatePrice(kind, line, quotes) : null
+          const warning = issue ? issueLineWarning(line, quote) : null
           return (
             <div
               key={index}
               role="group"
-              aria-label={`Dòng ${index + 1}`}
+              aria-label={t('Dòng {value}', { value: index + 1 })}
               className={cn(
                 'grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border p-3',
                 'md:rounded-none md:border-0 md:border-b md:px-3 md:py-2 md:last:border-b-0 md:[&_label]:sr-only',
-                grid,
+                GRID[kind],
               )}
             >
               <span className="text-xs font-semibold text-muted-foreground tabular-nums md:text-sm md:font-normal">
-                <span className="md:hidden">Dòng </span>
+                <span className="md:hidden">{t('Dòng')} </span>
                 {index + 1}
               </span>
               <div className="col-span-2 min-w-0 md:col-span-1">
-                {!isReturn ? (
-                  <EntityPicker
-                    id={`line-${index}-product`}
-                    resource="products"
-                    label="Mặt hàng"
-                    required
-                    disabled={disabled}
-                    params={productParams}
-                    value={line.productId}
-                    onChange={(productId) => update(index, { productId })}
-                  />
-                ) : originLines !== undefined ? (
-                  <Select
-                    id={`line-${index}-origin`}
-                    label="Dòng bán gốc"
-                    aria-label={`Dòng bán gốc ${index + 1}`}
-                    required
-                    disabled={!originLines?.length}
-                    value={line.originLineId}
-                    onChange={(event) =>
-                      update(index, { originLineId: event.target.value })
-                    }
-                    options={[
-                      { value: '', label: 'Chọn dòng hàng đã bán…' },
-                      ...(originLines ?? []).map((item) => ({
-                        value: item.id,
-                        label: `${item.productName} — đã bán ${formatQuantity(item.quantity)} ${item.unitName}`,
-                      })),
-                    ]}
-                  />
-                ) : (
-                  <Input
-                    id={`line-${index}-id`}
-                    label="Mã dòng bán gốc"
-                    aria-label={`Mã dòng bán gốc ${index + 1}`}
-                    required
-                    value={line.originLineId}
-                    onChange={(event) =>
-                      update(index, { originLineId: event.target.value })
-                    }
-                  />
+                <EntityPicker
+                  id={`line-${index}-product`}
+                  resource="products"
+                  label={t('Mặt hàng')}
+                  required
+                  disabled={disabled}
+                  params={{ status: 'ACTIVE' }}
+                  value={line.productId}
+                  onChange={(productId) => update(index, { productId })}
+                />
+                {quote && (
+                  <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                    {t('Tồn {stock} {unitName}', {
+                      stock: formatQuantity(quote.stock),
+                      unitName: quote.unitName,
+                    })}
+                  </p>
+                )}
+                {warning && (
+                  <p role="alert" className="mt-1 text-xs text-destructive">
+                    {warning}
+                  </p>
                 )}
               </div>
               <div className="col-span-2 md:col-span-1">
                 <Input
                   id={`line-${index}-quantity`}
-                  label={quantityLabel}
-                  aria-label={`Số lượng ${index + 1}${isAdjustment ? ' (+/-)' : ''}`}
+                  label={t('Số lượng')}
+                  aria-label={t('Số lượng {value}', { value: index + 1 })}
                   required
                   inputMode="decimal"
-                  className="text-right tabular-nums"
+                  className="text-end tabular-nums"
                   value={line.quantity}
                   onChange={(event) =>
                     update(index, { quantity: event.target.value })
                   }
                 />
               </div>
-              {kind === 'STOCK_RECEIPT' && (
+              {issue ? (
+                <p className="col-span-2 flex items-center justify-between gap-2 text-sm md:col-span-1 md:justify-end">
+                  <span className="text-xs text-muted-foreground md:sr-only">
+                    {t('Giá bán dự kiến')}
+                  </span>
+                  <span className="text-foreground tabular-nums">
+                    {price === null ? '—' : formatVND(price)}
+                  </span>
+                </p>
+              ) : (
                 <div className="col-span-2 md:col-span-1">
                   <Input
                     id={`line-${index}-price`}
-                    label="Đơn giá nhập (VNĐ)"
-                    aria-label={`Đơn giá nhập ${index + 1} (VNĐ)`}
+                    label={t('Đơn giá nhập (VNĐ)')}
+                    aria-label={t('Đơn giá nhập {value} (VNĐ)', {
+                      value: index + 1,
+                    })}
                     required
                     inputMode="numeric"
-                    className="text-right tabular-nums"
+                    className="text-end tabular-nums"
                     value={line.unitPrice}
                     onChange={(event) =>
                       update(index, { unitPrice: event.target.value })
@@ -195,35 +168,22 @@ export function GoodsLineEditor({
                   />
                 </div>
               )}
-              {isAdjustment && (
-                <div className="col-span-2 md:col-span-1">
-                  {sign === 1 ? (
-                    <Badge variant="success">Tăng</Badge>
-                  ) : sign === -1 ? (
-                    <Badge variant="danger">Giảm</Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </div>
-              )}
-              {priced && (
-                <p className="col-span-2 flex items-center justify-between gap-2 text-sm md:col-span-1 md:justify-end">
-                  <span className="text-xs text-muted-foreground md:sr-only">
-                    Tạm tính
-                  </span>
-                  <span className="font-medium text-foreground tabular-nums">
-                    {amount === null ? '—' : formatVND(amount.toString())}
-                  </span>
-                </p>
-              )}
+              <p className="col-span-2 flex items-center justify-between gap-2 text-sm md:col-span-1 md:justify-end">
+                <span className="text-xs text-muted-foreground md:sr-only">
+                  {t('Tạm tính')}
+                </span>
+                <span className="font-medium text-foreground tabular-nums">
+                  {amount === null ? '—' : formatVND(amount.toString())}
+                </span>
+              </p>
               <div className="order-first col-start-2 row-start-1 flex justify-end md:order-none md:col-auto md:row-auto">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="size-8 p-0 text-muted-foreground hover:text-destructive"
-                  aria-label={`Xóa dòng ${index + 1}`}
-                  title={`Xóa dòng ${index + 1}`}
+                  aria-label={t('Xóa dòng {value}', { value: index + 1 })}
+                  title={t('Xóa dòng {value}', { value: index + 1 })}
                   disabled={lines.length === 1}
                   onClick={() =>
                     onChange(lines.filter((_, position) => position !== index))
@@ -245,7 +205,7 @@ export function GoodsLineEditor({
           icon={<Plus className="size-4" />}
           onClick={() => onChange([...lines, emptyLine()])}
         >
-          Thêm dòng
+          {t('Thêm dòng')}
         </Button>
       </div>
     </fieldset>

@@ -1,5 +1,4 @@
 from unittest.mock import patch
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -15,9 +14,10 @@ from tests.auth.test_http import assert_schema_constraints
 from tests.support.contract import SOURCE, assert_schema, resolve
 
 pytestmark = pytest.mark.integration
+TABLES = {"products": "product", "agencies": "agency"}
 CASES = {
-    "products": (ProductService, ProductCreate, ProductUpdate, "Product"),
-    "agencies": (AgencyService, AgencyCreate, AgencyUpdate, "Agency"),
+    "products": (ProductService, ProductCreate, ProductUpdate, "ProductResponse"),
+    "agencies": (AgencyService, AgencyCreate, AgencyUpdate, "AgencyResponse"),
 }
 
 
@@ -64,8 +64,9 @@ def test_crud_state_contract_errors_and_rollback(client, engine, actor, masters,
         {},
         {"name": None},
         {"code": "INJECT"},
-        {"currentStock": "1"},
-        {"currentDebt": "1"},
+        {"stock": "1"},
+        {"debt": "1"},
+        {"lastPurchasePrice": "1"},
     ):
         assert (
             client.patch(
@@ -86,8 +87,9 @@ def test_crud_state_contract_errors_and_rollback(client, engine, actor, masters,
         next_page = client.get(
             path, params={"sort": sort, "limit": 1, "cursor": page["pagination"]["nextCursor"]}
         )
-        assert next_page.status_code == 200 and next_page.json()["items"][0] != page["items"][0]
-        assert_schema(next_page.json(), schema + "ListResponse")
+        assert next_page.status_code == 200, (sort, next_page.text)
+        assert next_page.json()["items"][0] != page["items"][0]
+        assert_schema(next_page.json(), schema.removesuffix("Response") + "ListResponse")
     with Session(engine) as session:
         service = kind(session, CursorCodec(b"x" * 32), actor, "master-rollback", lambda _: None)
         with patch.object(session, "commit", side_effect=RuntimeError("forced")):
@@ -109,11 +111,9 @@ def test_crud_state_contract_errors_and_rollback(client, engine, actor, masters,
     assert removed.status_code == 204 and not removed.content
     assert client.get(detail).status_code == 404
     with engine.connect() as c:
-        cache = "inventory_balance" if resource == "products" else "agency_balance"
-        owner = "productId" if resource == "products" else "agencyId"
         assert (
             c.execute(
-                text(f'SELECT count(*) FROM dms.{cache} WHERE "{owner}"=:id'),
+                text(f"SELECT count(*) FROM dms.{TABLES[resource]} WHERE id=:id"),
                 {"id": int(first.json()["id"])},
             ).scalar()
             == 0
@@ -177,36 +177,33 @@ def test_all_new_operations_exact_runtime_contract(client):
     assert count == 20
 
 
-def test_termination_key_replay_state_and_rollback(client, engine, actor, masters):
+def test_termination_state_precondition_and_rollback(client, engine, actor, masters):
     created = client.post("/api/v1/agencies", json=body_for("agencies", masters))
     path = created.headers["Location"] + "/terminate"
-    headers = {"If-Match": created.headers["ETag"], "Idempotency-Key": str(uuid4())}
-    result = client.post(path, json={"reason": "End"}, headers=headers)
+    assert client.post(path, json={"reason": "End"}).status_code == 428
+    assert (
+        client.post(path, json={"reason": " "}, headers={"If-Match": created.headers["ETag"]})
+    ).status_code == 422
+    result = client.post(
+        path, json={"reason": "End"}, headers={"If-Match": created.headers["ETag"]}
+    )
     assert result.status_code == 200, result.text
     assert result.json()["status"] == "TERMINATED"
-    assert_schema(result.json(), "Agency")
-    retry = client.post(path, json={"reason": "End"}, headers=headers)
-    assert retry.json() == result.json() and retry.headers["ETag"] == result.headers["ETag"]
-    assert client.post(path, json={"reason": "Other"}, headers=headers).status_code == 409
+    assert result.json()["terminationReason"] == "End"
+    assert_schema(result.json(), "AgencyResponse")
+    # A stale tag is a precondition failure; a fresh tag meets the terminal state.
     assert (
-        client.post(
-            path,
-            json={"reason": "End"},
-            headers={"If-Match": result.headers["ETag"], "Idempotency-Key": str(uuid4())},
-        ).status_code
-        == 409
+        client.post(path, json={"reason": "End"}, headers={"If-Match": created.headers["ETag"]})
+    ).status_code == 412
+    repeated = client.post(
+        path, json={"reason": "End"}, headers={"If-Match": result.headers["ETag"]}
     )
+    assert repeated.status_code == 409 and repeated.json()["code"] == "STATE_CONFLICT"
     assert (
         client.post(
-            "/api/v1/agencies/999999/terminate", json={"reason": "End"}, headers=headers
+            "/api/v1/agencies/999999/terminate", json={"reason": "End"}, headers={"If-Match": '"x"'}
         ).status_code
         == 404
-    )
-    assert (
-        client.post(
-            path, json={"reason": "End"}, headers={"Idempotency-Key": str(uuid4())}
-        ).status_code
-        == 428
     )
     active = client.post("/api/v1/agencies", json=body_for("agencies", masters))
     with Session(engine) as session:
@@ -221,7 +218,6 @@ def test_termination_key_replay_state_and_rollback(client, engine, actor, master
                     int(active.json()["id"]),
                     Reason(reason="End"),
                     Preconditions(active.headers["ETag"]),
-                    uuid4(),
                 )
     assert client.get(active.headers["Location"]).json()["status"] == "ACTIVE"
     with engine.connect() as c:
@@ -231,4 +227,3 @@ def test_termination_key_replay_state_and_rollback(client, engine, actor, master
             ).scalar()
             == 0
         )
-        assert c.exec_driver_sql("SELECT count(*) FROM dms.api_idempotency").scalar() == 1

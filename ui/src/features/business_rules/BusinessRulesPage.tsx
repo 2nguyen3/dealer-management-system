@@ -1,4 +1,8 @@
 import { Calculator, MapPin, Percent, RefreshCw, Save } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { WorkflowSteps } from '../../components/guide/WorkflowSteps'
+import { t } from '../../lib/i18n/core'
+import { dirtyRules, ruleSteps } from '../guide/workflows'
 import {
   useEffect,
   useRef,
@@ -75,7 +79,7 @@ export function BusinessRulesPage() {
         !/[1-9]/.test(rate)
       )
         throw new Error(
-          'Hệ số phải dương, tối đa 3 chữ số nguyên và 6 chữ số lẻ.',
+          t('Hệ số phải dương, tối đa 3 chữ số nguyên và 6 chữ số lẻ.'),
         )
       const body = {
         maxAgenciesPerWard: catalog(capacity),
@@ -100,8 +104,16 @@ export function BusinessRulesPage() {
       for (const prefix of ['/business-rules', '/products'])
         invalidateCache(prefix)
       setNotice(
-        'Đã cập nhật quy định. Giá trên các chứng từ đã lập không thay đổi.',
+        t(
+          'Đã cập nhật quy định. Đơn giá trên các phiếu xuất đã ghi sổ không thay đổi.',
+        ),
       )
+      notifyNextStep({
+        done: t('Đã lưu quy định mới.'),
+        next: t(
+          'Phiếu xuất ghi sổ từ bây giờ dùng tỷ lệ giá bán mới; tiếp nhận đại lý dùng giới hạn mới.',
+        ),
+      })
     } catch (failure) {
       setError(message(failure))
     } finally {
@@ -118,11 +130,12 @@ export function BusinessRulesPage() {
     <div className="space-y-6">
       <PageHeader
         className="mb-0"
-        title="Thay đổi quy định"
+        title={t('Thay đổi quy định')}
         actions={
-          <InfoHint label="Giới thiệu quy định">
-            Quy định chung cho việc tiếp nhận đại lý và tính giá bán. Thay đổi
-            chỉ ảnh hưởng tới các chứng từ lập sau khi lưu.
+          <InfoHint label={t('Giới thiệu quy định')}>
+            {t(
+              'Quy định chung cho việc tiếp nhận đại lý và tính giá bán. Thay đổi chỉ ảnh hưởng tới các chứng từ ghi sổ sau khi lưu.',
+            )}
           </InfoHint>
         }
       />
@@ -135,13 +148,13 @@ export function BusinessRulesPage() {
       {etag && (
         <Stagger
           className="grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-3"
-          aria-label="Quy định đang áp dụng"
+          aria-label={t('Quy định đang áp dụng')}
           role="list"
         >
           <StaggerItem role="listitem">
             <KpiCard
               className="h-full"
-              label="Đại lý tối đa / phường/xã"
+              label={t('Đại lý tối đa / phường/xã')}
               icon={<MapPin />}
               value={
                 capacityValue === null ? '—' : <CountUp value={capacityValue} />
@@ -151,7 +164,7 @@ export function BusinessRulesPage() {
           <StaggerItem role="listitem">
             <KpiCard
               className="h-full"
-              label="Hệ số giá bán"
+              label={t('Hệ số giá bán')}
               icon={<Calculator />}
               value={
                 rateValue === null ? '—' : `×${formatQuantity(saved.rate)}`
@@ -159,24 +172,31 @@ export function BusinessRulesPage() {
               delta={
                 rateValue === null
                   ? undefined
-                  : { ratio: rateValue - 1, label: 'so với giá nhập' }
+                  : { ratio: rateValue - 1, label: t('so với giá nhập') }
               }
             />
           </StaggerItem>
           <StaggerItem role="listitem" className="col-span-2 sm:col-span-1">
             <KpiCard
               className="h-full"
-              label="Ví dụ giá nhập 100.000 ₫"
+              label={t('Ví dụ giá nhập 100.000 ₫')}
               icon={<Percent />}
               value={
                 rateValue === null
                   ? '—'
                   : formatVND(String(Math.round(100000 * rateValue)))
               }
-              hint="Giá bán tương ứng"
+              hint={t('Giá bán tương ứng')}
             />
           </StaggerItem>
         </Stagger>
+      )}
+      {canManage && (
+        <WorkflowSteps
+          label={t('Quy trình thay đổi quy định')}
+          className="max-w-3xl"
+          steps={ruleSteps(dirtyRules(capacity, rate, saved), !!notice)}
+        />
       )}
       <form
         onSubmit={submit}
@@ -184,34 +204,40 @@ export function BusinessRulesPage() {
         aria-busy={loading || undefined}
       >
         <div className="flex items-center justify-between gap-3 border-b px-5 py-3">
-          <h2 className="text-base font-semibold">Quy định đang áp dụng</h2>
-          {!canManage && <Badge variant="neutral">Chỉ xem</Badge>}
+          <h2 className="text-base font-semibold">
+            {t('Quy định đang áp dụng')}
+          </h2>
+          {!canManage && <Badge variant="neutral">{t('Chỉ xem')}</Badge>}
         </div>
         <div className="divide-y">
           <RuleRow
             icon={<MapPin className="size-5" />}
-            title="Tiếp nhận đại lý"
-            hint="Giới hạn số đại lý đang hoạt động trong cùng một phường/xã."
+            title={t('Tiếp nhận đại lý')}
+            hint={t(
+              'Giới hạn số đại lý đang hoạt động trong cùng một phường/xã.',
+            )}
           >
             <Input
               id="rule-capacity"
-              label="Số đại lý tối đa mỗi phường/xã"
+              label={t('Số đại lý tối đa mỗi phường/xã')}
               inputMode="numeric"
               className="tabular-nums"
               value={capacity}
               onChange={(event) => setCapacity(event.target.value)}
               disabled={!canManage || busy}
-              helperText="Áp dụng khi tiếp nhận đại lý mới."
+              helperText={t('Áp dụng khi tiếp nhận đại lý mới.')}
             />
           </RuleRow>
           <RuleRow
             icon={<Calculator className="size-5" />}
-            title="Tính giá bán"
-            hint="Giá bán của mặt hàng được tính từ giá nhập nhân với hệ số."
+            title={t('Tính giá bán')}
+            hint={t(
+              'Giá bán của mặt hàng được tính từ giá nhập nhân với hệ số.',
+            )}
           >
             <Input
               id="rule-rate"
-              label="Hệ số giá bán"
+              label={t('Hệ số giá bán')}
               inputMode="decimal"
               className="tabular-nums"
               value={rate}
@@ -219,8 +245,13 @@ export function BusinessRulesPage() {
               disabled={!canManage || busy}
               helperText={
                 rate && /^\d+(\.\d+)?$/.test(rate)
-                  ? `Giá bán = giá nhập × ${formatQuantity(rate)}. Dùng dấu chấm cho phần thập phân.`
-                  : 'Giá bán = giá nhập × hệ số. Dùng dấu chấm cho phần thập phân.'
+                  ? t(
+                      'Giá bán = giá nhập × {rate}. Dùng dấu chấm cho phần thập phân.',
+                      { rate: formatQuantity(rate) },
+                    )
+                  : t(
+                      'Giá bán = giá nhập × hệ số. Dùng dấu chấm cho phần thập phân.',
+                    )
               }
             />
           </RuleRow>
@@ -236,7 +267,7 @@ export function BusinessRulesPage() {
               setVersion((value) => value + 1)
             }}
           >
-            Tải lại quy định
+            {t('Tải lại quy định')}
           </Button>
           {canManage && (
             <Button
@@ -245,7 +276,7 @@ export function BusinessRulesPage() {
               isLoading={busy}
               icon={<Save className="size-4" />}
             >
-              Lưu thay đổi quy định
+              {t('Lưu thay đổi quy định')}
             </Button>
           )}
         </div>
@@ -275,7 +306,7 @@ function RuleRow({
           {icon}
         </span>
         <h3 className="text-sm font-semibold">{title}</h3>
-        <InfoHint label={`Giải thích ${title}`}>{hint}</InfoHint>
+        <InfoHint label={t('Giải thích {title}', { title })}>{hint}</InfoHint>
       </div>
       <div className="min-w-0">{children}</div>
     </div>

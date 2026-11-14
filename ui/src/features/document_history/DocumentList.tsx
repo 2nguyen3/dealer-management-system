@@ -20,41 +20,37 @@ import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Table } from '../../components/ui/Table'
 import { formatDate, formatVND } from '../../lib/formatters'
-import { kindLabel, statusLabel } from '../../lib/labels'
+import { kindLabel, methodLabel, statusLabel } from '../../lib/labels'
 import { useAuth } from '../authentication/useAuth'
 import {
   canReadKind,
+  DOCUMENT_STATUSES,
   documentKinds,
   parseSummary,
+  RECEIPT_TYPES,
   type DocumentKind,
   type DocumentSummary,
 } from './documentContracts'
 import { DocumentInsights } from './DocumentInsights'
 import { FilterStatus, SegmentedFilter, TableSkeleton } from './DocumentParts'
+import { replacementSuffix } from './insightsModel'
 import { useDocumentPage } from './useDocumentRequests'
+import { t } from '@/lib/i18n/core'
 
 /** Server default order of every document list (contract `sort` default). */
 export const DOCUMENT_DEFAULT_SORT = '-businessDate'
-/** Contract sort fields of /documents and the four goods-document lists. */
+/** Contract sort fields of /documents and the three per-kind lists. */
 export const DOCUMENT_SORT_OPTIONS = [
-  { field: 'businessDate', label: 'Ngày chứng từ' },
-  { field: 'totalAmount', label: 'Tổng tiền' },
-  { field: 'createdAt', label: 'Thời điểm lập' },
-  { field: 'id', label: 'Thứ tự lập' },
+  { field: 'businessDate', label: t('Ngày chứng từ') },
+  { field: 'totalAmount', label: t('Tổng tiền') },
+  { field: 'createdAt', label: t('Thời điểm lập') },
+  { field: 'id', label: t('Thứ tự lập') },
 ] as const
 
-const statuses = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
-// Receipts and adjustments never carry an agency; issues/returns/money kinds do.
-const agencyless: readonly DocumentKind[] = [
-  'STOCK_RECEIPT',
-  'STOCK_ADJUSTMENT',
-]
-// Money-only kinds have no product lines to filter by.
-const productless: readonly DocumentKind[] = [
-  'PAYMENT_RECEIPT',
-  'CREDIT_APPLICATION',
-  'REFUND',
-]
+// Goods receipts never carry an agency; issues and payment receipts do.
+const agencyless: readonly DocumentKind[] = ['STOCK_RECEIPT']
+// Payment receipts have no product lines to filter by.
+const productless: readonly DocumentKind[] = ['PAYMENT_RECEIPT']
 const emptyDraft = {
   q: '',
   kind: '',
@@ -62,28 +58,25 @@ const emptyDraft = {
   toDate: '',
   agencyId: '',
   productId: '',
+  receiptType: '',
 }
 
-/** Status segments for a list: only stock issues wait in PENDING. */
-function statusSegments(kind?: DocumentKind) {
+/** Status segments of every document list: draft, posted, cancelled. */
+function statusSegments() {
   return [
-    { value: '', label: 'Tất cả' },
-    ...statuses
-      .filter((value) => value !== 'PENDING' || !kind || kind === 'STOCK_ISSUE')
-      .map((value) => ({ value, label: statusLabel(value) })),
+    { value: '', label: t('Tất cả') },
+    ...DOCUMENT_STATUSES.map((value) => ({ value, label: statusLabel(value) })),
   ]
 }
 
 export function DocumentList({
   kind,
-  posted = false,
   version = 0,
   actions,
   onRowClick,
   insights = true,
 }: {
   kind?: DocumentKind
-  posted?: boolean
   version?: number
   actions: (row: DocumentSummary) => ReactNode
   /** Primary row action; the row stays keyboard-reachable via `actions`. */
@@ -105,25 +98,36 @@ export function DocumentList({
         canReadKind(item as DocumentKind, hasPermission),
       )
   const query = new URLSearchParams(filters)
-  if (status && !posted) query.set('status', status)
+  if (status) query.set('status', status)
   query.set('limit', String(limit))
   query.set('sort', sort || DOCUMENT_DEFAULT_SORT)
-  if (posted) query.set('status', 'POSTED')
   if (cursors.at(-1)) query.set('cursor', cursors.at(-1)!)
   const path = `${kind ? documentKinds[kind].path : '/documents'}?${query}`
   // Version changes trigger only this active list, not unrelated master/ledger reads.
   const data = useDocumentPage(allowed ? path : null, parseSummary, version)
-  if (!allowed) return <Alert type="error">Không có quyền đọc chứng từ.</Alert>
+  if (!allowed)
+    return <Alert type="error">{t('Không có quyền đọc chứng từ.')}</Alert>
   const showKind = !kind
   const showAgency = !kind || !agencyless.includes(kind)
   const showProduct = !kind || !productless.includes(kind)
+  const showReceiptType =
+    kind === 'PAYMENT_RECEIPT' || (!kind && draft.kind === 'PAYMENT_RECEIPT')
+  const showTypeColumn = kind === 'PAYMENT_RECEIPT'
   const activeFilters =
     [...new URLSearchParams(filters).keys()].length + (status ? 1 : 0)
-  const columns = 5 + (showKind ? 1 : 0) + (showAgency ? 1 : 0)
+  const columns =
+    5 + (showKind ? 1 : 0) + (showAgency ? 1 : 0) + (showTypeColumn ? 1 : 0)
   function apply(next: typeof draft) {
     const params = new URLSearchParams()
+    const payments =
+      kind === 'PAYMENT_RECEIPT' || (!kind && next.kind === 'PAYMENT_RECEIPT')
     for (const [name, value] of Object.entries(next))
-      if (value && (!kind || name !== 'kind')) params.set(name, value)
+      if (
+        value &&
+        (!kind || name !== 'kind') &&
+        (name !== 'receiptType' || payments)
+      )
+        params.set(name, value)
     setCursors([''])
     setFilters(params.toString())
   }
@@ -145,7 +149,7 @@ export function DocumentList({
     <div className="space-y-4">
       <Card className="gap-0 p-3 shadow-xs sm:p-4">
         <form
-          aria-label="Bộ lọc chứng từ"
+          aria-label={t('Bộ lọc chứng từ')}
           className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(0,1.6fr)_repeat(auto-fit,minmax(9.5rem,1fr))]"
           onSubmit={(event) => {
             event.preventDefault()
@@ -157,7 +161,7 @@ export function DocumentList({
               htmlFor={searchId}
               className="text-[13px] text-foreground/85"
             >
-              Tìm chứng từ
+              {t('Tìm chứng từ')}
             </Label>
             <InputGroup className="bg-card">
               <InputGroupAddon>
@@ -166,7 +170,7 @@ export function DocumentList({
               <InputGroupInput
                 id={searchId}
                 type="search"
-                placeholder="Mã, đại lý, ghi chú…"
+                placeholder={t('Mã, đại lý, ghi chú…')}
                 value={draft.q}
                 onChange={(event) =>
                   setDraft({ ...draft, q: event.target.value })
@@ -176,13 +180,13 @@ export function DocumentList({
           </div>
           {!kind && (
             <Select
-              label="Loại chứng từ"
+              label={t('Loại chứng từ')}
               value={draft.kind}
               onChange={(event) =>
                 setDraft({ ...draft, kind: event.target.value })
               }
               options={[
-                { value: '', label: 'Tất cả loại' },
+                { value: '', label: t('Tất cả loại') },
                 ...Object.entries(documentKinds)
                   .filter(([key]) =>
                     canReadKind(key as DocumentKind, hasPermission),
@@ -195,30 +199,46 @@ export function DocumentList({
             <EntityPicker
               id="document-filter-agency"
               resource="agencies"
-              label="Đại lý"
-              placeholder="Tất cả"
+              label={t('Đại lý')}
+              placeholder={t('Tất cả')}
               value={draft.agencyId}
               onChange={(agencyId) => setDraft({ ...draft, agencyId })}
+            />
+          )}
+          {showReceiptType && (
+            <Select
+              label={t('Hình thức thu')}
+              value={draft.receiptType}
+              onChange={(event) =>
+                setDraft({ ...draft, receiptType: event.target.value })
+              }
+              options={[
+                { value: '', label: t('Tất cả') },
+                ...RECEIPT_TYPES.map((value) => ({
+                  value,
+                  label: methodLabel(value),
+                })),
+              ]}
             />
           )}
           {showProduct && (
             <EntityPicker
               id="document-filter-product"
               resource="products"
-              label="Mặt hàng"
-              placeholder="Tất cả"
+              label={t('Mặt hàng')}
+              placeholder={t('Tất cả')}
               value={draft.productId}
               onChange={(productId) => setDraft({ ...draft, productId })}
             />
           )}
           <DateField
-            label="Từ ngày"
+            label={t('Từ ngày')}
             value={draft.fromDate}
             max={draft.toDate || undefined}
             onChange={(fromDate) => setDraft({ ...draft, fromDate })}
           />
           <DateField
-            label="Đến ngày (không gồm)"
+            label={t('Đến ngày (không gồm)')}
             value={draft.toDate}
             min={draft.fromDate || undefined}
             onChange={(toDate) => setDraft({ ...draft, toDate })}
@@ -228,7 +248,7 @@ export function DocumentList({
             icon={<Filter className="size-4" />}
             className="w-full"
           >
-            Áp dụng bộ lọc
+            {t('Áp dụng bộ lọc')}
           </Button>
         </form>
       </Card>
@@ -237,7 +257,7 @@ export function DocumentList({
           <span className="flex flex-wrap items-center gap-3">
             {data.error}
             <Button variant="outline" size="sm" onClick={data.reload}>
-              Thử tải lại
+              {t('Thử tải lại')}
             </Button>
           </span>
         </Alert>
@@ -251,27 +271,21 @@ export function DocumentList({
       <Card className="gap-0 overflow-hidden py-0 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {posted ? (
-              <p className="text-sm font-medium text-foreground">
-                Chứng từ đã ghi sổ
-              </p>
-            ) : (
-              <SegmentedFilter
-                label="Lọc theo trạng thái"
-                value={status}
-                options={statusSegments(kind)}
-                onChange={(next) => {
-                  setStatus(next)
-                  setCursors([''])
-                }}
-              />
-            )}
+            <SegmentedFilter
+              label={t('Lọc theo trạng thái')}
+              value={status}
+              options={statusSegments()}
+              onChange={(next) => {
+                setStatus(next)
+                setCursors([''])
+              }}
+            />
             <FilterStatus count={activeFilters} onReset={reset} />
           </div>
           <div className="flex items-center gap-2">
             {data.page && (
               <span className="text-xs text-muted-foreground tabular-nums">
-                {data.page.items.length} dòng
+                {t('{count} dòng', { count: data.page.items.length })}
               </span>
             )}
             <SortMenu
@@ -282,24 +296,28 @@ export function DocumentList({
           </div>
         </div>
         {data.loading ? (
-          <TableSkeleton columns={columns} label="Đang tải chứng từ..." />
+          <TableSkeleton columns={columns} label={t('Đang tải chứng từ...')} />
         ) : (
           data.page &&
           (data.page.items.length ? (
             <div className="overflow-x-auto">
-              <Table caption="Danh sách chứng từ" className="min-w-[640px]">
+              <Table
+                caption={t('Danh sách chứng từ')}
+                className="min-w-[640px]"
+              >
                 <thead>
                   <tr>
-                    <th>Mã chứng từ</th>
-                    {showKind && <th>Loại</th>}
-                    {showAgency && <th>Đại lý</th>}
+                    <th>{t('Mã chứng từ')}</th>
+                    {showKind && <th>{t('Loại')}</th>}
+                    {showAgency && <th>{t('Đại lý')}</th>}
+                    {showTypeColumn && <th>{t('Hình thức')}</th>}
                     <SortableHeader
                       field="businessDate"
                       sort={sort}
                       onSort={onSort}
                       firstDirection="desc"
                     >
-                      Ngày
+                      {t('Ngày')}
                     </SortableHeader>
                     <SortableHeader
                       field="totalAmount"
@@ -308,11 +326,11 @@ export function DocumentList({
                       firstDirection="desc"
                       align="right"
                     >
-                      Tổng tiền
+                      {t('Tổng tiền')}
                     </SortableHeader>
-                    <th>Trạng thái</th>
+                    <th>{t('Trạng thái')}</th>
                     <th className="cell-actions">
-                      <span className="sr-only">Thao tác</span>
+                      <span className="sr-only">{t('Thao tác')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -333,6 +351,11 @@ export function DocumentList({
                             (row.agencyId ? `#${row.agencyId}` : '—')}
                         </td>
                       )}
+                      {showTypeColumn && (
+                        <td className="whitespace-nowrap">
+                          {methodLabel(row.receiptType)}
+                        </td>
+                      )}
                       <td className="whitespace-nowrap tabular-nums">
                         {formatDate(row.businessDate)}
                       </td>
@@ -342,11 +365,7 @@ export function DocumentList({
                       <td>
                         <StatusBadge
                           status={row.status}
-                          suffix={
-                            row.revisionNo > 1
-                              ? `v${row.revisionNo}`
-                              : undefined
-                          }
+                          suffix={replacementSuffix(row)}
                         />
                       </td>
                       <td
@@ -366,8 +385,8 @@ export function DocumentList({
             <div className="p-4">
               <EmptyState
                 icon={<FileSearch className="size-6" />}
-                title="Không có chứng từ phù hợp."
-                description={activeFilters ? 'Thử nới bộ lọc.' : undefined}
+                title={t('Không có chứng từ phù hợp.')}
+                description={activeFilters ? t('Thử nới bộ lọc.') : undefined}
               />
             </div>
           ))

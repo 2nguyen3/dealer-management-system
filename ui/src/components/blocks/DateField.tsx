@@ -7,6 +7,7 @@ import { Button } from '../shadcn/button'
 import { Calendar } from '../shadcn/calendar'
 import { Label } from '../shadcn/label'
 import { Popover, PopoverContent, PopoverTrigger } from '../shadcn/popover'
+import { t } from '@/lib/i18n/core'
 
 export interface DateFieldProps {
   label?: string
@@ -80,7 +81,7 @@ export function DateField({
               className={cn(
                 'w-full justify-start bg-card px-3 font-normal tabular-nums',
                 !selected && 'text-muted-foreground',
-                clearable && selected && 'pr-9',
+                clearable && selected && 'pe-9',
               )}
             >
               <CalendarIcon className="size-4 opacity-60" aria-hidden="true" />
@@ -109,8 +110,8 @@ export function DateField({
           <button
             type="button"
             onClick={() => onChange('')}
-            className="absolute inset-y-0 right-1 my-auto flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label={`Xóa ${label ?? 'ngày'}`}
+            className="absolute inset-y-0 end-1 my-auto flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label={t('Xóa {label}', { label: label ?? t('ngày') })}
           >
             <X className="size-3.5" aria-hidden="true" />
           </button>

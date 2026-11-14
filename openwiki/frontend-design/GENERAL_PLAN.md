@@ -1,5 +1,35 @@
 # General Plan
 
+## Đơn giản hóa 14/11/2026
+
+On 14/11/2026 the user simplified the DMS business model (backend schema 0011, three
+document kinds). Plan history below is unchanged; removed slices are marked
+**Bỏ theo yêu cầu 14/11/2026**. Plan and evidence:
+[simplification PLAN](../backend-design/plan/simplification/PLAN.md) and
+[VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md).
+
+- **Documents:** Phiếu nhập (PN), Phiếu xuất (PX), Phiếu thu (PT); `DRAFT → POSTED → CANCELLED`.
+  Each posted-document detail offers **Hủy** and **Sửa có lý do** (reason required; correction =
+  cancel + replacement, shown as "Thay thế cho …" / "Đã được thay bằng …"), only for documents
+  dated in the current month. The issue page shows current debt / limit / debt after the document
+  and a "Ghi sổ & lập phiếu thu" shortcut; payment receipts have no FIFO allocation and are
+  blocked above current debt.
+- **Removed features (Bỏ theo yêu cầu 14/11/2026):** `inventory` (F15), `upfront_payments` (F19),
+  `receivables` (F20), `stock_adjustments` (F21), `stock_counts` (F22), `sales_returns` (F23),
+  `agency_credit` (F24), `credit_applications` (F25), `refunds` (F27) and the separate
+  `document_corrections` feature (F29); the issue submit/PENDING/revision flow in F17; the product
+  low-stock threshold. Guide/i18n/Portal entries for them are removed too.
+- **Changed:** agencies show current debt / max debt; products show stock, last purchase price and
+  selling price; online payments have no refund and are limited to current debt; document history
+  shows the replacement chain; reports/dashboard follow the new formulas.
+- **Menu (18 items):** Tổng quan (Cổng quản lý, Bảng điều khiển, Báo cáo) · Đại lý & Hàng hóa
+  (Đại lý, Mặt hàng) · Chứng từ (Phiếu nhập, Phiếu xuất, Phiếu thu, Thanh toán trực tuyến) ·
+  Danh mục & Quy định (Loại đại lý, Đơn vị tính, Thay đổi quy định) · Quản trị & Lịch sử (Tài khoản,
+  Nhóm, Phân quyền, Nhật ký, Lịch sử chứng từ, Trợ lý AI).
+- **Contract:** [backend runtime API](../backend-design/API/openapi.json), 90 operations.
+
+The status text and checkpoints below are historical.
+
 **Frontend implementation order, module dependencies, API integration contract,
 and completion gates**
 
@@ -248,12 +278,12 @@ than assuming a read permission also grants profile editing or master-data acces
 | Step | Module / slice | Screen/action contract | Frontend prerequisites | Backend integration gate |
 | --- | --- | --- | --- | --- |
 | F14 | `document_workbench` | Shared draft header/line editor, kind dispatch, reason/confirmation patterns, snapshots, preview-vs-posted totals, parent ETags and stable user-intent keys. | F12, F13 | M13 plus each owning kind's implemented handlers; do not offer arbitrary generic posting or financial goods lines. |
-| F15 | `inventory` | Inventory: current-stock entry points and product ledger/stock statement, date/effective-entry filters and opening balance. | F14 | M14; inventory.read; current product overview stays in products. |
+| F15 | `inventory` — **Bỏ theo yêu cầu 14/11/2026.** | Inventory: current-stock entry points and product ledger/stock statement, date/effective-entry filters and opening balance. | F14 | M14; inventory.read; current product overview stays in products. |
 | F16 | `stock_receipts` — core | Stock Receipts: list/detail/create/draft header and line editing/post/draft cancel; posted snapshot states. | F15 | M15 and receipt-kind M13 lines; posted correction/cancel waits for F29/M29. |
-| F17 | `stock_issues` — core | Stock Issues: list/detail/draft editing/submit/READY snapshot/zero-upfront post; pending replacement without received money; draft cancellation. | F16 | M17; READY price preserved, stock/current limit rechecked at post; money-dependent completion waits for F19/M19. |
+| F17 | `stock_issues` — core | Đơn giản hóa 14/11/2026: submit/READY/pending replacement/upfront bỏ. Historical scope: Stock Issues: list/detail/draft editing/submit/READY snapshot/zero-upfront post; pending replacement without received money; draft cancellation. | F16 | M17; READY price preserved, stock/current limit rechecked at post; money-dependent completion waits for F19/M19. |
 | F18 | `payment_receipts` — core | Payment Receipts: list/detail/manual debt receipt draft/edit/post/draft cancel; FIFO allocation and authoritative paid/debt results. | F17 | M18; no manual invoice allocation or edit of automatic/online receipts; posted correction/cancel waits for F29/M29. |
-| F19 | `upfront_payments` + stock-issue integration | Upfront Payments: verification list/detail, record real-money evidence, receive separately, consume through issue posting, pending revision replacement after separation. | F18 | M19; VERIFIED is not a receipt; issue/automatic receipt atomic; failed stock post does not discard already received money. |
-| F20 | `receivables` | Receivables: financial overview, agency balance, invoice outstanding/settlement, statement and source allocations. | F19 | M20; same `/agencies/{agencyId}/balance` resource shared with Agency Credit, not duplicated. |
+| F19 | `upfront_payments` + stock-issue integration — **Bỏ theo yêu cầu 14/11/2026.** | Upfront Payments: verification list/detail, record real-money evidence, receive separately, consume through issue posting, pending revision replacement after separation. | F18 | M19; VERIFIED is not a receipt; issue/automatic receipt atomic; failed stock post does not discard already received money. |
+| F20 | `receivables` — **Bỏ theo yêu cầu 14/11/2026.** | Receivables: financial overview, agency balance, invoice outstanding/settlement, statement and source allocations. | F19 | M20; same `/agencies/{agencyId}/balance` resource shared with Agency Credit, not duplicated. |
 
 The frontend mirrors backend staged delivery: issue drafts/zero-upfront can work
 first, then receipt/upfront integration. A stock_issues or payment_receipts core
@@ -263,13 +293,13 @@ slice is not a completed child module while F19/F29 gates remain deferred.
 
 | Step | Module / slice | Screen/action contract | Frontend prerequisites | Backend integration gate |
 | --- | --- | --- | --- | --- |
-| F21 | `stock_adjustments` — core | Stock Adjustments: draft/header/line editing and signed-delta posting, reasons, draft cancel and zero-price display. | F16 | M21; no sales/charge or purchase-price source change; posted correction/cancel waits for F29/M29. |
-| F22 | `stock_counts` | Stock Counts: captured book/movement snapshot, actual count entry, zero-difference lines, recount and confirmation/linked adjustment. | F21 | M22; stale snapshot recovery with new observations; nonzero conditional posting permission; confirmed records immutable. |
-| F23 | `sales_returns` — core | Sales Returns: source invoice/line selection, partial returns, original prices/cumulative rounding, post/draft cancel and debt/credit split. | F20 | M23; no automatic refund; real return date; posted correction/cancel waits for F29/M29. |
-| F24 | `agency_credit` | Agency Credit: provenance-aware lots/detail/statement/available-vs-reserved money and shared agency balance read. | F23 | M24; separate debt/credit; reservation/availability primitives from M16; full refund-linked display verified after F27. |
-| F25 | `credit_applications` — core | Credit Applications: draft/edit/post/draft cancel against unreserved credit and debt, server FIFO results, no new cash display. | F24 | M25; concurrent credit consumption/reservation rejection; posted correction/cancel waits for F29/M29. |
+| F21 | `stock_adjustments` — core — **Bỏ theo yêu cầu 14/11/2026.** | Stock Adjustments: draft/header/line editing and signed-delta posting, reasons, draft cancel and zero-price display. | F16 | M21; no sales/charge or purchase-price source change; posted correction/cancel waits for F29/M29. |
+| F22 | `stock_counts` — **Bỏ theo yêu cầu 14/11/2026.** | Stock Counts: captured book/movement snapshot, actual count entry, zero-difference lines, recount and confirmation/linked adjustment. | F21 | M22; stale snapshot recovery with new observations; nonzero conditional posting permission; confirmed records immutable. |
+| F23 | `sales_returns` — core — **Bỏ theo yêu cầu 14/11/2026.** | Sales Returns: source invoice/line selection, partial returns, original prices/cumulative rounding, post/draft cancel and debt/credit split. | F20 | M23; no automatic refund; real return date; posted correction/cancel waits for F29/M29. |
+| F24 | `agency_credit` — **Bỏ theo yêu cầu 14/11/2026.** | Agency Credit: provenance-aware lots/detail/statement/available-vs-reserved money and shared agency balance read. | F23 | M24; separate debt/credit; reservation/availability primitives from M16; full refund-linked display verified after F27. |
+| F25 | `credit_applications` — core — **Bỏ theo yêu cầu 14/11/2026.** | Credit Applications: draft/edit/post/draft cancel against unreserved credit and debt, server FIFO results, no new cash display. | F24 | M25; concurrent credit consumption/reservation rejection; posted correction/cancel waits for F29/M29. |
 | F26 | `online_payments` | Online Payments: create/list/detail/checkout/poll/reconcile/event summaries; explain pending/failed/expired/late verified success and full receipt/excess credit. | F24 | M26; checkout return is not proof; provider webhook is server-to-server, never signed or called by UI as an employee action. |
-| F27 | `refunds` | Refunds: source receipt/draft/reserve/manual-paid confirmation/cancel, reservation reads, online attempts/reconcile and verified-failure retry. | F25, F26 | M27; UNKNOWN money remains reserved; paid refunds immutable; retries preserve source/revision/key rules, no second payment on timeout. |
+| F27 | `refunds` — **Bỏ theo yêu cầu 14/11/2026.** | Refunds: source receipt/draft/reserve/manual-paid confirmation/cancel, reservation reads, online attempts/reconcile and verified-failure retry. | F25, F26 | M27; UNKNOWN money remains reserved; paid refunds immutable; retries preserve source/revision/key rules, no second payment on timeout. |
 
 F21/F22 can progress independently of the financial track after F16. Online
 payment source events are safe read-only summaries for authorized users; backend
@@ -281,7 +311,7 @@ verify UI handling of confirmed API state, not fake browser payment success.
 | Step | Module / slice | Screen/action contract | Frontend prerequisites | Backend integration gate |
 | --- | --- | --- | --- | --- |
 | F28 | `document_history` | Document History: cross-kind search, version timelines/detail/lines, source navigation and HTML/PDF print of selected snapshots. | F14, F22, F27 | M28; kind-based read permissions, historical immutability and implemented per-kind line operations. |
-| F29 | `document_corrections` + owning-module completion | Posted correction/cancel flows in receipt/issue/manual-payment/independent-adjustment/return/credit screens; required reasons/full replacement, effect review and blocked dependencies. | F28 | M29; atomic replay of all affected sources, retain received/refunded money; conditional cash.receipt.post; no edit/cancel of confirmed-count adjustment or paid refund. |
+| F29 | `document_corrections` + owning-module completion — **Bỏ theo yêu cầu 14/11/2026.** Hủy/Sửa có lý do now live in each document page. | Posted correction/cancel flows in receipt/issue/manual-payment/independent-adjustment/return/credit screens; required reasons/full replacement, effect review and blocked dependencies. | F28 | M29; atomic replay of all affected sources, retain received/refunded money; conditional cash.receipt.post; no edit/cancel of confirmed-count adjustment or paid refund. |
 | F30 | `reports` | Reports: sales/debt/inventory/product-sales/cash-and-credit filters, authoritative totals, JSON pages and full-filter XLSX/PDF export. | F29 | M30; same permissions/export filters, full filtered export rather than page-only export; original-period correction and return-period semantics. |
 | F31 | `dashboard` | Dashboard: authorized monthly sections, current balances vs period metrics, unreceipted upfront evidence, charts and top-10 lists. | F30 | M31; never request/display sections beyond grants; blocked/omitted sections handled without leaking totals. |
 | F32 | `chatbot` | Chatbot: read-only debt/inventory/sales question form, agency-code selection on ambiguous names, clarification/unsupported/unavailable states. | F31 | M32; same read permissions, no client-generated SQL/mutations or inferred dealer ownership. |
@@ -292,6 +322,8 @@ API, not dashboard HTTP responses. All module completion requires its whole
 source operation inventory and cross-module behavior, not just an initial page.
 
 ## 5. Frontend dependency graph
+
+Historical graph. Nodes marked "Bỏ 14/11/2026" were removed by the simplification.
 
 Edges match the frontend prerequisite column above. Backend gates are listed in
 the table rather than represented as duplicate frontend modules. Split workflows
@@ -317,24 +349,24 @@ flowchart TD
   F11 --> F13
   F12 --> F14[Document workbench]
   F13 --> F14
-  F14 --> F15[Inventory]
+  F14 --> F15[Inventory - Bỏ 14/11/2026]
   F15 --> F16[Stock receipts core]
   F16 --> F17[Stock issues core]
   F17 --> F18[Payment receipts core]
-  F18 --> F19[Upfront and issue integration]
-  F19 --> F20[Receivables]
-  F16 --> F21[Stock adjustments core]
-  F21 --> F22[Stock counts]
-  F20 --> F23[Sales returns core]
-  F23 --> F24[Agency credit]
-  F24 --> F25[Credit applications core]
+  F18 --> F19[Upfront - Bỏ 14/11/2026]
+  F19 --> F20[Receivables - Bỏ 14/11/2026]
+  F16 --> F21[Stock adjustments - Bỏ 14/11/2026]
+  F21 --> F22[Stock counts - Bỏ 14/11/2026]
+  F20 --> F23[Sales returns - Bỏ 14/11/2026]
+  F23 --> F24[Agency credit - Bỏ 14/11/2026]
+  F24 --> F25[Credit applications - Bỏ 14/11/2026]
   F24 --> F26[Online payments]
-  F25 --> F27[Refunds]
+  F25 --> F27[Refunds - Bỏ 14/11/2026]
   F26 --> F27
   F14 --> F28[Document history]
   F22 --> F28
   F27 --> F28
-  F28 --> F29[Corrections and owning-module completion]
+  F28 --> F29[Corrections feature - Bỏ 14/11/2026]
   F29 --> F30[Reports]
   F30 --> F31[Dashboard]
   F31 --> F32[Chatbot]
@@ -443,6 +475,7 @@ roadmap-only change. No child-plan directory or duplicate API contract was creat
 
 | Area | Current state | Next action |
 | --- | --- | --- |
+| Đơn giản hóa 14/11/2026 | Removed features deleted, 18-item menu, document Hủy/Sửa có lý do | Evidence in [simplification VERIFICATION](../backend-design/plan/simplification/VERIFICATION.md). |
 | React/Vite/TypeScript starter | Implemented; health status and docs link only | Preserve existing setup and request cleanup. |
 | Frontend General Plan | Prepared in this document | Preserve dependency table/graph while implementing F01 onward. |
 | F01–F32 child plans and implementation | [32 paired child plans and 140 HTML wireframes prepared](plan/full_frontend/PLAN.md); implementation not started | Begin F01 tooling and tests; recheck each child against published backend operations before live integration. |

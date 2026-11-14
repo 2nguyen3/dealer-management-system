@@ -1,15 +1,18 @@
+from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.common.pagination import build_page, cursor_error
 from app.core.exceptions import ApiError
+from app.modules.reports.queries import IDENTITIES
 from app.modules.reports.repository import ReportQueries
 from app.modules.reports.schemas import (
-    CashCreditAmounts,
-    CashCreditFilters,
-    CashCreditReportResponse,
-    CashCreditReportRow,
+    CollectionAmounts,
+    CollectionsFilters,
+    CollectionsReportResponse,
+    CollectionsReportRow,
     DebtAmounts,
     DebtFilters,
     DebtReportResponse,
@@ -29,37 +32,66 @@ from app.modules.reports.schemas import (
     SalesTotals,
 )
 
+
+@dataclass(frozen=True)
+class ReportSpec:
+    filters: type[BaseModel]
+    row: type[BaseModel]
+    response: type[BaseModel]
+    totals: type[BaseModel] | None
+    sorts: tuple[str, ...]
+    default_sort: str
+    title: str
+
+
 REPORTS = {
-    "sales": (SalesFilters, SalesReportRow, SalesReportResponse, SalesTotals),
-    "debt": (DebtFilters, DebtReportRow, DebtReportResponse, DebtAmounts),
-    "inventory": (InventoryFilters, InventoryReportRow, InventoryReportResponse, None),
-    "product-sales": (
+    "sales": ReportSpec(
+        SalesFilters,
+        SalesReportRow,
+        SalesReportResponse,
+        SalesTotals,
+        ("agencyId", "salesAmount", "numberOfIssues"),
+        "agencyId",
+        "Báo cáo doanh số tháng",
+    ),
+    "debt": ReportSpec(
+        DebtFilters,
+        DebtReportRow,
+        DebtReportResponse,
+        DebtAmounts,
+        ("agencyId", "closingDebt", "debtIncrease"),
+        "agencyId",
+        "Báo cáo công nợ tháng",
+    ),
+    "inventory": ReportSpec(
+        InventoryFilters,
+        InventoryReportRow,
+        InventoryReportResponse,
+        None,
+        ("productId", "closingStock"),
+        "productId",
+        "Báo cáo tồn kho",
+    ),
+    "product-sales": ReportSpec(
         ProductSalesFilters,
         ProductSalesReportRow,
         ProductSalesReportResponse,
         ProductSalesTotals,
+        ("productId", "salesAmount", "soldQuantity"),
+        "-salesAmount",
+        "Báo cáo doanh số theo mặt hàng",
     ),
-    "cash-and-credit": (
-        CashCreditFilters,
-        CashCreditReportRow,
-        CashCreditReportResponse,
-        CashCreditAmounts,
+    "collections": ReportSpec(
+        CollectionsFilters,
+        CollectionsReportRow,
+        CollectionsReportResponse,
+        CollectionAmounts,
+        ("businessDate", "totalAmount"),
+        "businessDate",
+        "Báo cáo thu tiền",
     ),
 }
-SORTS = {
-    "sales": ("agencyId", "salesAmount", "netSalesAmount"),
-    "debt": ("agencyId", "closingDebt"),
-    "inventory": ("productId", "closingStock"),
-    "product-sales": ("productId", "salesAmount", "soldQuantity"),
-    "cash-and-credit": ("agencyId", "cashReceived", "closingCredit"),
-}
-TITLES = {
-    "sales": "Báo cáo doanh số",
-    "debt": "Báo cáo công nợ",
-    "inventory": "Báo cáo tồn kho",
-    "product-sales": "Báo cáo doanh số theo mặt hàng",
-    "cash-and-credit": "Báo cáo thu tiền và tín dụng",
-}
+COUNT_FIELDS = frozenset({"numberOfIssues", "receiptCount"})
 # Human-readable export headers; API JSON keys are unchanged.
 COLUMN_LABELS = {
     "agencyId": "Mã ĐL (ID)",
@@ -70,36 +102,30 @@ COLUMN_LABELS = {
     "productName": "Tên mặt hàng",
     "unitId": "Mã ĐVT",
     "unitName": "Đơn vị tính",
-    "salesAmount": "Doanh số bán",
-    "returnAmount": "Hàng trả",
-    "netSalesAmount": "Doanh số thuần",
     "numberOfIssues": "Số phiếu xuất",
+    "salesAmount": "Tổng trị giá",
     "salesRate": "Tỷ lệ (%)",
     "openingDebt": "Nợ đầu kỳ",
-    "debtIncrease": "Phát sinh tăng",
-    "cashApplied": "Thu tiền",
-    "returnsApplied": "Trừ hàng trả",
-    "creditApplied": "Cấn trừ tín dụng",
-    "debtDecrease": "Phát sinh giảm",
+    "debtIncrease": "Phát sinh",
+    "paidAmount": "Đã trả",
     "closingDebt": "Nợ cuối kỳ",
     "openingStock": "Tồn đầu kỳ",
     "receiptQuantity": "Nhập",
     "issueQuantity": "Xuất",
-    "returnQuantity": "Hàng trả nhập lại",
-    "adjustmentQuantity": "Điều chỉnh",
     "closingStock": "Tồn cuối kỳ",
     "soldQuantity": "SL bán",
-    "returnedQuantity": "SL trả",
-    "cashReceived": "Tiền đã thu",
-    "cashRefunded": "Tiền hoàn trả",
-    "verifiedUnreceiptedAmount": "Đã xác minh chưa thu",
-    "openingCredit": "Tín dụng đầu kỳ",
-    "creditCreated": "Tín dụng phát sinh",
-    "creditRefunded": "Tín dụng hoàn",
-    "closingCredit": "Tín dụng cuối kỳ",
-    "currentReservedCredit": "Tín dụng đang giữ",
-    "currentAvailableCredit": "Tín dụng khả dụng",
+    "businessDate": "Ngày",
+    "receiptCount": "Số phiếu thu",
+    "cashAmount": "Tiền mặt",
+    "bankTransferAmount": "Chuyển khoản",
+    "onlineAmount": "Trực tuyến",
+    "totalAmount": "Tổng tiền thu",
 }
+
+
+def identity_key(kind, row):
+    value = getattr(row, IDENTITIES[kind])
+    return value if isinstance(value, date) else int(value)
 
 
 class ReportService:
@@ -115,80 +141,78 @@ class ReportService:
     ):
         if kind not in REPORTS:
             raise ApiError(422, "VALIDATION_FAILED", "Invalid report kind")
-        filter_model, row_model, response_model, total_model = REPORTS[kind]
+        spec = REPORTS[kind]
         try:
             interval = ReportInterval(fromDate=from_date, toDate=to_date)
-            business_filters = filter_model.model_validate({} if filters is None else filters)
+            business_filters = spec.filters.model_validate({} if filters is None else filters)
         except ValidationError:
             raise ApiError(422, "VALIDATION_FAILED", "Invalid report period or filters") from None
         filters = business_filters.model_dump()
-        identifier = "productId" if kind in ("inventory", "product-sales") else "agencyId"
+        identifier = IDENTITIES[kind]
+        identity_type = date if identifier == "businessDate" else int
         anchor = None
         if not export:
-            sort = (
-                sort
-                if sort is not None
-                else ("-salesAmount" if kind == "product-sales" else identifier)
-            )
+            sort = spec.default_sort if sort is None else sort
             if (
                 not isinstance(sort, str)
-                or sort not in (*SORTS[kind], *("-" + field for field in SORTS[kind]))
+                or sort not in (*spec.sorts, *("-" + field for field in spec.sorts))
                 or type(limit) is not int
                 or not 1 <= limit <= 100
             ):
                 raise ApiError(422, "VALIDATION_FAILED", "Invalid report page controls")
             field = sort.removeprefix("-")
             scope = {"report": kind, **interval.model_dump(), "filters": filters, "sort": sort}
-            key_types = [int] if field == identifier else [Decimal, int]
+            if field == identifier:
+                key_types = [identity_type]
+            else:
+                key_types = [int if field in COUNT_FIELDS else Decimal, identity_type]
             if cursor is not None:
                 anchor = self.codec.decode(cursor, scope, key_types)
 
         detached = self.queries.read(kind, interval.fromDate, interval.toDate, filters)
         period = ReportPeriod(**interval.model_dump(), generatedAt=detached["generatedAt"])
-        rows = [row_model.model_validate(row) for row in detached["rows"]]
+        rows = [spec.row.model_validate(row) for row in detached["rows"]]
         totals = None
-        if total_model is not None:
-            # All total fields are integral money/counts. Integer summation avoids
-            # Decimal's default context rounding even for arbitrarily large sums.
+        if spec.totals is not None:
+            # Integral money/counts: integer summation never rounds, whatever the size.
             values = {
-                name: Decimal(sum(int(getattr(row, name)) for row in rows))
-                for name in total_model.model_fields
-                if name not in ("companyGrossSales", "numberOfIssues")
+                name: sum(int(getattr(row, name)) for row in rows)
+                for name in spec.totals.model_fields
+                if name != "companySalesAmount"
+            }
+            values = {
+                name: value if name in COUNT_FIELDS else Decimal(value)
+                for name, value in values.items()
             }
             if kind == "sales":
-                values.update(
-                    numberOfIssues=sum(row.numberOfIssues for row in rows),
-                    companyGrossSales=detached["companyGrossSales"],
-                )
-            totals = total_model.model_validate(values)
+                values["companySalesAmount"] = detached["companySalesAmount"]
+            totals = spec.totals.model_validate(values)
         if export:
-            rows.sort(key=lambda row: int(getattr(row, identifier)))
-            dataset = {
+            rows.sort(key=lambda row: identity_key(kind, row))
+            return {
                 "kind": kind,
-                "title": TITLES[kind],
+                "title": spec.title,
                 "period": period.model_dump(mode="json"),
                 "filters": business_filters.model_dump(mode="json", exclude_none=True),
-                "columns": [(key, COLUMN_LABELS.get(key, key)) for key in row_model.model_fields],
+                "columns": [(key, COLUMN_LABELS.get(key, key)) for key in spec.row.model_fields],
                 "rows": [row.model_dump(mode="json") for row in rows],
                 "totals": None if totals is None else totals.model_dump(mode="json"),
             }
-            return dataset
 
         def keys(row):
-            identity = int(getattr(row, identifier))
+            identity = identity_key(kind, row)
             return (identity,) if field == identifier else (getattr(row, field), identity)
 
-        rows.sort(key=keys, reverse=sort.startswith("-"))
+        descending = sort.startswith("-")
+        rows.sort(key=keys, reverse=descending)
         if anchor is not None:
             if not any(keys(row) == anchor for row in rows):
                 raise cursor_error()
             rows = [
-                row
-                for row in rows
-                if (keys(row) < anchor if sort.startswith("-") else keys(row) > anchor)
+                row for row in rows if (keys(row) < anchor if descending else keys(row) > anchor)
             ]
         items, pagination = build_page(rows, limit, self.codec, scope, keys)
         projection = dict(**period.model_dump(), items=items, pagination=pagination)
         if totals is not None:
             projection["totals"] = totals
-        return response_model.model_validate(projection)
+        return spec.response.model_validate(projection)

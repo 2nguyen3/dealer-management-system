@@ -14,6 +14,7 @@ import { formatCompactVND, toNumber } from '../../lib/chart'
 import { formatDate, formatVND } from '../../lib/formatters'
 import type { DocumentSummary } from './documentContracts'
 import { pageTotal, statusParts, valueByDay } from './insightsModel'
+import { t } from '@/lib/i18n/core'
 
 /**
  * Visual summary of the loaded list page: KPI tiles, a status donut and value
@@ -31,21 +32,21 @@ export const DocumentInsights = memo(function DocumentInsights({
   const total = pageTotal(items)
   const parts = statusParts(items)
   const days = valueByDay(items)
-  const scope = partial ? 'Trang hiện tại' : 'Toàn bộ kết quả'
+  const scope = partial ? t('Trang hiện tại') : t('Toàn bộ kết quả')
   return (
     <section
-      aria-label="Tổng quan danh sách"
+      aria-label={t('Tổng quan danh sách')}
       className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,13rem)_minmax(0,19rem)_minmax(0,1fr)]"
     >
       <div className="grid gap-4 sm:grid-cols-2 md:col-span-2 xl:col-span-1 xl:grid-cols-1">
         <KpiCard
-          label="Số chứng từ"
+          label={t('Số chứng từ')}
           value={<CountUp value={items.length} />}
           icon={<FileStack />}
           hint={scope}
         />
         <KpiCard
-          label="Tổng giá trị"
+          label={t('Tổng giá trị')}
           value={
             <CountUp
               value={toNumber(total.toString())}
@@ -57,7 +58,7 @@ export const DocumentInsights = memo(function DocumentInsights({
         />
       </div>
       <ChartCard
-        title="Trạng thái"
+        title={t('Trạng thái')}
         actions={
           <ShadcnBadge variant="secondary" className="font-normal">
             {scope}
@@ -67,7 +68,7 @@ export const DocumentInsights = memo(function DocumentInsights({
       >
         <DonutChart
           data={parts}
-          centerLabel="chứng từ"
+          centerLabel={t('chứng từ')}
           centerValue={String(items.length)}
           valueFormatter={(value) => String(value)}
           height={136}
@@ -83,14 +84,14 @@ export const DocumentInsights = memo(function DocumentInsights({
         />
       </ChartCard>
       <ChartCard
-        title="Giá trị theo ngày"
+        title={t('Giá trị theo ngày')}
         isEmpty={days.length === 0}
         table={
-          <Table caption="Giá trị chứng từ theo ngày">
+          <Table caption={t('Giá trị chứng từ theo ngày')}>
             <thead>
               <tr>
-                <th>Ngày</th>
-                <th className="cell-number">Giá trị</th>
+                <th>{t('Ngày')}</th>
+                <th className="cell-number">{t('Giá trị')}</th>
               </tr>
             </thead>
             <tbody>
@@ -107,7 +108,9 @@ export const DocumentInsights = memo(function DocumentInsights({
         <RoundedBarChart
           data={days}
           xKey="label"
-          series={[{ key: 'value', label: 'Giá trị', color: 'var(--chart-1)' }]}
+          series={[
+            { key: 'value', label: t('Giá trị'), color: 'var(--chart-1)' },
+          ]}
           height={150}
         />
       </ChartCard>

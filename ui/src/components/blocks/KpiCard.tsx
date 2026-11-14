@@ -4,6 +4,7 @@ import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { formatPercent } from '@/lib/chart'
 import { cn } from '@/lib/utils'
 import { Card } from '../shadcn/card'
+import { t } from '@/lib/i18n/core'
 
 export interface KpiDelta {
   /** Relative change, e.g. 0.12 for +12 %. `null` hides the percentage. */
@@ -150,7 +151,7 @@ export function KpiCard({
           aria-pressed={active}
           className="absolute inset-0 z-10 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
-          <span className="sr-only">Lọc theo {label}</span>
+          <span className="sr-only">{t('Lọc theo {label}', { label })}</span>
         </button>
         {body}
       </Card>

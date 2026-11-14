@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../../components/shadcn/tooltip'
+import { t } from '@/lib/i18n/core'
 
 /** One labelled fact in a description grid. */
 export function Fact({
@@ -144,7 +145,7 @@ export function Hint({
 export function TableSkeleton({
   rows = 5,
   columns = 5,
-  label = 'Đang tải dữ liệu...',
+  label = t('Đang tải dữ liệu...'),
 }: {
   rows?: number
   columns?: number
@@ -258,7 +259,7 @@ export function InfoTip({
 export function FilterStatus({
   count,
   onReset,
-  resetLabel = 'Xóa lọc',
+  resetLabel = t('Xóa lọc'),
 }: {
   count: number
   onReset: () => void
@@ -270,7 +271,7 @@ export function FilterStatus({
       <ShadcnBadge
         variant="secondary"
         className="gap-1 tabular-nums"
-        aria-label={`${count} bộ lọc đang áp dụng`}
+        aria-label={t('{count} bộ lọc đang áp dụng', { count })}
       >
         <ListFilter aria-hidden="true" />
         {count}
@@ -304,7 +305,7 @@ export function LifecycleSteps({
   steps,
   current,
   tone = 'primary',
-  label = 'Vòng đời chứng từ',
+  label = t('Vòng đời chứng từ'),
   className,
 }: {
   steps: readonly LifecycleStep[]

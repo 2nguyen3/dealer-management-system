@@ -8,6 +8,7 @@ import {
 } from 'motion/react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { currentIntl } from '@/lib/formatters'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -87,7 +88,7 @@ export function StaggerItem({
  */
 export function CountUp({
   value,
-  format = (n) => Math.round(n).toLocaleString('vi-VN'),
+  format = (n) => Math.round(n).toLocaleString(currentIntl()),
   duration = 0.9,
   className,
 }: {

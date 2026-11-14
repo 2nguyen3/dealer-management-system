@@ -1,5 +1,24 @@
 # Frontend project context
 
+## Business simplification checkpoint - 2026-11-14
+
+Features in `src/features/`: authentication, home, portal, guide, profile, dashboard,
+reports, agencies, products, agency_types, units, wards, business_rules, master_data,
+stock_receipts, stock_issues, payment_receipts, online_payments, document_history,
+users, user_groups, permissions, audit_logs, chatbot (placeholder, not built). The menu
+has 18 entries (`src/app/navigation.ts`) gated by the 22 backend function codes.
+Removed (Bỏ theo yêu cầu 14/11/2026): receivables, stock_counts, upfront_payments,
+inventory, agency_credit, refunds, sales_returns, stock_adjustments,
+credit_applications, document_corrections. Portal decks saved in localStorage drop
+removed routes; `src/lib/errors.ts` covers the new rule codes (PERIOD_CLOSED,
+REASON_REQUIRED, AGENCY_HAS_DEBT, PAYMENT_EXCEEDS_DEBT, DEBT_LIMIT_EXCEEDED,
+INSUFFICIENT_STOCK, PRODUCT_NOT_PRICED, WARD_CAPACITY_EXCEEDED…). Switching the
+interface language reloads behind the `index.html` boot splash (`showLoadingSplash`
+in `src/lib/i18n/runtime.ts`) instead of a blank page. Contract:
+`../openwiki/backend-design/API/openapi.json` (90 operations). Evidence:
+`../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page
+description below is historical.
+
 This guide applies to work inside `ui/`. It describes the current frontend, its
 place in the full application, and conventions for extending it. Commands run
 from `ui/` unless stated otherwise.
@@ -171,7 +190,12 @@ chart wrappers (rounded bars, gradient areas, donut, radial rings, segmented met
 `src/components/charts/MebiusCharts.tsx`.
 Lists sort server-side through `SortableHeader`/`SortMenu` + `useSort`
 (`src/components/data/`) using only the contract `sort` enum of each endpoint.
-`/profile` shows identity, permission coverage and theme preference.
+`/profile` shows identity, permission coverage, theme, interface language and hint preferences.
+
+Interface text is translated (24 languages, Vietnamese source/default): wrap strings in
+`t()`/`msg()` from `src/lib/i18n/core.ts`, never translate business data, keep VND, and
+use logical CSS utilities for RTL. See `README.md` → Interface languages. Every page has a
+GUIDE button (`src/features/guide/`) whose content must cover each route.
 
 Charts follow the validated categorical palette `--chart-1..8` in fixed entity
 order (never cycled or rank-coloured), single-hue magnitude, no dual axes, a legend

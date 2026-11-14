@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from ipaddress import ip_address
 
 from fastapi import Request
@@ -10,9 +11,8 @@ from app.common.catalogue_http import (
     make_service,
 )
 from app.common.pagination import CursorCodec
-from app.modules.online_payments.adapter import SandboxAdapter
 from app.modules.online_payments.service import OnlinePaymentService
-from app.modules.online_payments.vnpay import VnpayAdapter
+from app.modules.online_payments.vnpay import adapter_for
 
 
 def payment_client_ip(request: Request) -> str:
@@ -33,40 +33,23 @@ def payment_client_ip(request: Request) -> str:
     return "127.0.0.1"
 
 
-def adapter_for(settings, *, ip_address="127.0.0.1"):
-    if not settings.payment_provider:
-        return VnpayAdapter(settings, ip_address=ip_address) if settings.vnpay_tmn_code else None
-    return SandboxAdapter(
-        settings.payment_base_url,
-        settings.payment_credential,
-        settings.payment_callback_url,
-        timeout=settings.payment_timeout_seconds,
-    )
-
-
 def get_online_payment_service(
     request: Request,
     session: SessionDependency,
     principal: PrincipalDependency,
     auth: AuthDependency,
-):
+) -> OnlinePaymentService:
     settings = request.app.state.settings
-    # Reuse the complete AuthService callback from common composition.
-    from app.modules.document_core.service import DocumentService
-
-    base = make_service(DocumentService, request, session, principal, auth)
-    return OnlinePaymentService(
-        session,
-        base.codec,
-        principal.user_id,
-        request.state.request_id,
-        base.authorize,
-        settings,
-        adapter_for(settings, ip_address=payment_client_ip(request)),
+    service = partial(
+        OnlinePaymentService,
+        settings=settings,
+        adapter=adapter_for(settings, ip_address=payment_client_ip(request)),
     )
+    return make_service(service, request, session, principal, auth)
 
 
-def get_webhook_service(request: Request, session: SessionDependency):
+def get_webhook_service(request: Request, session: SessionDependency) -> OnlinePaymentService:
+    """System context for verified provider callbacks: no actor, no permission check."""
     settings = request.app.state.settings
     return OnlinePaymentService(
         session,
@@ -74,6 +57,6 @@ def get_webhook_service(request: Request, session: SessionDependency):
         None,
         request.state.request_id,
         lambda _: None,
-        settings,
-        adapter_for(settings, ip_address=payment_client_ip(request)),
+        settings=settings,
+        adapter=adapter_for(settings, ip_address=payment_client_ip(request)),
     )

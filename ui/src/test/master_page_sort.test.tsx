@@ -60,10 +60,10 @@ const goods = [
     name: 'Bút bi',
     unitId: 1,
     unitName: 'Cái',
-    lowStockThreshold: '10',
-    currentStock: '150',
-    currentPurchasePrice: '4000',
-    currentSellingPrice: '5000',
+    allowsFraction: false,
+    stock: '150',
+    lastPurchasePrice: '4000',
+    sellingPrice: '5000',
     status: 'ACTIVE',
   },
 ]
@@ -164,7 +164,7 @@ describe('MasterPage server sort', { timeout: 20000 }, () => {
     })
     await waitFor(() => {
       const target = lastCall(fetch, '/products')
-      expect(target).toContain('sort=-currentStock')
+      expect(target).toContain('sort=-stock')
       expect(target).toContain('q=B%C3%BAt')
     })
   })

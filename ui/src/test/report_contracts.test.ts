@@ -78,6 +78,8 @@ describe('exact source report validation', () => {
       { pagination: { limit: 25, hasMore: true, nextCursor: '' } },
       { extra: 'legacy' },
       { salesCount: 1 },
+      { totals: { ...good.totals, companyGrossSales: '1' } },
+      { items: [{ ...good.items[0], netSalesAmount: '1' }] },
     ])
       expect(() =>
         parseReport({ ...good, ...patch }, 'sales', good.fromDate, good.toDate),
@@ -149,6 +151,7 @@ describe('exact source report validation', () => {
           productId: '17',
           typeId: '2147483647',
           wardId: '2',
+          receiptType: 'ONLINE',
           madeUpFilter: 'no',
         },
       }
@@ -205,6 +208,146 @@ describe('exact source report validation', () => {
   })
 })
 
+describe('simplified report fields', () => {
+  it('accepts signed opening/closing debt and stock but unsigned flows', () => {
+    type Loose = {
+      fromDate: string
+      toDate: string
+      items: Record<string, unknown>[]
+      totals: Record<string, unknown>
+    }
+    const debt = reportFixture('debt') as unknown as Loose
+    debt.items[0]!.openingDebt = '-' + huge
+    debt.items[0]!.closingDebt = '-1'
+    debt.totals.closingDebt = '-1'
+    expect(
+      parseReport(debt, 'debt', debt.fromDate, debt.toDate).items[0]!
+        .closingDebt,
+    ).toBe('-1')
+    for (const [key, value] of [
+      ['debtIncrease', '-1'],
+      ['paidAmount', '-1'],
+      ['openingDebt', '-01'],
+      ['closingDebt', '1.5'],
+    ] as const) {
+      const bad = structuredClone(debt)
+      ;(bad.items[0] as Record<string, unknown>)[key] = value
+      expect(
+        () => parseReport(bad, 'debt', debt.fromDate, debt.toDate),
+        key,
+      ).toThrow()
+    }
+    const stock = reportFixture('inventory') as unknown as Loose
+    stock.items[0]!.closingStock = '-2.125'
+    expect(
+      parseReport(stock, 'inventory', stock.fromDate, stock.toDate).items[0]!
+        .closingStock,
+    ).toBe('-2.125')
+    for (const [key, value] of [
+      ['receiptQuantity', '-1'],
+      ['issueQuantity', '-0.001'],
+      ['closingStock', '-1.0001'],
+    ] as const) {
+      const bad = structuredClone(stock)
+      ;(bad.items[0] as Record<string, unknown>)[key] = value
+      expect(
+        () => parseReport(bad, 'inventory', stock.fromDate, stock.toDate),
+        key,
+      ).toThrow()
+    }
+  })
+
+  it('rejects removed legacy columns on every kind', () => {
+    const legacy: Record<ReportKind, string> = {
+      sales: 'returnAmount',
+      debt: 'cashApplied',
+      inventory: 'adjustmentQuantity',
+      'product-sales': 'returnedQuantity',
+      collections: 'cashRefunded',
+    }
+    for (const kind of Object.keys(legacy) as ReportKind[]) {
+      const data = reportFixture(kind)
+      const bad = structuredClone(data) as unknown as {
+        items: Record<string, unknown>[]
+      }
+      bad.items[0]![legacy[kind]] = '0'
+      expect(
+        () => parseReport(bad, kind, data.fromDate, data.toDate),
+        kind,
+      ).toThrow()
+    }
+    expect(Object.keys(reports)).not.toContain('cash-and-credit')
+  })
+
+  it('validates collections rows: business date, count and channel amounts', () => {
+    const data = reportFixture('collections')
+    expect(parseReport(data, 'collections', data.fromDate, data.toDate)).toBe(
+      data,
+    )
+    for (const [key, value] of [
+      ['businessDate', '2026-02-30'],
+      ['receiptCount', -1],
+      ['receiptCount', '3'],
+      ['onlineAmount', '-1'],
+    ] as const) {
+      const bad = structuredClone(data) as unknown as {
+        items: Record<string, unknown>[]
+      }
+      bad.items[0]![key] = value
+      expect(
+        () => parseReport(bad, 'collections', data.fromDate, data.toDate),
+        key,
+      ).toThrow()
+    }
+    const { totals: _omit, ...noTotals } = data
+    void _omit
+    expect(() =>
+      parseReport(noTotals, 'collections', data.fromDate, data.toDate),
+    ).toThrow()
+  })
+
+  it('sends the collections receipt type only as a contract enum value', () => {
+    const path = (receiptType: string) =>
+      reportPath({ ...reportQuery('collections'), filters: { receiptType } })
+    for (const value of ['CASH', 'BANK_TRANSFER', 'ONLINE'])
+      expect(
+        new URL(path(value), 'http://t').searchParams.get('receiptType'),
+      ).toBe(value)
+    expect(new URL(path(''), 'http://t').searchParams.has('receiptType')).toBe(
+      false,
+    )
+    for (const bad of ['cash', 'REFUND', 'CREDIT', ' CASH'])
+      expect(() => path(bad)).toThrow(/Hình thức thu không hợp lệ/)
+    // Other reports never forward a receipt type.
+    expect(
+      new URL(
+        reportPath({
+          ...reportQuery('sales'),
+          filters: { receiptType: 'CASH' },
+        }),
+        'http://t',
+      ).searchParams.has('receiptType'),
+    ).toBe(false)
+  })
+
+  it('uses the new sort enums and the base grant for inventory', () => {
+    expect(reports.sales.sorts).toContain('-numberOfIssues')
+    expect(reports.sales.sorts).not.toContain('-netSalesAmount')
+    expect(reports.debt.sorts).toContain('debtIncrease')
+    expect(reports.collections.sorts).toEqual([
+      'businessDate',
+      '-businessDate',
+      'totalAmount',
+      '-totalAmount',
+    ])
+    expect(reports.inventory.permission).toBe('reports.read')
+    expect(reports.collections.permission).toBe('debt.read')
+    expect(() =>
+      reportPath({ ...reportQuery('collections'), sort: '-cashReceived' }),
+    ).toThrow()
+  })
+})
+
 describe('source dashboard validation', () => {
   it('validates all sections and optional omissions preserving exact strings', () => {
     const data = dashboardFixture()
@@ -214,7 +357,7 @@ describe('source dashboard validation', () => {
     ).toEqual({ month: data.month, asOf: data.asOf })
   })
 
-  it('rejects null, wrong shapes, excessive top/trend sizes, unknown fields and mismatched month', () => {
+  it('rejects null, wrong shapes, excessive top/trend sizes, removed/unknown fields and mismatched month', () => {
     const data = dashboardFixture()
     for (const value of [
       null,
@@ -243,19 +386,92 @@ describe('source dashboard validation', () => {
       },
       {
         ...data,
-        receivables: {
-          ...data.receivables,
+        debt: {
+          ...data.debt,
           topAgencies: Array.from(
             { length: 11 },
-            () => data.receivables.topAgencies[0],
+            () => data.debt.topAgencies[0],
           ),
         },
       },
-      { ...data, pendingIssueCount: '0' },
-      { ...data, verifiedUnreceiptedAmount: 0 },
+      { ...data, sales: { ...data.sales, gross: '1' } },
+      { ...data, collections: { ...data.collections, receiptCount: '5' } },
+      { ...data, debt: { ...data.debt, totalDebt: '-1' } },
+      { ...data, debt: { ...data.debt, prepaidAmount: '-1' } },
+      { ...data, drafts: { stockReceipts: -1 } },
+      { ...data, drafts: { refunds: 1 } },
+      { ...data, inventory: { productCount: 1 } },
+      { ...data, receivables: {} },
+      { ...data, pendingIssueCount: 0 },
+      { ...data, verifiedUnreceiptedAmount: '0' },
       { ...data, invented: '0' },
     ])
       expect(() => parseDashboard(value, data.month)).toThrow()
     expect(() => parseDashboard(data, '2026-09')).toThrow(/không khớp/)
+  })
+
+  it('accepts partial drafts, negative agency debt and a null debt ratio', () => {
+    const data = dashboardFixture()
+    const partial = { ...data, drafts: { stockIssues: 0 } }
+    expect(parseDashboard(partial, data.month).drafts).toEqual({
+      stockIssues: 0,
+    })
+    expect(parseDashboard({ ...data, drafts: {} }, data.month).drafts).toEqual(
+      {},
+    )
+    const point = data.debt.topAgencies[0]!
+    const prepaid = {
+      ...data,
+      debt: {
+        ...data.debt,
+        topAgencies: [
+          { ...point, debt: '-250', maxDebt: '0', debtRatio: null },
+        ],
+      },
+    }
+    expect(parseDashboard(prepaid, data.month).debt!.topAgencies[0]).toEqual({
+      ...point,
+      debt: '-250',
+      maxDebt: '0',
+      debtRatio: null,
+    })
+  })
+
+  it.each([
+    ['0', true],
+    ['100', true],
+    ['150.5', true],
+    ['12.34', true],
+    ['12.345', false],
+    ['-1', false],
+    ['01', false],
+    [12, false],
+  ] as const)('debtRatio %j valid=%s', (debtRatio, valid) => {
+    const data = dashboardFixture()
+    const value = {
+      ...data,
+      debt: {
+        ...data.debt,
+        topAgencies: [{ ...data.debt.topAgencies[0]!, debtRatio }],
+      },
+    }
+    if (valid) expect(parseDashboard(value, data.month).debt).toBeTruthy()
+    else expect(() => parseDashboard(value, data.month)).toThrow()
+  })
+
+  it.each([
+    ['debt', '1000000000000000000'],
+    ['debt', '-01'],
+    ['maxDebt', '-1'],
+  ] as const)('rejects topAgencies %s %j', (key, value) => {
+    const data = dashboardFixture()
+    const bad = {
+      ...data,
+      debt: {
+        ...data.debt,
+        topAgencies: [{ ...data.debt.topAgencies[0]!, [key]: value }],
+      },
+    }
+    expect(() => parseDashboard(bad, data.month)).toThrow()
   })
 })

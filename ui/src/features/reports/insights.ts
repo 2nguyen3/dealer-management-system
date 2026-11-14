@@ -1,10 +1,12 @@
 // Pure projections of a report page into KPI and chart data. Exact server
 // strings are kept for display; numbers are only used for plotting/ranking.
 import { formatCompactVND, formatPlain, toNumber } from '../../lib/chart'
+import { formatDate, formatVND } from '../../lib/formatters'
 import type { ReportKind, ReportRow } from './contracts'
 import { displayValue } from './display'
+import { t } from '@/lib/i18n/core'
 
-/** One plotted category (agency or product) with numeric values per key. */
+/** One plotted category (agency, product or day) with numeric values per key. */
 export interface ChartDatum {
   id: string
   /** Short axis label. */
@@ -18,7 +20,7 @@ export interface ChartDatum {
   [key: string]: unknown
 }
 
-const agencyKinds = new Set<ReportKind>(['sales', 'debt', 'cash-and-credit'])
+const agencyKinds = new Set<ReportKind>(['sales', 'debt'])
 
 export function isAgencyReport(kind: ReportKind): boolean {
   return agencyKinds.has(kind)
@@ -33,6 +35,11 @@ export function rowIdentity(
   kind: ReportKind,
   row: ReportRow,
 ): { id: string; code: string; name: string } {
+  if (kind === 'collections') {
+    const date = String(row.businessDate)
+    const name = formatDate(date)
+    return { id: date, code: name.slice(0, 5), name }
+  }
   if (isAgencyReport(kind))
     return {
       id: String(row.agencyId),
@@ -56,7 +63,10 @@ function datum(
   const result: ChartDatum = {
     id: identity.id,
     label: axis === 'code' ? identity.code : truncate(identity.name),
-    name: `${identity.code} — ${identity.name}`,
+    name:
+      kind === 'collections'
+        ? identity.name
+        : `${identity.code} — ${identity.name}`,
     display: {},
   }
   for (const key of keys) {
@@ -84,6 +94,24 @@ export function rankRows(
     .map((row) => datum(kind, row, keys, options.axis ?? 'name'))
 }
 
+/**
+ * Rows of a dated report (collections) in chronological order: the last
+ * `limit` days of the page, labelled dd/MM.
+ */
+export function timelineRows(
+  kind: ReportKind,
+  items: ReportRow[],
+  keys: string[],
+  limit = 31,
+): ChartDatum[] {
+  return [...items]
+    .sort((a, b) =>
+      String(a.businessDate).localeCompare(String(b.businessDate)),
+    )
+    .slice(-limit)
+    .map((row) => datum(kind, row, keys, 'code'))
+}
+
 /** True when no plotted value differs from zero (nothing to draw). */
 export function allZero(data: ChartDatum[], keys: string[]): boolean {
   return data.every((d) => keys.every((key) => !d[key]))
@@ -92,9 +120,9 @@ export function allZero(data: ChartDatum[], keys: string[]): boolean {
 export type FlowRole = 'balance' | 'increase' | 'decrease'
 
 export const flowRoles: Record<FlowRole, { label: string; color: string }> = {
-  balance: { label: 'Số dư', color: 'var(--chart-1)' },
-  increase: { label: 'Tăng', color: 'var(--chart-2)' },
-  decrease: { label: 'Giảm', color: 'var(--chart-3)' },
+  balance: { label: t('Số dư'), color: 'var(--chart-1)' },
+  increase: { label: t('Tăng'), color: 'var(--chart-2)' },
+  decrease: { label: t('Giảm'), color: 'var(--chart-3)' },
 }
 
 /** Balance/flow components taken from the full-filter totals. */
@@ -113,24 +141,15 @@ export function flowData(
   }))
 }
 
+/** Opening debt + increase − paid = closing debt (BM6.2). */
 export const debtFlow: { key: string; label: string; role: FlowRole }[] = [
-  { key: 'openingDebt', label: 'Nợ đầu kỳ', role: 'balance' },
-  { key: 'debtIncrease', label: 'Phát sinh nợ', role: 'increase' },
-  { key: 'cashApplied', label: 'Thu tiền trừ nợ', role: 'decrease' },
-  { key: 'returnsApplied', label: 'Trả hàng trừ nợ', role: 'decrease' },
-  { key: 'creditApplied', label: 'Cấn trừ dư có', role: 'decrease' },
-  { key: 'closingDebt', label: 'Nợ cuối kỳ', role: 'balance' },
+  { key: 'openingDebt', label: t('Nợ đầu kỳ'), role: 'balance' },
+  { key: 'debtIncrease', label: t('Phát sinh nợ'), role: 'increase' },
+  { key: 'paidAmount', label: t('Đã thu'), role: 'decrease' },
+  { key: 'closingDebt', label: t('Nợ cuối kỳ'), role: 'balance' },
 ]
 
-export const creditFlow: { key: string; label: string; role: FlowRole }[] = [
-  { key: 'openingCredit', label: 'Dư có đầu kỳ', role: 'balance' },
-  { key: 'creditCreated', label: 'Dư có phát sinh', role: 'increase' },
-  { key: 'creditApplied', label: 'Đã cấn trừ', role: 'decrease' },
-  { key: 'creditRefunded', label: 'Đã hoàn', role: 'decrease' },
-  { key: 'closingCredit', label: 'Dư có cuối kỳ', role: 'balance' },
-]
-
-/** Exact non-negative decimal string compare against zero. */
+/** Exact decimal string compare against zero. */
 function isZero(value: unknown): boolean {
   return /^-?0(\.0+)?$/.test(String(value))
 }
@@ -142,16 +161,22 @@ export function inventoryCounts(items: ReportRow[]) {
     moving: items.filter(
       (row) => !isZero(row.receiptQuantity) || !isZero(row.issueQuantity),
     ).length,
-    outOfStock: items.filter((row) => isZero(row.closingStock)).length,
-    adjusted: items.filter((row) => !isZero(row.adjustmentQuantity)).length,
+    issued: items.filter((row) => !isZero(row.issueQuantity)).length,
+    outOfStock: items.filter(
+      (row) =>
+        isZero(row.closingStock) || String(row.closingStock).startsWith('-'),
+    ).length,
   }
 }
 
-/** Return share of gross sales as an exact-enough ratio for a KPI hint. */
-export function returnRatio(totals: ReportRow | undefined): number | null {
+/**
+ * Share of the filtered sales in the whole company's sales for the period,
+ * or null when the company sold nothing in it.
+ */
+export function salesShare(totals: ReportRow | undefined): number | null {
   if (!totals) return null
-  const gross = toNumber(totals.salesAmount)
-  return gross > 0 ? toNumber(totals.returnAmount) / gross : null
+  const company = toNumber(totals.companySalesAmount)
+  return company > 0 ? toNumber(totals.salesAmount) / company : null
 }
 
 /** One part of a composition visual (donut slice or radial ring). */
@@ -175,111 +200,170 @@ export interface Composition {
   parts: CompositionPart[]
 }
 
-const compositionSpecs: Record<
-  Exclude<ReportKind, 'inventory'>,
+const collectionParts = [
+  { key: 'cashAmount', label: t('Tiền mặt'), color: 'var(--chart-1)' },
   {
-    title: string
-    centerLabel: string
-    center?: string
-    parts: { key: string; label: string; color: string }[]
+    key: 'bankTransferAmount',
+    label: t('Chuyển khoản'),
+    color: 'var(--chart-2)',
+  },
+  { key: 'onlineAmount', label: t('Trực tuyến'), color: 'var(--chart-3)' },
+]
+
+const PRODUCT_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+]
+
+/** Exact non-negative difference of two whole-VND strings (0 when below). */
+export function remainder(total: unknown, part: unknown): string {
+  try {
+    const value = BigInt(String(total ?? '0')) - BigInt(String(part ?? '0'))
+    return value > 0n ? value.toString() : '0'
+  } catch {
+    return '0'
   }
-> = {
-  sales: {
-    title: 'Cơ cấu doanh số',
-    centerLabel: 'Doanh số gộp',
-    center: 'salesAmount',
-    parts: [
-      {
-        key: 'netSalesAmount',
-        label: 'Doanh số thuần',
-        color: 'var(--chart-1)',
-      },
-      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
-    ],
-  },
-  'product-sales': {
-    title: 'Cơ cấu doanh số',
-    centerLabel: 'Doanh số gộp',
-    center: 'salesAmount',
-    parts: [
-      {
-        key: 'netSalesAmount',
-        label: 'Doanh số thuần',
-        color: 'var(--chart-1)',
-      },
-      { key: 'returnAmount', label: 'Hàng trả lại', color: 'var(--chart-3)' },
-    ],
-  },
-  debt: {
-    title: 'Cơ cấu giảm nợ',
-    centerLabel: 'Tổng giảm nợ',
-    center: 'debtDecrease',
-    parts: [
-      { key: 'cashApplied', label: 'Thu tiền', color: 'var(--chart-1)' },
-      { key: 'returnsApplied', label: 'Trả hàng', color: 'var(--chart-2)' },
-      { key: 'creditApplied', label: 'Cấn trừ dư có', color: 'var(--chart-3)' },
-    ],
-  },
-  'cash-and-credit': {
-    title: 'Sử dụng dư có',
-    centerLabel: 'Đã dùng',
-    parts: [
-      { key: 'creditApplied', label: 'Đã cấn trừ', color: 'var(--chart-1)' },
-      { key: 'creditRefunded', label: 'Đã hoàn', color: 'var(--chart-2)' },
-    ],
-  },
+}
+
+function donut(
+  title: string,
+  centerLabel: string,
+  center: unknown,
+  parts: { key: string; label: string; color: string; raw: unknown }[],
+): Composition {
+  const shaped = parts.map(({ key, label, color, raw }) => ({
+    key,
+    label,
+    value: Math.max(0, toNumber(raw as string | undefined)),
+    display: raw === undefined || raw === null ? '—' : formatVND(String(raw)),
+    ratio: 0,
+    color,
+  }))
+  const total = shaped.reduce((sum, part) => sum + part.value, 0)
+  for (const part of shaped) part.ratio = total ? part.value / total : 0
+  return {
+    title,
+    shape: 'donut',
+    centerLabel,
+    centerValue: formatCompactVND(toNumber(center as string | undefined)),
+    parts: shaped,
+  }
 }
 
 /**
- * Part-to-whole view of a report: a donut over the full-filter totals, or for
- * inventory (no totals) radial rings of product shares on the current page.
+ * Part-to-whole view of a report: a donut over the full-filter totals (the
+ * product donut ranks the page's leading products), or for inventory (no
+ * totals) radial rings of product shares on the current page.
  */
 export function compositionOf(
   kind: ReportKind,
   totals: ReportRow | undefined,
   items: ReportRow[],
 ): Composition {
-  if (kind === 'inventory') {
-    const counts = inventoryCounts(items)
-    const share = (n: number) => (counts.products ? n / counts.products : 0)
-    const ring = (key: string, label: string, n: number, color: string) => ({
-      key,
-      label,
-      value: n,
-      display: `${formatPlain(n)} / ${formatPlain(counts.products)}`,
-      ratio: share(n),
-      color,
-    })
-    return {
-      title: 'Tình trạng mặt hàng',
-      shape: 'rings',
-      centerLabel: 'Mặt hàng',
-      centerValue: formatPlain(counts.products),
-      parts: [
-        ring('moving', 'Có nhập/xuất', counts.moving, 'var(--chart-1)'),
-        ring('outOfStock', 'Hết tồn', counts.outOfStock, 'var(--chart-8)'),
-        ring('adjusted', 'Có điều chỉnh', counts.adjusted, 'var(--chart-3)'),
-      ],
+  switch (kind) {
+    case 'inventory': {
+      const counts = inventoryCounts(items)
+      const share = (n: number) => (counts.products ? n / counts.products : 0)
+      const ring = (key: string, label: string, n: number, color: string) => ({
+        key,
+        label,
+        value: n,
+        display: `${formatPlain(n)} / ${formatPlain(counts.products)}`,
+        ratio: share(n),
+        color,
+      })
+      return {
+        title: t('Tình trạng mặt hàng'),
+        shape: 'rings',
+        centerLabel: t('Mặt hàng'),
+        centerValue: formatPlain(counts.products),
+        parts: [
+          ring('moving', t('Có nhập/xuất'), counts.moving, 'var(--chart-1)'),
+          ring('issued', t('Có xuất bán'), counts.issued, 'var(--chart-2)'),
+          ring('outOfStock', t('Hết tồn'), counts.outOfStock, 'var(--chart-8)'),
+        ],
+      }
     }
-  }
-  const spec = compositionSpecs[kind]
-  const parts = spec.parts.map(({ key, label, color }) => ({
-    key,
-    label,
-    value: Math.max(0, toNumber(totals?.[key])),
-    display: displayValue(key, totals?.[key]),
-    ratio: 0,
-    color,
-  }))
-  const total = parts.reduce((sum, part) => sum + part.value, 0)
-  for (const part of parts) part.ratio = total ? part.value / total : 0
-  return {
-    title: spec.title,
-    shape: 'donut',
-    centerLabel: spec.centerLabel,
-    centerValue: formatCompactVND(
-      spec.center ? toNumber(totals?.[spec.center]) : total,
-    ),
-    parts,
+    case 'sales':
+      return donut(
+        t('Tỷ trọng trong doanh số công ty'),
+        t('Toàn công ty'),
+        totals?.companySalesAmount,
+        [
+          {
+            key: 'salesAmount',
+            label: t('Đại lý đã lọc'),
+            color: 'var(--chart-1)',
+            raw: totals?.salesAmount,
+          },
+          {
+            key: 'others',
+            label: t('Đại lý khác'),
+            color: 'var(--chart-2)',
+            raw: totals
+              ? remainder(totals.companySalesAmount, totals.salesAmount)
+              : undefined,
+          },
+        ],
+      )
+    case 'debt':
+      return donut(
+        t('Phát sinh và đã thu'),
+        t('Nợ cuối kỳ'),
+        totals?.closingDebt,
+        [
+          {
+            key: 'debtIncrease',
+            label: t('Phát sinh nợ'),
+            color: 'var(--chart-1)',
+            raw: totals?.debtIncrease,
+          },
+          {
+            key: 'paidAmount',
+            label: t('Đã thu'),
+            color: 'var(--chart-2)',
+            raw: totals?.paidAmount,
+          },
+        ],
+      )
+    case 'collections':
+      return donut(
+        t('Cơ cấu hình thức thu'),
+        t('Tổng thu'),
+        totals?.totalAmount,
+        collectionParts.map((part) => ({ ...part, raw: totals?.[part.key] })),
+      )
+    case 'product-sales': {
+      const top = [...items]
+        .sort((a, b) => toNumber(b.salesAmount) - toNumber(a.salesAmount))
+        .slice(0, PRODUCT_COLORS.length)
+      const shown = top.reduce(
+        (sum, row) => sum + BigInt(String(row.salesAmount)),
+        0n,
+      )
+      return donut(
+        t('Mặt hàng dẫn đầu doanh số'),
+        t('Tổng doanh số'),
+        totals?.salesAmount,
+        [
+          ...top.map((row, index) => ({
+            key: String(row.productId),
+            label: String(row.productName),
+            color: PRODUCT_COLORS[index]!,
+            raw: row.salesAmount,
+          })),
+          {
+            key: 'others',
+            label: t('Mặt hàng khác'),
+            color: 'var(--chart-8)',
+            raw: totals
+              ? remainder(totals.salesAmount, shown.toString())
+              : undefined,
+          },
+        ],
+      )
+    }
   }
 }

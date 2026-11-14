@@ -18,7 +18,18 @@ from app.modules.products.schemas import (
 from app.modules.products.service import ProductService
 
 router = APIRouter(prefix="/products", tags=["Products"], route_class=BusinessRoute)
-READ = {"anyOf": ["product.manage", "inventory.read"]}
+# Viewing products (with current stock) replaces the retired inventory.read (handoff 4.3).
+READ = {
+    "anyOf": [
+        "product.manage",
+        "stock.receipt.prepare",
+        "stock.receipt.post",
+        "stock.issue.prepare",
+        "stock.issue.post",
+        "sales.read",
+        "reports.read",
+    ]
+}
 WRITE = {"allOf": ["product.manage"]}
 Reader = Annotated[Principal, Depends(require_permissions(any_of=tuple(READ["anyOf"])))]
 Writer = Annotated[Principal, Depends(require_permissions(all_of=("product.manage",)))]
@@ -41,7 +52,6 @@ def list_products(
     code: NonEmptyText | None = None,
     status: MasterStatus | None = None,
     unitId: CatalogParameter | None = None,
-    isLowStock: bool | None = None,
     stockFrom: Quantity | None = None,
     stockTo: Quantity | None = None,
     sort: Literal[
@@ -49,10 +59,10 @@ def list_products(
         "-id",
         "name",
         "-name",
-        "currentStock",
-        "-currentStock",
-        "currentSellingPrice",
-        "-currentSellingPrice",
+        "stock",
+        "-stock",
+        "sellingPrice",
+        "-sellingPrice",
     ] = "id",
 ):
     return service.list(
@@ -62,7 +72,6 @@ def list_products(
         code=code,
         status=status,
         unitId=unitId,
-        isLowStock=isLowStock,
         stockFrom=stockFrom,
         stockTo=stockTo,
         sort=sort,

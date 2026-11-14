@@ -1,14 +1,12 @@
 import {
-  BadgeCheck,
-  Banknote,
-  ClipboardList,
   Crosshair,
+  FilePen,
+  HandCoins,
   Landmark,
-  PackageX,
+  ReceiptText,
   RotateCw,
   Store,
   TrendingUp,
-  Undo2,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { KpiCard } from '../../components/blocks/KpiCard'
@@ -17,7 +15,6 @@ import {
   DonutChart,
   GradientAreaChart,
   LegendList,
-  SegmentedMeter,
 } from '../../components/charts/MebiusCharts'
 import { CountUp, Stagger, StaggerItem } from '../../components/motion/Motion'
 import { Card } from '../../components/shadcn/card'
@@ -62,19 +59,19 @@ import {
 import { Slicers } from './Slicers'
 import { useReport, useSnapshot } from './useReport'
 import { MiniTable, VisualCard } from './VisualCard'
+import { t } from '@/lib/i18n/core'
 
 type Section = keyof typeof sectionGrants
 
 const sectionLabels: Record<Section, string> = {
-  agencies: 'Đại lý',
-  inventory: 'Tồn kho',
-  sales: 'Doanh số',
-  receivables: 'Công nợ và tiền',
-  pendingIssueCount: 'Phiếu xuất đang chờ',
-  verifiedUnreceiptedAmount: 'Tiền đã xác minh chưa ghi phiếu thu',
+  agencies: t('Đại lý'),
+  sales: t('Doanh số'),
+  collections: t('Thu tiền'),
+  debt: t('Công nợ'),
+  drafts: t('Phiếu nháp'),
 }
 
-const VS_PREVIOUS = 'so với tháng trước'
+const VS_PREVIOUS = t('so với tháng trước')
 const TOP = 10
 
 /** Compact animated money value; the exact amount stays for screen readers. */
@@ -92,7 +89,7 @@ function count(value: number) {
 /** KPI delta props; without a comparable previous month show a plain hint. */
 function delta(ratio: number | null, upIsGood: boolean) {
   return ratio === null
-    ? { hint: 'Chưa có tháng trước' }
+    ? { hint: t('Chưa có tháng trước') }
     : { delta: { ratio, upIsGood, label: VS_PREVIOUS } }
 }
 
@@ -107,10 +104,14 @@ function filterNote(kind: ReportKind, filters: Filters): string | null {
   if (!applied.length && !ignored.length) return null
   return [
     applied.length
-      ? `Theo bộ lọc: ${applied.map((key) => filterNames[key]).join(', ')}`
+      ? t('Theo bộ lọc: {map}', {
+          map: applied.map((key) => filterNames[key]).join(', '),
+        })
       : '',
     ignored.length
-      ? `Không áp dụng: ${ignored.map((key) => filterNames[key]).join(', ')}`
+      ? t('Không áp dụng: {map}', {
+          map: ignored.map((key) => filterNames[key]).join(', '),
+        })
       : '',
   ]
     .filter(Boolean)
@@ -145,7 +146,7 @@ export function DashboardPage() {
   const salesReport = useReport(query('sales'), scope)
   const debtReport = useReport(query('debt'), scope)
   const productReport = useReport(query('product-sales'), scope)
-  const cashReport = useReport(query('cash-and-credit'), scope)
+  const collectionsReport = useReport(query('collections'), scope)
   const inventoryReport = useReport(query('inventory'), scope)
   const productId = filters.productId?.id
   const productFocus = useReport(
@@ -175,26 +176,23 @@ export function DashboardPage() {
 
   const data = snapshot.data
   const agencies = can('agencies') ? data?.agencies : undefined
-  const inventory = can('inventory') ? data?.inventory : undefined
   const sales = can('sales') ? data?.sales : undefined
-  const receivables = can('receivables') ? data?.receivables : undefined
-  const pendingIssues = can('pendingIssueCount')
-    ? data?.pendingIssueCount
-    : undefined
-  const verifiedUnreceipted = can('verifiedUnreceiptedAmount')
-    ? data?.verifiedUnreceiptedAmount
-    : undefined
+  const collections = can('collections') ? data?.collections : undefined
+  const debt = can('debt') ? data?.debt : undefined
+  const drafts = can('drafts') ? data?.drafts : undefined
   const missing = data
     ? (Object.keys(sectionGrants) as Section[]).filter(
         (section) => can(section) && !(section in data),
       )
     : []
-  const periodLabel = `Tháng ${monthLabel(selectedMonth)}`
+  const periodLabel = t('Tháng {monthLabel}', {
+    monthLabel: monthLabel(selectedMonth),
+  })
   const selectedAgency = filters.agencyId?.id ?? null
   const selectedProduct = filters.productId?.id ?? null
 
   const anyAgencyReport = (
-    ['sales', 'debt', 'product-sales', 'cash-and-credit'] as ReportKind[]
+    ['sales', 'debt', 'product-sales', 'collections'] as ReportKind[]
   ).some(reportAllowed)
   const slicers = {
     agencyId:
@@ -208,9 +206,8 @@ export function DashboardPage() {
     wardId:
       reportAllowed('debt') &&
       (grants.has('agency.read') || grants.has('agency.manage')),
-    productId:
-      (reportAllowed('product-sales') || reportAllowed('inventory')) &&
-      (grants.has('product.manage') || grants.has('inventory.read')),
+    // reports.read (implied by reportAllowed) also admits GET /products.
+    productId: reportAllowed('product-sales') || reportAllowed('inventory'),
   }
 
   function setFilter(key: FilterKey, value: FilterValue | null) {
@@ -224,7 +221,7 @@ export function DashboardPage() {
   }
   function changeMonth(value: string) {
     if (!validMonth(value)) {
-      setMonthError('Chọn tháng hợp lệ.')
+      setMonthError(t('Chọn tháng hợp lệ.'))
       return
     }
     setMonthError(null)
@@ -237,64 +234,75 @@ export function DashboardPage() {
   if (sales) {
     kpis.push(
       {
-        key: 'net',
+        key: 'sales',
         node: (
           <KpiCard
-            label="Doanh số thuần"
-            {...money(sales.net)}
+            label={t('Doanh số')}
+            {...money(sales.salesAmount)}
             icon={<TrendingUp />}
-            {...delta(trendDelta(trend, selectedMonth, 'net'), true)}
-            trend={trend.map((point) => toNumber(point.net))}
+            {...delta(trendDelta(trend, selectedMonth, 'salesAmount'), true)}
+            trend={trend.map((point) => toNumber(point.salesAmount))}
           />
         ),
       },
       {
-        key: 'returns',
+        key: 'issues',
         node: (
           <KpiCard
-            label="Hàng trả lại"
-            {...money(sales.returns)}
-            icon={<Undo2 />}
-            {...delta(trendDelta(trend, selectedMonth, 'returns'), false)}
-            trend={trend.map((point) => toNumber(point.returns))}
-            trendColor="var(--chart-3)"
+            label={t('Phiếu xuất đã ghi sổ')}
+            value={count(sales.issueCount)}
+            icon={<ReceiptText />}
+            {...delta(trendDelta(trend, selectedMonth, 'issueCount'), true)}
+            trend={trend.map((point) => point.issueCount)}
+            trendColor="var(--chart-2)"
           />
         ),
       },
     )
   }
-  if (receivables) {
-    kpis.push(
-      {
-        key: 'debt',
-        node: (
-          <KpiCard
-            label="Công nợ hiện tại"
-            {...money(receivables.currentDebt)}
-            icon={<Landmark />}
-            hint={`Dư có ${formatVND(receivables.currentCredit)}`}
-          />
-        ),
-      },
-      {
-        key: 'cash',
-        node: (
-          <KpiCard
-            label="Tiền thực thu"
-            {...money(receivables.cashReceived)}
-            icon={<Banknote />}
-            hint={`Đã hoàn ${formatVND(receivables.cashRefunded)}`}
-          />
-        ),
-      },
-    )
+  if (collections) {
+    kpis.push({
+      key: 'collections',
+      node: (
+        <KpiCard
+          label={t('Tiền đã thu')}
+          {...money(collections.totalAmount)}
+          icon={<HandCoins />}
+          hint={t('{count} phiếu thu trong tháng', {
+            count: formatPlain(collections.receiptCount),
+          })}
+        />
+      ),
+    })
+  }
+  if (debt) {
+    kpis.push({
+      key: 'debt',
+      node: (
+        <KpiCard
+          label={t('Tổng công nợ')}
+          {...money(debt.totalDebt)}
+          icon={<Landmark />}
+          hint={
+            BigInt(debt.prepaidAmount) > 0n
+              ? t('{count} đại lý đang nợ · trả trước {prepaid}', {
+                  count: formatPlain(debt.agenciesInDebt),
+                  prepaid: formatVND(debt.prepaidAmount),
+                })
+              : t('{count} đại lý đang nợ', {
+                  count: formatPlain(debt.agenciesInDebt),
+                })
+          }
+        />
+      ),
+    })
   }
   if (agencies) {
     kpis.push({
       key: 'agencies',
       node: (
         <KpiCard
-          label="Đại lý hoạt động"
+          label={t('Đại lý hoạt động')}
           value={
             <>
               {count(agencies.active)} / {count(agencies.total)}
@@ -303,86 +311,69 @@ export function DashboardPage() {
           icon={<Store />}
           hint={
             agencies.total
-              ? `${formatPercent(agencies.active / agencies.total)} tổng số`
-              : 'Chưa có đại lý'
+              ? t('{value} tổng số', {
+                  value: formatPercent(agencies.active / agencies.total),
+                })
+              : t('Chưa có đại lý')
           }
         />
       ),
     })
   }
-  if (inventory) {
+  if (drafts) {
+    const parts = [
+      ['PN', drafts.stockReceipts],
+      ['PX', drafts.stockIssues],
+      ['PT', drafts.paymentReceipts],
+    ].filter((part): part is [string, number] => part[1] !== undefined)
     kpis.push({
-      key: 'low-stock',
+      key: 'drafts',
       node: (
         <KpiCard
-          label="Mặt hàng tồn thấp"
-          value={count(inventory.lowStockProductCount)}
-          icon={<PackageX />}
-          hint={`/ ${formatQuantity(inventory.productCount)} mặt hàng · nhập ${formatCompactVND(toNumber(inventory.receivedAmount))}`}
-        />
-      ),
-    })
-  }
-  if (pendingIssues !== undefined) {
-    kpis.push({
-      key: 'pending',
-      node: (
-        <KpiCard
-          label="Phiếu xuất đang chờ"
-          value={count(pendingIssues)}
-          icon={<ClipboardList />}
-          hint="Chưa ghi sổ"
-        />
-      ),
-    })
-  }
-  if (verifiedUnreceipted !== undefined) {
-    kpis.push({
-      key: 'verified',
-      node: (
-        <KpiCard
-          label="Đã xác minh, chưa ghi phiếu thu"
-          {...money(verifiedUnreceipted)}
-          icon={<BadgeCheck />}
-          hint="Chưa tính vào thực thu"
+          label={t('Phiếu nháp chưa ghi sổ')}
+          value={count(parts.reduce((sum, [, value]) => sum + value, 0))}
+          icon={<FilePen />}
+          hint={
+            parts.length
+              ? parts
+                  .map(([prefix, value]) => `${prefix} ${formatPlain(value)}`)
+                  .join(' · ')
+              : t('Chưa ghi sổ')
+          }
         />
       ),
     })
   }
   const expectedKpis =
     (can('sales') ? 2 : 0) +
-    (can('receivables') ? 2 : 0) +
+    (can('collections') ? 1 : 0) +
+    (can('debt') ? 1 : 0) +
     (can('agencies') ? 1 : 0) +
-    (can('inventory') ? 1 : 0) +
-    (can('pendingIssueCount') ? 1 : 0) +
-    (can('verifiedUnreceiptedAmount') ? 1 : 0)
+    (can('drafts') ? 1 : 0)
 
   // ---------------------------------------------------------------- visuals
   const trendData = trend.map((point) => ({
     label: shortMonthLabel(point.month),
-    gross: toNumber(point.gross),
-    net: toNumber(point.net),
-    returns: toNumber(point.returns),
+    salesAmount: toNumber(point.salesAmount),
   }))
-  const salesMix = sales
-    ? [
-        {
-          key: 'net',
-          label: 'Doanh số thuần',
-          raw: sales.net,
-          value: Math.max(0, toNumber(sales.net)),
-          color: 'var(--chart-1)',
-        },
-        {
-          key: 'returns',
-          label: 'Hàng trả lại',
-          raw: sales.returns,
-          value: Math.max(0, toNumber(sales.returns)),
-          color: 'var(--chart-3)',
-        },
-      ]
+  const collectionParts = (
+    [
+      ['cashAmount', t('Tiền mặt'), 'var(--chart-1)'],
+      ['bankTransferAmount', t('Chuyển khoản'), 'var(--chart-2)'],
+      ['onlineAmount', t('Trực tuyến'), 'var(--chart-3)'],
+    ] as const
+  ).map(([key, label, color]) => ({ key, label, color }))
+  const collectionMix = collections
+    ? collectionParts.map((part) => ({
+        ...part,
+        raw: collections[part.key],
+        value: Math.max(0, toNumber(collections[part.key])),
+      }))
     : []
-  const salesMixTotal = salesMix.reduce((sum, part) => sum + part.value, 0)
+  const collectionMixTotal = collectionMix.reduce(
+    (sum, part) => sum + part.value,
+    0,
+  )
 
   const productSource = reportAllowed('product-sales')
     ? {
@@ -396,7 +387,7 @@ export function DashboardPage() {
           error: snapshot.error,
           retry: () => setReload((n) => n + 1),
           rows: sales?.topProducts ?? [],
-          note: 'Toàn công ty',
+          note: t('Toàn công ty'),
         }
       : null
   const productBars: BarDatum[] = (productSource?.rows ?? [])
@@ -406,7 +397,11 @@ export function DashboardPage() {
       label: String(row.productName),
       value: toNumber(row.salesAmount),
       display: formatVND(String(row.salesAmount)),
-      detail: `${String(row.productCode)} · bán ${formatQuantity(String(row.soldQuantity))} ${String(row.unitName)}`,
+      detail: t('{productCode} · bán {soldQuantity} {unitName}', {
+        productCode: String(row.productCode),
+        soldQuantity: formatQuantity(String(row.soldQuantity)),
+        unitName: String(row.unitName),
+      }),
     }))
   const pickProduct = (row: ReportRow) =>
     toggle('productId', { id: String(row.productId), label: productLabel(row) })
@@ -421,15 +416,16 @@ export function DashboardPage() {
         amountKey: 'closingDebt',
         note: filterNote('debt', filters),
       }
-    : receivables ||
-        (can('receivables') && (snapshot.loading || snapshot.error))
+    : debt || (can('debt') && (snapshot.loading || snapshot.error))
       ? {
           loading: snapshot.loading,
           error: snapshot.error,
           retry: () => setReload((n) => n + 1),
-          rows: (receivables?.topAgencies ?? []) as unknown as ReportRow[],
-          amountKey: 'currentDebt',
-          note: 'Dư nợ hiện tại, toàn công ty',
+          rows: (debt?.topAgencies ?? []).filter(
+            (row) => toNumber(row.debt) > 0,
+          ) as unknown as ReportRow[],
+          amountKey: 'debt',
+          note: t('Dư nợ hiện tại, toàn công ty'),
         }
       : null
   const debtBars: BarDatum[] = (debtSource?.rows ?? [])
@@ -439,7 +435,13 @@ export function DashboardPage() {
       label: String(row.agencyName),
       value: toNumber(row[debtSource!.amountKey]),
       display: formatVND(String(row[debtSource!.amountKey])),
-      detail: String(row.agencyCode),
+      detail:
+        typeof row.debtRatio === 'string'
+          ? t('{agencyCode} · {ratio} % nợ tối đa', {
+              agencyCode: String(row.agencyCode),
+              ratio: formatQuantity(row.debtRatio),
+            })
+          : String(row.agencyCode),
     }))
   const pickAgency = (row: { readonly [key: string]: unknown }) =>
     toggle('agencyId', { id: String(row.agencyId), label: agencyLabel(row) })
@@ -452,53 +454,41 @@ export function DashboardPage() {
   const salesBars: BarDatum[] = salesRows.slice(0, TOP).map((row) => ({
     id: String(row.agencyId),
     label: String(row.agencyName),
-    value: toNumber(row.netSalesAmount),
-    display: formatVND(String(row.netSalesAmount)),
-    detail: `${String(row.agencyCode)} · ${formatQuantity(String(row.numberOfIssues))} phiếu xuất`,
+    value: toNumber(row.salesAmount),
+    display: formatVND(String(row.salesAmount)),
+    detail: t('{agencyCode} · {numberOfIssues} phiếu xuất', {
+      agencyCode: String(row.agencyCode),
+      numberOfIssues: formatQuantity(String(row.numberOfIssues)),
+    }),
   }))
 
-  const cashTotals = cashReport.page?.totals
-  const cashSource = reportAllowed('cash-and-credit')
+  const collectionTotals = collectionsReport.page?.totals
+  const cashSource = reportAllowed('collections')
     ? {
-        ...cashReport,
-        items: cashTotals
-          ? (
-              [
-                ['cashReceived', 'Tiền thực thu'],
-                ['cashRefunded', 'Tiền thực hoàn'],
-                ['creditCreated', 'Dư có phát sinh'],
-                ['creditApplied', 'Dư có đã cấn trừ'],
-                ['creditRefunded', 'Dư có đã hoàn'],
-              ] as const
-            ).map(([key, label]) => ({
-              key,
-              label,
-              value: String(cashTotals[key]),
+        ...collectionsReport,
+        items: collectionTotals
+          ? collectionParts.map((part) => ({
+              key: part.key,
+              label: part.label,
+              value: String(collectionTotals[part.key]),
             }))
           : [],
-        note: filterNote('cash-and-credit', filters),
+        note: filterNote('collections', filters),
       }
-    : receivables ||
-        (can('receivables') && (snapshot.loading || snapshot.error))
+    : collections ||
+        (can('collections') && (snapshot.loading || snapshot.error))
       ? {
           loading: snapshot.loading,
           error: snapshot.error,
           retry: () => setReload((n) => n + 1),
-          items: receivables
-            ? [
-                {
-                  key: 'cashReceived',
-                  label: 'Tiền thực thu',
-                  value: receivables.cashReceived,
-                },
-                {
-                  key: 'cashRefunded',
-                  label: 'Tiền thực hoàn',
-                  value: receivables.cashRefunded,
-                },
-              ]
+          items: collections
+            ? collectionParts.map((part) => ({
+                key: part.key,
+                label: part.label,
+                value: collections[part.key],
+              }))
             : [],
-          note: 'Toàn công ty',
+          note: t('Toàn công ty'),
         }
       : null
   const cashBars: BarDatum[] = (cashSource?.items ?? []).map((item) => ({
@@ -516,10 +506,7 @@ export function DashboardPage() {
     display: `${formatQuantity(String(row.closingStock))} ${String(row.unitName)}`,
     detail: String(row.productCode),
   }))
-  const showInventory =
-    !!inventory ||
-    reportAllowed('inventory') ||
-    (can('inventory') && (snapshot.loading || !!snapshot.error))
+  const showInventory = reportAllowed('inventory')
 
   const matrixSources = {
     sales: reportAllowed('sales'),
@@ -553,64 +540,63 @@ export function DashboardPage() {
     if (focusAgencySales)
       focusItems.push(
         {
-          label: 'Doanh số thuần của đại lý',
-          value: formatVND(String(focusAgencySales.netSalesAmount)),
+          label: t('Doanh số của đại lý'),
+          value: formatVND(String(focusAgencySales.salesAmount)),
         },
         {
-          label: 'Tỷ lệ doanh số',
+          label: t('Tỷ lệ doanh số'),
           value: `${formatQuantity(String(focusAgencySales.salesRate))} %`,
         },
       )
     if (focusAgencyDebt)
       focusItems.push({
-        label: 'Nợ cuối kỳ của đại lý',
+        label: t('Nợ cuối kỳ của đại lý'),
         value: formatVND(String(focusAgencyDebt.closingDebt)),
       })
-    if (cashTotals)
+    if (collectionTotals)
       focusItems.push({
-        label: 'Thực thu từ đại lý',
-        value: formatVND(String(cashTotals.cashReceived)),
+        label: t('Đã thu từ đại lý'),
+        value: formatVND(String(collectionTotals.totalAmount)),
       })
   }
   if (selectedProduct) {
     if (focusProductSales)
       focusItems.push(
         {
-          label: 'Mặt hàng: số lượng bán',
+          label: t('Mặt hàng: số lượng bán'),
           value: `${formatQuantity(String(focusProductSales.soldQuantity))} ${String(focusProductSales.unitName)}`,
         },
         {
-          label: 'Mặt hàng: doanh số gộp',
+          label: t('Mặt hàng: doanh số'),
           value: formatVND(String(focusProductSales.salesAmount)),
         },
       )
     if (focusProductStock)
       focusItems.push({
-        label: 'Mặt hàng: tồn cuối kỳ',
+        label: t('Mặt hàng: tồn cuối kỳ'),
         value: `${formatQuantity(String(focusProductStock.closingStock))} ${String(focusProductStock.unitName)}`,
       })
   }
 
   const refreshing =
     snapshot.loading ||
-    [salesReport, debtReport, productReport, cashReport, inventoryReport].some(
-      (state) => state.loading,
-    )
+    [
+      salesReport,
+      debtReport,
+      productReport,
+      collectionsReport,
+      inventoryReport,
+    ].some((state) => state.loading)
 
   const retry = () => setReload((n) => n + 1)
-  const inStock = inventory
-    ? Math.max(0, inventory.productCount - inventory.lowStockProductCount)
-    : 0
-  const inStockRatio =
-    inventory && inventory.productCount ? inStock / inventory.productCount : 0
 
   return (
     <div className="space-y-5">
       <PageHeader
         className="mb-0"
-        eyebrow="Tổng quan điều hành"
-        title="Bảng điều khiển"
-        description="Nhấn một đại lý hoặc mặt hàng để lọc chéo."
+        eyebrow={t('Tổng quan điều hành')}
+        title={t('Bảng điều khiển')}
+        description={t('Nhấn một đại lý hoặc mặt hàng để lọc chéo.')}
         actions={
           admitted && (
             <>
@@ -620,7 +606,7 @@ export function DashboardPage() {
               >
                 {data ? (
                   <>
-                    {periodLabel} · Cập nhật lúc{' '}
+                    {t('{periodLabel} · Cập nhật lúc', { periodLabel })}{' '}
                     <time
                       dateTime={data.asOf}
                       className="font-medium text-foreground"
@@ -629,14 +615,15 @@ export function DashboardPage() {
                     </time>
                   </>
                 ) : snapshot.loading ? (
-                  'Đang tải dữ liệu…'
+                  t('Đang tải dữ liệu…')
                 ) : (
                   periodLabel
                 )}
               </p>
-              <InfoTip label="Phạm vi số liệu">
-                Chỉ số tính cho toàn công ty. Công nợ, đại lý và tồn kho là số
-                hiện tại; doanh số, nhập hàng và thu tiền theo tháng đã chọn.
+              <InfoTip label={t('Phạm vi số liệu')}>
+                {t(
+                  'Chỉ số tính cho toàn công ty và chỉ gồm phiếu đã ghi sổ. Công nợ, đại lý và phiếu nháp là số hiện tại; doanh số và thu tiền theo tháng đã chọn.',
+                )}
               </InfoTip>
               <Button
                 variant="outline"
@@ -645,7 +632,7 @@ export function DashboardPage() {
                 isLoading={refreshing}
                 onClick={retry}
               >
-                Làm mới
+                {t('Làm mới')}
               </Button>
             </>
           )
@@ -653,8 +640,9 @@ export function DashboardPage() {
       />
       {!admitted ? (
         <Alert type="info">
-          Bạn không có quyền truy cập bảng điều khiển. Liên hệ quản trị viên nếu
-          cần được cấp quyền.
+          {t(
+            'Bạn không có quyền truy cập bảng điều khiển. Liên hệ quản trị viên nếu cần được cấp quyền.',
+          )}
         </Alert>
       ) : (
         <>
@@ -669,9 +657,9 @@ export function DashboardPage() {
           />
           {monthError && <Alert type="error">{monthError}</Alert>}
 
-          <section aria-label="Chỉ số chính" className="space-y-3">
+          <section aria-label={t('Chỉ số chính')} className="space-y-3">
             {snapshot.error ? (
-              <Alert type="error" title="Không tải được chỉ số tổng quan">
+              <Alert type="error" title={t('Không tải được chỉ số tổng quan')}>
                 <span className="block">{snapshot.error}</span>
                 <Button
                   variant="outline"
@@ -679,7 +667,7 @@ export function DashboardPage() {
                   className="mt-2"
                   onClick={retry}
                 >
-                  Thử lại
+                  {t('Thử lại')}
                 </Button>
               </Alert>
             ) : snapshot.loading ? (
@@ -687,7 +675,9 @@ export function DashboardPage() {
                 className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
                 aria-busy="true"
               >
-                <span className="sr-only">Đang tải bảng điều khiển...</span>
+                <span className="sr-only">
+                  {t('Đang tải bảng điều khiển...')}
+                </span>
                 {Array.from({ length: Math.max(1, expectedKpis) }, (_, i) => (
                   <Card key={i} className="gap-3 p-4 shadow-xs">
                     <Skeleton className="h-4 w-1/2" />
@@ -700,11 +690,11 @@ export function DashboardPage() {
               <>
                 {missing.length > 0 && (
                   <Alert type="info">
-                    Chưa có dữ liệu cho:{' '}
-                    {missing
-                      .map((section) => sectionLabels[section])
-                      .join(', ')}
-                    .
+                    {t('Chưa có dữ liệu cho: {map}.', {
+                      map: missing
+                        .map((section) => sectionLabels[section])
+                        .join(', '),
+                    })}
                   </Alert>
                 )}
                 {kpis.length > 0 && (
@@ -720,7 +710,7 @@ export function DashboardPage() {
 
           {focusItems.length > 0 && (
             <section
-              aria-label="Đối tượng đang chọn"
+              aria-label={t('Đối tượng đang chọn')}
               className="bg-water animate-in rounded-xl border border-primary/20 p-4 duration-300 fade-in-0 slide-in-from-top-1"
             >
               <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -755,40 +745,32 @@ export function DashboardPage() {
             {can('sales') && (
               <StaggerItem className="md:col-span-12 xl:col-span-8">
                 <VisualCard
-                  title="Xu hướng doanh số"
-                  description="12 tháng gần nhất · toàn công ty"
+                  title={t('Xu hướng doanh số')}
+                  description={t('12 tháng gần nhất · toàn công ty')}
                   loading={snapshot.loading}
                   error={snapshot.error}
                   onRetry={retry}
                   isEmpty={!trendData.length}
                   empty={
                     <EmptyState
-                      title="Chưa có dữ liệu xu hướng"
-                      description="Không có doanh số trong 12 tháng gần nhất."
+                      title={t('Chưa có dữ liệu xu hướng')}
+                      description={t(
+                        'Không có doanh số trong 12 tháng gần nhất.',
+                      )}
                     />
                   }
                   table={
                     <MiniTable
-                      caption="Xu hướng doanh số"
-                      headers={[
-                        'Tháng',
-                        'Doanh số gộp',
-                        'Trả hàng',
-                        'Doanh số thuần',
-                      ]}
+                      caption={t('Xu hướng doanh số')}
+                      headers={[t('Tháng'), t('Doanh số'), t('Phiếu xuất')]}
                       rows={trend.map((point) => ({
                         key: point.month,
                         label: monthLabel(point.month),
                         cells: [
-                          formatVND(point.gross),
-                          formatVND(point.returns),
-                          formatVND(point.net),
+                          formatVND(point.salesAmount),
+                          formatPlain(point.issueCount),
                         ],
-                        values: [
-                          toNumber(point.gross),
-                          toNumber(point.returns),
-                          toNumber(point.net),
-                        ],
+                        values: [toNumber(point.salesAmount), point.issueCount],
                       }))}
                     />
                   }
@@ -798,18 +780,11 @@ export function DashboardPage() {
                     xKey="label"
                     series={[
                       {
-                        key: 'gross',
-                        label: 'Doanh số gộp',
-                        color: 'var(--chart-2)',
-                      },
-                      {
-                        key: 'net',
-                        label: 'Doanh số thuần',
+                        key: 'salesAmount',
+                        label: t('Doanh số'),
                         color: 'var(--chart-1)',
                       },
                     ]}
-                    dashedKey="returns"
-                    dashedLabel="Hàng trả lại"
                     tooltipFormatter={(value) => formatVND(value)}
                     height={280}
                   />
@@ -817,63 +792,67 @@ export function DashboardPage() {
               </StaggerItem>
             )}
 
-            {can('sales') && (
+            {can('collections') && (
               <StaggerItem className="md:col-span-6 xl:col-span-4">
                 <VisualCard
-                  title="Cơ cấu doanh số"
-                  description={`${periodLabel} · toàn công ty`}
+                  title={t('Cơ cấu thu tiền')}
+                  description={t('{periodLabel} · toàn công ty', {
+                    periodLabel,
+                  })}
                   loading={snapshot.loading}
                   error={snapshot.error}
                   onRetry={retry}
-                  isEmpty={!sales || salesMixTotal === 0}
+                  isEmpty={!collections || collectionMixTotal === 0}
                   empty={
                     <EmptyState
-                      title="Chưa có doanh số trong tháng"
-                      description="Thử chọn tháng khác."
+                      title={t('Chưa thu tiền trong tháng')}
+                      description={t('Thử chọn tháng khác.')}
                     />
                   }
                   table={
-                    sales && (
+                    collections && (
                       <MiniTable
-                        caption="Cơ cấu doanh số"
-                        headers={['Chỉ tiêu', 'Số tiền']}
+                        caption={t('Cơ cấu thu tiền')}
+                        headers={[t('Hình thức'), t('Số tiền')]}
                         rows={[
-                          ...salesMix.map((part) => ({
+                          ...collectionMix.map((part) => ({
                             key: part.key,
                             label: part.label,
                             cells: [formatVND(part.raw)],
                           })),
                           {
-                            key: 'gross',
-                            label: 'Doanh số gộp',
-                            cells: [formatVND(sales.gross)],
+                            key: 'total',
+                            label: t('Tổng thu'),
+                            cells: [formatVND(collections.totalAmount)],
                           },
                         ]}
                       />
                     )
                   }
                 >
-                  {sales && (
+                  {collections && (
                     <div className="grid items-center gap-4">
                       <DonutChart
-                        data={salesMix}
-                        centerLabel="Doanh số gộp"
-                        centerValue={formatCompactVND(toNumber(sales.gross))}
+                        data={collectionMix}
+                        centerLabel={t('Tổng thu')}
+                        centerValue={formatCompactVND(
+                          toNumber(collections.totalAmount),
+                        )}
                         valueFormatter={formatCompactVND}
                         height={200}
                       />
                       <LegendList
-                        items={salesMix.map((part) => ({
+                        items={collectionMix.map((part) => ({
                           key: part.key,
                           label: part.label,
                           color: part.color,
                           value: (
                             <span title={formatVND(part.raw)}>
                               {formatCompactVND(toNumber(part.raw))}
-                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                              <span className="ms-1.5 text-xs font-normal text-muted-foreground">
                                 {formatPercent(
-                                  salesMixTotal
-                                    ? part.value / salesMixTotal
+                                  collectionMixTotal
+                                    ? part.value / collectionMixTotal
                                     : 0,
                                 )}
                               </span>
@@ -890,26 +869,29 @@ export function DashboardPage() {
             {productSource && (
               <StaggerItem className="md:col-span-6 xl:col-span-4">
                 <VisualCard
-                  title="Mặt hàng bán chạy"
-                  description={`Top ${TOP} · doanh số gộp${productSource.note ? ` · ${productSource.note}` : ''}`}
+                  title={t('Mặt hàng bán chạy')}
+                  description={t('Top {TOP} · doanh số{value}', {
+                    TOP,
+                    value: productSource.note ? ` · ${productSource.note}` : '',
+                  })}
                   loading={productSource.loading}
                   error={productSource.error}
                   onRetry={productSource.retry}
                   isEmpty={!productBars.length}
                   empty={
                     <EmptyState
-                      title="Không có mặt hàng bán trong kỳ"
-                      description="Thử chọn tháng khác hoặc bỏ bộ lọc."
+                      title={t('Không có mặt hàng bán trong kỳ')}
+                      description={t('Thử chọn tháng khác hoặc bỏ bộ lọc.')}
                     />
                   }
                   table={
                     <MiniTable
-                      caption="Top mặt hàng"
+                      caption={t('Top mặt hàng')}
                       headers={[
-                        'Mặt hàng',
-                        'Đã bán',
-                        'Doanh số gộp',
-                        'Doanh số thuần',
+                        t('Mặt hàng'),
+                        t('Đã bán'),
+                        t('Số phiếu'),
+                        t('Doanh số'),
                       ]}
                       rows={productSource.rows.slice(0, TOP).map((row) => ({
                         key: String(row.productId),
@@ -917,16 +899,18 @@ export function DashboardPage() {
                         detail: String(row.productCode),
                         selected: String(row.productId) === selectedProduct,
                         onSelect: () => pickProduct(row),
-                        selectLabel: `Lọc theo mặt hàng ${productLabel(row)}`,
+                        selectLabel: t('Lọc theo mặt hàng {productLabel}', {
+                          productLabel: productLabel(row),
+                        }),
                         cells: [
                           `${formatQuantity(String(row.soldQuantity))} ${String(row.unitName)}`,
+                          formatQuantity(String(row.numberOfIssues)),
                           formatVND(String(row.salesAmount)),
-                          formatVND(String(row.netSalesAmount)),
                         ],
                         values: [
                           toNumber(row.soldQuantity),
+                          toNumber(row.numberOfIssues),
                           toNumber(row.salesAmount),
-                          toNumber(row.netSalesAmount),
                         ],
                       }))}
                     />
@@ -934,7 +918,7 @@ export function DashboardPage() {
                 >
                   <RankedBarChart
                     data={productBars}
-                    seriesLabel="Doanh số gộp"
+                    seriesLabel={t('Doanh số')}
                     selectedId={selectedProduct}
                     onSelect={(datum) => {
                       const row = productSource.rows.find(
@@ -950,7 +934,7 @@ export function DashboardPage() {
             {reportAllowed('sales') && (
               <StaggerItem className="md:col-span-6 xl:col-span-4">
                 <VisualCard
-                  title="Doanh số thuần theo đại lý"
+                  title={t('Doanh số theo đại lý')}
                   description={`Top ${TOP}${filterNote('sales', filters) ? ` · ${filterNote('sales', filters)}` : ''}`}
                   loading={salesReport.loading}
                   error={salesReport.error}
@@ -958,18 +942,18 @@ export function DashboardPage() {
                   isEmpty={!salesBars.length}
                   empty={
                     <EmptyState
-                      title="Chưa có doanh số đại lý"
-                      description="Không có phiếu xuất trong kỳ đã chọn."
+                      title={t('Chưa có doanh số đại lý')}
+                      description={t('Không có phiếu xuất trong kỳ đã chọn.')}
                     />
                   }
                   table={
                     <MiniTable
-                      caption="Doanh số theo đại lý"
+                      caption={t('Doanh số theo đại lý')}
                       headers={[
-                        'Đại lý',
-                        'Số phiếu',
-                        'Doanh số thuần',
-                        'Tỷ lệ',
+                        t('Đại lý'),
+                        t('Số phiếu'),
+                        t('Doanh số'),
+                        t('Tỷ lệ'),
                       ]}
                       rows={salesRows.slice(0, TOP).map((row) => ({
                         key: String(row.agencyId),
@@ -977,15 +961,17 @@ export function DashboardPage() {
                         detail: String(row.agencyCode),
                         selected: String(row.agencyId) === selectedAgency,
                         onSelect: () => pickAgency(row),
-                        selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
+                        selectLabel: t('Lọc theo đại lý {agencyLabel}', {
+                          agencyLabel: agencyLabel(row),
+                        }),
                         cells: [
                           formatQuantity(String(row.numberOfIssues)),
-                          formatVND(String(row.netSalesAmount)),
+                          formatVND(String(row.salesAmount)),
                           `${formatQuantity(String(row.salesRate))} %`,
                         ],
                         values: [
                           toNumber(row.numberOfIssues),
-                          toNumber(row.netSalesAmount),
+                          toNumber(row.salesAmount),
                           toNumber(row.salesRate),
                         ],
                       }))}
@@ -994,7 +980,7 @@ export function DashboardPage() {
                 >
                   <RankedBarChart
                     data={salesBars}
-                    seriesLabel="Doanh số thuần"
+                    seriesLabel={t('Doanh số')}
                     selectedId={selectedAgency}
                     onSelect={(datum) => pickAgencyBar(salesRows, datum)}
                   />
@@ -1005,10 +991,13 @@ export function DashboardPage() {
             {debtSource && (
               <StaggerItem className="md:col-span-6 xl:col-span-4">
                 <VisualCard
-                  title="Đại lý nợ nhiều nhất"
+                  title={t('Đại lý nợ nhiều nhất')}
                   description={
                     debtFromReport
-                      ? `Top ${TOP} · nợ cuối kỳ${debtSource.note ? ` · ${debtSource.note}` : ''}`
+                      ? t('Top {TOP} · nợ cuối kỳ{value}', {
+                          TOP,
+                          value: debtSource.note ? ` · ${debtSource.note}` : '',
+                        })
                       : `Top ${TOP} · ${debtSource.note}`
                   }
                   loading={debtSource.loading}
@@ -1017,16 +1006,16 @@ export function DashboardPage() {
                   isEmpty={!debtBars.length}
                   empty={
                     <EmptyState
-                      title="Không có đại lý nào đang nợ"
-                      description="Tất cả đại lý đã tất toán công nợ."
+                      title={t('Không có đại lý nào đang nợ')}
+                      description={t('Tất cả đại lý đã tất toán công nợ.')}
                     />
                   }
                   table={
                     <MiniTable
-                      caption="Top đại lý có dư nợ"
+                      caption={t('Top đại lý có dư nợ')}
                       headers={[
-                        'Đại lý',
-                        debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại',
+                        t('Đại lý'),
+                        debtFromReport ? t('Nợ cuối kỳ') : t('Dư nợ hiện tại'),
                       ]}
                       rows={debtSource.rows.slice(0, TOP).map((row) => ({
                         key: String(row.agencyId),
@@ -1034,7 +1023,9 @@ export function DashboardPage() {
                         detail: String(row.agencyCode),
                         selected: String(row.agencyId) === selectedAgency,
                         onSelect: () => pickAgency(row),
-                        selectLabel: `Lọc theo đại lý ${agencyLabel(row)}`,
+                        selectLabel: t('Lọc theo đại lý {agencyLabel}', {
+                          agencyLabel: agencyLabel(row),
+                        }),
                         cells: [formatVND(String(row[debtSource.amountKey]))],
                         values: [toNumber(row[debtSource.amountKey])],
                       }))}
@@ -1044,7 +1035,7 @@ export function DashboardPage() {
                   <RankedBarChart
                     data={debtBars}
                     seriesLabel={
-                      debtFromReport ? 'Nợ cuối kỳ' : 'Dư nợ hiện tại'
+                      debtFromReport ? t('Nợ cuối kỳ') : t('Dư nợ hiện tại')
                     }
                     color="var(--chart-3)"
                     selectedId={selectedAgency}
@@ -1057,7 +1048,7 @@ export function DashboardPage() {
             {cashSource && (
               <StaggerItem className="md:col-span-6">
                 <VisualCard
-                  title="Dòng tiền và dư có"
+                  title={t('Thu tiền theo hình thức')}
                   description={cashSource.note ?? periodLabel}
                   loading={cashSource.loading}
                   error={cashSource.error}
@@ -1065,8 +1056,8 @@ export function DashboardPage() {
                   isEmpty={!cashBars.length}
                   table={
                     <MiniTable
-                      caption="Dòng tiền và dư có"
-                      headers={['Chỉ tiêu', 'Số tiền']}
+                      caption={t('Thu tiền theo hình thức')}
+                      headers={[t('Hình thức'), t('Số tiền')]}
                       rows={cashSource.items.map((item) => ({
                         key: item.key,
                         label: item.label,
@@ -1078,7 +1069,7 @@ export function DashboardPage() {
                 >
                   <RankedBarChart
                     data={cashBars}
-                    seriesLabel="Số tiền"
+                    seriesLabel={t('Số tiền')}
                     color="var(--chart-2)"
                   />
                 </VisualCard>
@@ -1088,36 +1079,22 @@ export function DashboardPage() {
             {showInventory && (
               <StaggerItem className="md:col-span-6">
                 <VisualCard
-                  title="Sức khỏe tồn kho"
-                  description={
-                    reportAllowed('inventory')
-                      ? 'Tồn thấp nhất cuối kỳ'
-                      : 'Hiện tại'
-                  }
-                  loading={
-                    reportAllowed('inventory')
-                      ? inventoryReport.loading
-                      : snapshot.loading
-                  }
-                  error={
-                    reportAllowed('inventory')
-                      ? inventoryReport.error
-                      : snapshot.error
-                  }
-                  onRetry={
-                    reportAllowed('inventory') ? inventoryReport.retry : retry
-                  }
-                  isEmpty={!inventory && !stockBars.length}
+                  title={t('Sức khỏe tồn kho')}
+                  description={t('Tồn thấp nhất cuối kỳ')}
+                  loading={inventoryReport.loading}
+                  error={inventoryReport.error}
+                  onRetry={inventoryReport.retry}
+                  isEmpty={!stockBars.length}
                   table={
                     stockRows.length ? (
                       <MiniTable
-                        caption="Mặt hàng tồn thấp nhất"
+                        caption={t('Mặt hàng tồn thấp nhất')}
                         headers={[
-                          'Mặt hàng',
-                          'Tồn đầu',
-                          'Nhập',
-                          'Xuất',
-                          'Tồn cuối',
+                          t('Mặt hàng'),
+                          t('Tồn đầu'),
+                          t('Nhập'),
+                          t('Xuất'),
+                          t('Tồn cuối'),
                         ]}
                         rows={stockRows.map((row) => ({
                           key: String(row.productId),
@@ -1125,7 +1102,9 @@ export function DashboardPage() {
                           detail: `${String(row.productCode)} · ${String(row.unitName)}`,
                           selected: String(row.productId) === selectedProduct,
                           onSelect: () => pickProduct(row),
-                          selectLabel: `Lọc theo mặt hàng ${productLabel(row)}`,
+                          selectLabel: t('Lọc theo mặt hàng {productLabel}', {
+                            productLabel: productLabel(row),
+                          }),
                           cells: [
                             formatQuantity(String(row.openingStock)),
                             formatQuantity(String(row.receiptQuantity)),
@@ -1144,47 +1123,10 @@ export function DashboardPage() {
                   }
                 >
                   <div className="space-y-4">
-                    {inventory && (
-                      <div className="space-y-2">
-                        <div className="flex items-baseline justify-between gap-2 text-xs">
-                          <span className="text-muted-foreground">
-                            Mặt hàng đủ hàng
-                          </span>
-                          <span className="text-base font-semibold tabular-nums">
-                            {formatPercent(inStockRatio)}
-                          </span>
-                        </div>
-                        <SegmentedMeter
-                          ratio={inStockRatio}
-                          label="Tỷ lệ mặt hàng đủ hàng"
-                          color="var(--success)"
-                          className="h-7"
-                        />
-                        <LegendList
-                          className="grid-cols-2 gap-x-6 text-xs"
-                          items={[
-                            {
-                              key: 'low',
-                              label: 'Tồn thấp',
-                              value: formatPlain(
-                                inventory.lowStockProductCount,
-                              ),
-                              color: 'var(--warning)',
-                            },
-                            {
-                              key: 'ok',
-                              label: 'Đủ hàng',
-                              value: formatPlain(inStock),
-                              color: 'var(--success)',
-                            },
-                          ]}
-                        />
-                      </div>
-                    )}
                     {stockBars.length > 0 && (
                       <RankedBarChart
                         data={stockBars}
-                        seriesLabel="Tồn cuối kỳ"
+                        seriesLabel={t('Tồn cuối kỳ')}
                         color="var(--chart-7)"
                         selectedId={selectedProduct}
                         onSelect={(datum) => {
@@ -1203,8 +1145,11 @@ export function DashboardPage() {
             {(matrixSources.sales || matrixSources.debt) && (
               <StaggerItem className="md:col-span-12">
                 <VisualCard
-                  title="Ma trận đại lý"
-                  description={`${periodLabel} · nhấn tiêu đề cột để sắp xếp`}
+                  title={t('Ma trận đại lý')}
+                  description={t(
+                    '{periodLabel} · nhấn tiêu đề cột để sắp xếp',
+                    { periodLabel },
+                  )}
                   loading={matrixLoading}
                   error={matrixError}
                   onRetry={() => {
@@ -1214,8 +1159,10 @@ export function DashboardPage() {
                   isEmpty={!matrixRows.length}
                   empty={
                     <EmptyState
-                      title="Không có đại lý phù hợp"
-                      description="Không có số liệu đại lý cho bộ lọc hiện tại."
+                      title={t('Không có đại lý phù hợp')}
+                      description={t(
+                        'Không có số liệu đại lý cho bộ lọc hiện tại.',
+                      )}
                     />
                   }
                 >

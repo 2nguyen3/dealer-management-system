@@ -18,14 +18,15 @@ import {
   type FlowState,
   type FlowStep,
 } from './flow'
+import { t } from '@/lib/i18n/core'
 
 const STATE_TEXT: Record<FlowState, string> = {
   done: 'Xong',
-  current: 'Đang ở bước này',
-  upcoming: 'Tiếp theo',
-  failed: 'Dừng tại đây',
-  expired: 'Quá hạn',
-  skipped: 'Bỏ qua',
+  current: t('Đang ở bước này'),
+  upcoming: t('Tiếp theo'),
+  failed: t('Dừng tại đây'),
+  expired: t('Quá hạn'),
+  skipped: t('Bỏ qua'),
 }
 
 const MEDIA: Record<FlowState, string> = {
@@ -51,22 +52,22 @@ const OUTCOME: Record<
   { text: string; tone: string; bar: string }
 > = {
   active: {
-    text: 'Đang diễn ra',
+    text: t('Đang diễn ra'),
     tone: 'border-primary/30 bg-primary/10 text-primary',
     bar: '[&_[data-slot=progress-indicator]]:bg-primary',
   },
   complete: {
-    text: 'Hoàn thành',
+    text: t('Hoàn thành'),
     tone: 'border-success/30 bg-success/10 text-success',
     bar: '[&_[data-slot=progress-indicator]]:bg-success',
   },
   failed: {
-    text: 'Đã dừng',
+    text: t('Đã dừng'),
     tone: 'border-destructive/30 bg-destructive/10 text-destructive',
     bar: '[&_[data-slot=progress-indicator]]:bg-destructive',
   },
   expired: {
-    text: 'Đã quá hạn',
+    text: t('Đã quá hạn'),
     tone: 'border-warning/30 bg-warning/10 text-warning',
     bar: '[&_[data-slot=progress-indicator]]:bg-warning',
   },

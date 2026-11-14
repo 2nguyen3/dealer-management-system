@@ -1,6 +1,7 @@
 // Half-open `[fromDate, toDate)` report periods and quick slicer presets.
 import { vietnamMonth, type ReportKind, type ReportQuery } from './contracts'
 import { reports } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 /** `YYYY-MM` shifted by `months` (may be negative). */
 export function shiftMonth(month: string, months: number): string {
@@ -31,10 +32,10 @@ export type PeriodPreset =
   'thisMonth' | 'lastMonth' | 'thisQuarter' | 'thisYear'
 
 export const periodPresets: { value: PeriodPreset; label: string }[] = [
-  { value: 'thisMonth', label: 'Tháng này' },
-  { value: 'lastMonth', label: 'Tháng trước' },
-  { value: 'thisQuarter', label: 'Quý này' },
-  { value: 'thisYear', label: 'Năm nay' },
+  { value: 'thisMonth', label: t('Tháng này') },
+  { value: 'lastMonth', label: t('Tháng trước') },
+  { value: 'thisQuarter', label: t('Quý này') },
+  { value: 'thisYear', label: t('Năm nay') },
 ]
 
 /** Preset period relative to the Vietnam business month `month`. */

@@ -155,7 +155,7 @@ describe('Authentication Components', () => {
       )
 
       fireEvent.change(screen.getByLabelText(/Email/i, { selector: 'input' }), {
-        target: { value: 'locked@agentra.demo' },
+        target: { value: 'vanluc@agentra.vn' },
       })
       fireEvent.change(
         screen.getByLabelText(/Mật khẩu/i, { selector: 'input' }),

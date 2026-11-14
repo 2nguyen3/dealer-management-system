@@ -4,20 +4,21 @@ import { master } from '../master_data/masterContracts'
 import { num, partsBy, sumBy } from '../master_data/summaryData'
 import { DonutTile, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 function groupSummary(items: Row[]) {
   return (
     <>
-      <StatTile label="Nhóm" value={items.length} icon={<UsersRound />} />
+      <StatTile label={t('Nhóm')} value={items.length} icon={<UsersRound />} />
       <StatTile
-        label="Người dùng"
+        label={t('Người dùng')}
         value={sumBy(items, (item) => num(item.userCount))}
         icon={<Users />}
       />
       <DonutTile
-        title="Người dùng theo nhóm"
-        centerLabel="tài khoản"
-        head={['Nhóm', 'Số người dùng']}
+        title={t('Người dùng theo nhóm')}
+        centerLabel={t('tài khoản')}
+        head={[t('Nhóm'), t('Số người dùng')]}
         data={partsBy(
           items,
           (item) => num(item.id),
@@ -31,25 +32,25 @@ function groupSummary(items: Row[]) {
 
 const config: MasterConfig = {
   path: '/user-groups',
-  title: 'Nhóm người dùng',
-  description: 'Các nhóm tài khoản dùng để phân quyền chức năng.',
+  title: t('Nhóm người dùng'),
+  description: t('Các nhóm tài khoản dùng để phân quyền chức năng.'),
   manage: 'groups.manage',
   deletePermission: 'permissions.manage',
   decode: master,
   sorts: [
-    { field: 'code', label: 'Mã nhóm' },
-    { field: 'name', label: 'Tên nhóm' },
-    { field: 'id', label: 'Thứ tự tạo' },
+    { field: 'code', label: t('Mã nhóm') },
+    { field: 'name', label: t('Tên nhóm') },
+    { field: 'id', label: t('Thứ tự tạo') },
   ],
   summary: groupSummary,
   fields: [
-    { key: 'code', label: 'Mã nhóm' },
-    { key: 'name', label: 'Tên nhóm' },
+    { key: 'code', label: t('Mã nhóm') },
+    { key: 'name', label: t('Tên nhóm') },
   ],
   columns: [
-    ['code', 'Mã nhóm'],
-    ['name', 'Tên nhóm'],
-    ['userCount', 'Số người dùng', 'count'],
+    ['code', t('Mã nhóm')],
+    ['name', t('Tên nhóm')],
+    ['userCount', t('Số người dùng'), 'count'],
   ],
 }
 export function UserGroupsPage() {

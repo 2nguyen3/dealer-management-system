@@ -4,18 +4,23 @@ import { user } from '../master_data/masterContracts'
 import { countWhere, num, partsBy, ratioOf } from '../master_data/summaryData'
 import { DonutTile, MeterTile, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 function userSummary(items: Row[]) {
   const locked = countWhere(items, (item) => item.status === 'LOCKED')
   const active = items.length - locked
   return (
     <>
-      <StatTile label="Đang hoạt động" value={active} icon={<UserCheck />} />
-      <StatTile label="Đang khóa" value={locked} icon={<UserLock />} />
+      <StatTile
+        label={t('Đang hoạt động')}
+        value={active}
+        icon={<UserCheck />}
+      />
+      <StatTile label={t('Đang khóa')} value={locked} icon={<UserLock />} />
       <DonutTile
-        title="Tài khoản theo nhóm"
-        centerLabel="tài khoản"
-        head={['Nhóm', 'Số tài khoản']}
+        title={t('Tài khoản theo nhóm')}
+        centerLabel={t('tài khoản')}
+        head={[t('Nhóm'), t('Số tài khoản')]}
         data={partsBy(
           items,
           (item) => num(item.groupId),
@@ -23,14 +28,17 @@ function userSummary(items: Row[]) {
         )}
       />
       <MeterTile
-        title="Tài khoản hoạt động"
+        title={t('Tài khoản hoạt động')}
         className="lg:col-span-4"
         ratio={ratioOf(active, items.length)}
-        caption={`${active}/${items.length} tài khoản`}
+        caption={t('{active}/{count} tài khoản', {
+          active,
+          count: items.length,
+        })}
         color="var(--success)"
         legend={[
-          { key: 'active', label: 'Hoạt động', value: active },
-          { key: 'locked', label: 'Đang khóa', value: locked },
+          { key: 'active', label: t('Hoạt động'), value: active },
+          { key: 'locked', label: t('Đang khóa'), value: locked },
         ]}
       />
     </>
@@ -39,43 +47,48 @@ function userSummary(items: Row[]) {
 
 const config: MasterConfig = {
   path: '/users',
-  title: 'Quản lý tài khoản',
-  description: 'Tạo tài khoản, gán nhóm quyền, khóa và đặt lại mật khẩu.',
+  title: t('Quản lý tài khoản'),
+  description: t('Tạo tài khoản, gán nhóm quyền, khóa và đặt lại mật khẩu.'),
   manage: 'users.manage',
   decode: user,
   noDelete: true,
   passwordReset: true,
   statuses: ['ACTIVE', 'LOCKED'],
-  filters: [['groupId', 'Nhóm người dùng', { picker: 'user-groups' }]],
+  filters: [['groupId', t('Nhóm người dùng'), { picker: 'user-groups' }]],
   sorts: [
-    { field: 'fullName', label: 'Họ tên' },
+    { field: 'fullName', label: t('Họ tên') },
     { field: 'email', label: 'Email' },
-    { field: 'createdAt', label: 'Ngày tạo', firstDirection: 'desc' },
-    { field: 'id', label: 'Thứ tự tạo' },
+    { field: 'createdAt', label: t('Ngày tạo'), firstDirection: 'desc' },
+    { field: 'id', label: t('Thứ tự tạo') },
   ],
   summary: userSummary,
   fields: [
-    { key: 'fullName', label: 'Họ tên' },
+    { key: 'fullName', label: t('Họ tên') },
     { key: 'email', label: 'Email', type: 'email' },
     {
       key: 'groupId',
-      label: 'Nhóm người dùng',
+      label: t('Nhóm người dùng'),
       type: 'catalog',
       lookup: { picker: 'user-groups' },
     },
-    { key: 'password', label: 'Mật khẩu', type: 'password', createOnly: true },
+    {
+      key: 'password',
+      label: t('Mật khẩu'),
+      type: 'password',
+      createOnly: true,
+    },
     {
       key: 'status',
-      label: 'Trạng thái',
+      label: t('Trạng thái'),
       type: 'status',
       choices: ['ACTIVE', 'LOCKED'],
     },
   ],
   columns: [
-    ['fullName', 'Họ tên'],
+    ['fullName', t('Họ tên')],
     ['email', 'Email'],
-    ['groupName', 'Nhóm'],
-    ['status', 'Trạng thái', 'status'],
+    ['groupName', t('Nhóm')],
+    ['status', t('Trạng thái'), 'status'],
   ],
 }
 export function UsersPage() {

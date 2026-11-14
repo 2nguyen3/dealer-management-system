@@ -13,6 +13,7 @@ import {
 } from '../features/authentication/useAuth'
 import { OnlinePaymentsPage } from '../features/online_payments/OnlinePaymentsPage'
 import * as apiModule from '../lib/api'
+import * as cacheModule from '../lib/cache'
 import { formatDateTime } from '../lib/formatters'
 import type { UserResponse } from '../lib/types'
 
@@ -82,31 +83,43 @@ describe('OnlinePaymentsPage Component', () => {
       </MemoryRouter>,
     )
 
-  const agencies = [
-    { id: '101', code: 'DL-101', name: 'Đại lý Minh Phát', currentDebt: '0' },
-    { id: '102', code: 'DL-102', name: 'Đại lý Toàn Thắng', currentDebt: '0' },
+  // AgencyResponse-shaped rows: debt is signed, maxDebt is the type limit.
+  const agencies: Record<string, unknown>[] = [
+    {
+      id: '101',
+      code: 'DL-101',
+      name: 'Đại lý Minh Phát',
+      status: 'ACTIVE',
+      debt: '0',
+      maxDebt: '5000000',
+    },
+    {
+      id: '102',
+      code: 'DL-102',
+      name: 'Đại lý Toàn Thắng',
+      status: 'ACTIVE',
+      debt: '1250000',
+      maxDebt: '5000000',
+    },
   ]
+  let agency102: () => unknown = () => agencies[1]
 
-  const agencyResponse = (path: string) =>
-    path.startsWith('/agencies?')
-      ? {
-          data: {
-            items: agencies,
-            pagination: { limit: 20, nextCursor: null, hasMore: false },
-          },
-          status: 200,
-          etag: null,
-        }
-      : path === '/agencies/102'
-        ? { data: agencies[1], status: 200, etag: null }
-        : null
+  const agencyResponse = (path: string) => {
+    if (path.startsWith('/agencies?'))
+      return {
+        data: {
+          items: agencies,
+          pagination: { limit: 20, nextCursor: null, hasMore: false },
+        },
+        status: 200,
+        etag: null,
+      }
+    if (path === '/agencies/102')
+      return { data: agency102(), status: 200, etag: null }
+    return null
+  }
 
-  const detailValue = (scope: HTMLElement, label: string) =>
-    within(scope).getByText(label).nextElementSibling?.textContent
-
-  const fillCreate = async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo thanh toán mới' }))
-    const dialog = screen.getByRole('dialog')
+  const pickAgency = async (dialog: HTMLElement) => {
     const agency = within(dialog).getByRole('combobox', {
       name: /Đại lý thanh toán/,
     })
@@ -114,6 +127,19 @@ describe('OnlinePaymentsPage Component', () => {
     fireEvent.click(
       await within(dialog).findByText('DL-102 — Đại lý Toàn Thắng'),
     )
+  }
+
+  const debtPanel = (dialog: HTMLElement) =>
+    within(dialog).findByLabelText('Công nợ đại lý')
+
+  const detailValue = (scope: HTMLElement, label: string) =>
+    within(scope).getByText(label).nextElementSibling?.textContent
+
+  const fillCreate = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo thanh toán mới' }))
+    const dialog = screen.getByRole('dialog')
+    await pickAgency(dialog)
+    await debtPanel(dialog)
     fireEvent.change(screen.getByLabelText(/Số tiền thanh toán/), {
       target: { value: '300000' },
     })
@@ -146,6 +172,11 @@ describe('OnlinePaymentsPage Component', () => {
         if (path === '/online-payments/1002')
           return { data: current(), status: 200, etag: null }
         if (
+          path === '/online-payments/1002/reconcile' &&
+          options.method === 'POST'
+        )
+          return { data: current(), status: 200, etag: null }
+        if (
           path.startsWith('/online-payments?') ||
           path === '/online-payments/1002/events?limit=25'
         )
@@ -162,6 +193,7 @@ describe('OnlinePaymentsPage Component', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
+    agency102 = () => agencies[1]
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path: string) => {
       const agency = agencyResponse(path)
       if (agency) return agency
@@ -600,24 +632,234 @@ describe('OnlinePaymentsPage Component', () => {
     expect(
       within(dialog).queryByRole('button', { name: 'Khởi tạo thanh toán' }),
     ).toBeNull()
-    const agency = within(dialog).getByRole('combobox', {
-      name: /Đại lý thanh toán/,
-    })
-    fireEvent.focus(agency)
-    fireEvent.click(
-      await within(dialog).findByText('DL-102 — Đại lý Toàn Thắng'),
-    )
+    await pickAgency(dialog)
+    await debtPanel(dialog)
     fireEvent.change(within(dialog).getByLabelText(/Số tiền thanh toán/), {
       target: { value: '0' },
     })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
     expect(
-      await within(dialog).findByText(/Số tiền phải là số nguyên dương/),
+      await within(dialog).findByText(/Số tiền phải là số nguyên VND dương/),
     ).toBeDefined()
     expect(
       within(dialog).queryByRole('button', { name: 'Khởi tạo thanh toán' }),
     ).toBeNull()
     expect(create).not.toHaveBeenCalled()
+  })
+
+  it('shows the current debt and blocks an amount above it', async () => {
+    const create = vi.fn()
+    mockServer(undefined, create)
+    renderPage()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tạo thanh toán mới' }),
+    )
+    const dialog = screen.getByRole('dialog')
+    await pickAgency(dialog)
+    const panel = await debtPanel(dialog)
+    expect(within(panel).getByText('1.250.000 ₫')).toBeDefined()
+    expect(within(panel).getByText('5.000.000 ₫')).toBeDefined()
+    const amount = within(dialog).getByLabelText(/Số tiền thanh toán/)
+    fireEvent.change(amount, { target: { value: '1250001' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    expect(
+      await within(dialog).findByText(
+        'Số tiền vượt công nợ hiện tại (1.250.000 ₫).',
+      ),
+    ).toBeDefined()
+    expect(
+      within(dialog).queryByRole('button', { name: 'Khởi tạo thanh toán' }),
+    ).toBeNull()
+    // Boundary: exactly the current debt, filled by the shortcut.
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Thu toàn bộ nợ' }),
+    )
+    expect((amount as HTMLInputElement).value).toBe('1250000')
+    expect(within(panel).getByText('0 ₫')).toBeDefined()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    expect(
+      await within(dialog).findByRole('button', {
+        name: 'Khởi tạo thanh toán',
+      }),
+    ).toBeDefined()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['0', 'Đại lý hiện không còn nợ để thanh toán.'],
+    ['-200000', 'Đại lý hiện không còn nợ để thanh toán.'],
+  ])('blocks a payment when the agency debt is %s', async (debt, expected) => {
+    agency102 = () => ({ ...agencies[1], debt })
+    const create = vi.fn()
+    mockServer(undefined, create)
+    renderPage()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tạo thanh toán mới' }),
+    )
+    const dialog = screen.getByRole('dialog')
+    await pickAgency(dialog)
+    await debtPanel(dialog)
+    expect(
+      within(dialog).queryByRole('button', { name: 'Thu toàn bộ nợ' }),
+    ).toBeNull()
+    fireEvent.change(within(dialog).getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '1' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    expect(await within(dialog).findByText(expected)).toBeDefined()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('blocks the review when the agency balance cannot be read', async () => {
+    agency102 = () => ({ ...agencies[1], debt: 'abc' })
+    const create = vi.fn()
+    mockServer(undefined, create)
+    renderPage()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tạo thanh toán mới' }),
+    )
+    const dialog = screen.getByRole('dialog')
+    await pickAgency(dialog)
+    expect(
+      await within(dialog).findByText('Thông tin công nợ đại lý không hợp lệ.'),
+    ).toBeDefined()
+    expect(within(dialog).queryByLabelText('Công nợ đại lý')).toBeNull()
+    fireEvent.change(within(dialog).getByLabelText(/Số tiền thanh toán/), {
+      target: { value: '1' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+    expect(
+      await within(dialog).findByText(
+        'Chưa đọc được công nợ hiện tại của đại lý.',
+      ),
+    ).toBeDefined()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('reconciles only a PENDING payment and invalidates document caches', async () => {
+    const invalidate = vi.spyOn(cacheModule, 'invalidateCache')
+    const fetch = mockServer(() => samplePayments[1]!)
+    renderPage('?paymentId=1002')
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Chờ xử lý')
+    invalidate.mockClear()
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: 'Đối soát giao dịch hiện tại',
+      }),
+    )
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([path, options]) =>
+            path === '/online-payments/1002/reconcile' &&
+            options?.method === 'POST',
+        ),
+      ).toBe(true),
+    )
+    await waitFor(() =>
+      expect(invalidate.mock.calls.map(([prefix]) => prefix)).toEqual(
+        expect.arrayContaining([
+          '/online-payments',
+          '/payment-receipts',
+          '/documents',
+          '/agencies',
+          '/dashboard',
+          '/reports',
+        ]),
+      ),
+    )
+    expect(
+      invalidate.mock.calls.some(([prefix]) => prefix === '/receivables'),
+    ).toBe(false)
+  })
+
+  it.each(['SUCCESS', 'FAILED', 'EXPIRED'])(
+    'does not offer reconciliation for a terminal %s payment',
+    async (status) => {
+      mockServer(() => ({
+        ...samplePayments[1]!,
+        status,
+        ...(status === 'SUCCESS'
+          ? {
+              receiptDocumentId: '502',
+              paymentTime: '2026-10-11T14:05:00Z',
+              providerTransactionId: 'TXN-002',
+            }
+          : {}),
+      }))
+      renderPage('?paymentId=1002')
+      const dialog = await screen.findByRole('dialog')
+      await within(dialog).findByRole('button', {
+        name: 'Kiểm tra trạng thái',
+      })
+      await waitFor(() =>
+        expect(
+          within(dialog).queryByText('Đang chờ cổng thanh toán xác nhận'),
+        ).toBeNull(),
+      )
+      expect(
+        within(dialog).queryByRole('button', {
+          name: 'Đối soát giao dịch hiện tại',
+        }),
+      ).toBeNull()
+    },
+  )
+
+  it('links the automatic receipt by code when the receipts page is allowed', async () => {
+    const success = {
+      ...samplePayments[1]!,
+      agencyCode: 'DL-102',
+      agencyName: 'Đại lý Toàn Thắng',
+      status: 'SUCCESS',
+      receiptDocumentId: '502',
+      receiptCode: 'PT-502',
+      paymentTime: '2026-10-11T14:05:00Z',
+      providerTransactionId: 'TXN-002',
+    }
+    mockServer(() => success)
+    const permissions = ['payments.online', 'cash.receipt.post']
+    renderPage('?paymentId=1002', {
+      ...mockAuthContext,
+      allowedFunctions: permissions as AuthContextValue['allowedFunctions'],
+      hasPermission: (perm) =>
+        Array.isArray(perm)
+          ? perm.some((p) => permissions.includes(p))
+          : permissions.includes(perm),
+    })
+    const dialog = await screen.findByRole('dialog')
+    const link = await within(dialog).findByRole('link', { name: 'PT-502' })
+    expect(link.getAttribute('href')).toBe('/payment-receipts?document=502')
+    expect(detailValue(dialog, 'Đại lý')).toBe('DL-102 · Đại lý Toàn Thắng')
+  })
+
+  it('shows the receipt code as text when the receipts page is not allowed, falling back to the id', async () => {
+    const success = {
+      ...samplePayments[1]!,
+      status: 'SUCCESS',
+      receiptDocumentId: '502',
+      receiptCode: 'PT-502',
+      paymentTime: '2026-10-11T14:05:00Z',
+      providerTransactionId: 'TXN-002',
+    }
+    let current: Record<string, unknown> = success
+    mockServer(() => current)
+    // Every viewer of this page can open /payment-receipts today, so the
+    // not-allowed branch is exercised with a session that has no grants.
+    renderPage('?paymentId=1002', {
+      ...mockAuthContext,
+      allowedFunctions: [],
+      hasPermission: () => false,
+    })
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('PT-502')
+    expect(within(dialog).queryByRole('link', { name: 'PT-502' })).toBeNull()
+    expect(detailValue(dialog, 'Đại lý')).toBe('#102')
+    current = { ...success, receiptCode: null }
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Kiểm tra trạng thái' }),
+    )
+    expect(await within(dialog).findByText('#502')).toBeDefined()
   })
 
   it('confirms a summary, then hands off with tracker, QR and detail link', async () => {

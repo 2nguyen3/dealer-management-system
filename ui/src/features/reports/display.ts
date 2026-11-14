@@ -2,66 +2,56 @@
 // untouched: these helpers only format the exact strings returned by the server.
 import { formatDate, formatQuantity, formatVND } from '../../lib/formatters'
 import {
-  cashAmounts,
+  collectionAmounts,
   debtAmounts,
   reports,
   rowRules,
-  salesAmounts,
   type ReportKind,
 } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 /** Database identifiers are kept for requests/row keys but not shown. */
 export const hiddenColumns = new Set(['agencyId', 'productId', 'unitId'])
 
 export const columnLabels: Record<string, string> = {
-  agencyCode: 'Mã đại lý',
-  agencyName: 'Tên đại lý',
-  productCode: 'Mã hàng',
-  productName: 'Mặt hàng',
-  unitName: 'Đơn vị',
-  numberOfIssues: 'Số phiếu xuất',
-  salesAmount: 'Doanh số gộp',
-  returnAmount: 'Hàng trả lại',
-  netSalesAmount: 'Doanh số thuần',
-  salesRate: 'Tỷ lệ doanh số',
-  companyGrossSales: 'Doanh số gộp toàn công ty',
-  openingDebt: 'Nợ đầu kỳ',
-  debtIncrease: 'Phát sinh nợ',
-  cashApplied: 'Thu tiền trừ nợ',
-  returnsApplied: 'Trả hàng trừ nợ',
-  creditApplied: 'Cấn trừ dư có',
-  debtDecrease: 'Tổng giảm nợ',
-  closingDebt: 'Nợ cuối kỳ',
-  openingStock: 'Tồn đầu kỳ',
-  receiptQuantity: 'Nhập',
-  issueQuantity: 'Xuất',
-  returnQuantity: 'Trả lại',
-  adjustmentQuantity: 'Điều chỉnh',
-  closingStock: 'Tồn cuối kỳ',
-  soldQuantity: 'Số lượng bán',
-  returnedQuantity: 'Số lượng trả',
-  cashReceived: 'Tiền đã thu',
-  cashRefunded: 'Tiền đã hoàn',
-  verifiedUnreceiptedAmount: 'Đã xác nhận, chưa lập phiếu thu',
-  openingCredit: 'Dư có đầu kỳ',
-  creditCreated: 'Dư có phát sinh',
-  creditRefunded: 'Dư có đã hoàn',
-  closingCredit: 'Dư có cuối kỳ',
-  currentReservedCredit: 'Dư có đang giữ',
-  currentAvailableCredit: 'Dư có khả dụng',
+  agencyCode: t('Mã đại lý'),
+  agencyName: t('Tên đại lý'),
+  productCode: t('Mã hàng'),
+  productName: t('Mặt hàng'),
+  unitName: t('Đơn vị'),
+  numberOfIssues: t('Số phiếu xuất'),
+  salesAmount: t('Doanh số'),
+  salesRate: t('Tỷ lệ doanh số'),
+  companySalesAmount: t('Doanh số toàn công ty'),
+  openingDebt: t('Nợ đầu kỳ'),
+  debtIncrease: t('Phát sinh nợ'),
+  paidAmount: t('Đã thu'),
+  closingDebt: t('Nợ cuối kỳ'),
+  openingStock: t('Tồn đầu kỳ'),
+  receiptQuantity: t('Nhập'),
+  issueQuantity: t('Xuất'),
+  closingStock: t('Tồn cuối kỳ'),
+  soldQuantity: t('Số lượng bán'),
+  businessDate: t('Ngày'),
+  receiptCount: t('Số phiếu thu'),
+  cashAmount: t('Tiền mặt'),
+  bankTransferAmount: t('Chuyển khoản'),
+  onlineAmount: t('Trực tuyến'),
+  totalAmount: t('Tổng thu'),
 }
 
 /** Filter parameter → picker label. Parameter names are unchanged. */
 export const filterLabels: Record<string, string> = {
-  agencyId: 'Đại lý',
-  typeId: 'Loại đại lý',
-  wardId: 'Phường/xã',
-  productId: 'Mặt hàng',
+  agencyId: t('Đại lý'),
+  typeId: t('Loại đại lý'),
+  wardId: t('Phường/xã'),
+  productId: t('Mặt hàng'),
+  receiptType: t('Hình thức thu'),
 }
 
 const sortSubjects: Record<string, string> = {
-  agencyId: 'Đại lý',
-  productId: 'Mặt hàng',
+  agencyId: t('Đại lý'),
+  productId: t('Mặt hàng'),
 }
 
 /** Readable label for an exact server sort value such as `-salesAmount`. */
@@ -70,17 +60,20 @@ export function sortLabel(sort: string): string {
   const key = sort.replace(/^-/, '')
   const subject = sortSubjects[key]
   if (subject)
-    return `${subject}: ${descending ? 'mới thêm trước' : 'cũ trước'}`
-  return `${columnLabels[key] ?? key}: ${descending ? 'cao đến thấp' : 'thấp đến cao'}`
+    return `${subject}: ${descending ? t('mới thêm trước') : t('cũ trước')}`
+  if (key === 'businessDate')
+    return `${columnLabels.businessDate}: ${descending ? t('mới nhất trước') : t('cũ nhất trước')}`
+  return `${columnLabels[key] ?? key}: ${descending ? t('cao đến thấp') : t('thấp đến cao')}`
 }
 
-export type ValueKind = 'money' | 'quantity' | 'count' | 'percent' | 'text'
+export type ValueKind =
+  'money' | 'quantity' | 'count' | 'percent' | 'date' | 'text'
 
 const moneyKeys = new Set([
-  ...Object.keys(salesAmounts),
   ...Object.keys(debtAmounts),
-  ...Object.keys(cashAmounts),
-  'companyGrossSales',
+  ...Object.keys(collectionAmounts).filter((key) => key !== 'receiptCount'),
+  'salesAmount',
+  'companySalesAmount',
 ])
 const quantityKeys = new Set(
   Object.keys(rowRules.inventory)
@@ -91,8 +84,9 @@ const quantityKeys = new Set(
 export function valueKind(key: string): ValueKind {
   if (moneyKeys.has(key)) return 'money'
   if (quantityKeys.has(key)) return 'quantity'
-  if (key === 'numberOfIssues') return 'count'
+  if (key === 'numberOfIssues' || key === 'receiptCount') return 'count'
   if (key === 'salesRate') return 'percent'
+  if (key === 'businessDate') return 'date'
   return 'text'
 }
 
@@ -108,13 +102,16 @@ export function displayValue(key: string, value: unknown): string {
       return formatQuantity(raw)
     case 'percent':
       return `${formatQuantity(raw)} %`
+    case 'date':
+      return formatDate(raw)
     default:
       return raw
   }
 }
 
 export function isNumeric(key: string): boolean {
-  return valueKind(key) !== 'text'
+  const kind = valueKind(key)
+  return kind !== 'text' && kind !== 'date'
 }
 
 export function visibleColumns(kind: ReportKind): string[] {
@@ -151,9 +148,9 @@ export function exportHint(
   dirty: boolean,
   exporting: boolean,
 ): string | null {
-  if (exporting) return 'Đang xuất tệp, vui lòng chờ.'
-  if (!hasPage) return 'Xem báo cáo trước để có thể xuất tệp.'
+  if (exporting) return t('Đang xuất tệp, vui lòng chờ.')
+  if (!hasPage) return t('Xem báo cáo trước để có thể xuất tệp.')
   if (dirty)
-    return 'Bộ lọc đã thay đổi. Nhấn Áp dụng để cập nhật trước khi xuất.'
+    return t('Bộ lọc đã thay đổi. Nhấn Áp dụng để cập nhật trước khi xuất.')
   return null
 }

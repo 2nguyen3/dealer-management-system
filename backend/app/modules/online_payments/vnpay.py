@@ -1,4 +1,8 @@
-"""VNPAY 2.1.0 sandbox protocol; detached context, no SQL/session or browser authority."""
+"""VNPAY 2.1.0 sandbox protocol; detached context, no SQL/session or browser authority.
+
+Only payment checkout, signed IPN/Return verification and the ``querydr`` payment
+query remain; refunds were removed with the business simplification (handoff 3.3).
+"""
 
 import asyncio
 import copy
@@ -13,20 +17,15 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import httpx
-from pydantic import SecretStr
 
 from app.core.exceptions import ApiError
-from app.modules.online_payments.adapter import SandboxAdapter
 from app.modules.online_payments.schemas import Checkout, VerifiedPayment
-from app.modules.refunds.schemas import VerifiedRefund
+
+PROVIDER = "VNPAY"
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 QUERY_REQUEST = (
     "RequestId Version Command TmnCode TxnRef TransactionDate CreateDate IpAddr OrderInfo"
-).split()
-REFUND_REQUEST = (
-    "RequestId Version Command TmnCode TransactionType TxnRef Amount TransactionNo "
-    "TransactionDate CreateBy CreateDate IpAddr OrderInfo"
 ).split()
 RESPONSE = (
     "ResponseId Command ResponseCode Message TmnCode TxnRef Amount BankCode PayDate "
@@ -89,28 +88,32 @@ def checked_signature(fields, secret, order=None):
     return values
 
 
-class VnpayAdapter(SandboxAdapter):
+class VnpayAdapter:
     def __init__(self, settings, *, ip_address="127.0.0.1", client=None, clock=None):
-        super().__init__(
-            settings.vnpay_api_url,
-            SecretStr(""),
-            settings.vnpay_ipn_url,
-            timeout=settings.payment_timeout_seconds,
-            client=client,
-        )
+        self.base_url = settings.vnpay_api_url.rstrip("/")
+        self.timeout = settings.payment_timeout_seconds
+        self.client = client
         self.settings = settings
         self.ip_address = ip_address
         self.clock = clock or (lambda: datetime.now(UTC))
         self.payment = None
-        self.refund = None
-        self.actor = None
 
-    def bind(self, payment, refund=None, actor=None):
+    def bind(self, payment):
+        """Detached copy bound to one payment row; the original stays unbound."""
         bound = copy.copy(self)
         bound.payment = dict(payment)
-        bound.refund = None if refund is None else dict(refund)
-        bound.actor = actor
         return bound
+
+    async def transport(self, method, path, payload, headers):
+        # HTTPX's socket read timeout alone resets for each chunk. The outer
+        # deadline also bounds slow headers/body trickles and client cleanup.
+        async with asyncio.timeout(self.timeout):
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout), follow_redirects=False
+            ) as client:
+                return await client.request(
+                    method, self.base_url + path, json=payload, headers=headers
+                )
 
     def sign(self, fields, order=None):
         return checksum(fields, self.settings.vnpay_hash_secret.get_secret_value(), order)
@@ -210,8 +213,7 @@ class VnpayAdapter(SandboxAdapter):
 
     def call_api(self, fields):
         command = fields["vnp_Command"]
-        order = QUERY_REQUEST if command == "querydr" else REFUND_REQUEST
-        fields = {**fields, "vnp_SecureHash": self.sign(fields, order)}
+        fields = {**fields, "vnp_SecureHash": self.sign(fields, QUERY_REQUEST)}
         try:
             if self.client is None:
                 response = asyncio.run(self.transport("POST", "", fields, {}))
@@ -225,9 +227,7 @@ class VnpayAdapter(SandboxAdapter):
             ):
                 raise ValueError
             data = {key: str(value) for key, value in data.items()}
-            response_order = RESPONSE + (
-                ["PromotionCode", "PromotionAmount"] if command == "querydr" else []
-            )
+            response_order = RESPONSE + ["PromotionCode", "PromotionAmount"]
             try:
                 data = checked_signature(
                     data, self.settings.vnpay_hash_secret.get_secret_value(), response_order
@@ -262,78 +262,9 @@ class VnpayAdapter(SandboxAdapter):
             raise ApiError(502, "INVALID_PROVIDER_RESPONSE", "Query is not a payment result")
         return self.payment_evidence(data)
 
-    def request_refund(self, reference, payment_reference, amount):
-        fields = self.api_fields("refund", payment_reference)
-        fields.update(
-            vnp_RequestId=hashlib.sha256(reference.encode()).hexdigest()[:32],
-            vnp_TransactionType="02" if Decimal(str(amount)) == self.payment["amount"] else "03",
-            vnp_Amount=amount_to_vnpay(amount),
-            vnp_TransactionNo=self.payment["providerTransactionId"],
-            vnp_CreateBy=str(self.actor),
-            vnp_OrderInfo="Agentra refund " + reference,
-            vnp_CreateDate=self.refund["createdAt"].astimezone(VN).strftime("%Y%m%d%H%M%S"),
-        )
-        return self.refund_evidence(self.call_api(fields), reference, amount)
 
-    def query_refund(self, reference):
-        fields = self.api_fields("querydr", self.payment["merchantReference"])
-        fields["vnp_OrderInfo"] = "Agentra refund " + reference
-        if self.refund["providerRefundId"]:
-            fields["vnp_TransactionNo"] = self.refund["providerRefundId"]
-        data = self.call_api(fields)
-        if (
-            not self.refund["providerRefundId"]
-            or data.get("vnp_TransactionNo") != self.refund["providerRefundId"]
-        ):
-            return VerifiedRefund(
-                merchantRefundReference=reference,
-                providerRefundId=self.refund["providerRefundId"],
-                amount=str(self.refund["amount"]),
-                state="UNKNOWN",
-            )
-        return self.refund_evidence(data, reference, self.refund["amount"])
-
-    def refund_evidence(self, data, reference, amount):
-        if (
-            data.get("vnp_TransactionType") not in ("02", "03")
-            or data.get("vnp_OrderInfo") != "Agentra refund " + reference
-            or amount_from_vnpay(data.get("vnp_Amount")) != str(amount)
-        ):
-            raise ApiError(502, "INVALID_PROVIDER_RESPONSE", "Refund proof differs from attempt")
-        transaction = data.get("vnp_TransactionNo", "")
-        if not re.fullmatch(r"[0-9]{1,15}", transaction) or int(transaction) == 0:
-            raise ApiError(502, "INVALID_PROVIDER_RESPONSE", "Invalid VNPAY refund identity")
-        state = data.get("vnp_TransactionStatus")
-        if state == "00":
-            return VerifiedRefund(
-                merchantRefundReference=reference,
-                providerRefundId=transaction,
-                amount=str(amount),
-                state="SUCCESS",
-                completedAt=native_time(data.get("vnp_PayDate")),
-            )
-        if state == "09":
-            return VerifiedRefund(
-                merchantRefundReference=reference,
-                providerRefundId=transaction,
-                amount=str(amount),
-                state="FAILED",
-                completedAt=(
-                    native_time(data["vnp_PayDate"]) if data.get("vnp_PayDate") else self.clock()
-                ),
-                failureReason="VNPAY declined refund (09)",
-            )
-        return VerifiedRefund(
-            merchantRefundReference=reference,
-            providerRefundId=transaction,
-            amount=str(amount),
-            state="PENDING" if state in ("05", "06") else "UNKNOWN",
-        )
-
-
-def bind_adapter(adapter, payment, refund=None, actor=None):
-    return adapter.bind(payment, refund, actor) if isinstance(adapter, VnpayAdapter) else adapter
-
-
-def provider_for(settings):
-    return settings.payment_provider or ("VNPAY" if getattr(settings, "vnpay_tmn_code", "") else "")
+def adapter_for(settings, *, ip_address="127.0.0.1"):
+    """The configured VNPAY adapter, or None while VNPAY credentials are blank."""
+    if not settings.vnpay_tmn_code or not settings.vnpay_hash_secret.get_secret_value():
+        return None
+    return VnpayAdapter(settings, ip_address=ip_address)

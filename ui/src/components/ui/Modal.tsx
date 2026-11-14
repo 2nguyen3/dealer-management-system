@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../shadcn/dialog'
+import { t } from '@/lib/i18n/core'
 
 export interface ModalProps {
   isOpen: boolean
@@ -66,7 +67,7 @@ export function Modal({
             type="button"
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             onClick={onClose}
-            aria-label="Đóng hộp thoại"
+            aria-label={t('Đóng hộp thoại')}
           >
             <X className="size-4" aria-hidden="true" />
           </button>

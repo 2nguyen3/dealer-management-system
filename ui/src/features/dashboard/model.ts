@@ -10,6 +10,7 @@ import {
   type ReportRow,
 } from '../reports/contracts'
 import type { Dashboard } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 export const MONTH_CHOICES = 24
 
@@ -43,7 +44,10 @@ export function shiftMonth(value: string, offset: number): string {
 export function monthChoices(current: string) {
   return Array.from({ length: MONTH_CHOICES }, (_, offset) => {
     const value = shiftMonth(current, -offset)
-    return { value, label: `Tháng ${monthLabel(value)}` }
+    return {
+      value,
+      label: t('Tháng {monthLabel}', { monthLabel: monthLabel(value) }),
+    }
   })
 }
 
@@ -72,10 +76,10 @@ export const emptyFilters: Filters = {
 }
 
 export const filterNames: Record<FilterKey, string> = {
-  agencyId: 'Đại lý',
-  typeId: 'Loại đại lý',
-  wardId: 'Phường/xã',
-  productId: 'Mặt hàng',
+  agencyId: t('Đại lý'),
+  typeId: t('Loại đại lý'),
+  wardId: t('Phường/xã'),
+  productId: t('Mặt hàng'),
 }
 
 export function activeFilters(filters: Filters): [FilterKey, FilterValue][] {
@@ -94,15 +98,15 @@ export const reportPlan: Record<
   ReportKind,
   { sort: string; limit: string; server: FilterKey[] }
 > = {
-  sales: { sort: '-netSalesAmount', limit: '100', server: ['typeId'] },
+  sales: { sort: '-salesAmount', limit: '100', server: ['typeId'] },
   debt: {
     sort: '-closingDebt',
     limit: '100',
     server: ['typeId', 'wardId'],
   },
   'product-sales': { sort: '-salesAmount', limit: '10', server: ['agencyId'] },
-  'cash-and-credit': {
-    sort: '-cashReceived',
+  collections: {
+    sort: 'businessDate',
     limit: '100',
     server: ['agencyId'],
   },
@@ -154,7 +158,7 @@ export type TrendPoint = NonNullable<Dashboard['sales']>['monthlyTrend'][number]
 export function trendDelta(
   points: TrendPoint[],
   selectedMonth: string,
-  field: 'gross' | 'returns' | 'net',
+  field: 'salesAmount' | 'issueCount',
 ): number | null {
   const current = points.find((point) => point.month === selectedMonth)
   const previous = points.find(
@@ -174,11 +178,10 @@ export interface MatrixRow {
 }
 
 export type MatrixColumn =
-  | 'netSalesAmount'
-  | 'returnAmount'
+  | 'salesAmount'
   | 'numberOfIssues'
   | 'debtIncrease'
-  | 'debtDecrease'
+  | 'paidAmount'
   | 'closingDebt'
 
 export const matrixColumns: {
@@ -188,26 +191,25 @@ export const matrixColumns: {
   kind: 'money' | 'count'
 }[] = [
   {
-    key: 'netSalesAmount',
-    label: 'Doanh số thuần',
-    source: 'sales',
-    kind: 'money',
-  },
-  {
-    key: 'returnAmount',
-    label: 'Hàng trả lại',
+    key: 'salesAmount',
+    label: t('Doanh số'),
     source: 'sales',
     kind: 'money',
   },
   {
     key: 'numberOfIssues',
-    label: 'Số phiếu xuất',
+    label: t('Số phiếu xuất'),
     source: 'sales',
     kind: 'count',
   },
-  { key: 'debtIncrease', label: 'Phát sinh nợ', source: 'debt', kind: 'money' },
-  { key: 'debtDecrease', label: 'Giảm nợ', source: 'debt', kind: 'money' },
-  { key: 'closingDebt', label: 'Nợ cuối kỳ', source: 'debt', kind: 'money' },
+  {
+    key: 'debtIncrease',
+    label: t('Phát sinh nợ'),
+    source: 'debt',
+    kind: 'money',
+  },
+  { key: 'paidAmount', label: t('Đã thu'), source: 'debt', kind: 'money' },
+  { key: 'closingDebt', label: t('Nợ cuối kỳ'), source: 'debt', kind: 'money' },
 ]
 
 /** Merges the sales and debt report rows into one agency × metric matrix. */

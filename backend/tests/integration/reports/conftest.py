@@ -1,158 +1,263 @@
-import os
-from uuid import uuid4
+"""Real-PostgreSQL fixtures for reports and the dashboard (simplified model, handoff 3.4).
+
+Documents are created only through the shared DocumentService, so every figure the
+reports read was produced by the real posting/cancel paths. ``app.main.create_app`` is
+not used: modules rewritten in parallel may not import yet, so a minimal application
+mounts the real auth, reports and dashboard routers with the production handlers.
+"""
+
+from collections.abc import Callable
+from datetime import date, timedelta
+from decimal import Decimal
 
 import pytest
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException
 
-from app.modules.stock_receipts.schemas import Reason
-from tests.integration.catalogues.helpers import (
-    agency,
-    draft,
-    install_builders,
-    post_stock,
-    product,
+from app.common.responses import (
+    api_error_handler,
+    auth_error_handler,
+    http_error_handler,
+    validation_error_handler,
 )
-from tests.integration.document_corrections.test_issues import replacement
-from tests.integration.document_corrections.test_issues import use_case as issue_corrections
-from tests.integration.document_corrections.test_return_credit import match, post_return, returns
-from tests.integration.sales_returns.test_protected_rounding import fractional_trading
-from tests.integration.settlement_core.conftest import trading  # noqa: F401
-from tests.integration.settlement_core.helpers import commit, financial, issue, mark_posted, service
-from tests.integration.settlement_core.test_reservations import refund, reservations
-from tests.integration.user_groups.conftest import actor, client, engine  # noqa: F401
-from tests.support.database import selected_database_factory
+from app.core.config import Settings
+from app.core.exceptions import ApiError, AuthError
+from app.core.request_context import request_context
+from app.core.security import hash_password
+from app.db.session import get_session
+from app.modules.auth.delivery import SmtpResetDelivery
+from app.modules.auth.rate_limit import AuthRateLimiter
+from app.modules.auth.router import router as auth_router
+from app.modules.dashboard.router import router as dashboard_router
+from app.modules.document_core.schemas import (
+    PaymentReceiptInput,
+    StockIssueInput,
+    StockReceiptInput,
+)
+from app.modules.document_core.service import DocumentService
+from app.modules.reports.router import router as reports_router
+from tests.integration.documents.conftest import (  # noqa: F401
+    World,
+    database_factory,
+    documents,
+    engine,
+    match,
+    today,
+    world,
+)
+
+pytestmark = pytest.mark.integration
+
+PASSWORD = "Agentra@2026#Test"
 
 
-@pytest.fixture(scope="session")
-def database_factory():
-    # Guard before entering the shared factory: never fall back to CREATE DATABASE.
-    if os.environ.get("SUPABASE_TEST_SCHEMAS") != "1":
-        pytest.fail("M30 fixtures require Supabase UUID schemas: SUPABASE_TEST_SCHEMAS=1")
-    with selected_database_factory(suite="business") as create:
-        yield create
+# ------------------------------------------------------------- dates ----
+
+
+def month_start(day: date) -> date:
+    return day.replace(day=1)
+
+
+def next_month(day: date) -> date:
+    return (day.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+
+def previous_month(day: date) -> date:
+    return (day.replace(day=1) - timedelta(days=1)).replace(day=1)
 
 
 @pytest.fixture
-def report_scenario(engine, actor, trading):  # noqa: F811
-    """Committed small report witness; IDs, not duplicate display names, identify facts."""
-    fractional = fractional_trading(engine, actor, {"agency": str(trading[0])})
-    fractional_product = int(fractional["product"])
-    with Session(engine) as session:
-        original = issue(session, actor, trading, quantity=3)
-        cash = financial(session, actor, trading[0], 306)
-        service(session, actor).post_receipt(cash, uuid4())
-        commit(session)
-        owner = returns(session, actor)
-        line = owner.core.repo.lines(owner.core.repo.document(original)["currentRevisionId"])[0]
-        returned = post_return(owner, original, line["id"], "2", "2026-01-04")
-        paid = refund(session, actor, trading[0], cash, 40)
-        reservations(session, actor).reserve(paid)
-        commit(session)
-        mark_posted(session, actor, paid)
-        reservations(session, actor).consume(paid, uuid4())
-        commit(session)
-        reserved = refund(session, actor, trading[0], cash, 50)
-        reservations(session, actor).reserve(reserved)
-        commit(session)
-        fractional_issue = issue(session, actor, (trading[0], fractional_product), quantity=3)
-        commit(session)
-        # Non-success provider records have no posted cash/ledger source. Reports
-        # must not promote setup, failure or expiry evidence into received money.
-        session.execute(
-            text("""INSERT INTO dms.online_payment
-              ("agencyId",provider,"merchantReference","idempotencyKey",amount,status,"expiresAt")
-              SELECT :agency,'REPORT_FIXTURE','m30-'||state,gen_random_uuid(),1,'PENDING',
-                clock_timestamp()+interval '1 day'
-              FROM unnest(ARRAY['PENDING','FAILED','EXPIRED']) AS state"""),
-            {"agency": trading[0]},
-        )
-        session.execute(
-            text("""UPDATE dms.online_payment
-          SET status=substring("merchantReference" FROM 5)
-          WHERE "merchantReference" IN ('m30-FAILED','m30-EXPIRED')""")
-        )
-        commit(session)
-        fractional_line = owner.core.repo.lines(
-            owner.core.repo.document(fractional_issue)["currentRevisionId"]
-        )[0]
-        zero_return = post_return(
-            owner, fractional_issue, fractional_line["id"], "0.25", "2026-02-03"
-        )
-        install_builders(session, actor)
-        other_agency = agency(session)
-        changed = issue(session, actor, (other_agency, trading[1]), quantity=3)
-        discarded = issue(session, actor, (other_agency, trading[1]), quantity=1)
-        commit(session)
-        correction = issue_corrections(session, actor)
-        correction.correct(
-            changed,
-            replacement(trading[1], "2", businessDate="2026-02-02"),
-            match(correction.owner, changed),
-            uuid4(),
-        )
-        correction.cancel(
-            discarded,
-            Reason(reason="Report cancellation witness"),
-            match(correction.owner, discarded),
-            uuid4(),
-        )
+def dates(engine):  # noqa: F811
+    """Business today, the current month [start, end) and the previous month's last day."""
+    current = today(engine)
+    start = month_start(current)
     return {
-        "agencies": (trading[0], other_agency),
-        "products": (trading[1], fractional_product),
-        "issue": original,
-        "receipt": cash,
-        "return": returned,
-        "corrected_issue": changed,
-        "cancelled_issue": discarded,
-        "zero_return": zero_return,
-        "paid_refund": paid,
-        "reserved_refund": reserved,
-        "current_credit": 164,
-        "current_reserved": 50,
-        "current_available": 114,
+        "today": current,
+        "start": start,
+        "end": next_month(current),
+        "previousStart": previous_month(current),
+        "previousLast": start - timedelta(days=1),
     }
 
 
+# ------------------------------------------------------------ bodies ----
+
+
+def receipt(*lines, business_date=None):
+    return StockReceiptInput.model_validate(
+        {
+            "businessDate": business_date,
+            "lines": [
+                {"productId": str(product), "quantity": str(quantity), "unitPrice": str(price)}
+                for product, quantity, price in lines
+            ],
+        }
+    )
+
+
+def issue(agency, *lines, business_date=None):
+    return StockIssueInput.model_validate(
+        {
+            "agencyId": str(agency),
+            "businessDate": business_date,
+            "lines": [
+                {"productId": str(product), "quantity": str(quantity)}
+                for product, quantity in lines
+            ],
+        }
+    )
+
+
+def payment(agency, amount, receipt_type="CASH", business_date=None):
+    return PaymentReceiptInput.model_validate(
+        {
+            "agencyId": str(agency),
+            "amount": str(amount),
+            "receiptType": receipt_type,
+            "businessDate": business_date,
+        }
+    )
+
+
+class Ledger:
+    """Creates drafts, posts and cancels through DocumentService only."""
+
+    def __init__(self, documents: Callable[[str], DocumentService], engine):  # noqa: F811
+        self.documents = documents
+        self.engine = engine
+
+    def draft(self, kind, body):
+        return self.documents(kind).create(body)
+
+    def post(self, kind, body):
+        service = self.documents(kind)
+        draft = service.create(body)
+        return service.post(int(draft.id), match(service, draft))
+
+    def cancel(self, kind, document, reason="Lập nhầm chứng từ"):
+        service = self.documents(kind)
+        return service.cancel(int(document.id), reason, match(service, document))
+
+    def online(self, agency, amount, business_date=None):
+        """Verified VNPAY receipt (the only path that may push debt below zero)."""
+        with Session(self.engine) as session:
+            service = DocumentService(
+                session, None, None, "ipn-test", lambda _: None, kind="PAYMENT_RECEIPT"
+            )
+            identifier = service.record_online_receipt(
+                agency, Decimal(amount), business_date=business_date
+            )
+            session.commit()
+        return identifier
+
+    def current(self):
+        with self.engine.connect() as connection:
+            stock = dict(connection.execute(text("SELECT id::text, stock FROM dms.product")).all())
+            debt = dict(connection.execute(text("SELECT id::text, debt FROM dms.agency")).all())
+        return stock, debt
+
+
 @pytest.fixture
-def historical_inventory_scenario(engine, actor):  # noqa: F811
-    """Existing D14 shape: historical 1.2e15, current 7e14; no cache writes."""
-    with Session(engine) as session:
-        install_builders(session, actor)
-        session.execute(text('UPDATE dms.agency_type SET "maxDebt"=900000000000000000 WHERE id=1'))
-        agency_id = agency(session)
-        unit = session.scalar(
-            text("INSERT INTO dms.unit (code,name) VALUES ('HIST','Historical') RETURNING id")
-        )
-        product_id = product(session, unit)
-        receipts = []
-        for position in range(2):
-            incoming = draft(session, product_id, quantity="600000000000000")
+def ledger(documents, engine):  # noqa: F811
+    return Ledger(documents, engine)
+
+
+@pytest.fixture
+def stocked(ledger, world, dates):  # noqa: F811
+    """Previous month: 100 cartons of noodles at 100,000đ and 50 kg rice at 20,000đ."""
+    return ledger.post(
+        "STOCK_RECEIPT",
+        receipt(
+            (world.noodles, 100, 100000),
+            (world.rice, 50, 20000),
+            business_date=dates["previousLast"],
+        ),
+    )
+
+
+# ---------------------------------------------------------------- HTTP ----
+
+
+@pytest.fixture
+def accounts(engine, world):  # noqa: F811
+    """Extra users: sales, warehouse and one in a group without any grant."""
+    with Session(engine) as session, session.begin():
+        session.execute(text("SELECT set_config('dms.function_code', 'users.manage', true)"))
+        empty_group = session.execute(
+            text("INSERT INTO dms.user_group (code, name) VALUES ('EMPTY', 'Trống') RETURNING id")
+        ).scalar_one()
+        password = hash_password(PASSWORD)
+        for name, email, group in (
+            ("Kinh doanh", "sales@agentra.vn", 2),
+            ("Thủ kho", "warehouse@agentra.vn", 3),
+            ("Không quyền", "nobody@agentra.vn", empty_group),
+        ):
             session.execute(
                 text(
-                    "UPDATE dms.document_revision SET \"businessDate\"=DATE '2026-01-01' "
-                    'WHERE "documentId"=:id'
+                    'INSERT INTO dms.app_user ("fullName", email, "passwordHash", "groupId") '
+                    "VALUES (:n, :e, :p, :g)"
                 ),
-                {"id": incoming},
+                {"n": name, "e": email, "p": password, "g": group},
             )
-            post_stock(session, incoming)
-            receipts.append(incoming)
-            if position == 0:
-                outgoing = draft(
-                    session,
-                    product_id,
-                    quantity="500000000000000",
-                    kind="STOCK_ISSUE",
-                    agency_id=agency_id,
-                )
-                post_stock(session, outgoing)
-        commit(session)
     return {
-        "agency": agency_id,
-        "product": product_id,
-        "unit": unit,
-        "receipts": receipts,
-        "issue": outgoing,
-        "historical_stock": 1200000000000000,
-        "current_stock": 700000000000000,
+        "manager": "manager@agentra.vn",
+        "accounting": "clerk@agentra.vn",
+        "sales": "sales@agentra.vn",
+        "warehouse": "warehouse@agentra.vn",
+        "nobody": "nobody@agentra.vn",
     }
+
+
+def build_app(engine) -> FastAPI:  # noqa: F811
+    settings = Settings(
+        _env_file=None,
+        db_host="localhost",
+        db_user="test",
+        db_password="test",
+        auth_signing_key="synthetic-test-key-32-bytes-or-more",
+        auth_rate_limit=10000,
+        api_rate_limit=10000,
+    )
+    app = FastAPI()
+    app.state.settings = settings
+    app.state.engine = engine
+    app.state.reset_delivery = SmtpResetDelivery(settings)
+    app.state.auth_limiter = AuthRateLimiter(settings.auth_rate_limit_max_buckets)
+    app.middleware("http")(request_context)
+    app.add_exception_handler(AuthError, auth_error_handler)
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(HTTPException, http_error_handler)
+    for router in (auth_router, reports_router, dashboard_router):
+        app.include_router(router, prefix="/api/v1")
+
+    def sessions():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = sessions
+    return app
+
+
+@pytest.fixture
+def login(engine, accounts):  # noqa: F811
+    """Factory: a TestClient authenticated as one of ``accounts``."""
+    clients = []
+
+    def make(role: str) -> TestClient:
+        client = TestClient(build_app(engine), raise_server_exceptions=False)
+        clients.append(client)
+        response = client.post(
+            "/api/v1/auth/login", json={"email": accounts[role], "password": PASSWORD}
+        )
+        assert response.status_code == 200, response.text
+        client.headers["Authorization"] = "Bearer " + response.json()["accessToken"]
+        return client
+
+    yield make
+    for client in clients:
+        client.close()

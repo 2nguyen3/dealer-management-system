@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-const LIVE_API_BASE = 'http://localhost:8080/api/v1'
+// Excluded from `npm test`; run explicitly against a disposable stack:
+// VITE_LIVE_API_BASE=http://127.0.0.1:8081/api/v1 npx vitest run src/test/live_docker_integration.test.ts
+const LIVE_API_BASE =
+  (import.meta.env.VITE_LIVE_API_BASE as string | undefined) ??
+  'http://localhost:8080/api/v1'
 
 describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => {
   it('connects to health endpoints through running Docker Nginx proxy', async () => {
@@ -15,7 +19,7 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'quanly@agentra.demo',
+        email: 'thaonguyen@agentra.vn',
         password: 'WrongPassword123!',
       }),
     })
@@ -29,8 +33,8 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'locked@agentra.demo',
-        password: 'AgentraDemo!2026#LOCK',
+        email: 'vanluc@agentra.vn',
+        password: 'Agentra@2026#KinhDoanh4',
       }),
     })
     expect(res.status).toBe(403)
@@ -44,8 +48,8 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'quanly@agentra.demo',
-        password: 'AgentraDemo!2026#QL',
+        email: 'thaonguyen@agentra.vn',
+        password: 'Agentra@2026#QuanLy1',
       }),
     })
     expect(loginRes.status).toBe(200)
@@ -55,7 +59,7 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
       user: { fullName: string; email: string; groupCode: string }
     }
     expect(tokens.accessToken).toBeTruthy()
-    expect(tokens.user.email).toBe('quanly@agentra.demo')
+    expect(tokens.user.email).toBe('thaonguyen@agentra.vn')
     expect(tokens.user.groupCode).toBe('MANAGEMENT')
 
     // 2. Query /auth/me with Bearer token
@@ -75,80 +79,28 @@ describe('Live Docker Integration Tests (proxied through Nginx on 8080)', () => 
     expect(meBody.allowedFunctions).toContain('users.manage')
 
     // 3. Query business APIs with Bearer token through proxy
-    const [
-      agenciesRes,
-      productsRes,
-      wardsRes,
-      rulesRes,
-      usersRes,
-      receiptsRes,
-      issuesRes,
-      paymentReceiptsRes,
-      receivablesRes,
-      adjustmentsRes,
-      countsRes,
-      returnsRes,
-      creditLotsRes,
-      upfrontRes,
-    ] = await Promise.all([
-      fetch(`${LIVE_API_BASE}/agencies?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/products?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/wards?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/business-rules`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/users?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/stock-receipts?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/stock-issues?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/payment-receipts?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/receivables?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/stock-adjustments?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/stock-counts?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/sales-returns?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/agencies/70/credit-lots`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-      fetch(`${LIVE_API_BASE}/upfront-confirmations?limit=5`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-      }),
-    ])
-
-    expect(agenciesRes.status).toBe(200)
-    expect(productsRes.status).toBe(200)
-    expect(wardsRes.status).toBe(200)
-    expect(rulesRes.status).toBe(200)
-    expect(usersRes.status).toBe(200)
-    expect(receiptsRes.status).toBe(200)
-    expect(issuesRes.status).toBe(200)
-    expect(paymentReceiptsRes.status).toBe(200)
-    expect(receivablesRes.status).toBe(200)
-    expect(adjustmentsRes.status).toBe(200)
-    expect(countsRes.status).toBe(200)
-    expect(returnsRes.status).toBe(200)
-    expect(creditLotsRes.status).toBe(200)
-    expect(upfrontRes.status).toBe(200)
+    const paths = [
+      '/agencies?limit=5',
+      '/products?limit=5',
+      '/wards?limit=5',
+      '/business-rules',
+      '/users?limit=5',
+      '/stock-receipts?limit=5',
+      '/stock-issues?limit=5',
+      '/payment-receipts?limit=5',
+      '/online-payments?limit=5',
+      '/documents?limit=5',
+      '/reports/debt',
+      '/dashboard',
+    ]
+    const responses = await Promise.all(
+      paths.map((path) =>
+        fetch(`${LIVE_API_BASE}${path}`, {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        }),
+      ),
+    )
+    expect(responses.map((res) => res.status)).toEqual(paths.map(() => 200))
 
     // 4. Test Single-use Refresh
     const refreshRes = await fetch(`${LIVE_API_BASE}/auth/refresh`, {

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/shadcn/dialog'
+import { t } from '@/lib/i18n/core'
 
 function Command({
   className,
@@ -28,8 +29,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
+  title = t('Bảng lệnh'),
+  description = t('Tìm lệnh để thực hiện…'),
   children,
   className,
   showCloseButton = true,
@@ -161,7 +162,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        'ml-auto text-xs tracking-widest text-muted-foreground',
+        'ms-auto text-xs tracking-widest text-muted-foreground',
         className,
       )}
       {...props}

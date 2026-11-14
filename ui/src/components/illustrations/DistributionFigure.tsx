@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type * as Three from 'three'
 import './DistributionFigure.css'
+import { t } from '@/lib/i18n/core'
 
 type Point = [number, number, number]
 type Tones = readonly [string, string, string]
@@ -314,7 +315,9 @@ export function DistributionFigure() {
       <div
         className="distribution-figure__viewport"
         role="img"
-        aria-label="Nhà kho, cửa xuất hàng, kiện hàng trên pallet và xe giao hàng. Mô hình minh họa, không phải dữ liệu tồn kho."
+        aria-label={t(
+          'Nhà kho, cửa xuất hàng, kiện hàng trên pallet và xe giao hàng. Mô hình minh họa, không phải dữ liệu tồn kho.',
+        )}
       >
         <svg
           className="distribution-figure__fallback"
@@ -355,7 +358,7 @@ export function DistributionFigure() {
         />
       </div>
       <figcaption id={captionId} className="distribution-figure__caption">
-        Minh họa mạng lưới phân phối
+        {t('Minh họa mạng lưới phân phối')}
       </figcaption>
       <div className="distribution-figure__controls">
         <button
@@ -366,12 +369,12 @@ export function DistributionFigure() {
           aria-describedby={statusId}
         >
           {state === 'ready'
-            ? 'Đổi góc nhìn'
+            ? t('Đổi góc nhìn')
             : state === 'loading'
-              ? 'Đang tải mô hình…'
+              ? t('Đang tải mô hình…')
               : state === 'error'
-                ? 'Thử lại mô hình'
-                : 'Khám phá mô hình'}
+                ? t('Thử lại mô hình')
+                : t('Khám phá mô hình')}
         </button>
         <span
           id={statusId}
@@ -379,14 +382,14 @@ export function DistributionFigure() {
           className="distribution-figure__status"
         >
           {state === 'error'
-            ? 'Không thể hiển thị 3D. Hình minh họa tĩnh vẫn khả dụng.'
+            ? t('Không thể hiển thị 3D. Hình minh họa tĩnh vẫn khả dụng.')
             : state === 'ready'
               ? sideView
-                ? 'Góc nhìn: bên hông nhà kho.'
-                : 'Góc nhìn: cửa xuất hàng.'
+                ? t('Góc nhìn: bên hông nhà kho.')
+                : t('Góc nhìn: cửa xuất hàng.')
               : state === 'loading'
-                ? 'Hình minh họa tĩnh được giữ lại trong khi tải.'
-                : 'Mô hình khái niệm, không sử dụng dữ liệu vận hành.'}
+                ? t('Hình minh họa tĩnh được giữ lại trong khi tải.')
+                : t('Mô hình khái niệm, không sử dụng dữ liệu vận hành.')}
         </span>
       </div>
     </figure>

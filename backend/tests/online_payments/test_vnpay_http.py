@@ -5,14 +5,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.exceptions import ApiError
-from app.main import create_app
 from app.modules.online_payments.dependencies import get_webhook_service
-from tests.online_payments.test_vnpay import config, proof, signed
+from tests.online_payments.harness import build_app, config
+from tests.online_payments.test_vnpay import proof, signed
 
 
 @pytest.fixture
 def native_client():
-    app = create_app(config())
+    app = build_app(config())
     service = Mock()
     service.complete.return_value = (SimpleNamespace(id="1"), False)
     app.dependency_overrides[get_webhook_service] = lambda: service
@@ -39,7 +39,7 @@ def test_native_ipn_verified_completion_and_duplicate(native_client):
 @pytest.mark.parametrize(
     "code,message,expected",
     [
-        ("NOT_FOUND", "missing", "01"),
+        ("NOT_FOUND", "Online payment not found", "01"),
         ("PAYMENT_CONFLICT", "amount differs", "04"),
         ("PAYMENT_CONFLICT", "transaction differs", "99"),
         ("PROVIDER_UNAVAILABLE", "commit failed", "99"),
@@ -86,3 +86,22 @@ def test_disabled_native_provider_is_not_acknowledged(native_client):
     assert client.get("/api/v1/integrations/vnpay/ipn").json()["RspCode"] == "99"
     assert client.get("/api/v1/integrations/vnpay/return").status_code == 503
     service.complete.assert_not_called()
+
+
+def test_unexpected_failure_is_retryable_never_http_500(native_client):
+    client, service = native_client
+    service.complete.side_effect = RuntimeError("database exploded")
+    result = client.get("/api/v1/integrations/vnpay/ipn", params=signed(proof(), callback=True))
+    assert result.status_code == 200
+    assert result.json() == {"RspCode": "99", "Message": "Please retry"}
+    assert "exploded" not in result.text
+
+
+def test_unknown_order_reference_is_order_not_found(native_client):
+    client, service = native_client
+    service.complete.side_effect = ApiError(404, "NOT_FOUND", "Online payment not found")
+    fields = signed(proof(vnp_TxnRef="VNP-from-before-reseed"), callback=True)
+    result = client.get("/api/v1/integrations/vnpay/ipn", params=fields)
+    assert result.status_code == 200
+    assert result.json() == {"RspCode": "01", "Message": "Order not found"}
+    assert service.complete.call_args.args[1].merchantReference == "VNP-from-before-reseed"

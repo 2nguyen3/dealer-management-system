@@ -5,9 +5,13 @@ import {
   Search,
   UserRound,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
-import { PageIconContext } from '@/components/blocks/pageIconContext'
+import {
+  PageIconContext,
+  PageToolsContext,
+} from '@/components/blocks/pageIconContext'
+import { registerGuideNavigator } from '@/components/guide/notifyNextStep'
 import { PageTransition } from '@/components/motion/Motion'
 import { Avatar, AvatarFallback } from '@/components/shadcn/avatar'
 import {
@@ -49,6 +53,8 @@ import { TooltipProvider } from '@/components/shadcn/tooltip'
 import { ModeToggle } from '@/components/theme/ModeToggle'
 import { initials } from '../features/profile/profileModel'
 import { ChangePasswordModal } from '../features/authentication/ChangePasswordModal'
+import { GuideButton } from '../features/guide/GuideButton'
+import { FavoriteButton } from '../features/portal/FavoriteButton'
 import { useAuth } from '../features/authentication/useAuth'
 import {
   allowsNavigation,
@@ -56,6 +62,8 @@ import {
   routePermissions,
 } from './navigation'
 import { navigationIcons } from './navigationIcons'
+import { getLocale, t } from '@/lib/i18n/core'
+import { localeDirection } from '@/lib/i18n/locales'
 
 function isRouteActive(pathname: string, path: string): boolean {
   return path === '/'
@@ -92,11 +100,15 @@ function WorkspaceSidebar({
     .filter((group) => group.items.length > 0)
 
   return (
-    <Sidebar collapsible="icon" id="workspace-navigation">
+    <Sidebar
+      collapsible="icon"
+      id="workspace-navigation"
+      side={localeDirection(getLocale()) === 'rtl' ? 'right' : 'left'}
+    >
       <SidebarHeader className="gap-3 px-2 pt-4">
         <NavLink
           to="/"
-          aria-label="Agentra - Bàn làm việc"
+          aria-label={t('Agentra - Cổng quản lý')}
           data-testid="sidebar-brand"
           className="flex min-w-0 items-center gap-2 rounded-md py-1 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
@@ -117,24 +129,24 @@ function WorkspaceSidebar({
               Agentra
             </span>
             <span className="truncate text-[11px] tracking-wide text-sidebar-foreground/70">
-              Hệ thống phân phối
+              {t('Hệ thống phân phối')}
             </span>
           </span>
         </NavLink>
         <label className="relative group-data-[collapsible=icon]:hidden">
-          <span className="sr-only">Tìm chức năng</span>
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-sidebar-foreground/60" />
+          <span className="sr-only">{t('Tìm chức năng')}</span>
+          <Search className="pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2 text-sidebar-foreground/60" />
           <SidebarInput
             type="search"
-            placeholder="Tìm chức năng…"
+            placeholder={t('Tìm chức năng…')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-9 border-sidebar-border bg-sidebar-accent pl-8 text-sidebar-accent-foreground placeholder:text-sidebar-foreground/50"
+            className="h-9 border-sidebar-border bg-sidebar-accent ps-8 text-sidebar-accent-foreground placeholder:text-sidebar-foreground/50"
           />
         </label>
       </SidebarHeader>
       <SidebarContent>
-        <nav aria-label="Điều hướng nghiệp vụ">
+        <nav aria-label={t('Điều hướng nghiệp vụ')}>
           {groups.map((group) => (
             <SidebarGroup key={group.title}>
               <SidebarGroupLabel className="text-[11px] tracking-wider text-sidebar-foreground/55 uppercase">
@@ -163,7 +175,7 @@ function WorkspaceSidebar({
                         </SidebarMenuButton>
                         {item.unavailable && (
                           <SidebarMenuBadge className="text-[10px] text-sidebar-foreground/60">
-                            Sắp có
+                            {t('Sắp có')}
                           </SidebarMenuBadge>
                         )}
                       </SidebarMenuItem>
@@ -178,7 +190,7 @@ function WorkspaceSidebar({
               className="px-4 py-2 text-sm text-sidebar-foreground/70"
               role="status"
             >
-              Không tìm thấy chức năng phù hợp.
+              {t('Không tìm thấy chức năng phù hợp.')}
             </p>
           )}
         </nav>
@@ -191,7 +203,9 @@ function WorkspaceSidebar({
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     size="lg"
-                    aria-label={`Tài khoản ${user.fullName}`}
+                    aria-label={t('Tài khoản {fullName}', {
+                      fullName: user.fullName,
+                    })}
                     className="data-[state=open]:bg-sidebar-accent"
                   >
                     <Avatar className="size-8 rounded-lg">
@@ -199,7 +213,7 @@ function WorkspaceSidebar({
                         {initials(user.fullName)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="grid flex-1 text-start text-sm leading-tight">
                       <span className="truncate font-medium text-white">
                         {user.fullName}
                       </span>
@@ -207,7 +221,7 @@ function WorkspaceSidebar({
                         {user.groupName}
                       </span>
                     </span>
-                    <ChevronsUpDown className="ml-auto size-4" />
+                    <ChevronsUpDown className="ms-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -230,12 +244,12 @@ function WorkspaceSidebar({
                       onClick={() => isMobile && setOpenMobile(false)}
                     >
                       <UserRound />
-                      Hồ sơ cá nhân
+                      {t('Hồ sơ cá nhân')}
                     </NavLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={onChangePassword}>
                     <KeyRound />
-                    Đổi mật khẩu
+                    {t('Đổi mật khẩu')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
@@ -243,7 +257,7 @@ function WorkspaceSidebar({
                     onSelect={onLogout}
                   >
                     <LogOut />
-                    {isLoggingOut ? 'Đang thoát…' : 'Đăng xuất'}
+                    {isLoggingOut ? t('Đang thoát…') : t('Đăng xuất')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -257,7 +271,7 @@ function WorkspaceSidebar({
 }
 
 export function ShellLayout() {
-  const { logout } = useAuth()
+  const { logout, hasPermission } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
@@ -279,7 +293,27 @@ export function ShellLayout() {
         null)
   const pageLabel =
     current?.item.label ??
-    (location.pathname === '/profile' ? 'Hồ sơ cá nhân' : 'Không gian làm việc')
+    (location.pathname === '/profile'
+      ? t('Hồ sơ cá nhân')
+      : t('Không gian làm việc'))
+
+  useEffect(() => {
+    registerGuideNavigator(
+      (to) => navigate(to),
+      (to) =>
+        allowsNavigation(
+          hasPermission,
+          routePermissions[to.split(/[?#]/)[0] ?? to],
+        ),
+    )
+    return () => registerGuideNavigator(null)
+  }, [navigate, hasPermission])
+  const guidePath =
+    current?.item.path ??
+    Object.keys(navigationIcons)
+      .filter((path) => isRouteActive(location.pathname, path))
+      .sort((a, b) => b.length - a.length)[0] ??
+    location.pathname
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -299,10 +333,10 @@ export function ShellLayout() {
     <TooltipProvider delayDuration={200}>
       <SidebarProvider>
         <a
-          className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+          className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:start-2"
           href="#main-content"
         >
-          Đến nội dung chính
+          {t('Đến nội dung chính')}
         </a>
         <WorkspaceSidebar
           onChangePassword={() => setIsPasswordModalOpen(true)}
@@ -312,10 +346,10 @@ export function ShellLayout() {
         <SidebarInset className="min-w-0 bg-background">
           <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-6">
             <SidebarTrigger
-              className="-ml-1"
-              aria-label="Mở hoặc thu gọn menu"
+              className="-ms-1"
+              aria-label={t('Mở hoặc thu gọn menu')}
             />
-            <Separator orientation="vertical" className="mr-1 !h-4" />
+            <Separator orientation="vertical" className="me-1 !h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 {current && (
@@ -333,7 +367,7 @@ export function ShellLayout() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ms-auto flex items-center gap-1">
               <ModeToggle />
             </div>
           </header>
@@ -347,13 +381,26 @@ export function ShellLayout() {
                 role="alert"
                 className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
               >
-                Không thể đăng xuất. Vui lòng thử lại.
+                {t('Không thể đăng xuất. Vui lòng thử lại.')}
               </p>
             )}
             <PageIconContext.Provider value={pageIcon}>
-              <PageTransition key={location.pathname}>
-                <Outlet />
-              </PageTransition>
+              <PageToolsContext.Provider
+                value={
+                  <>
+                    <GuideButton
+                      key={guidePath}
+                      path={guidePath}
+                      title={pageLabel}
+                    />
+                    <FavoriteButton path={guidePath} title={pageLabel} />
+                  </>
+                }
+              >
+                <PageTransition key={location.pathname}>
+                  <Outlet />
+                </PageTransition>
+              </PageToolsContext.Provider>
             </PageIconContext.Provider>
           </main>
         </SidebarInset>

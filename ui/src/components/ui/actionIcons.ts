@@ -26,6 +26,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
+import { sourceOf } from '@/lib/i18n/core'
 
 /**
  * One icon per kind of action, shared by buttons and dialog titles so the
@@ -107,9 +108,16 @@ const PATTERNS: readonly [RegExp, ActionKind][] = RULES.map(
   ([phrase, kind]) => [new RegExp(`^${phrase}(?!\\p{L})`, 'u'), kind],
 )
 
-/** Action kind implied by a button label, or `null` when none applies. */
+/**
+ * Action kind implied by a button label, or `null` when none applies. A
+ * translated label is first mapped back to its Vietnamese source text, so the
+ * same verb keeps the same icon in every interface language.
+ */
 export function inferAction(label: string): ActionKind | null {
-  const text = label.trim().toLocaleLowerCase('vi').normalize('NFC')
+  const text = sourceOf(label.trim())
+    .trim()
+    .toLocaleLowerCase('vi')
+    .normalize('NFC')
   if (!text) return null
   return PATTERNS.find(([pattern]) => pattern.test(text))?.[1] ?? null
 }

@@ -1,4 +1,10 @@
-from typing import Annotated
+"""Report contracts for the simplified model (handoff 3.4).
+
+Every figure is a plain sum over POSTED documents; drafts and cancelled documents never
+count. Periods are the half-open business-date interval ``[fromDate, toDate)``.
+"""
+
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -17,6 +23,10 @@ from app.common.schemas import (
     SignedAggregateMoney,
     SignedAggregateQuantity,
 )
+
+Count = Annotated[int, Field(strict=True, ge=0)]
+Text = Annotated[str, Field(strict=True)]
+ReceiptType = Literal["CASH", "BANK_TRANSFER", "ONLINE"]
 
 
 class ReportInterval(ApiModel):
@@ -46,8 +56,9 @@ class ProductSalesFilters(InventoryFilters):
     agencyId: Id | None = None
 
 
-class CashCreditFilters(ApiModel):
+class CollectionsFilters(ApiModel):
     agencyId: Id | None = None
+    receiptType: ReceiptType | None = None
 
 
 class ReportPeriod(ReportInterval):
@@ -56,77 +67,32 @@ class ReportPeriod(ReportInterval):
 
 class AgencyReportIdentity(ApiModel):
     agencyId: Id
-    agencyCode: Annotated[str, Field(strict=True)]
-    agencyName: Annotated[str, Field(strict=True)]
+    agencyCode: Text
+    agencyName: Text
 
 
 class ProductReportIdentity(ApiModel):
     productId: Id
-    productCode: Annotated[str, Field(strict=True)]
-    productName: Annotated[str, Field(strict=True)]
+    productCode: Text
+    productName: Text
     unitId: CatalogId
-    unitName: Annotated[str, Field(strict=True)]
+    unitName: Text
 
 
-class ProductSalesTotals(ApiModel):
+# ------------------------------------------------------------ BM5.1 sales ----
+
+
+class SalesReportRow(AgencyReportIdentity):
+    numberOfIssues: Count
     salesAmount: AggregateMoney
-    returnAmount: AggregateMoney
-    netSalesAmount: SignedAggregateMoney
-
-
-class SalesTotals(ProductSalesTotals):
-    numberOfIssues: Annotated[int, Field(strict=True, ge=0)]
-    companyGrossSales: AggregateMoney
-
-
-class SalesReportRow(AgencyReportIdentity, ProductSalesTotals):
-    numberOfIssues: Annotated[int, Field(strict=True, ge=0)]
     salesRate: Percentage
 
 
-class DebtAmounts(ApiModel):
-    openingDebt: AggregateMoney
-    debtIncrease: AggregateMoney
-    cashApplied: AggregateMoney
-    returnsApplied: AggregateMoney
-    creditApplied: AggregateMoney
-    debtDecrease: AggregateMoney
-    closingDebt: AggregateMoney
-
-
-class DebtReportRow(AgencyReportIdentity, DebtAmounts):
-    pass
-
-
-class InventoryReportRow(ProductReportIdentity):
-    openingStock: AggregateQuantity
-    receiptQuantity: AggregateQuantity
-    issueQuantity: AggregateQuantity
-    returnQuantity: AggregateQuantity
-    adjustmentQuantity: SignedAggregateQuantity
-    closingStock: AggregateQuantity
-
-
-class ProductSalesReportRow(ProductReportIdentity, ProductSalesTotals):
-    soldQuantity: AggregateQuantity
-    returnedQuantity: AggregateQuantity
-
-
-class CashCreditAmounts(ApiModel):
-    cashReceived: AggregateMoney
-    cashRefunded: AggregateMoney
-    verifiedUnreceiptedAmount: AggregateMoney
-    openingCredit: AggregateMoney
-    creditCreated: AggregateMoney
-    creditApplied: AggregateMoney
-    creditRefunded: AggregateMoney
-    closingCredit: AggregateMoney
-    currentReservedCredit: AggregateMoney
-    currentAvailableCredit: AggregateMoney
-
-
-class CashCreditReportRow(AgencyReportIdentity, CashCreditAmounts):
-    pass
+class SalesTotals(ApiModel):
+    numberOfIssues: Count
+    salesAmount: AggregateMoney
+    # Whole-company total of the period: the denominator of salesRate, even when filtered.
+    companySalesAmount: AggregateMoney
 
 
 class SalesReportResponse(ReportPeriod):
@@ -135,15 +101,57 @@ class SalesReportResponse(ReportPeriod):
     totals: SalesTotals
 
 
+# ------------------------------------------------------------- BM5.2 debt ----
+
+
+class DebtAmounts(ApiModel):
+    # Debt may be negative: a late verified online payment is a prepayment (3.3).
+    openingDebt: SignedAggregateMoney
+    debtIncrease: AggregateMoney
+    paidAmount: AggregateMoney
+    closingDebt: SignedAggregateMoney
+
+
+class DebtReportRow(AgencyReportIdentity):
+    openingDebt: SignedAggregateMoney
+    debtIncrease: AggregateMoney
+    paidAmount: AggregateMoney
+    closingDebt: SignedAggregateMoney
+
+
 class DebtReportResponse(ReportPeriod):
     items: list[DebtReportRow]
     pagination: Pagination
     totals: DebtAmounts
 
 
+# -------------------------------------------------------------- inventory ----
+
+
+class InventoryReportRow(ProductReportIdentity):
+    # Backdated documents can make a historical running balance negative.
+    openingStock: SignedAggregateQuantity
+    receiptQuantity: AggregateQuantity
+    issueQuantity: AggregateQuantity
+    closingStock: SignedAggregateQuantity
+
+
 class InventoryReportResponse(ReportPeriod):
     items: list[InventoryReportRow]
     pagination: Pagination
+
+
+# ---------------------------------------------------------- product sales ----
+
+
+class ProductSalesReportRow(ProductReportIdentity):
+    numberOfIssues: Count
+    soldQuantity: AggregateQuantity
+    salesAmount: AggregateMoney
+
+
+class ProductSalesTotals(ApiModel):
+    salesAmount: AggregateMoney
 
 
 class ProductSalesReportResponse(ReportPeriod):
@@ -152,7 +160,27 @@ class ProductSalesReportResponse(ReportPeriod):
     totals: ProductSalesTotals
 
 
-class CashCreditReportResponse(ReportPeriod):
-    items: list[CashCreditReportRow]
+# ------------------------------------------------------------ collections ----
+
+
+class CollectionAmounts(ApiModel):
+    receiptCount: Count
+    cashAmount: AggregateMoney
+    bankTransferAmount: AggregateMoney
+    onlineAmount: AggregateMoney
+    totalAmount: AggregateMoney
+
+
+class CollectionsReportRow(ApiModel):
+    businessDate: BusinessDate
+    receiptCount: Count
+    cashAmount: AggregateMoney
+    bankTransferAmount: AggregateMoney
+    onlineAmount: AggregateMoney
+    totalAmount: AggregateMoney
+
+
+class CollectionsReportResponse(ReportPeriod):
+    items: list[CollectionsReportRow]
     pagination: Pagination
-    totals: CashCreditAmounts
+    totals: CollectionAmounts

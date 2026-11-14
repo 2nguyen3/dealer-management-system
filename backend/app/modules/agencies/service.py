@@ -1,12 +1,8 @@
 from datetime import UTC, datetime
-from uuid import UUID
 
 from app.common.catalogue import CatalogueService
-from app.common.commands import CommandResult, CommandScope
 from app.common.preconditions import Preconditions
 from app.core.exceptions import ApiError
-from app.core.request_context import set_audit_context
-from app.core.transactions import TransactionRunner
 from app.modules.agencies.repository import AgencyRepository
 from app.modules.agencies.schemas import AgencyListResponse, AgencyResponse, Reason
 
@@ -20,7 +16,7 @@ class AgencyService(CatalogueService):
     search_fields = ("code", "name", "phone", "email", "address")
     sorts = {
         sort: (field,) if field == "id" else (field, "id")
-        for field in ("id", "name", "currentDebt", "acceptedDate")
+        for field in ("id", "name", "debt", "acceptedDate")
         for sort in (field, "-" + field)
     }
     conflicts = {("23514", "ck_owner_eligible_deletion"): ("RESOURCE_IN_USE", "Agency has usage")}
@@ -52,14 +48,8 @@ class AgencyService(CatalogueService):
         super().validate_update(row, values)
         values["updatedBy"] = self.actor_id
 
-    def terminate(self, identifier: int, body: Reason, condition: Preconditions, key: UUID):
-        def authorize():
-            set_audit_context(
-                self.session, self.actor_id, self.request_id, function_code=self.permission
-            )
-            self.authorize((self.permission,))
-
-        def work(command):
+    def terminate(self, identifier: int, body: Reason, condition: Preconditions):
+        def work():
             row = self.repo.lock(identifier)
             if row is None:
                 raise ApiError(404, "NOT_FOUND", "Agency not found")
@@ -67,6 +57,14 @@ class AgencyService(CatalogueService):
             condition.compare(self.etag(self.get(identifier)))
             if row.status != "ACTIVE":
                 raise ApiError(409, "STATE_CONFLICT", "Agency is already terminated")
+            if row.debt != 0:
+                # QĐ6 forbids new documents for a terminated agency, so settle debt first.
+                raise ApiError(
+                    409,
+                    "AGENCY_HAS_DEBT",
+                    "Settle the agency debt before terminating it",
+                    details={"debt": str(row.debt)},
+                )
             self.repo.update(
                 identifier,
                 {
@@ -76,19 +74,6 @@ class AgencyService(CatalogueService):
                     "updatedBy": self.actor_id,
                 },
             )
+            return lambda: self.get(identifier)
 
-            def project():
-                item = self.get(identifier)
-                return CommandResult(
-                    status=200, body=item.model_dump(mode="json"), headers={"ETag": self.etag(item)}
-                )
-
-            return project
-
-        return TransactionRunner(self.session).run(
-            CommandScope(self.actor_id, "terminateAgency", f"agency:{identifier}", key),
-            body.model_dump(),
-            authorize=authorize,
-            work=work,
-            conflicts=self.conflicts,
-        )
+        return self.write(work)

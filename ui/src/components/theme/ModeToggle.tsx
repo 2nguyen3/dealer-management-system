@@ -11,11 +11,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/shadcn/dropdown-menu'
 import { isPalette, PALETTES, usePalette } from './palette'
+import { t } from '@/lib/i18n/core'
 
 export const THEME_OPTIONS = [
-  { value: 'light', label: 'Sáng', icon: Sun },
-  { value: 'dark', label: 'Tối', icon: Moon },
-  { value: 'system', label: 'Theo hệ thống', icon: Laptop },
+  { value: 'light', label: t('Sáng'), icon: Sun },
+  { value: 'dark', label: t('Tối'), icon: Moon },
+  { value: 'system', label: t('Theo hệ thống'), icon: Laptop },
 ] as const
 
 /** shadcn "mode toggle": light / dark / system menu plus the colour palette. */
@@ -28,14 +29,14 @@ export function ModeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Đổi giao diện và màu chủ đạo"
+          aria-label={t('Đổi giao diện và màu chủ đạo')}
         >
           <Sun className="size-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
           <Moon className="absolute size-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuLabel>Chế độ</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('Chế độ')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
@@ -45,7 +46,7 @@ export function ModeToggle() {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Màu chủ đạo</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('Màu chủ đạo')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={palette}
           onValueChange={(value) => isPalette(value) && setPalette(value)}
@@ -58,7 +59,7 @@ export function ModeToggle() {
                 aria-hidden="true"
               />
               {option.label}
-              <span className="ml-auto text-xs text-muted-foreground">
+              <span className="ms-auto text-xs text-muted-foreground">
                 {option.hint}
               </span>
             </DropdownMenuRadioItem>

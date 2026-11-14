@@ -1,9 +1,13 @@
-from pathlib import Path
-
 from sqlalchemy import text
 
 from app.common.pagination import CursorCodec
 from app.core.request_context import set_audit_context
+from app.modules.document_core.schemas import (
+    PaymentReceiptInput,
+    StockIssueInput,
+    StockReceiptInput,
+)
+from app.modules.document_core.service import DocumentService
 from tests.integration.catalogues.conftest import CASES
 
 
@@ -12,36 +16,31 @@ def service_for(resource, session, actor, request="race-request"):
 
 
 def install_builders(session, actor):
-    sql = Path("app/db/sql/seed_helpers.sql").read_text(encoding="utf-8")
-    if not session.scalar(text("SELECT to_regprocedure('pg_temp.actor()')")):
-        session.connection().connection.driver_connection.execute(sql, prepare=False)
+    """Remember the fixture actor; documents are built through DocumentService."""
+    session.info["fixture_actor"] = actor
     set_audit_context(session, actor, "fixture", function_code="stock.receipt.post")
 
 
+def documents(session, kind):
+    return DocumentService(
+        session,
+        CursorCodec(b"x" * 32),
+        session.info["fixture_actor"],
+        "fixture",
+        lambda _: None,
+        kind=kind,
+        embedded=True,
+    )
+
+
 def agency(session, ward=1, type_id=1):
-    # Wards are the read-only 168-row catalogue loaded by revision 0010.
+    # Wards are the read-only 168-row catalogue (0010, rebuilt unchanged by 0011).
     return session.scalar(
         text(
             'INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate") '
             "VALUES ('Agency',:type,:ward,'agency@example.com','2026-01-01') RETURNING id"
         ),
         {"type": type_id, "ward": ward},
-    )
-
-
-def legacy_agency(session, type_id=1):
-    """Pre-0010 agency in a district that revision 0010 maps (Quận 1 -> Phường Sài Gòn)."""
-    district = session.scalar(text("SELECT id FROM dms.district WHERE name='Quận 1'"))
-    if district is None:
-        district = session.scalar(
-            text("INSERT INTO dms.district (code,name) VALUES ('BASE','Quận 1') RETURNING id")
-        )
-    return session.scalar(
-        text(
-            'INSERT INTO dms.agency (name,"typeId","districtId",email,"acceptedDate") '
-            "VALUES ('Agency',:type,:district,'agency@example.com','2026-01-01') RETURNING id"
-        ),
-        {"type": type_id, "district": district},
     )
 
 
@@ -52,35 +51,29 @@ def product(session, unit=1):
     )
 
 
-def draft(session, product_id, *, quantity="1", kind="STOCK_RECEIPT", agency_id=None):
-    session.execute(text("SET CONSTRAINTS ALL DEFERRED"))
-    return session.scalar(
-        text(
-            "SELECT pg_temp.stock_draft(:kind,:agency,DATE '2026-01-02',"
-            "jsonb_build_array(jsonb_build_object('product',CAST(:product AS bigint),"
-            "'quantity',CAST(:quantity AS numeric),'price',100)),gen_random_uuid())"
-        ),
-        {"kind": kind, "agency": agency_id, "product": product_id, "quantity": quantity},
-    )
+def draft(session, product_id, *, quantity="1", kind="STOCK_RECEIPT", agency_id=None, price="100"):
+    line = {"productId": str(product_id), "quantity": str(quantity)}
+    if kind == "STOCK_RECEIPT":
+        body = StockReceiptInput.model_validate({"lines": [{**line, "unitPrice": str(price)}]})
+    else:
+        body = StockIssueInput.model_validate({"agencyId": str(agency_id), "lines": [line]})
+    return documents(session, kind).create(body)
 
 
 def post_stock(session, document_id):
-    session.execute(text("SELECT pg_temp.post_stock(:id)"), {"id": document_id})
-    session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    kind = session.scalar(text("SELECT kind FROM dms.document WHERE id=:id"), {"id": document_id})
+    documents(session, kind).post(document_id, None)
 
 
-def count_line(session, actor, product_id, unit_id, counted="0"):
-    identifier = session.scalar(
-        text(
-            'INSERT INTO dms.stock_count ("countedAt","createdBy") '
-            "VALUES (clock_timestamp(),:actor) RETURNING id"
-        ),
-        {"actor": actor},
-    )
-    return session.scalar(
-        text(
-            'INSERT INTO dms.stock_count_line ("countId","productId","unitId",'
-            '"bookQuantity","countedQuantity") VALUES (:id,:product,:unit,0,:counted) RETURNING id'
-        ),
-        {"id": identifier, "product": product_id, "unit": unit_id, "counted": counted},
-    )
+def cancel_stock(session, document_id, reason="Nhập trùng phiếu"):
+    kind = session.scalar(text("SELECT kind FROM dms.document WHERE id=:id"), {"id": document_id})
+    documents(session, kind).cancel(document_id, reason, None)
+
+
+def payment(session, agency_id, amount):
+    """Create and post a cash payment receipt; returns its id."""
+    service = documents(session, "PAYMENT_RECEIPT")
+    body = PaymentReceiptInput.model_validate({"agencyId": str(agency_id), "amount": str(amount)})
+    identifier = service.create(body)
+    service.post(identifier, None)
+    return identifier

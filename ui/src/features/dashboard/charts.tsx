@@ -39,7 +39,7 @@ function TooltipRow({
         aria-hidden="true"
       />
       <span className="text-muted-foreground">{label}</span>
-      <span className="ml-auto pl-3 font-semibold text-foreground tabular-nums">
+      <span className="ms-auto ps-3 font-semibold text-foreground tabular-nums">
         {value}
       </span>
     </div>
