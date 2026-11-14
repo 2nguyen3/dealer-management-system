@@ -1,3 +1,5 @@
+import { currentIntl, NBSP, numberStyle } from './formatters'
+import { getLocale } from './i18n/core'
 /**
  * Shared chart helpers. Categorical colours are the validated eight-slot
  * palette exposed as `--chart-1..8`; assign them in fixed order to a stable
@@ -29,32 +31,46 @@ export function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-const COMPACT = new Intl.NumberFormat('vi-VN', {
-  notation: 'compact',
-  maximumFractionDigits: 1,
-})
-const PLAIN = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 })
-const PERCENT = new Intl.NumberFormat('vi-VN', {
-  style: 'percent',
-  maximumFractionDigits: 1,
-})
+const numberFormats = new Map<string, Intl.NumberFormat>()
+/** Cached `Intl.NumberFormat` of the current interface language. */
+function numberFormat(
+  kind: 'compact' | 'plain' | 'percent',
+): Intl.NumberFormat {
+  const tag = currentIntl()
+  const key = `${tag}:${kind}`
+  let format = numberFormats.get(key)
+  if (!format) {
+    format = new Intl.NumberFormat(
+      tag,
+      kind === 'compact'
+        ? { notation: 'compact', maximumFractionDigits: 1 }
+        : kind === 'percent'
+          ? { style: 'percent', maximumFractionDigits: 1 }
+          : { maximumFractionDigits: 0 },
+    )
+    numberFormats.set(key, format)
+  }
+  return format
+}
 
 /** Axis/tick label: 1,2 Tr, 350 N … */
 export function formatCompact(value: number): string {
-  return COMPACT.format(value)
+  return numberFormat('compact').format(value)
 }
 
-/** Compact money for KPI tiles: "1,2 Tr ₫". */
+/** Compact money for KPI tiles: "1,2 Tr ₫" (always VND). */
 export function formatCompactVND(value: number): string {
-  return `${COMPACT.format(value)} ₫`
+  const amount = numberFormat('compact').format(value)
+  if (getLocale() === 'vi') return `${amount} ₫`
+  return numberStyle().currencyBefore ? `₫${amount}` : `${amount}${NBSP}₫`
 }
 
 export function formatPlain(value: number): string {
-  return PLAIN.format(value)
+  return numberFormat('plain').format(value)
 }
 
 export function formatPercent(ratio: number): string {
-  return PERCENT.format(ratio)
+  return numberFormat('percent').format(ratio)
 }
 
 /**
