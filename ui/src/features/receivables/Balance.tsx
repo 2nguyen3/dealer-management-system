@@ -25,6 +25,7 @@ import {
   record,
   type Row,
 } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 const RECEIPT_READERS = [
   'debt.read',
@@ -111,7 +112,7 @@ export function Balance({ agencyId }: { agencyId: string }) {
   if (state.agency !== agencyId)
     return (
       <div role="status" className="space-y-3">
-        <span className="sr-only">Đang tải số dư...</span>
+        <span className="sr-only">{t('Đang tải số dư...')}</span>
         <div className="grid gap-4 sm:grid-cols-3">
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
@@ -137,35 +138,35 @@ export function Balance({ agencyId }: { agencyId: string }) {
   const creditParts = [
     {
       key: 'available',
-      label: 'Khả dụng',
+      label: t('Khả dụng'),
       value: toNumber(String(data.availableCredit)),
       color: 'var(--success)',
     },
     {
       key: 'reserved',
-      label: 'Đang giữ chỗ',
+      label: t('Đang giữ chỗ'),
       value: toNumber(String(data.reservedCredit)),
       color: 'var(--chart-3)',
     },
   ]
   const lastRow = last?.row
   const lastPayment = !canReadReceipts
-    ? { value: '—', hint: 'Không có quyền xem phiếu thu' }
+    ? { value: '—', hint: t('Không có quyền xem phiếu thu') }
     : !last
-      ? { value: '…', hint: 'Đang tải…' }
+      ? { value: '…', hint: t('Đang tải…') }
       : last.error
-        ? { value: '—', hint: 'Không tải được phiếu thu' }
+        ? { value: '—', hint: t('Không tải được phiếu thu') }
         : lastRow
           ? {
               ...compact(lastRow.totalAmount),
               hint: `${formatDate(String(lastRow.businessDate))} · ${String(lastRow.code)}`,
             }
-          : { value: '—', hint: 'Chưa có phiếu thu đã ghi sổ' }
+          : { value: '—', hint: t('Chưa có phiếu thu đã ghi sổ') }
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard
-          label="Công nợ hiện tại"
+          label={t('Công nợ hiện tại')}
           icon={<Wallet />}
           {...compact(data.currentDebt)}
           delta={{
@@ -173,18 +174,20 @@ export function Balance({ agencyId }: { agencyId: string }) {
             upIsGood: false,
             label:
               usage === null
-                ? 'Không giới hạn nợ'
-                : `${formatPercent(usage)} hạn mức`,
+                ? t('Không giới hạn nợ')
+                : t('{usage} hạn mức', { usage: formatPercent(usage) }),
           }}
         />
         <KpiCard
-          label="Số dư có khả dụng"
+          label={t('Số dư có khả dụng')}
           icon={<PiggyBank />}
           {...compact(data.availableCredit)}
-          hint={`Đang giữ ${formatCompactVND(toNumber(String(data.reservedCredit)))}`}
+          hint={t('Đang giữ {toNumber}', {
+            toNumber: formatCompactVND(toNumber(String(data.reservedCredit))),
+          })}
         />
         <KpiCard
-          label="Thanh toán gần nhất"
+          label={t('Thanh toán gần nhất')}
           icon={<HandCoins />}
           value={lastPayment.value}
           exactValue={
@@ -196,7 +199,7 @@ export function Balance({ agencyId }: { agencyId: string }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="gap-3 p-4 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="font-medium">Sử dụng hạn mức</span>
+            <span className="font-medium">{t('Sử dụng hạn mức')}</span>
             {usage !== null && (
               <span
                 className={cn(
@@ -210,40 +213,43 @@ export function Balance({ agencyId }: { agencyId: string }) {
               >
                 {formatPercent(usage)}
                 {usage >= 1
-                  ? ' · Vượt hạn mức'
+                  ? t(' · Vượt hạn mức')
                   : usage >= 0.8
-                    ? ' · Sắp chạm hạn mức'
+                    ? t(' · Sắp chạm hạn mức')
                     : ''}
               </span>
             )}
           </div>
           {usage === null ? (
             <p className="flex h-9 items-center text-sm text-muted-foreground">
-              Đại lý không đặt hạn mức nợ.
+              {t('Đại lý không đặt hạn mức nợ.')}
             </p>
           ) : (
             <SegmentedMeter
               ratio={usage}
               color={usageColor}
-              label="Mức sử dụng hạn mức nợ"
+              label={t('Mức sử dụng hạn mức nợ')}
             />
           )}
           <div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-            <span>Đã dùng {formatCompactVND(debt)}</span>
+            <span>{t('Đã dùng {debt}', { debt: formatCompactVND(debt) })}</span>
             <span>
-              Còn{' '}
-              {formatCompactVND(toNumber(String(data.remainingCreditLimit)))}
+              {t('Còn {toNumber}', {
+                toNumber: formatCompactVND(
+                  toNumber(String(data.remainingCreditLimit)),
+                ),
+              })}
             </span>
           </div>
         </Card>
         <Card className="gap-2 p-4 shadow-xs">
-          <span className="text-sm font-medium">Cơ cấu dư có</span>
+          <span className="text-sm font-medium">{t('Cơ cấu dư có')}</span>
           {credit > 0 ? (
             <div className="flex items-center gap-3">
               <DonutChart
                 data={creditParts}
                 centerValue={formatCompactVND(credit)}
-                centerLabel="dư có"
+                centerLabel={t('dư có')}
                 valueFormatter={formatCompactVND}
                 height={112}
                 className="max-w-28 shrink-0"
@@ -260,19 +266,19 @@ export function Balance({ agencyId }: { agencyId: string }) {
             </div>
           ) : (
             <p className="flex h-28 items-center justify-center text-sm text-muted-foreground">
-              Chưa có dư có.
+              {t('Chưa có dư có.')}
             </p>
           )}
         </Card>
       </div>
       <DetailList
         entries={[
-          ['currentDebt', 'Dư nợ hiện tại'],
-          ['maxDebt', 'Hạn mức nợ'],
-          ['remainingCreditLimit', 'Hạn mức còn lại'],
-          ['currentCredit', 'Dư có hiện tại'],
-          ['reservedCredit', 'Dư có đang giữ'],
-          ['availableCredit', 'Dư có khả dụng'],
+          ['currentDebt', t('Dư nợ hiện tại')],
+          ['maxDebt', t('Hạn mức nợ')],
+          ['remainingCreditLimit', t('Hạn mức còn lại')],
+          ['currentCredit', t('Dư có hiện tại')],
+          ['reservedCredit', t('Dư có đang giữ')],
+          ['availableCredit', t('Dư có khả dụng')],
         ].map(([field, label]) => [
           label!,
           <span key={field} className="tabular-nums">

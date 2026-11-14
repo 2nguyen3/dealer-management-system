@@ -1,4 +1,5 @@
 import { ApiError, apiFetch, type RequestOptions } from '../../lib/api'
+import { t } from '@/lib/i18n/core'
 
 export type Row = Record<string, unknown>
 export interface Page<T> {
@@ -29,7 +30,7 @@ export function decimal(value: unknown): string {
 
 export function positiveMoney(value: string): string {
   if (!/^[1-9][0-9]{0,17}$/.test(value)) {
-    throw new Error('Số tiền phải là số nguyên dương, tối đa 18 chữ số.')
+    throw new Error(t('Số tiền phải là số nguyên dương, tối đa 18 chữ số.'))
   }
   return value
 }
@@ -135,7 +136,7 @@ export function queryPath(
 }
 
 export function message(error: unknown): string {
-  return error instanceof Error ? error.message : 'Yêu cầu thất bại.'
+  return error instanceof Error ? error.message : t('Yêu cầu thất bại.')
 }
 
 // Retain a key until a confirmed response. An uncertain retry must use identical bytes.
@@ -149,7 +150,7 @@ export class Intent {
     keyed = true,
   ) {
     const { retainAccepted = false, ...requestOptions } = options
-    if (this.busy) throw new Error('Một yêu cầu đang được xử lý.')
+    if (this.busy) throw new Error(t('Một yêu cầu đang được xử lý.'))
     const fingerprint = JSON.stringify([
       requestOptions.method,
       requestOptions.body,
@@ -158,11 +159,15 @@ export class Intent {
     const previous = this.pending.get(path)
     if (previous && !keyed)
       throw new Error(
-        'Kết quả chưa rõ. Tải lại và kiểm tra trước khi gửi lại thao tác không có idempotency.',
+        t(
+          'Kết quả chưa rõ. Tải lại và kiểm tra trước khi gửi lại thao tác không có idempotency.',
+        ),
       )
     if (previous && previous.fingerprint !== fingerprint) {
       throw new Error(
-        'Kết quả trước chưa rõ. Giữ nguyên nội dung để thử lại hoặc tải lại và đối soát trước khi đổi yêu cầu.',
+        t(
+          'Kết quả trước chưa rõ. Giữ nguyên nội dung để thử lại hoặc tải lại và đối soát trước khi đổi yêu cầu.',
+        ),
       )
     }
     const intent = previous ?? { fingerprint, key: crypto.randomUUID() }
@@ -280,7 +285,7 @@ export function dateRangeParams(
   if (from && to && from > to)
     return {
       params: {},
-      error: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.',
+      error: t('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.'),
     }
   const bound = (date: string) => (instant ? `${date}T00:00:00+07:00` : date)
   return {
@@ -298,10 +303,10 @@ export function dateRangeParams(
  */
 export function vietnamInstant(local: string): string {
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local)
-  if (!match) throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+  if (!match) throw new Error(t('Vui lòng nhập đầy đủ ngày và giờ.'))
   const [, day, hour, minute, second = '00'] = match
   businessDate(day)
   if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59)
-    throw new Error('Vui lòng nhập đầy đủ ngày và giờ.')
+    throw new Error(t('Vui lòng nhập đầy đủ ngày và giờ.'))
   return `${day}T${hour}:${minute}:${second}+07:00`
 }

@@ -15,6 +15,9 @@ import {
   ShieldCheck,
   TimerOff,
 } from 'lucide-react'
+import { notifyNextStep } from '@/components/guide/notifyNextStep'
+import { t } from '@/lib/i18n/core'
+import { reconcileNotice } from '../guide/workflows'
 import {
   useEffect,
   useEffectEvent,
@@ -92,7 +95,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 /** Server sort enum for GET /online-payments: createdAt, id (±). */
 const DEFAULT_SORT = '-createdAt'
-const WIZARD = ['Thông tin', 'Xác nhận', 'Thanh toán'] as const
+const WIZARD = [t('Thông tin'), t('Xác nhận'), t('Thanh toán')] as const
 type CreateStep = 'form' | 'confirm' | 'handoff'
 
 function optionalDateTime(value: unknown, fallback: string): string {
@@ -194,7 +197,7 @@ export function OnlinePaymentsPage() {
     let current = true
     const locate = async () => {
       if (requestedPaymentId === null && !requestedReference)
-        throw new Error('Mã tham chiếu không hợp lệ.')
+        throw new Error(t('Mã tham chiếu không hợp lệ.'))
       const response = await apiFetch<unknown>(
         requestedPaymentId !== null
           ? `/online-payments/${id(requestedPaymentId)}`
@@ -208,7 +211,7 @@ export function OnlinePaymentsPage() {
               (item) => item.merchantReference === requestedReference,
             )
       if (!item)
-        throw new Error('Không tìm thấy giao dịch với mã tham chiếu này.')
+        throw new Error(t('Không tìm thấy giao dịch với mã tham chiếu này.'))
       if (current) {
         setSelected(id(item.id))
         setDetail(item)
@@ -295,7 +298,7 @@ export function OnlinePaymentsPage() {
   const review = () => {
     setError('')
     try {
-      if (!agencyId) throw new Error('Vui lòng chọn đại lý thanh toán.')
+      if (!agencyId) throw new Error(t('Vui lòng chọn đại lý thanh toán.'))
       id(agencyId)
       positiveMoney(amount)
       setCreateStep('confirm')
@@ -333,10 +336,21 @@ export function OnlinePaymentsPage() {
         setAgencyLabel('')
         setAmount('')
       }
+      if (!accepted)
+        notifyNextStep({
+          done: t('Đã tạo giao dịch thanh toán trực tuyến.'),
+          next: t(
+            'Bước tiếp: gửi liên kết hoặc mã QR để đại lý trả trên VNPAY. Trang trả về không phải là xác nhận thành công; chờ cổng báo (IPN) hoặc bấm đối soát.',
+          ),
+        })
       setNotice(
         accepted
-          ? 'Đang khởi tạo trang thanh toán. Giữ nguyên nội dung và bấm tiếp tục để hoàn tất cùng giao dịch này, không tạo giao dịch mới.'
-          : 'Đã tạo giao dịch. Tiền chỉ được ghi nhận khi cổng thanh toán xác nhận thành công.',
+          ? t(
+              'Đang khởi tạo trang thanh toán. Giữ nguyên nội dung và bấm tiếp tục để hoàn tất cùng giao dịch này, không tạo giao dịch mới.',
+            )
+          : t(
+              'Đã tạo giao dịch. Tiền chỉ được ghi nhận khi cổng thanh toán xác nhận thành công.',
+            ),
       )
       invalidateCache('/online-payments')
       list.reload()
@@ -356,7 +370,9 @@ export function OnlinePaymentsPage() {
         `/online-payments/${selected}/reconcile`,
         { method: 'POST' },
       )
-      setDetail(payment(response.data))
+      const reconciled = payment(response.data)
+      setDetail(reconciled)
+      notifyNextStep(reconcileNotice(reconciled.status))
       setVersion((value) => value + 1)
       for (const prefix of [
         '/online-payments',
@@ -395,9 +411,11 @@ export function OnlinePaymentsPage() {
   return (
     <div className="page-container space-y-6">
       <PageHeader
-        eyebrow="Tài chính"
-        title="Thanh toán trực tuyến"
-        description="Tạo giao dịch → đại lý trả trên VNPAY → cổng xác nhận (IPN) → phiếu thu tự động."
+        eyebrow={t('Tài chính')}
+        title={t('Thanh toán trực tuyến')}
+        description={t(
+          'Tạo giao dịch → đại lý trả trên VNPAY → cổng xác nhận (IPN) → phiếu thu tự động.',
+        )}
         className="mb-0"
         actions={
           canManage && (
@@ -405,7 +423,7 @@ export function OnlinePaymentsPage() {
               icon={<CreditCard className="size-4" />}
               onClick={openCreate}
             >
-              Tạo thanh toán mới
+              {t('Tạo thanh toán mới')}
             </Button>
           )
         }
@@ -414,60 +432,64 @@ export function OnlinePaymentsPage() {
       {notice && <Alert type="info">{notice}</Alert>}
       {!list.loading && list.items.length > 0 && (
         <PageSummary
-          title="Tổng quan giao dịch"
-          noun="giao dịch"
+          title={t('Tổng quan giao dịch')}
+          noun={t('giao dịch')}
           total={list.items.length}
           groups={groups}
           kpis={[
             {
-              label: 'Đã ghi nhận',
+              label: t('Đã ghi nhận'),
               icon: <BadgeCheck />,
               value: formatCompactVND(group('SUCCESS')?.amount ?? 0),
-              hint: `${group('SUCCESS')?.count ?? 0} giao dịch có phiếu thu`,
+              hint: t('{count} giao dịch có phiếu thu', {
+                count: group('SUCCESS')?.count ?? 0,
+              }),
             },
             {
-              label: 'Chờ cổng xác nhận',
+              label: t('Chờ cổng xác nhận'),
               icon: <Hourglass />,
               value: formatCompactVND(group('PENDING')?.amount ?? 0),
-              hint: `${group('PENDING')?.count ?? 0} giao dịch`,
+              hint: t('{count} giao dịch', {
+                count: group('PENDING')?.count ?? 0,
+              }),
             },
             {
-              label: 'Không thành công',
+              label: t('Không thành công'),
               icon: <CircleX />,
               value: <CountUp value={stopped} />,
-              hint: 'Thất bại hoặc hết hạn',
+              hint: t('Thất bại hoặc hết hạn'),
             },
           ]}
         />
       )}
       <FilterBar>
         <Input
-          label="Mã tham chiếu"
-          placeholder="Mã tham chiếu chính xác"
+          label={t('Mã tham chiếu')}
+          placeholder={t('Mã tham chiếu chính xác')}
           value={reference}
           onChange={(event) => setReference(event.target.value)}
         />
         <EntityPicker
           resource="agencies"
-          label="Đại lý"
+          label={t('Đại lý')}
           value={agencyFilter}
           onChange={(value) => setAgencyFilter(value)}
-          placeholder="Tất cả đại lý"
+          placeholder={t('Tất cả đại lý')}
         />
         <Select
-          label="Trạng thái"
+          label={t('Trạng thái')}
           value={status}
           onChange={(event) => setStatus(event.target.value)}
-          options={enumOptions(PAYMENT_STATUSES, statusLabel, 'Tất cả')}
+          options={enumOptions(PAYMENT_STATUSES, statusLabel, t('Tất cả'))}
         />
         <DateField
-          label="Tạo từ ngày"
+          label={t('Tạo từ ngày')}
           value={fromDate}
           onChange={setFromDate}
           max={toDate || undefined}
         />
         <DateField
-          label="Đến ngày"
+          label={t('Đến ngày')}
           value={toDate}
           onChange={setToDate}
           min={fromDate || undefined}
@@ -478,46 +500,46 @@ export function OnlinePaymentsPage() {
           icon={<RefreshCw className="size-4" />}
           onClick={list.reload}
         >
-          Tải lại
+          {t('Tải lại')}
         </Button>
       </FilterBar>
       {list.error && <Alert type="error">{list.error}</Alert>}
       <TableCard
-        title="Giao dịch trực tuyến"
-        description="Trạng thái theo xác nhận IPN của cổng."
+        title={t('Giao dịch trực tuyến')}
+        description={t('Trạng thái theo xác nhận IPN của cổng.')}
         icon={<Globe />}
       >
         {list.loading ? (
-          <TableSkeleton label="Đang tải giao dịch..." />
+          <TableSkeleton label={t('Đang tải giao dịch...')} />
         ) : !list.items.length ? (
           <div className="p-4">
             <EmptyState
               icon={<CreditCard className="size-6" />}
-              title="Không có giao dịch phù hợp."
+              title={t('Không có giao dịch phù hợp.')}
             />
           </div>
         ) : (
-          <Table caption="Danh sách giao dịch trực tuyến">
+          <Table caption={t('Danh sách giao dịch trực tuyến')}>
             <thead>
               <tr>
-                <th scope="col">Mã tham chiếu</th>
-                <th scope="col">Đại lý</th>
+                <th scope="col">{t('Mã tham chiếu')}</th>
+                <th scope="col">{t('Đại lý')}</th>
                 <SortableHeader
                   field="createdAt"
                   sort={sorter.sort}
                   onSort={onSort}
                   firstDirection="desc"
                 >
-                  Tạo lúc
+                  {t('Tạo lúc')}
                 </SortableHeader>
-                <th scope="col">Thời điểm thanh toán</th>
+                <th scope="col">{t('Thời điểm thanh toán')}</th>
                 <th scope="col" className="cell-number">
-                  Số tiền
+                  {t('Số tiền')}
                 </th>
-                <th scope="col">Tiến trình</th>
-                <th scope="col">Trạng thái</th>
+                <th scope="col">{t('Tiến trình')}</th>
+                <th scope="col">{t('Trạng thái')}</th>
                 <th scope="col" className="cell-actions">
-                  Thao tác
+                  {t('Thao tác')}
                 </th>
               </tr>
             </thead>
@@ -561,7 +583,9 @@ export function OnlinePaymentsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      aria-label={`Chi tiết ${String(item.merchantReference)}`}
+                      aria-label={t('Chi tiết {merchantReference}', {
+                        merchantReference: String(item.merchantReference),
+                      })}
                       onClick={() => {
                         setSelected(String(item.id))
                         setDetail(null)
@@ -569,7 +593,7 @@ export function OnlinePaymentsPage() {
                         setError('')
                       }}
                     >
-                      Chi tiết
+                      {t('Chi tiết')}
                     </Button>
                   </td>
                 </tr>
@@ -588,7 +612,7 @@ export function OnlinePaymentsPage() {
       <Modal
         isOpen={open}
         onClose={closeCreate}
-        title="Tạo thanh toán trực tuyến"
+        title={t('Tạo thanh toán trực tuyến')}
         maxWidth={createStep === 'handoff' ? 'lg' : 'md'}
       >
         <div className="space-y-4">
@@ -605,7 +629,7 @@ export function OnlinePaymentsPage() {
             >
               <EntityPicker
                 resource="agencies"
-                label="Đại lý thanh toán"
+                label={t('Đại lý thanh toán')}
                 value={agencyId}
                 onChange={(value, item) => {
                   setAgencyId(value)
@@ -614,9 +638,9 @@ export function OnlinePaymentsPage() {
                 required
               />
               <Input
-                label="Số tiền thanh toán (VND nguyên)"
+                label={t('Số tiền thanh toán (VND nguyên)')}
                 inputMode="numeric"
-                className="text-right tabular-nums"
+                className="text-end tabular-nums"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 helperText={
@@ -628,10 +652,10 @@ export function OnlinePaymentsPage() {
               />
               <FormActions>
                 <Button type="button" variant="outline" onClick={closeCreate}>
-                  Đóng
+                  {t('Đóng')}
                 </Button>
                 <Button type="submit" icon={<ArrowRight className="size-4" />}>
-                  Tiếp tục
+                  {t('Tiếp tục')}
                 </Button>
               </FormActions>
             </form>
@@ -640,9 +664,9 @@ export function OnlinePaymentsPage() {
             <form onSubmit={create} className="space-y-4">
               <DetailList
                 entries={[
-                  ['Đại lý', agencyLabel || `#${agencyId}`],
+                  [t('Đại lý'), agencyLabel || `#${agencyId}`],
                   [
-                    'Số tiền',
+                    t('Số tiền'),
                     <span
                       key="amount"
                       className="text-lg font-semibold tabular-nums"
@@ -652,8 +676,8 @@ export function OnlinePaymentsPage() {
                         : amount}
                     </span>,
                   ],
-                  ['Cổng thanh toán', 'VNPAY'],
-                  ['Ghi nhận khi', 'Cổng xác nhận (IPN) thành công'],
+                  [t('Cổng thanh toán'), 'VNPAY'],
+                  [t('Ghi nhận khi'), t('Cổng xác nhận (IPN) thành công')],
                 ]}
               />
               <div className="flex items-start gap-2 rounded-lg border border-info/25 bg-info/8 p-3 text-xs text-foreground/80">
@@ -662,8 +686,9 @@ export function OnlinePaymentsPage() {
                   aria-hidden="true"
                 />
                 <span>
-                  Trang quay lại từ VNPAY không phải là xác nhận. Chỉ IPN hợp lệ
-                  mới lập phiếu thu.
+                  {t(
+                    'Trang quay lại từ VNPAY không phải là xác nhận. Chỉ IPN hợp lệ mới lập phiếu thu.',
+                  )}
                 </span>
               </div>
               <FormActions>
@@ -676,15 +701,15 @@ export function OnlinePaymentsPage() {
                     setCreateStep('form')
                   }}
                 >
-                  Quay lại
+                  {t('Quay lại')}
                 </Button>
                 <Button type="button" variant="outline" onClick={closeCreate}>
-                  Đóng
+                  {t('Đóng')}
                 </Button>
                 <Button type="submit" isLoading={busy}>
                   {pendingSetupId
-                    ? 'Tiếp tục khởi tạo thanh toán'
-                    : 'Khởi tạo thanh toán'}
+                    ? t('Tiếp tục khởi tạo thanh toán')
+                    : t('Khởi tạo thanh toán')}
                 </Button>
               </FormActions>
             </form>
@@ -692,7 +717,10 @@ export function OnlinePaymentsPage() {
           {createStep === 'handoff' && detail && (
             <div className="space-y-4">
               {detailSteps && (
-                <FlowSteps label="Tiến trình thanh toán" steps={detailSteps} />
+                <FlowSteps
+                  label={t('Tiến trình thanh toán')}
+                  steps={detailSteps}
+                />
               )}
               <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
                 {payable ? (
@@ -700,14 +728,14 @@ export function OnlinePaymentsPage() {
                 ) : (
                   <div className="flex size-40 items-center justify-center rounded-xl border border-dashed text-center text-xs text-muted-foreground">
                     {detail.status === 'PENDING'
-                      ? 'Chưa có liên kết'
-                      : 'Không cần thanh toán'}
+                      ? t('Chưa có liên kết')
+                      : t('Không cần thanh toán')}
                   </div>
                 )}
                 <div className="min-w-0 space-y-3">
                   <div>
                     <p className="text-xs text-muted-foreground">
-                      Số tiền cần trả
+                      {t('Số tiền cần trả')}
                     </p>
                     <p className="text-3xl font-semibold tracking-tight tabular-nums">
                       {formatVND(String(detail.amount))}
@@ -718,8 +746,9 @@ export function OnlinePaymentsPage() {
                   </div>
                   {payable && <CheckoutActions url={url} />}
                   <p className="text-xs text-muted-foreground">
-                    Gửi mã QR hoặc liên kết cho đại lý. Trạng thái chỉ đổi khi
-                    cổng xác nhận.
+                    {t(
+                      'Gửi mã QR hoặc liên kết cho đại lý. Trạng thái chỉ đổi khi cổng xác nhận.',
+                    )}
                   </p>
                 </div>
               </div>
@@ -729,7 +758,7 @@ export function OnlinePaymentsPage() {
                   icon={<RefreshCw className="size-4" />}
                   onClick={() => setVersion((value) => value + 1)}
                 >
-                  Kiểm tra trạng thái
+                  {t('Kiểm tra trạng thái')}
                 </Button>
                 <Button
                   variant="outline"
@@ -738,7 +767,7 @@ export function OnlinePaymentsPage() {
                     setCreateStep('form')
                   }}
                 >
-                  Xem chi tiết
+                  {t('Xem chi tiết')}
                 </Button>
                 <Button onClick={closeCreate}>Xong</Button>
               </ActionBar>
@@ -752,12 +781,12 @@ export function OnlinePaymentsPage() {
           setSelected(null)
           setDetail(null)
         }}
-        title="Chi tiết giao dịch"
+        title={t('Chi tiết giao dịch')}
         maxWidth="lg"
       >
         {!detail ? (
           <div role="status" className="space-y-3">
-            <span className="sr-only">Đang tải chi tiết...</span>
+            <span className="sr-only">{t('Đang tải chi tiết...')}</span>
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-40 w-full" />
           </div>
@@ -768,35 +797,38 @@ export function OnlinePaymentsPage() {
               amount={formatVND(String(detail.amount))}
             />
             {detailSteps && (
-              <FlowSteps label="Tiến trình thanh toán" steps={detailSteps} />
+              <FlowSteps
+                label={t('Tiến trình thanh toán')}
+                steps={detailSteps}
+              />
             )}
             <DetailList
               entries={[
                 [
-                  'Mã tham chiếu',
+                  t('Mã tham chiếu'),
                   <span key="ref" className="font-mono text-xs">
                     {String(detail.merchantReference)}
                   </span>,
                 ],
-                ['Đại lý', `#${String(detail.agencyId)}`],
-                ['Cổng thanh toán', String(detail.provider)],
+                [t('Đại lý'), `#${String(detail.agencyId)}`],
+                [t('Cổng thanh toán'), String(detail.provider)],
                 [
-                  'Mã giao dịch cổng',
+                  t('Mã giao dịch cổng'),
                   typeof detail.providerTransactionId === 'string'
                     ? detail.providerTransactionId
-                    : 'Chưa có',
+                    : t('Chưa có'),
                 ],
                 [
-                  'Phiếu thu',
+                  t('Phiếu thu'),
                   detail.receiptDocumentId
                     ? `#${String(detail.receiptDocumentId)}`
-                    : 'Chưa có',
+                    : t('Chưa có'),
                 ],
                 [
-                  'Thời điểm thanh toán',
-                  optionalDateTime(detail.paymentTime, 'Chưa xác nhận'),
+                  t('Thời điểm thanh toán'),
+                  optionalDateTime(detail.paymentTime, t('Chưa xác nhận')),
                 ],
-                ['Hết hạn lúc', optionalDateTime(detail.expiresAt, '—')],
+                [t('Hết hạn lúc'), optionalDateTime(detail.expiresAt, '—')],
               ]}
             />
             <ActionBar>
@@ -805,16 +837,16 @@ export function OnlinePaymentsPage() {
                 icon={<RefreshCw className="size-4" />}
                 onClick={() => setVersion((value) => value + 1)}
               >
-                Kiểm tra trạng thái
+                {t('Kiểm tra trạng thái')}
               </Button>
               {canManage && detail.status !== 'SUCCESS' && (
                 <Button variant="outline" disabled={busy} onClick={reconcile}>
-                  Đối soát giao dịch hiện tại
+                  {t('Đối soát giao dịch hiện tại')}
                 </Button>
               )}
               {canManage && selected === pendingSetupId && (
                 <Button disabled={busy} onClick={openCreate}>
-                  Tiếp tục khởi tạo thanh toán
+                  {t('Tiếp tục khởi tạo thanh toán')}
                 </Button>
               )}
               {payable && (
@@ -822,7 +854,7 @@ export function OnlinePaymentsPage() {
                   <PopoverTrigger asChild>
                     <ShadcnButton variant="outline">
                       <QrCode className="size-4" aria-hidden="true" />
-                      Mã QR
+                      {t('Mã QR')}
                     </ShadcnButton>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-3">
@@ -834,21 +866,21 @@ export function OnlinePaymentsPage() {
             </ActionBar>
             {canManage && (
               <SectionCard
-                title="Phản hồi từ cổng thanh toán"
-                description="Đã kiểm tra chữ ký."
+                title={t('Phản hồi từ cổng thanh toán')}
+                description={t('Đã kiểm tra chữ ký.')}
                 icon={<ShieldCheck />}
               >
                 {events.length ? (
                   <div className="overflow-x-auto rounded-lg border">
-                    <Table caption="Lịch sử phản hồi từ cổng thanh toán">
+                    <Table caption={t('Lịch sử phản hồi từ cổng thanh toán')}>
                       <thead>
                         <tr>
-                          <th scope="col">Thời điểm</th>
-                          <th scope="col">Mã giao dịch cổng</th>
+                          <th scope="col">{t('Thời điểm')}</th>
+                          <th scope="col">{t('Mã giao dịch cổng')}</th>
                           <th scope="col" className="cell-number">
-                            Số tiền
+                            {t('Số tiền')}
                           </th>
-                          <th scope="col">Kết quả</th>
+                          <th scope="col">{t('Kết quả')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -883,12 +915,12 @@ export function OnlinePaymentsPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Chưa có phản hồi nào.
+                    {t('Chưa có phản hồi nào.')}
                   </p>
                 )}
                 {eventsMore && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Chỉ hiển thị 25 phản hồi đầu tiên.
+                    {t('Chỉ hiển thị 25 phản hồi đầu tiên.')}
                   </p>
                 )}
               </SectionCard>
@@ -905,7 +937,7 @@ function WizardSteps({ current }: { current: number }) {
   return (
     <ol
       className="flex items-center gap-2"
-      aria-label="Các bước tạo thanh toán"
+      aria-label={t('Các bước tạo thanh toán')}
     >
       {WIZARD.map((label, index) => (
         <li
@@ -919,7 +951,7 @@ function WizardSteps({ current }: { current: number }) {
           {index > 0 && (
             <Separator
               className={cn(
-                'mr-1 flex-1 transition-colors duration-500',
+                'me-1 flex-1 transition-colors duration-500',
                 index <= current && 'bg-primary',
               )}
             />
@@ -953,14 +985,18 @@ function MiniFlow({ steps }: { steps: FlowStep[] | null }) {
   )
   const current = steps.find((step) => step.state === 'current')
   const summary = stop
-    ? `dừng ở ${stop.label}`
+    ? t('dừng ở {label}', { label: stop.label })
     : current
-      ? `đang ở ${current.label}`
-      : 'hoàn thành'
+      ? t('đang ở {label}', { label: current.label })
+      : t('hoàn thành')
   return (
     <span
       role="img"
-      aria-label={`Tiến trình ${done}/${steps.length}: ${summary}`}
+      aria-label={t('Tiến trình {done}/{count}: {summary}', {
+        done,
+        count: steps.length,
+        summary,
+      })}
       title={summary}
       className="inline-flex items-center gap-1"
     >
@@ -991,11 +1027,11 @@ function CheckoutQr({ url, size }: { url: string; size: number }) {
           value={url}
           size={size}
           level="M"
-          title="Mã QR trang thanh toán VNPAY"
+          title={t('Mã QR trang thanh toán VNPAY')}
         />
       </div>
       <figcaption className="text-center text-[0.7rem] text-muted-foreground">
-        Quét để mở VNPAY
+        {t('Quét để mở VNPAY')}
       </figcaption>
     </figure>
   )
@@ -1006,7 +1042,7 @@ function CheckoutLink({ url }: { url: string }) {
     <ShadcnButton asChild>
       <a href={url} target="_blank" rel="noreferrer">
         <ExternalLink className="size-4" aria-hidden="true" />
-        Mở trang thanh toán
+        {t('Mở trang thanh toán')}
       </a>
     </ShadcnButton>
   )
@@ -1027,7 +1063,7 @@ function CheckoutActions({ url }: { url: string }) {
       <CheckoutLink url={url} />
       <ShadcnButton type="button" variant="outline" onClick={() => void copy()}>
         <Copy className="size-4" aria-hidden="true" />
-        {copied ? 'Đã sao chép' : 'Sao chép liên kết'}
+        {copied ? t('Đã sao chép') : t('Sao chép liên kết')}
       </ShadcnButton>
     </div>
   )
@@ -1045,30 +1081,31 @@ const STATUS_VIEWS: Record<
 > = {
   PENDING: {
     icon: <Clock3 />,
-    title: 'Đang chờ cổng thanh toán xác nhận',
-    description:
+    title: t('Đang chờ cổng thanh toán xác nhận'),
+    description: t(
       'Việc quay lại từ trang VNPAY không có nghĩa là đã thanh toán. Chỉ ghi nhận khi cổng gửi xác nhận hợp lệ.',
+    ),
     tone: 'border-warning/30 bg-warning/8',
     iconTone: 'text-warning',
   },
   SUCCESS: {
     icon: <CircleCheck />,
-    title: 'Đã ghi nhận thanh toán',
-    description: 'Cổng đã xác nhận; phiếu thu được lập tự động.',
+    title: t('Đã ghi nhận thanh toán'),
+    description: t('Cổng đã xác nhận; phiếu thu được lập tự động.'),
     tone: 'border-success/30 bg-success/8',
     iconTone: 'text-success',
   },
   FAILED: {
     icon: <CircleX />,
-    title: 'Thanh toán không thành công',
-    description: 'Không có tiền được ghi nhận. Có thể tạo giao dịch mới.',
+    title: t('Thanh toán không thành công'),
+    description: t('Không có tiền được ghi nhận. Có thể tạo giao dịch mới.'),
     tone: 'border-destructive/30 bg-destructive/8',
     iconTone: 'text-destructive',
   },
   EXPIRED: {
     icon: <TimerOff />,
-    title: 'Liên kết thanh toán đã hết hạn',
-    description: 'Không có tiền được ghi nhận. Tạo giao dịch mới nếu cần.',
+    title: t('Liên kết thanh toán đã hết hạn'),
+    description: t('Không có tiền được ghi nhận. Tạo giao dịch mới nếu cần.'),
     tone: 'border-border bg-muted/60',
     iconTone: 'text-muted-foreground',
   },
@@ -1108,8 +1145,10 @@ function PaymentStatusPanel({
           <p className="text-sm text-foreground/75">{view.description}</p>
         </div>
       </div>
-      <div className="shrink-0 sm:text-right">
-        <p className="text-xs font-medium text-muted-foreground">Số tiền</p>
+      <div className="shrink-0 sm:text-end">
+        <p className="text-xs font-medium text-muted-foreground">
+          {t('Số tiền')}
+        </p>
         <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">
           {amount}
         </p>

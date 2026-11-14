@@ -48,6 +48,7 @@ import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { Balance } from './Balance'
 import { SourceStatement } from './SourceStatement'
 import { agingBuckets, limitUsage, usageBuckets } from './statementModel'
+import { t } from '@/lib/i18n/core'
 
 /** Server sort enum for GET /receivables (default -currentDebt). */
 const DEFAULT_SORT = '-currentDebt'
@@ -71,10 +72,10 @@ function usageTone(usage: number): string {
 }
 
 const totalLabels: Record<string, string> = {
-  currentDebt: 'Dư nợ',
-  currentCredit: 'Dư có',
-  reservedCredit: 'Dư có giữ chỗ',
-  availableCredit: 'Dư có khả dụng',
+  currentDebt: t('Dư nợ'),
+  currentCredit: t('Dư có'),
+  reservedCredit: t('Dư có giữ chỗ'),
+  availableCredit: t('Dư có khả dụng'),
 }
 const totalIcons: Record<string, typeof Wallet> = {
   currentDebt: Wallet,
@@ -113,9 +114,11 @@ function Aging({ items }: { items: Row[] }) {
   const total = buckets.reduce((sum, bucket) => sum + bucket.amount, 0)
   if (total <= 0) return null
   return (
-    <div className="mb-4 space-y-2" aria-label="Tuổi nợ hóa đơn">
+    <div className="mb-4 space-y-2" aria-label={t('Tuổi nợ hóa đơn')}>
       <p className="text-xs text-muted-foreground">
-        Tuổi nợ (tính trên {items.length} hóa đơn đang hiển thị)
+        {t('Tuổi nợ (tính trên {count} hóa đơn đang hiển thị)', {
+          count: items.length,
+        })}
       </p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {buckets.map((bucket, index) => (
@@ -141,7 +144,10 @@ function Aging({ items }: { items: Row[] }) {
               />
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {bucket.count} hóa đơn · {formatPercent(bucket.amount / total)}
+              {t('{count} hóa đơn · {value}', {
+                count: bucket.count,
+                value: formatPercent(bucket.amount / total),
+              })}
             </p>
           </li>
         ))}
@@ -161,34 +167,34 @@ function Invoices({ agencyId }: { agencyId: string }) {
   )
   return (
     <SectionCard
-      title="Số dư hóa đơn"
-      description="Phiếu xuất còn nợ."
+      title={t('Số dư hóa đơn')}
+      description={t('Phiếu xuất còn nợ.')}
       icon={<FileText />}
     >
       {list.error && <Alert type="error">{list.error}</Alert>}
       {!list.loading && !list.error && <Aging items={list.items} />}
       <div className="overflow-hidden rounded-lg border">
         {list.loading ? (
-          <TableSkeleton rows={3} label="Đang tải hóa đơn..." />
+          <TableSkeleton rows={3} label={t('Đang tải hóa đơn...')} />
         ) : !list.error && !list.items.length ? (
           <p className="p-4 text-sm text-muted-foreground">
-            Không có hóa đơn còn số dư.
+            {t('Không có hóa đơn còn số dư.')}
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <Table caption="Số dư hóa đơn">
+            <Table caption={t('Số dư hóa đơn')}>
               <thead>
                 <tr>
-                  <th scope="col">Phiếu xuất</th>
+                  <th scope="col">{t('Phiếu xuất')}</th>
                   <SortableHeader
                     field="businessDate"
                     sort={sorter.sort}
                     onSort={onSort}
                   >
-                    Ngày
+                    {t('Ngày')}
                   </SortableHeader>
                   <th scope="col" className="cell-number">
-                    Tổng tiền
+                    {t('Tổng tiền')}
                   </th>
                   <SortableHeader
                     field="outstandingAmount"
@@ -197,9 +203,9 @@ function Invoices({ agencyId }: { agencyId: string }) {
                     align="right"
                     firstDirection="desc"
                   >
-                    Còn nợ
+                    {t('Còn nợ')}
                   </SortableHeader>
-                  <th scope="col">Tình trạng</th>
+                  <th scope="col">{t('Tình trạng')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,24 +271,26 @@ export function ReceivablesPage() {
   return (
     <div className="page-container space-y-6">
       <PageHeader
-        eyebrow="Tài chính"
-        title="Công nợ đại lý"
-        description="Dư nợ, hạn mức còn lại, tuổi nợ và sổ công nợ theo đại lý."
+        eyebrow={t('Tài chính')}
+        title={t('Công nợ đại lý')}
+        description={t(
+          'Dư nợ, hạn mức còn lại, tuổi nợ và sổ công nợ theo đại lý.',
+        )}
         className="mb-0"
       />
       <FilterBar>
         <Input
-          label="Tìm theo mã hoặc tên đại lý"
-          placeholder="VD: DL-101, Minh Phát…"
+          label={t('Tìm theo mã hoặc tên đại lý')}
+          placeholder={t('VD: DL-101, Minh Phát…')}
           value={q}
           onChange={(event) => setQ(event.target.value)}
         />
       </FilterBar>
       {list.error && <Alert type="error">{list.error}</Alert>}
       {totals.length > 0 && (
-        <section aria-label="Tổng theo bộ lọc" className="space-y-2">
+        <section aria-label={t('Tổng theo bộ lọc')} className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">
-            Tổng theo bộ lọc
+            {t('Tổng theo bộ lọc')}
           </h2>
           <Stagger className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {totals.map(([key, value]) => {
@@ -306,18 +314,21 @@ export function ReceivablesPage() {
       {!list.loading && list.items.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <ChartCard
-            title="Dư nợ và hạn mức còn lại"
-            description={`Trang hiện tại · ${bars.length} đại lý đầu theo thứ tự đang sắp xếp`}
+            title={t('Dư nợ và hạn mức còn lại')}
+            description={t(
+              'Trang hiện tại · {count} đại lý đầu theo thứ tự đang sắp xếp',
+              { count: bars.length },
+            )}
             table={
-              <Table caption="Bảng dư nợ và hạn mức còn lại">
+              <Table caption={t('Bảng dư nợ và hạn mức còn lại')}>
                 <thead>
                   <tr>
-                    <th scope="col">Đại lý</th>
+                    <th scope="col">{t('Đại lý')}</th>
                     <th scope="col" className="cell-number">
-                      Dư nợ
+                      {t('Dư nợ')}
                     </th>
                     <th scope="col" className="cell-number">
-                      Còn lại
+                      {t('Còn lại')}
                     </th>
                   </tr>
                 </thead>
@@ -343,18 +354,20 @@ export function ReceivablesPage() {
               stacked
               height={220}
               series={[
-                { key: 'debt', label: 'Dư nợ', color: 'var(--chart-1)' },
+                { key: 'debt', label: t('Dư nợ'), color: 'var(--chart-1)' },
                 {
                   key: 'remaining',
-                  label: 'Hạn mức còn lại',
+                  label: t('Hạn mức còn lại'),
                   color: 'var(--chart-2)',
                 },
               ]}
             />
           </ChartCard>
           <ChartCard
-            title="Mức dùng hạn mức"
-            description={`Trang hiện tại · ${list.items.length} đại lý`}
+            title={t('Mức dùng hạn mức')}
+            description={t('Trang hiện tại · {count} đại lý', {
+              count: list.items.length,
+            })}
           >
             <div className="flex items-center gap-3">
               <DonutChart
@@ -365,7 +378,7 @@ export function ReceivablesPage() {
                   color: bucket.color,
                 }))}
                 centerValue={String(list.items.length)}
-                centerLabel="đại lý"
+                centerLabel={t('đại lý')}
                 valueFormatter={(value) => String(Math.round(value))}
                 height={150}
                 className="max-w-36 shrink-0"
@@ -383,18 +396,20 @@ export function ReceivablesPage() {
           </ChartCard>
         </div>
       )}
-      <TableCard title="Công nợ theo đại lý" icon={<Wallet />}>
+      <TableCard title={t('Công nợ theo đại lý')} icon={<Wallet />}>
         {list.loading ? (
-          <TableSkeleton label="Đang tải công nợ..." />
+          <TableSkeleton label={t('Đang tải công nợ...')} />
         ) : !list.error && list.items.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title="Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm."
-              description="Thử tìm theo mã hoặc một phần tên đại lý."
+              title={t(
+                'Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm.',
+              )}
+              description={t('Thử tìm theo mã hoặc một phần tên đại lý.')}
             />
           </div>
         ) : (
-          <Table caption="Công nợ đại lý">
+          <Table caption={t('Công nợ đại lý')}>
             <thead>
               <tr>
                 <SortableHeader
@@ -402,9 +417,9 @@ export function ReceivablesPage() {
                   sort={sorter.sort}
                   onSort={onSort}
                 >
-                  Mã đại lý
+                  {t('Mã đại lý')}
                 </SortableHeader>
-                <th scope="col">Tên đại lý</th>
+                <th scope="col">{t('Tên đại lý')}</th>
                 <SortableHeader
                   field="currentDebt"
                   sort={sorter.sort}
@@ -412,7 +427,7 @@ export function ReceivablesPage() {
                   align="right"
                   firstDirection="desc"
                 >
-                  Dư nợ
+                  {t('Dư nợ')}
                 </SortableHeader>
                 <SortableHeader
                   field="remainingCreditLimit"
@@ -421,13 +436,13 @@ export function ReceivablesPage() {
                   align="right"
                   firstDirection="desc"
                 >
-                  Hạn mức còn lại
+                  {t('Hạn mức còn lại')}
                 </SortableHeader>
                 <th scope="col" className="min-w-36">
-                  Sử dụng hạn mức
+                  {t('Sử dụng hạn mức')}
                 </th>
                 <th scope="col" className="cell-actions">
-                  Thao tác
+                  {t('Thao tác')}
                 </th>
               </tr>
             </thead>
@@ -459,7 +474,9 @@ export function ReceivablesPage() {
                           <Progress
                             value={Math.min(100, usage * 100)}
                             className={cn('h-1.5 w-20', usageTone(usage))}
-                            aria-label={`Sử dụng hạn mức ${String(item.agencyCode)}`}
+                            aria-label={t('Sử dụng hạn mức {agencyCode}', {
+                              agencyCode: String(item.agencyCode),
+                            })}
                           />
                           <span className="text-xs tabular-nums text-muted-foreground">
                             {formatPercent(usage)}
@@ -471,10 +488,12 @@ export function ReceivablesPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={`Chi tiết công nợ ${String(item.agencyCode)}`}
+                        aria-label={t('Chi tiết công nợ {agencyCode}', {
+                          agencyCode: String(item.agencyCode),
+                        })}
                         onClick={open}
                       >
-                        Chi tiết
+                        {t('Chi tiết')}
                       </Button>
                     </td>
                   </tr>
@@ -495,7 +514,9 @@ export function ReceivablesPage() {
       <Modal
         isOpen={!!selected}
         onClose={() => setSelected('')}
-        title={`Chi tiết công nợ ${selectedName || `#${selected}`}`}
+        title={t('Chi tiết công nợ {value}', {
+          value: selectedName || `#${selected}`,
+        })}
         maxWidth="xl"
       >
         {selected && (
@@ -509,7 +530,7 @@ export function ReceivablesPage() {
                   icon={<BookOpenText className="size-4" />}
                   onClick={() => setStatement(true)}
                 >
-                  Mở sổ công nợ
+                  {t('Mở sổ công nợ')}
                 </Button>
               </div>
             )}
@@ -517,13 +538,13 @@ export function ReceivablesPage() {
               <SourceStatement
                 key={`statement-${selected}`}
                 path={`/agencies/${selected}/receivable-entries`}
-                title="Sổ công nợ"
+                title={t('Sổ công nợ')}
                 opening="openingDebt"
                 closing="closingDebt"
                 chart
-                chartTitle="Diễn biến dư nợ"
-                increaseLabel="Tăng nợ"
-                decreaseLabel="Giảm nợ"
+                chartTitle={t('Diễn biến dư nợ')}
+                increaseLabel={t('Tăng nợ')}
+                decreaseLabel={t('Giảm nợ')}
               />
             )}
           </div>

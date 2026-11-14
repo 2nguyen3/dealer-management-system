@@ -1,5 +1,6 @@
 import { toNumber } from '@/lib/chart'
 import type { FinancialDocument, Row } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 /** Visual state of one lifecycle step. Derived only from server data. */
 export type FlowState =
@@ -59,16 +60,16 @@ export function documentLifecycle(
   const { status } = item
   if (variant === 'refund') {
     const labels = [
-      ['draft', 'Lập yêu cầu'],
-      ['reserve', 'Giữ chỗ quỹ'],
-      ['payout', 'Chi tiền cho đại lý'],
-      ['done', 'Hoàn tất'],
+      ['draft', t('Lập yêu cầu')],
+      ['reserve', t('Giữ chỗ quỹ')],
+      ['payout', t('Chi tiền cho đại lý')],
+      ['done', t('Hoàn tất')],
     ] as const
     if (status === 'POSTED')
       return build(labels, ['done', 'done', 'done', 'done'])
     if (status === 'CANCELLED')
       return build(labels, ['done', 'failed', 'skipped', 'skipped'], {
-        1: 'Phiếu bị hủy',
+        1: t('Phiếu bị hủy'),
       })
     const reserved =
       typeof item.reservedAmount === 'string' &&
@@ -78,32 +79,34 @@ export function documentLifecycle(
     const attempt = item.latestAttemptState
     if (attempt === 'FAILED')
       return build(labels, ['done', 'done', 'failed', 'upcoming'], {
-        2: 'Lần hoàn trực tuyến thất bại',
+        2: t('Lần hoàn trực tuyến thất bại'),
       })
     return build(labels, ['done', 'done', 'current', 'upcoming'], {
       2:
         attempt === 'PENDING' || attempt === 'UNKNOWN'
-          ? 'Chờ cổng xác nhận'
+          ? t('Chờ cổng xác nhận')
           : undefined,
     })
   }
   const labels =
     variant === 'credit'
       ? ([
-          ['draft', 'Lập nháp'],
-          ['post', 'Bù trừ dư có'],
-          ['debt', 'Công nợ giảm'],
+          ['draft', t('Lập nháp')],
+          ['post', t('Bù trừ dư có')],
+          ['debt', t('Công nợ giảm')],
         ] as const)
       : ([
-          ['draft', 'Lập nháp'],
-          ['post', 'Ghi sổ'],
-          ['debt', 'Công nợ cập nhật'],
+          ['draft', t('Lập nháp')],
+          ['post', t('Ghi sổ')],
+          ['debt', t('Công nợ cập nhật')],
         ] as const)
   if (status === 'POSTED') return build(labels, SETTLED)
   if (status === 'CANCELLED')
-    return build(labels, ['done', 'failed', 'skipped'], { 1: 'Phiếu bị hủy' })
+    return build(labels, ['done', 'failed', 'skipped'], {
+      1: t('Phiếu bị hủy'),
+    })
   return build(labels, ['done', 'current', 'upcoming'], {
-    1: status === 'PENDING' ? 'Đang xử lý' : undefined,
+    1: status === 'PENDING' ? t('Đang xử lý') : undefined,
   })
 }
 
@@ -114,16 +117,16 @@ export function documentLifecycle(
  */
 export function upfrontLifecycle(state: unknown): FlowStep[] | null {
   const labels = [
-    ['verify', 'Xác minh tiền'],
-    ['issue', 'Phiếu xuất ghi sổ'],
-    ['receipt', 'Lập phiếu thu'],
+    ['verify', t('Xác minh tiền')],
+    ['issue', t('Phiếu xuất ghi sổ')],
+    ['receipt', t('Lập phiếu thu')],
   ] as const
   if (state === 'VERIFIED')
     return build(labels, ['done', 'current', 'upcoming'])
   if (state === 'CONSUMED') return build(labels, SETTLED)
   if (state === 'RECEIVED_SEPARATELY')
     return build(labels, ['done', 'skipped', 'done'], {
-      1: 'Thu riêng, không gắn phiếu xuất',
+      1: t('Thu riêng, không gắn phiếu xuất'),
     })
   return null
 }

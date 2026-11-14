@@ -1,6 +1,7 @@
 import { toNumber } from '@/lib/chart'
 import { formatDate } from '@/lib/formatters'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 export interface BalancePoint {
   key: string
@@ -39,10 +40,10 @@ export function agingBuckets(
   today: string,
 ): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { key: '0-30', label: '0–30 ngày', amount: 0, count: 0 },
-    { key: '31-60', label: '31–60 ngày', amount: 0, count: 0 },
-    { key: '61-90', label: '61–90 ngày', amount: 0, count: 0 },
-    { key: '90+', label: 'Trên 90 ngày', amount: 0, count: 0 },
+    { key: '0-30', label: t('0–30 ngày'), amount: 0, count: 0 },
+    { key: '31-60', label: t('31–60 ngày'), amount: 0, count: 0 },
+    { key: '61-90', label: t('61–90 ngày'), amount: 0, count: 0 },
+    { key: '90+', label: t('Trên 90 ngày'), amount: 0, count: 0 },
   ]
   const now = Date.parse(`${today}T00:00:00Z`)
   for (const invoice of invoices) {
@@ -83,11 +84,11 @@ export function usageBuckets(
   rows: { currentDebt: unknown; maxDebt: unknown }[],
 ): UsageBucket[] {
   const buckets: UsageBucket[] = [
-    { key: 'low', label: 'Dưới 50%', count: 0 },
+    { key: 'low', label: t('Dưới 50%'), count: 0 },
     { key: 'mid', label: '50–80%', count: 0 },
     { key: 'high', label: '80–100%', count: 0 },
-    { key: 'over', label: 'Vượt hạn mức', count: 0 },
-    { key: 'none', label: 'Không giới hạn', count: 0 },
+    { key: 'over', label: t('Vượt hạn mức'), count: 0 },
+    { key: 'none', label: t('Không giới hạn'), count: 0 },
   ]
   for (const row of rows) {
     const usage = limitUsage(row.currentDebt, row.maxDebt)

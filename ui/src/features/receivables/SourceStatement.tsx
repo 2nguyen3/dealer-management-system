@@ -31,6 +31,7 @@ import {
 import { TableSkeleton } from '../payment_receipts/financeUi'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { balanceSeries, type BalancePoint } from './statementModel'
+import { t } from '@/lib/i18n/core'
 
 /** Inventory statements carry quantities; receivable/credit ones carry money. */
 function amount(value: unknown, quantity: boolean): string {
@@ -61,7 +62,7 @@ function BalanceChart({
   quantity: boolean
 }) {
   const config = {
-    balance: { label: 'Số dư sau', color: 'var(--chart-1)' },
+    balance: { label: t('Số dư sau'), color: 'var(--chart-1)' },
   } satisfies ChartConfig
   const fillId = `balance-fill-${useId().replace(/:/g, '')}`
   const label = (raw: string) =>
@@ -69,21 +70,23 @@ function BalanceChart({
   return (
     <ChartCard
       title={title}
-      description="Số dư sau mỗi dòng còn hiệu lực trên trang hiện tại."
+      description={t('Số dư sau mỗi dòng còn hiệu lực trên trang hiện tại.')}
       isEmpty={points.length < 2}
       empty={
         <p className="flex h-32 items-center justify-center text-center text-sm text-muted-foreground">
-          Cần ít nhất hai dòng còn hiệu lực để vẽ diễn biến số dư.
+          {t('Cần ít nhất hai dòng còn hiệu lực để vẽ diễn biến số dư.')}
         </p>
       }
       table={
-        <Table caption={`Bảng số liệu ${title.toLowerCase()}`}>
+        <Table
+          caption={t('Bảng số liệu {title}', { title: title.toLowerCase() })}
+        >
           <thead>
             <tr>
-              <th scope="col">Ngày</th>
-              <th scope="col">Chứng từ</th>
+              <th scope="col">{t('Ngày')}</th>
+              <th scope="col">{t('Chứng từ')}</th>
               <th scope="col" className="cell-number">
-                Số dư sau
+                {t('Số dư sau')}
               </th>
             </tr>
           </thead>
@@ -155,7 +158,9 @@ function BalanceChart({
                   const point = item.payload as BalancePoint
                   return (
                     <div className="flex w-full items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Số dư sau</span>
+                      <span className="text-muted-foreground">
+                        {t('Số dư sau')}
+                      </span>
                       <span className="font-medium tabular-nums">
                         {label(point.raw)}
                       </span>
@@ -187,9 +192,9 @@ export function SourceStatement({
   opening,
   closing,
   chart = false,
-  chartTitle = 'Diễn biến số dư',
-  increaseLabel = 'Tăng',
-  decreaseLabel = 'Giảm',
+  chartTitle = t('Diễn biến số dư'),
+  increaseLabel = t('Tăng'),
+  decreaseLabel = t('Giảm'),
 }: {
   path: string
   title: string
@@ -223,25 +228,25 @@ export function SourceStatement({
         className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
       >
         <DateField
-          label="Từ ngày"
+          label={t('Từ ngày')}
           value={fromDate}
           onChange={setFromDate}
           max={toDate || undefined}
         />
         <DateField
-          label="Đến ngày"
+          label={t('Đến ngày')}
           value={toDate}
           onChange={setToDate}
           min={fromDate || undefined}
           error={range.error || undefined}
         />
         <Select
-          label="Hiệu lực"
+          label={t('Hiệu lực')}
           value={effectiveOnly}
           onChange={(event) => setEffectiveOnly(event.target.value)}
           options={[
-            { value: 'true', label: 'Còn hiệu lực' },
-            { value: 'false', label: 'Gồm dòng đảo' },
+            { value: 'true', label: t('Còn hiệu lực') },
+            { value: 'false', label: t('Gồm dòng đảo') },
           ]}
         />
         <Button
@@ -249,27 +254,27 @@ export function SourceStatement({
           icon={<RefreshCw className="size-4" />}
           onClick={list.reload}
         >
-          Tải lại
+          {t('Tải lại')}
         </Button>
       </div>
       {list.error && <Alert type="error">{list.error}</Alert>}
       {list.metadata && (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-lg border bg-muted/40 px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Đầu kỳ</dt>
-            <dd className="cell-number text-left text-base font-semibold">
+            <dt className="text-xs text-muted-foreground">{t('Đầu kỳ')}</dt>
+            <dd className="cell-number text-start text-base font-semibold">
               {amount(list.metadata[opening], quantity)}
             </dd>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2">
-            <dt className="text-xs text-muted-foreground">Cuối kỳ</dt>
-            <dd className="cell-number text-left text-base font-semibold">
+            <dt className="text-xs text-muted-foreground">{t('Cuối kỳ')}</dt>
+            <dd className="cell-number text-start text-base font-semibold">
               {amount(list.metadata[closing], quantity)}
             </dd>
           </div>
           {list.metadata.unitId !== undefined && (
             <div className="rounded-lg border bg-muted/40 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">Đơn vị</dt>
+              <dt className="text-xs text-muted-foreground">{t('Đơn vị')}</dt>
               <dd className="text-base font-semibold">
                 #{String(list.metadata.unitId)}
               </dd>
@@ -286,12 +291,12 @@ export function SourceStatement({
       )}
       <div className="overflow-hidden rounded-lg border">
         {list.loading ? (
-          <TableSkeleton rows={4} label="Đang tải sổ..." />
+          <TableSkeleton rows={4} label={t('Đang tải sổ...')} />
         ) : list.items.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title="Không có biến động trong bộ lọc."
-              description="Thử đổi khoảng ngày hoặc chọn “Gồm dòng đảo”."
+              title={t('Không có biến động trong bộ lọc.')}
+              description={t('Thử đổi khoảng ngày hoặc chọn “Gồm dòng đảo”.')}
             />
           </div>
         ) : (
@@ -299,9 +304,9 @@ export function SourceStatement({
             <Table caption={title}>
               <thead>
                 <tr>
-                  <th scope="col">Ngày nghiệp vụ</th>
-                  <th scope="col">Chứng từ nguồn</th>
-                  {showKind && <th scope="col">Loại</th>}
+                  <th scope="col">{t('Ngày nghiệp vụ')}</th>
+                  <th scope="col">{t('Chứng từ nguồn')}</th>
+                  {showKind && <th scope="col">{t('Loại')}</th>}
                   <th scope="col" className="cell-number">
                     {increaseLabel}
                   </th>
@@ -309,9 +314,9 @@ export function SourceStatement({
                     {decreaseLabel}
                   </th>
                   <th scope="col" className="cell-number">
-                    Số dư sau
+                    {t('Số dư sau')}
                   </th>
-                  <th scope="col">Hiệu lực</th>
+                  <th scope="col">{t('Hiệu lực')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -331,7 +336,9 @@ export function SourceStatement({
                         {String(item.sourceDocumentCode)}
                         {item.sourceRevisionNo !== undefined && (
                           <div className="text-xs text-muted-foreground">
-                            Phiên bản {String(item.sourceRevisionNo)}
+                            {t('Phiên bản {sourceRevisionNo}', {
+                              sourceRevisionNo: String(item.sourceRevisionNo),
+                            })}
                           </div>
                         )}
                       </td>
@@ -349,9 +356,9 @@ export function SourceStatement({
                       </td>
                       <td>
                         {item.isEffective ? (
-                          <Badge variant="success">Hiệu lực</Badge>
+                          <Badge variant="success">{t('Hiệu lực')}</Badge>
                         ) : (
-                          <Badge variant="neutral">Đã đảo</Badge>
+                          <Badge variant="neutral">{t('Đã đảo')}</Badge>
                         )}
                       </td>
                     </tr>

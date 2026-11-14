@@ -62,6 +62,10 @@ import {
   TableCard,
   TableSkeleton,
 } from './financeUi'
+import { NextActionCallout } from '@/components/guide/NextActionCallout'
+import { notifyNextStep } from '@/components/guide/notifyNextStep'
+import { t } from '@/lib/i18n/core'
+import { financialNext, financialNotice } from '../guide/workflows'
 import { documentLifecycle, groupTotals } from './flow'
 import { FlowSteps } from './FlowSteps'
 import { PageSummary } from './PageSummary'
@@ -94,10 +98,10 @@ export function FinancialDocuments({
       ? '/credit-applications'
       : '/payment-receipts'
   const title = refund
-    ? 'Hoàn tiền đại lý'
+    ? t('Hoàn tiền đại lý')
     : credit
-      ? 'Bù trừ dư có'
-      : 'Phiếu thu tiền'
+      ? t('Bù trừ dư có')
+      : t('Phiếu thu tiền')
   const canPrepare = hasPermission(
     refund
       ? 'cash.refund.prepare'
@@ -110,10 +114,10 @@ export function FinancialDocuments({
   )
   const canCancel = hasPermission('documents.cancel') && (!refund || canPost)
   const description = refund
-    ? 'Lập yêu cầu → giữ chỗ quỹ → chi tiền → hoàn tất.'
+    ? t('Lập yêu cầu → giữ chỗ quỹ → chi tiền → hoàn tất.')
     : credit
-      ? 'Lập nháp → bù trừ dư có → công nợ giảm. Không phát sinh tiền mặt.'
-      : 'Lập nháp → ghi sổ → công nợ cập nhật.'
+      ? t('Lập nháp → bù trừ dư có → công nợ giảm. Không phát sinh tiền mặt.')
+      : t('Lập nháp → ghi sổ → công nợ cập nhật.')
   const HeaderIcon = refund ? Undo2 : credit ? ArrowRightLeft : Banknote
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
@@ -209,7 +213,7 @@ export function FinancialDocuments({
         note: note.trim() || null,
       }
       if (refund && !reason.trim())
-        throw new Error('Vui lòng nhập lý do hoàn tiền.')
+        throw new Error(t('Vui lòng nhập lý do hoàn tiền.'))
       setBusy(true)
       const response = await intent.current.send<unknown>(path, {
         method: 'POST',
@@ -217,7 +221,14 @@ export function FinancialDocuments({
       })
       const created = record(response.data)
       id(created.id)
-      setNotice('Đã tạo bản nháp. Chưa ghi nhận tiền hoặc thay đổi công nợ.')
+      setNotice(t('Đã tạo bản nháp. Chưa ghi nhận tiền hoặc thay đổi công nợ.'))
+      notifyNextStep(
+        financialNotice(
+          kind,
+          'create',
+          typeof created.code === 'string' ? created.code : '',
+        ),
+      )
       setCreateOpen(false)
       setSelectedId(id(created.id))
       refresh()
@@ -247,7 +258,14 @@ export function FinancialDocuments({
           ...(match ? { ifMatch: detail.etag } : {}),
         },
       )
-      setNotice('Đã thực hiện thao tác. Đang cập nhật trạng thái mới nhất.')
+      setNotice(t('Đã thực hiện thao tác. Đang cập nhật trạng thái mới nhất.'))
+      notifyNextStep(
+        financialNotice(
+          kind,
+          actionPath ? 'reconcile' : name,
+          detail.item.code,
+        ),
+      )
       refresh()
     } catch (failure) {
       setError(message(failure))
@@ -342,7 +360,7 @@ export function FinancialDocuments({
   return (
     <div className="page-container space-y-6">
       <PageHeader
-        eyebrow="Tài chính"
+        eyebrow={t('Tài chính')}
         title={title}
         description={description}
         className="mb-0"
@@ -356,10 +374,10 @@ export function FinancialDocuments({
               }}
             >
               {refund
-                ? 'Lập yêu cầu hoàn tiền'
+                ? t('Lập yêu cầu hoàn tiền')
                 : credit
-                  ? 'Lập phiếu bù trừ'
-                  : 'Lập phiếu thu mới'}
+                  ? t('Lập phiếu bù trừ')
+                  : t('Lập phiếu thu mới')}
             </Button>
           )
         }
@@ -368,29 +386,29 @@ export function FinancialDocuments({
       {notice && <Alert type="success">{notice}</Alert>}
       {!list.loading && list.items.length > 0 && (
         <PageSummary
-          title="Tổng quan chứng từ"
-          noun="chứng từ"
+          title={t('Tổng quan chứng từ')}
+          noun={t('chứng từ')}
           total={list.items.length}
           groups={groups}
           kpis={[
             {
-              label: 'Tổng giá trị',
+              label: t('Tổng giá trị'),
               icon: <HeaderIcon />,
               value: formatCompactVND(pageAmount),
-              hint: `${list.items.length} chứng từ`,
+              hint: t('{count} chứng từ', { count: list.items.length }),
             },
             {
               label: refund
-                ? 'Giá trị đã hoàn'
+                ? t('Giá trị đã hoàn')
                 : credit
-                  ? 'Giá trị đã bù trừ'
-                  : 'Giá trị đã ghi sổ',
+                  ? t('Giá trị đã bù trừ')
+                  : t('Giá trị đã ghi sổ'),
               icon: <CircleDollarSign />,
               value: formatCompactVND(postedGroup?.amount ?? 0),
-              hint: `${postedGroup?.count ?? 0} chứng từ`,
+              hint: t('{count} chứng từ', { count: postedGroup?.count ?? 0 }),
             },
             {
-              label: 'Nháp chờ xử lý',
+              label: t('Nháp chờ xử lý'),
               icon: <FileClock />,
               value: <CountUp value={draftGroup?.count ?? 0} />,
               hint: formatCompactVND(draftGroup?.amount ?? 0),
@@ -400,40 +418,40 @@ export function FinancialDocuments({
       )}
       <FilterBar>
         <Input
-          label="Tìm chứng từ"
-          placeholder="Số phiếu, ghi chú…"
+          label={t('Tìm chứng từ')}
+          placeholder={t('Số phiếu, ghi chú…')}
           value={q}
           onChange={(event) => setQ(event.target.value)}
         />
         <EntityPicker
           resource="agencies"
-          label="Đại lý"
+          label={t('Đại lý')}
           value={agencyFilter}
           onChange={(value) => setAgencyFilter(value)}
-          placeholder="Tất cả đại lý"
+          placeholder={t('Tất cả đại lý')}
         />
         <Select
-          label="Trạng thái"
+          label={t('Trạng thái')}
           value={status}
           onChange={(event) => setStatus(event.target.value)}
-          options={enumOptions(DOCUMENT_STATUSES, statusLabel, 'Tất cả')}
+          options={enumOptions(DOCUMENT_STATUSES, statusLabel, t('Tất cả'))}
         />
         {kind === 'receipt' && (
           <Select
-            label="Hình thức"
+            label={t('Hình thức')}
             value={methodFilter}
             onChange={(event) => setMethodFilter(event.target.value)}
-            options={enumOptions(RECEIPT_METHODS, methodLabel, 'Tất cả')}
+            options={enumOptions(RECEIPT_METHODS, methodLabel, t('Tất cả'))}
           />
         )}
         <DateField
-          label="Từ ngày"
+          label={t('Từ ngày')}
           value={fromDate}
           onChange={setFromDate}
           max={toDate || undefined}
         />
         <DateField
-          label="Đến ngày"
+          label={t('Đến ngày')}
           value={toDate}
           onChange={setToDate}
           min={fromDate || undefined}
@@ -444,39 +462,41 @@ export function FinancialDocuments({
           icon={<RefreshCw className="size-4" />}
           onClick={list.reload}
         >
-          Tải lại
+          {t('Tải lại')}
         </Button>
       </FilterBar>
       {list.error && <Alert type="error">{list.error}</Alert>}
-      <TableCard title={`Danh sách ${title.toLowerCase()}`}>
+      <TableCard title={t('Danh sách {title}', { title: title.toLowerCase() })}>
         {list.loading ? (
-          <TableSkeleton label="Đang tải chứng từ..." />
+          <TableSkeleton label={t('Đang tải chứng từ...')} />
         ) : list.items.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title="Không có chứng từ phù hợp."
+              title={t('Không có chứng từ phù hợp.')}
               description={
                 filtered
-                  ? 'Thử bỏ bớt điều kiện lọc hoặc đổi khoảng ngày.'
-                  : 'Chưa có chứng từ nào được lập.'
+                  ? t('Thử bỏ bớt điều kiện lọc hoặc đổi khoảng ngày.')
+                  : t('Chưa có chứng từ nào được lập.')
               }
             />
           </div>
         ) : (
-          <Table caption={`Danh sách ${title.toLowerCase()}`}>
+          <Table
+            caption={t('Danh sách {title}', { title: title.toLowerCase() })}
+          >
             <thead>
               <tr>
-                <th scope="col">Số phiếu</th>
-                <th scope="col">Đại lý</th>
+                <th scope="col">{t('Số phiếu')}</th>
+                <th scope="col">{t('Đại lý')}</th>
                 <SortableHeader
                   field="businessDate"
                   sort={sorter.sort}
                   onSort={onSort}
                   firstDirection="desc"
                 >
-                  Ngày nghiệp vụ
+                  {t('Ngày nghiệp vụ')}
                 </SortableHeader>
-                {!credit && <th scope="col">Hình thức</th>}
+                {!credit && <th scope="col">{t('Hình thức')}</th>}
                 <SortableHeader
                   field="totalAmount"
                   sort={sorter.sort}
@@ -484,11 +504,11 @@ export function FinancialDocuments({
                   align="right"
                   firstDirection="desc"
                 >
-                  Số tiền
+                  {t('Số tiền')}
                 </SortableHeader>
-                <th scope="col">Trạng thái</th>
+                <th scope="col">{t('Trạng thái')}</th>
                 <th scope="col" className="cell-actions">
-                  Thao tác
+                  {t('Thao tác')}
                 </th>
               </tr>
             </thead>
@@ -522,7 +542,9 @@ export function FinancialDocuments({
                     <Button
                       size="sm"
                       variant="outline"
-                      aria-label={`Chi tiết ${String(row.code)}`}
+                      aria-label={t('Chi tiết {code}', {
+                        code: String(row.code),
+                      })}
                       onClick={() => {
                         setDetail(null)
                         setDetailError('')
@@ -531,7 +553,7 @@ export function FinancialDocuments({
                         setError('')
                       }}
                     >
-                      Chi tiết
+                      {t('Chi tiết')}
                     </Button>
                   </td>
                 </tr>
@@ -551,14 +573,14 @@ export function FinancialDocuments({
       <Modal
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}
-        title={refund ? 'Lập yêu cầu hoàn tiền' : title}
+        title={refund ? t('Lập yêu cầu hoàn tiền') : title}
       >
         <form onSubmit={create} className="space-y-4">
           {error && <Alert type="error">{error}</Alert>}
           {refund ? (
             <EntityPicker
               resource="payment-receipts"
-              label="Phiếu thu nguồn (đã ghi sổ)"
+              label={t('Phiếu thu nguồn (đã ghi sổ)')}
               value={originDocumentId}
               onChange={(value) => setOriginDocumentId(value)}
               params={
@@ -571,7 +593,7 @@ export function FinancialDocuments({
           ) : (
             <EntityPicker
               resource="agencies"
-              label="Đại lý"
+              label={t('Đại lý')}
               value={agencyId}
               onChange={(value) => setAgencyId(value)}
               required
@@ -579,15 +601,15 @@ export function FinancialDocuments({
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             <DateField
-              label="Ngày nghiệp vụ"
+              label={t('Ngày nghiệp vụ')}
               value={date}
               onChange={setDate}
               required
             />
             <Input
-              label="Số tiền (VND nguyên)"
+              label={t('Số tiền (VND nguyên)')}
               inputMode="numeric"
-              className="text-right tabular-nums"
+              className="text-end tabular-nums"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               helperText={
@@ -600,7 +622,7 @@ export function FinancialDocuments({
           </div>
           {!credit && (
             <Select
-              label="Phương thức"
+              label={t('Phương thức')}
               value={method}
               onChange={(event) => setMethod(event.target.value)}
               options={(refund
@@ -611,14 +633,14 @@ export function FinancialDocuments({
           )}
           {refund && (
             <Input
-              label="Lý do hoàn tiền"
+              label={t('Lý do hoàn tiền')}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               required
             />
           )}
           <Input
-            label="Ghi chú"
+            label={t('Ghi chú')}
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
@@ -628,10 +650,10 @@ export function FinancialDocuments({
               variant="outline"
               onClick={() => setCreateOpen(false)}
             >
-              Đóng
+              {t('Đóng')}
             </Button>
             <Button type="submit" isLoading={busy}>
-              Lưu bản nháp
+              {t('Lưu bản nháp')}
             </Button>
           </FormActions>
         </form>
@@ -642,7 +664,11 @@ export function FinancialDocuments({
           setSelectedId(null)
           setDetail(null)
         }}
-        title={item ? `Chi tiết ${item.code}` : 'Chi tiết chứng từ'}
+        title={
+          item
+            ? t('Chi tiết {code}', { code: item.code })
+            : t('Chi tiết chứng từ')
+        }
         maxWidth="lg"
       >
         {detailError && <Alert type="error">{detailError}</Alert>}
@@ -650,7 +676,7 @@ export function FinancialDocuments({
         {!item ? (
           detailError ? null : (
             <div role="status" className="space-y-3">
-              <span className="sr-only">Đang tải chi tiết...</span>
+              <span className="sr-only">{t('Đang tải chi tiết...')}</span>
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-40 w-full" />
             </div>
@@ -662,8 +688,10 @@ export function FinancialDocuments({
               code={item.code}
               badge={<StatusBadge status={item.status} />}
               amount={formatVND(item.currentRevision.totalAmount)}
-              amountLabel={refund ? 'Số tiền hoàn' : 'Số tiền'}
-              meta={`Ngày nghiệp vụ ${formatDate(item.currentRevision.businessDate)}`}
+              amountLabel={refund ? t('Số tiền hoàn') : t('Số tiền')}
+              meta={t('Ngày nghiệp vụ {businessDate}', {
+                businessDate: formatDate(item.currentRevision.businessDate),
+              })}
               tone={
                 item.status === 'POSTED'
                   ? 'success'
@@ -673,29 +701,42 @@ export function FinancialDocuments({
               }
             />
             <FlowSteps
-              label="Vòng đời chứng từ"
+              label={t('Vòng đời chứng từ')}
               steps={documentLifecycle(kind, item)}
+            />
+            <NextActionCallout
+              action={financialNext(kind, item, {
+                post: canPost,
+                manual: manualReceipt,
+                reserved,
+                unknown,
+              })}
             />
             <DetailList entries={detailEntries(item)} />
             {credit && (
               <Alert type="info">
-                Không phát sinh tiền mặt; trừ vào khoản nợ cũ nhất trước.
+                {t('Không phát sinh tiền mặt; trừ vào khoản nợ cũ nhất trước.')}
               </Alert>
             )}
             {!manualReceipt && (
               <Alert type="info">
-                Phiếu thu tự động/trực tuyến: chỉ xem, không ghi sổ thủ công.
+                {t(
+                  'Phiếu thu tự động/trực tuyến: chỉ xem, không ghi sổ thủ công.',
+                )}
               </Alert>
             )}
             {refund && unknown && (
               <Alert type="warning">
-                Lần hoàn tiền đang chờ kết quả, số tiền vẫn được giữ. Hãy đối
-                soát lần hoàn hiện tại thay vì hủy hoặc tạo lần mới.
+                {t(
+                  'Lần hoàn tiền đang chờ kết quả, số tiền vẫn được giữ. Hãy đối soát lần hoàn hiện tại thay vì hủy hoặc tạo lần mới.',
+                )}
               </Alert>
             )}
             {!detail?.etag && (
               <Alert type="warning">
-                Chưa thể thao tác trên phiếu này. Vui lòng tải lại chi tiết.
+                {t(
+                  'Chưa thể thao tác trên phiếu này. Vui lòng tải lại chi tiết.',
+                )}
               </Alert>
             )}
             <ActionBar>
@@ -708,7 +749,7 @@ export function FinancialDocuments({
                   setDetailVersion((value) => value + 1)
                 }}
               >
-                Tải lại chi tiết
+                {t('Tải lại chi tiết')}
               </Button>
               {canCancelItem && (
                 <Button
@@ -719,7 +760,7 @@ export function FinancialDocuments({
                     setConfirm('cancel')
                   }}
                 >
-                  Hủy phiếu
+                  {t('Hủy phiếu')}
                 </Button>
               )}
               {canReconcile && (
@@ -734,7 +775,7 @@ export function FinancialDocuments({
                     )
                   }
                 >
-                  Đối soát lần thử hiện tại
+                  {t('Đối soát lần thử hiện tại')}
                 </Button>
               )}
               {canRequestOnline && (
@@ -742,7 +783,7 @@ export function FinancialDocuments({
                   disabled={!actionable}
                   onClick={() => setConfirm('online')}
                 >
-                  Yêu cầu hoàn trực tuyến
+                  {t('Yêu cầu hoàn trực tuyến')}
                 </Button>
               )}
               {canConfirmPaid && (
@@ -750,7 +791,7 @@ export function FinancialDocuments({
                   disabled={!actionable}
                   onClick={() => setConfirm('paid')}
                 >
-                  Xác nhận đã chi tiền
+                  {t('Xác nhận đã chi tiền')}
                 </Button>
               )}
               {canSubmitPost && (
@@ -758,7 +799,7 @@ export function FinancialDocuments({
                   disabled={!actionable}
                   onClick={() => setConfirm('post')}
                 >
-                  {refund ? 'Giữ chỗ quỹ' : 'Ghi sổ'}
+                  {refund ? t('Giữ chỗ quỹ') : t('Ghi sổ')}
                 </Button>
               )}
             </ActionBar>
@@ -770,13 +811,36 @@ export function FinancialDocuments({
           <ConfirmDialog
             isOpen={confirm === 'post'}
             onClose={() => setConfirm(null)}
-            title={refund ? 'Giữ chỗ quỹ hoàn tiền' : `Ghi sổ ${item.code}`}
+            title={
+              refund
+                ? t('Giữ chỗ quỹ hoàn tiền')
+                : t('Ghi sổ {code}', { code: item.code })
+            }
             description={
               refund
-                ? `Giữ ${formatVND(item.currentRevision.totalAmount)} cho yêu cầu hoàn tiền ${item.code}. Số tiền này sẽ không thể dùng cho việc khác cho tới khi hoàn tất hoặc hủy.`
-                : `Ghi sổ ${item.code} với số tiền ${formatVND(item.currentRevision.totalAmount)}. Công nợ của đại lý sẽ được cập nhật ngay.`
+                ? t(
+                    'Giữ {totalAmount} cho yêu cầu hoàn tiền {code}. Số tiền này sẽ không thể dùng cho việc khác cho tới khi hoàn tất hoặc hủy.',
+                    {
+                      totalAmount: formatVND(item.currentRevision.totalAmount),
+                      code: item.code,
+                    },
+                  )
+                : t(
+                    'Ghi sổ {code} với số tiền {totalAmount}. Công nợ của đại lý sẽ được cập nhật ngay. {value}',
+                    {
+                      code: item.code,
+                      totalAmount: formatVND(item.currentRevision.totalAmount),
+                      value: credit
+                        ? t(
+                            'Dư có của đại lý giảm; khoản bù trừ trừ vào hóa đơn (phiếu xuất) còn nợ cũ nhất trước.',
+                          )
+                        : t(
+                            'Tiền được phân bổ vào hóa đơn (phiếu xuất) còn nợ cũ nhất trước (FIFO); số tiền vượt công nợ hiện tại sẽ bị từ chối.',
+                          ),
+                    },
+                  )
             }
-            confirmLabel={refund ? 'Xác nhận giữ chỗ' : 'Xác nhận ghi sổ'}
+            confirmLabel={refund ? t('Xác nhận giữ chỗ') : t('Xác nhận ghi sổ')}
             busy={busy}
             disabled={!actionable}
             onConfirm={() => void action(refund ? 'submit' : 'post')}
@@ -784,9 +848,11 @@ export function FinancialDocuments({
           <ConfirmDialog
             isOpen={confirm === 'online'}
             onClose={() => setConfirm(null)}
-            title="Yêu cầu hoàn trực tuyến"
-            description="Gửi yêu cầu hoàn tiền tới cổng thanh toán. Kết quả chỉ được ghi nhận khi cổng xác nhận; hãy đối soát nếu kết quả chưa rõ."
-            confirmLabel="Gửi yêu cầu hoàn"
+            title={t('Yêu cầu hoàn trực tuyến')}
+            description={t(
+              'Gửi yêu cầu hoàn tiền tới cổng thanh toán. Kết quả chỉ được ghi nhận khi cổng xác nhận; hãy đối soát nếu kết quả chưa rõ.',
+            )}
+            confirmLabel={t('Gửi yêu cầu hoàn')}
             busy={busy}
             disabled={!actionable}
             onConfirm={() => void action('attempts')}
@@ -794,25 +860,28 @@ export function FinancialDocuments({
           <ConfirmDialog
             isOpen={confirm === 'paid'}
             onClose={() => setConfirm(null)}
-            title="Xác nhận đã chi tiền"
-            description={`Ghi nhận đã chi ${formatVND(item.currentRevision.totalAmount)} cho đại lý. Cần thời điểm chi thực tế và tham chiếu bằng chứng.`}
-            confirmLabel="Xác nhận đã chi tiền"
+            title={t('Xác nhận đã chi tiền')}
+            description={t(
+              'Ghi nhận đã chi {totalAmount} cho đại lý. Cần thời điểm chi thực tế và tham chiếu bằng chứng.',
+              { totalAmount: formatVND(item.currentRevision.totalAmount) },
+            )}
+            confirmLabel={t('Xác nhận đã chi tiền')}
             busy={busy}
             disabled={!actionable || !paidReady}
             onConfirm={confirmPaid}
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Thời điểm đã chi"
+                label={t('Thời điểm đã chi')}
                 type="datetime-local"
-                helperText="Giờ Việt Nam (GMT+7)"
+                helperText={t('Giờ Việt Nam (GMT+7)')}
                 value={paidAt}
                 onChange={(event) => setPaidAt(event.target.value)}
                 required
               />
               <Input
-                label="Tham chiếu bằng chứng chi tiền"
-                placeholder="Số phiếu chi, mã chuyển khoản…"
+                label={t('Tham chiếu bằng chứng chi tiền')}
+                placeholder={t('Số phiếu chi, mã chuyển khoản…')}
                 value={evidence}
                 onChange={(event) => setEvidence(event.target.value)}
                 required
@@ -822,16 +891,18 @@ export function FinancialDocuments({
           <ConfirmDialog
             isOpen={confirm === 'cancel'}
             onClose={() => setConfirm(null)}
-            title={`Hủy ${item.code}`}
-            description="Phiếu đã hủy không thể khôi phục. Các bút toán liên quan (nếu có) sẽ được đảo."
-            confirmLabel="Hủy phiếu"
+            title={t('Hủy {code}', { code: item.code })}
+            description={t(
+              'Phiếu đã hủy không thể khôi phục. Các bút toán liên quan (nếu có) sẽ được đảo.',
+            )}
+            confirmLabel={t('Hủy phiếu')}
             danger
             busy={busy}
             disabled={!actionable || !reason.trim()}
             onConfirm={() => void action('cancel', { reason: reason.trim() })}
           >
             <Input
-              label="Lý do hủy"
+              label={t('Lý do hủy')}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               required
@@ -846,30 +917,30 @@ export function FinancialDocuments({
 function detailEntries(item: FinancialDocument): DetailEntry[] {
   const revision = item.currentRevision
   const entries: DetailEntry[] = [
-    ['Loại chứng từ', kindLabel(item.kind)],
-    ['Đại lý', revision.agencySnapshot?.name ?? `#${item.agencyId}`],
+    [t('Loại chứng từ'), kindLabel(item.kind)],
+    [t('Đại lý'), revision.agencySnapshot?.name ?? `#${item.agencyId}`],
   ]
   if (revision.paymentMethod)
-    entries.push(['Hình thức', methodLabel(revision.paymentMethod)])
+    entries.push([t('Hình thức'), methodLabel(revision.paymentMethod)])
   if (item.receiptType)
-    entries.push(['Loại phiếu thu', receiptTypeLabel(item.receiptType)])
+    entries.push([t('Loại phiếu thu'), receiptTypeLabel(item.receiptType)])
   if (item.kind === 'REFUND') {
     if (item.originDocumentId)
-      entries.push(['Phiếu thu nguồn', `#${item.originDocumentId}`])
+      entries.push([t('Phiếu thu nguồn'), `#${item.originDocumentId}`])
     entries.push(
-      ['Đang giữ', formatVND(item.reservedAmount)],
-      ['Đã hoàn', formatVND(item.refundedAmount)],
+      [t('Đang giữ'), formatVND(item.reservedAmount)],
+      [t('Đã hoàn'), formatVND(item.refundedAmount)],
       [
-        'Lần hoàn gần nhất',
+        t('Lần hoàn gần nhất'),
         item.latestAttemptState ? (
           <StatusBadge key="attempt" status={item.latestAttemptState} />
         ) : (
-          'Chưa có'
+          t('Chưa có')
         ),
       ],
     )
-    if (revision.reason) entries.push(['Lý do hoàn tiền', revision.reason])
+    if (revision.reason) entries.push([t('Lý do hoàn tiền'), revision.reason])
   }
-  entries.push(['Ghi chú', revision.note ?? '—'])
+  entries.push([t('Ghi chú'), revision.note ?? '—'])
   return entries
 }

@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/shadcn/skeleton'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n/core'
 
 /** One-row slicer bar above a list; wraps on narrow screens. */
 export function FilterBar({
@@ -75,7 +76,7 @@ export function TableCard({
 /** Placeholder rows shown while a list loads. */
 export function TableSkeleton({
   rows = 5,
-  label = 'Đang tải dữ liệu...',
+  label = t('Đang tải dữ liệu...'),
 }: {
   rows?: number
   label?: string
@@ -142,7 +143,7 @@ export function SectionCard({
 export function DetailHeader({
   code,
   badge,
-  amountLabel = 'Số tiền',
+  amountLabel = t('Số tiền'),
   amount,
   meta,
   icon,
@@ -186,7 +187,7 @@ export function DetailHeader({
         </div>
       </div>
       {amount !== undefined && (
-        <div className="shrink-0 sm:text-right">
+        <div className="shrink-0 sm:text-end">
           <p className="text-xs font-medium text-muted-foreground">
             {amountLabel}
           </p>
@@ -250,7 +251,7 @@ export function ConfirmDialog({
         {children}
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" type="button" onClick={onClose}>
-            Quay lại
+            {t('Quay lại')}
           </Button>
           <Button
             type="button"
