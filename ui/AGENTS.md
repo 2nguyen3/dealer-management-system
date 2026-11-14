@@ -6,7 +6,9 @@ Features in `src/features/`: authentication, home, portal, guide, profile, dashb
 reports, agencies, products, agency_types, units, wards, business_rules, master_data,
 stock_receipts, stock_issues, payment_receipts, online_payments, document_history,
 users, user_groups, permissions, audit_logs, chatbot (placeholder, not built). The menu
-has 18 entries (`src/app/navigation.ts`) gated by the 22 backend function codes.
+has 14 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
+Catalogue (agency types/units/rules) and Users & Permissions (users/groups/permissions)
+are one entry each with route-backed sub-tabs (`navigationSections`, `SectionTabs.tsx`).
 Removed (Bỏ theo yêu cầu 14/11/2026): receivables, stock_counts, upfront_payments,
 inventory, agency_credit, refunds, sales_returns, stock_adjustments,
 credit_applications, document_corrections. Portal decks saved in localStorage drop
