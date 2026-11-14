@@ -200,7 +200,7 @@ that scope with historical617-case whole-code coverage. E11/E12/R3 engineering g
 | Database | Supabase-hosted PostgreSQL, accessed directly from the backend. |
 | ORM/driver | SQLAlchemy 2 synchronous engines and sessions, with psycopg 3. |
 | Schema migrations | Alembic with reviewed SQL snapshots; metadata for future mapped models. |
-| Demo passwords | Argon2id via argon2-cffi; demo credentials are in the root README. |
+| Demo passwords | Argon2id via argon2-cffi; demo credentials are in `openwiki/cred/account/account.md`. |
 | Authentication | PyJWT HS256, opaque digest-only tokens, current PostgreSQL sessions/grants, TLS SMTP and one-process limiter. |
 | Tests | pytest, FastAPI `TestClient`, HTTPX, and standard-library mocks. |
 | Python quality | Ruff linting, import sorting, and formatting. |
@@ -466,7 +466,7 @@ per action and calling `DocumentService(embedded=True)` so every posting goes th
 the same rules and triggers as the API. A rerun prints "already present; verification
 only" and changes nothing. Data must look real: Vietnamese names, addresses, phones,
 office hours, no "mẫu/demo/test" words (checked by `verify --seeded`). Accounts and
-passwords are in `seed_data.USERS` and the root README; passwords use Argon2id.
+passwords are in `seed_data.USERS` and `openwiki/cred/account/account.md`; passwords use Argon2id.
 Never disable triggers or write balances directly.
 
 ## Docker deployment
