@@ -62,6 +62,22 @@ npm run preview
 `preview` serves a local production build; it is not a production server and
 does not provide the development API proxy. Use Docker Compose for a full-stack
 production-build smoke test. `npm run format` applies Prettier formatting.
+`npm run test:e2e` runs the browser smoke test against a running app.
+`npm run i18n:extract [-- out.json]` lists every interface message ID.
+
+## Interface languages
+
+Vietnamese is the source and default language; 23 more (English, Chinese ×2, Japanese,
+Korean, Thai, Indonesian, Malay, Filipino, Khmer, Lao, Burmese, Hindi, Bengali, Urdu,
+Arabic, Turkish, Russian, German, French, Spanish, Brazilian Portuguese, Italian) are chosen
+in **Hồ sơ → Giao diện** or on the login screen and saved as `agentra-locale`. Wrap every
+interface string in `t('…')` (or `msg('…')` for constants) from `@/lib/i18n/core`; the
+Vietnamese text is the message ID and `{name}` marks parameters. Catalogues live in
+`src/lib/i18n/locales/<code>.json` and load lazily; `src/test/i18n_catalogs.test.ts`
+fails when a catalogue misses a message, has an extra key or changes a placeholder.
+Business data (names, wards, notes, document codes) is never translated and money is
+always VND. Use logical CSS utilities (`ms/me/ps/pe/start/end/text-start`) so Arabic and
+Urdu render right-to-left. Terminology: `openwiki/frontend-design/plan/i18n/GLOSSARY.md`.
 
 ## Docker
 

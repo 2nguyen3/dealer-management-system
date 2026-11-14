@@ -171,7 +171,12 @@ chart wrappers (rounded bars, gradient areas, donut, radial rings, segmented met
 `src/components/charts/MebiusCharts.tsx`.
 Lists sort server-side through `SortableHeader`/`SortMenu` + `useSort`
 (`src/components/data/`) using only the contract `sort` enum of each endpoint.
-`/profile` shows identity, permission coverage and theme preference.
+`/profile` shows identity, permission coverage, theme, interface language and hint preferences.
+
+Interface text is translated (24 languages, Vietnamese source/default): wrap strings in
+`t()`/`msg()` from `src/lib/i18n/core.ts`, never translate business data, keep VND, and
+use logical CSS utilities for RTL. See `README.md` → Interface languages. Every page has a
+GUIDE button (`src/features/guide/`) whose content must cover each route.
 
 Charts follow the validated categorical palette `--chart-1..8` in fixed entity
 order (never cycled or rank-coloured), single-hue magnitude, no dual axes, a legend
