@@ -151,6 +151,15 @@ the complete document workbench; line and posted-cancel gates extend to R5.
 - [x] F32 `chatbot` — read-only queries/agency selection/clarification/unsupported/
   forbidden/unavailable states pass (`src/features/chatbot/`).
 
+### Wave F — Guidance, interface languages and Portal (2026-11-14)
+
+- [x] `workflow_guide` — GUIDE button on every page, workflow rails, locked-step reasons,
+  next-step toasts and the translated error catalogue ([plan](plan/workflow_guide/PLAN.md)).
+- [x] `i18n` — 24 interface languages, Vietnamese default, lazy catalogues, RTL `ar`/`ur`,
+  locale-aware formats with VND ([plan](plan/i18n/PLAN.md)).
+- [x] `portal` — "Cổng quản lý" with the favourites deck and the business-function
+  catalogue ([plan](plan/portal/PLAN.md)).
+
 ## 3. Deferred integration and full-module closure
 
 - [ ] Stock receipts close after F16 + F29 and M15 + M29; correction/cancel and
