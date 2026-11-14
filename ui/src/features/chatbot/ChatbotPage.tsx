@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/blocks/PageHeader'
 import { Stagger, StaggerItem } from '@/components/motion/Motion'
 import { Avatar, AvatarFallback } from '@/components/shadcn/avatar'
 import { Badge } from '@/components/ui/Badge'
+import { t } from '@/lib/i18n/core'
 
 /** Three softly bouncing dots: the assistant is "waiting" for its service. */
 function WaitingDots() {
@@ -37,12 +38,12 @@ export function ChatbotPage() {
     <div className="page-container space-y-6">
       <PageHeader
         eyebrow="Agentra / Assistant"
-        title="Trợ lý tra cứu"
+        title={t('Trợ lý tra cứu')}
         className="mb-0"
       />
       <section
         className="mx-auto flex max-w-3xl animate-in flex-col overflow-hidden rounded-xl border bg-card shadow-xs duration-500 fade-in-0 slide-in-from-bottom-2"
-        aria-label="Trợ lý Agentra – Chưa khả dụng"
+        aria-label={t('Trợ lý Agentra – Chưa khả dụng')}
         aria-describedby="chatbot-unavailable"
       >
         <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
@@ -53,20 +54,20 @@ export function ChatbotPage() {
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold">Trợ lý Agentra</h2>
+              <h2 className="text-sm font-semibold">{t('Trợ lý Agentra')}</h2>
               <p className="text-xs text-muted-foreground">
-                Hỏi đáp theo quyền của bạn
+                {t('Hỏi đáp theo quyền của bạn')}
               </p>
             </div>
           </div>
           <Badge variant="neutral" id="chatbot-unavailable">
-            Chưa khả dụng
+            {t('Chưa khả dụng')}
           </Badge>
         </header>
         <Stagger
           className="bg-dots flex min-h-72 flex-col gap-4 bg-muted/30 px-4 py-6"
           role="group"
-          aria-label="Hội thoại"
+          aria-label={t('Hội thoại')}
           step={0.15}
         >
           <StaggerItem className="flex items-end gap-2">
@@ -77,12 +78,14 @@ export function ChatbotPage() {
             </Avatar>
             <div className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border bg-card px-4 py-3 text-sm shadow-xs">
               <p className="font-medium">
-                Dịch vụ chatbot chưa được triển khai. Tính năng hỏi đáp đang
-                tắt.
+                {t(
+                  'Dịch vụ chatbot chưa được triển khai. Tính năng hỏi đáp đang tắt.',
+                )}
               </p>
               <p className="text-xs text-muted-foreground">
-                Không gửi câu hỏi, không tải trước dữ liệu và không tự tạo câu
-                trả lời.
+                {t(
+                  'Không gửi câu hỏi, không tải trước dữ liệu và không tự tạo câu trả lời.',
+                )}
               </p>
             </div>
           </StaggerItem>
@@ -97,7 +100,7 @@ export function ChatbotPage() {
               className="size-3.5 shrink-0 text-primary"
               aria-hidden="true"
             />
-            <p>Mở trợ lý không cấp thêm quyền truy cập dữ liệu.</p>
+            <p>{t('Mở trợ lý không cấp thêm quyền truy cập dữ liệu.')}</p>
           </StaggerItem>
         </Stagger>
         <div
@@ -105,8 +108,8 @@ export function ChatbotPage() {
           aria-hidden="true"
         >
           <div className="flex h-10 flex-1 cursor-not-allowed items-center gap-2 rounded-full border bg-muted/50 px-4 text-sm text-muted-foreground">
-            <Lock className="size-3.5" />Ô nhập câu hỏi sẽ mở khi dịch vụ được
-            triển khai
+            <Lock className="size-3.5" />
+            {t('Ô nhập câu hỏi sẽ mở khi dịch vụ được triển khai')}
           </div>
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <SendHorizontal className="size-4" />
