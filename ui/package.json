@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "node src/test/e2e_browser_smoke.cjs",
+    "i18n:extract": "node scripts/i18n-extract.ts",
     "preview": "vite preview"
   },
   "dependencies": {

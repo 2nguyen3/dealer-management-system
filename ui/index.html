@@ -20,6 +20,11 @@
         var p = localStorage.getItem('agentra-palette')
         if (/^(thuy|moc|kim|hoa|tho|tim)$/.test(p || ''))
           document.documentElement.dataset.palette = p
+        var l = localStorage.getItem('agentra-locale')
+        if (/^[a-z]{2,3}(-[A-Z]{2})?$/.test(l || '')) {
+          document.documentElement.lang = l
+          if (/^(ar|ur)$/.test(l)) document.documentElement.dir = 'rtl'
+        }
       } catch (e) {}
     </script>
   </head>
