@@ -11,6 +11,7 @@ import {
   type ReportRow,
   type Rule,
 } from '../reports/contracts'
+import { t } from '@/lib/i18n/core'
 
 export const dashboardAdmission = [
   'agency.read',
@@ -126,6 +127,6 @@ export function parseDashboard(
     if (name in source) rules[name] = rule
   fields(source, rules)
   if (source.month !== requestedMonth)
-    throw new Error('Tháng dữ liệu máy chủ không khớp yêu cầu.')
+    throw new Error(t('Tháng dữ liệu máy chủ không khớp yêu cầu.'))
   return source as unknown as Dashboard
 }

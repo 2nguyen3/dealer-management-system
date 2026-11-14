@@ -13,6 +13,7 @@ import {
   type FilterValue,
   type Filters,
 } from './model'
+import { t } from '@/lib/i18n/core'
 
 export interface SlicerAvailability {
   agencyId: boolean
@@ -56,13 +57,13 @@ export function Slicers({
 
   return (
     <section
-      aria-label="Bộ lọc bảng điều khiển"
+      aria-label={t('Bộ lọc bảng điều khiển')}
       className="z-10 rounded-xl border bg-card/95 p-3 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:sticky lg:top-14"
     >
       <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] [&_.form-field]:mb-0">
         <Select
           id="dashboard-month"
-          label="Tháng"
+          label={t('Tháng')}
           options={months}
           value={month}
           onChange={(event) => onMonth(event.target.value)}
@@ -71,8 +72,8 @@ export function Slicers({
           <EntityPicker
             id="dashboard-agency"
             resource="agencies"
-            label="Đại lý"
-            placeholder="Tất cả đại lý"
+            label={t('Đại lý')}
+            placeholder={t('Tất cả đại lý')}
             value={filters.agencyId?.id ?? ''}
             onChange={(id, item) =>
               onFilter(
@@ -85,7 +86,7 @@ export function Slicers({
         {available.typeId && (
           <Select
             id="dashboard-type"
-            label="Loại đại lý"
+            label={t('Loại đại lý')}
             value={filters.typeId?.id ?? ''}
             error={types.error || undefined}
             onChange={(event) =>
@@ -94,7 +95,7 @@ export function Slicers({
             options={[
               {
                 value: '',
-                label: types.loading ? 'Đang tải…' : 'Tất cả loại',
+                label: types.loading ? t('Đang tải…') : t('Tất cả loại'),
               },
               ...types.options,
             ]}
@@ -103,7 +104,7 @@ export function Slicers({
         {available.wardId && (
           <WardPicker
             id="dashboard-ward"
-            placeholder="Tất cả phường/xã"
+            placeholder={t('Tất cả phường/xã')}
             value={filters.wardId?.id ?? ''}
             onChange={(id, item) =>
               onFilter(
@@ -117,8 +118,8 @@ export function Slicers({
           <EntityPicker
             id="dashboard-product"
             resource="products"
-            label="Mặt hàng"
-            placeholder="Tất cả mặt hàng"
+            label={t('Mặt hàng')}
+            placeholder={t('Tất cả mặt hàng')}
             value={filters.productId?.id ?? ''}
             onChange={(id, item) =>
               onFilter(
@@ -135,13 +136,16 @@ export function Slicers({
             className="size-3.5 text-muted-foreground"
             aria-hidden="true"
           />
-          <span className="sr-only">Đang lọc:</span>
-          <ul className="flex flex-wrap gap-2" aria-label="Bộ lọc đang áp dụng">
+          <span className="sr-only">{t('Đang lọc:')}</span>
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t('Bộ lọc đang áp dụng')}
+          >
             {active.map(([key, value]) => (
               <li key={key} className="max-w-full">
                 <Badge
                   variant="outline"
-                  className="max-w-full animate-in gap-1 rounded-full border-primary/25 bg-primary/8 py-0.5 pr-0.5 pl-2.5 font-normal text-foreground duration-300 zoom-in-95 fade-in-0"
+                  className="max-w-full animate-in gap-1 rounded-full border-primary/25 bg-primary/8 py-0.5 pe-0.5 ps-2.5 font-normal text-foreground duration-300 zoom-in-95 fade-in-0"
                 >
                   <span className="truncate">
                     <span className="text-muted-foreground">
@@ -154,7 +158,9 @@ export function Slicers({
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => onFilter(key, null)}
-                    aria-label={`Bỏ lọc ${filterNames[key]}`}
+                    aria-label={t('Bỏ lọc {filterNames}', {
+                      filterNames: filterNames[key],
+                    })}
                     className="size-5 rounded-full text-muted-foreground hover:bg-primary/15"
                   >
                     <X className="size-3" aria-hidden="true" />
@@ -166,11 +172,11 @@ export function Slicers({
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto"
+            className="ms-auto"
             icon={<FilterX className="size-4" aria-hidden="true" />}
             onClick={onReset}
           >
-            Xóa bộ lọc
+            {t('Xóa bộ lọc')}
           </Button>
         </div>
       )}

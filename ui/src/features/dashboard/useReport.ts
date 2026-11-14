@@ -7,6 +7,7 @@ import {
   type ReportQuery,
 } from '../reports/contracts'
 import { parseDashboard, type Dashboard } from './contracts'
+import { t } from '@/lib/i18n/core'
 
 export interface ReportState {
   page: ReportPage | null
@@ -40,7 +41,7 @@ export function useReport(
     try {
       path = reportPath(query)
     } catch (err) {
-      invalid = err instanceof Error ? err.message : 'Bộ lọc không hợp lệ.'
+      invalid = err instanceof Error ? err.message : t('Bộ lọc không hợp lệ.')
     }
   }
   const key = JSON.stringify([path, scope, attempt])
@@ -66,7 +67,7 @@ export function useReport(
           setFailure({
             key,
             message:
-              err instanceof Error ? err.message : 'Không thể tải báo cáo.',
+              err instanceof Error ? err.message : t('Không thể tải báo cáo.'),
           })
       })
     return () => controller.abort()
@@ -122,7 +123,7 @@ export function useSnapshot(
             message:
               err instanceof Error
                 ? err.message
-                : 'Không thể tải bảng điều khiển.',
+                : t('Không thể tải bảng điều khiển.'),
           })
       })
     return () => controller.abort()

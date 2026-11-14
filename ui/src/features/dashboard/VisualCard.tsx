@@ -8,6 +8,7 @@ import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Table } from '../../components/ui/Table'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n/core'
 
 /**
  * One dashboard visual with its own loading/error lifecycle, so a failing
@@ -54,7 +55,9 @@ export function VisualCard({
     >
       {loading ? (
         <div className="flex h-40 items-end gap-2 py-2" aria-busy="true">
-          <span className="sr-only">Đang tải {title.toLowerCase()}…</span>
+          <span className="sr-only">
+            {t('Đang tải {title}…', { title: title.toLowerCase() })}
+          </span>
           {[0.55, 0.8, 0.4, 0.95, 0.65, 0.3, 0.75].map((height, index) => (
             <Skeleton
               key={index}
@@ -64,7 +67,10 @@ export function VisualCard({
           ))}
         </div>
       ) : error ? (
-        <Alert type="error" title={`Không tải được ${title.toLowerCase()}`}>
+        <Alert
+          type="error"
+          title={t('Không tải được {title}', { title: title.toLowerCase() })}
+        >
           <span className="block">{error}</span>
           {onRetry && (
             <Button
@@ -74,7 +80,7 @@ export function VisualCard({
               icon={<RotateCw className="size-3.5" aria-hidden="true" />}
               onClick={onRetry}
             >
-              Thử lại
+              {t('Thử lại')}
             </Button>
           )}
         </Alert>
@@ -132,7 +138,7 @@ export function MiniTable({
                 onSort={toggle}
                 align={index ? 'right' : 'left'}
                 firstDirection={index ? 'desc' : 'asc'}
-                className={index ? undefined : 'text-left'}
+                className={index ? undefined : 'text-start'}
               >
                 {header}
               </SortableHeader>
@@ -140,7 +146,7 @@ export function MiniTable({
               <th
                 key={header}
                 scope="col"
-                className={index ? 'cell-number' : 'text-left'}
+                className={index ? 'cell-number' : 'text-start'}
               >
                 {header}
               </th>
@@ -151,14 +157,14 @@ export function MiniTable({
       <tbody>
         {ordered.map((row) => (
           <tr key={row.key} className={cn(row.selected && 'bg-accent')}>
-            <th scope="row" className="px-3 py-2 text-left font-normal">
+            <th scope="row" className="px-3 py-2 text-start font-normal">
               {row.onSelect ? (
                 <button
                   type="button"
                   onClick={row.onSelect}
                   aria-pressed={!!row.selected}
                   aria-label={row.selectLabel}
-                  className="rounded-sm text-left font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="rounded-sm text-start font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   {row.label}
                 </button>
