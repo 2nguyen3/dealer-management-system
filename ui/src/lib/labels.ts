@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n/core'
 /**
  * Vietnamese display labels for server enum values. Server values stay the
  * authority for logic and requests; these maps are presentation only.
@@ -7,36 +8,36 @@ export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 const STATUS_LABELS: Record<string, string> = {
   // Lifecycle of documents/revisions
-  DRAFT: 'Nháp',
-  READY: 'Sẵn sàng',
-  PENDING: 'Chờ xử lý',
-  SUBMITTED: 'Đã gửi',
-  CONFIRMED: 'Đã xác nhận',
-  VERIFIED: 'Đã xác minh',
-  POSTED: 'Đã ghi sổ',
-  PAID: 'Đã thanh toán',
-  UNPAID: 'Chưa thanh toán',
-  PARTIALLY_PAID: 'Thanh toán một phần',
-  CANCELED: 'Đã hủy',
-  CANCELLED: 'Đã hủy',
-  CONSUMED: 'Đã sử dụng',
-  RELEASED: 'Đã giải phóng',
-  RECEIVED_SEPARATELY: 'Đã thu riêng',
+  DRAFT: t('Nháp'),
+  READY: t('Sẵn sàng'),
+  PENDING: t('Chờ xử lý'),
+  SUBMITTED: t('Đã gửi'),
+  CONFIRMED: t('Đã xác nhận'),
+  VERIFIED: t('Đã xác minh'),
+  POSTED: t('Đã ghi sổ'),
+  PAID: t('Đã thanh toán'),
+  UNPAID: t('Chưa thanh toán'),
+  PARTIALLY_PAID: t('Thanh toán một phần'),
+  CANCELED: t('Đã hủy'),
+  CANCELLED: t('Đã hủy'),
+  CONSUMED: t('Đã sử dụng'),
+  RELEASED: t('Đã giải phóng'),
+  RECEIVED_SEPARATELY: t('Đã thu riêng'),
   // Settlement
-  SETTLED: 'Đã tất toán',
-  PARTIAL: 'Tất toán một phần',
-  UNSETTLED: 'Chưa tất toán',
+  SETTLED: t('Đã tất toán'),
+  PARTIAL: t('Tất toán một phần'),
+  UNSETTLED: t('Chưa tất toán'),
   // Provider/payment attempts
-  SUCCESS: 'Thành công',
-  FAILED: 'Thất bại',
-  EXPIRED: 'Hết hạn',
-  UNKNOWN: 'Chưa rõ',
+  SUCCESS: t('Thành công'),
+  FAILED: t('Thất bại'),
+  EXPIRED: t('Hết hạn'),
+  UNKNOWN: t('Chưa rõ'),
   // Master data
-  ACTIVE: 'Đang hoạt động',
-  INACTIVE: 'Ngừng hoạt động',
-  LOCKED: 'Đã khóa',
-  TERMINATED: 'Đã chấm dứt',
-  DISCONTINUED: 'Ngừng kinh doanh',
+  ACTIVE: t('Đang hoạt động'),
+  INACTIVE: t('Ngừng hoạt động'),
+  LOCKED: t('Đã khóa'),
+  TERMINATED: t('Đã chấm dứt'),
+  DISCONTINUED: t('Ngừng kinh doanh'),
 }
 
 const STATUS_TONES: Record<string, Tone> = {
@@ -70,40 +71,40 @@ const STATUS_TONES: Record<string, Tone> = {
 }
 
 const KIND_LABELS: Record<string, string> = {
-  STOCK_RECEIPT: 'Phiếu nhập hàng',
-  STOCK_ISSUE: 'Phiếu xuất hàng',
-  PAYMENT_RECEIPT: 'Phiếu thu tiền',
-  SALES_RETURN: 'Phiếu trả hàng',
-  STOCK_ADJUSTMENT: 'Phiếu điều chỉnh kho',
-  CREDIT_APPLICATION: 'Cấn trừ dư có',
-  REFUND: 'Hoàn tiền',
+  STOCK_RECEIPT: t('Phiếu nhập hàng'),
+  STOCK_ISSUE: t('Phiếu xuất hàng'),
+  PAYMENT_RECEIPT: t('Phiếu thu tiền'),
+  SALES_RETURN: t('Phiếu trả hàng'),
+  STOCK_ADJUSTMENT: t('Phiếu điều chỉnh kho'),
+  CREDIT_APPLICATION: t('Cấn trừ dư có'),
+  REFUND: t('Hoàn tiền'),
   // Ledger entry kinds
-  CHARGE: 'Ghi nợ',
-  PAYMENT: 'Thanh toán',
-  CREDIT: 'Ghi có',
-  OFFSET: 'Cấn trừ',
-  RETURN: 'Trả hàng',
-  CREATED: 'Khởi tạo',
+  CHARGE: t('Ghi nợ'),
+  PAYMENT: t('Thanh toán'),
+  CREDIT: t('Ghi có'),
+  OFFSET: t('Cấn trừ'),
+  RETURN: t('Trả hàng'),
+  CREATED: t('Khởi tạo'),
 }
 
 const METHOD_LABELS: Record<string, string> = {
-  CASH: 'Tiền mặt',
-  BANK_TRANSFER: 'Chuyển khoản',
-  ONLINE: 'Trực tuyến (VNPAY)',
+  CASH: t('Tiền mặt'),
+  BANK_TRANSFER: t('Chuyển khoản'),
+  ONLINE: t('Trực tuyến (VNPAY)'),
 }
 
 const RECEIPT_TYPE_LABELS: Record<string, string> = {
-  AUTO_FROM_ISSUE: 'Thu kèm phiếu xuất',
-  DEBT_COLLECTION: 'Thu công nợ',
-  RECEIVED_UNAPPLIED: 'Thu chưa phân bổ',
+  AUTO_FROM_ISSUE: t('Thu kèm phiếu xuất'),
+  DEBT_COLLECTION: t('Thu công nợ'),
+  RECEIVED_UNAPPLIED: t('Thu chưa phân bổ'),
 }
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
-  INSERT: 'Tạo mới',
-  UPDATE: 'Cập nhật',
-  DELETE: 'Xóa',
-  SYSTEM: 'Hệ thống',
-  USER: 'Người dùng',
+  INSERT: t('Tạo mới'),
+  UPDATE: t('Cập nhật'),
+  DELETE: t('Xóa'),
+  SYSTEM: t('Hệ thống'),
+  USER: t('Người dùng'),
 }
 
 function lookup(map: Record<string, string>, value: unknown): string {
@@ -154,9 +155,9 @@ export function enumOptions(
 
 /** Kinds of Ho Chi Minh City wards/communes after the 2025 reform. */
 export const WARD_KIND_LABELS = {
-  WARD: 'Phường',
-  COMMUNE: 'Xã',
-  SPECIAL_ZONE: 'Đặc khu',
+  WARD: t('Phường'),
+  COMMUNE: t('Xã'),
+  SPECIAL_ZONE: t('Đặc khu'),
 } as const
 
 /** Vietnamese label for a ward kind (Phường / Xã / Đặc khu). */

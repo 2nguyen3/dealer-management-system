@@ -135,7 +135,7 @@ export function RoundedBarChart({
                   <span className="text-muted-foreground">
                     {config[String(name)]?.label ?? name}
                   </span>
-                  <span className="ml-auto pl-3 font-semibold tabular-nums">
+                  <span className="ms-auto ps-3 font-semibold tabular-nums">
                     {(tooltipFormatter ?? valueFormatter)(Number(value))}
                   </span>
                 </div>
@@ -269,7 +269,7 @@ export function GradientAreaChart({
                   <span className="text-muted-foreground">
                     {config[String(name)]?.label ?? name}
                   </span>
-                  <span className="ml-auto pl-3 font-semibold tabular-nums">
+                  <span className="ms-auto ps-3 font-semibold tabular-nums">
                     {(tooltipFormatter ?? valueFormatter)(Number(value))}
                   </span>
                 </div>
@@ -362,7 +362,7 @@ export function DonutChart({
                   <span className="text-muted-foreground">
                     {item.payload?.label}
                   </span>
-                  <span className="ml-auto pl-3 font-semibold tabular-nums">
+                  <span className="ms-auto ps-3 font-semibold tabular-nums">
                     {valueFormatter(Number(value))}
                   </span>
                 </div>
@@ -472,7 +472,7 @@ export function RadialRings({
                   <span className="text-muted-foreground">
                     {item.payload?.label}
                   </span>
-                  <span className="ml-auto pl-3 font-semibold tabular-nums">
+                  <span className="ms-auto ps-3 font-semibold tabular-nums">
                     {Math.round(Number(value))}%
                   </span>
                 </div>
@@ -583,7 +583,7 @@ export function LegendList({
           <span className="min-w-0 truncate text-muted-foreground">
             {item.label}
           </span>
-          <span className="ml-auto font-semibold tabular-nums">
+          <span className="ms-auto font-semibold tabular-nums">
             {item.value}
           </span>
         </li>

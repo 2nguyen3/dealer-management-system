@@ -18,6 +18,7 @@ import {
 } from '@/components/shadcn/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { sortDirection, type SortValue } from './sorting'
+import { t } from '@/lib/i18n/core'
 
 /**
  * Sortable column header (shadcn data-table recipe): a ghost button with a
@@ -66,7 +67,7 @@ export function SortableHeader({
         onClick={() => onSort(field, firstDirection)}
         className={cn(
           'h-7 gap-1 px-1.5 text-[length:inherit] font-semibold tracking-wider uppercase [&_svg]:size-3.5',
-          align === 'right' ? '-mr-1.5 ml-auto flex-row-reverse' : '-ml-1.5',
+          align === 'right' ? '-me-1.5 ms-auto flex-row-reverse' : '-ms-1.5',
           direction ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
@@ -87,7 +88,7 @@ export function SortMenu({
   options,
   sort,
   onChange,
-  defaultLabel = 'Mặc định',
+  defaultLabel = t('Mặc định'),
   className,
 }: {
   options: readonly SortOption[]
@@ -109,12 +110,14 @@ export function SortMenu({
             <ArrowDownNarrowWide className="size-4" />
           )}
           <span className="truncate">
-            {active ? active.label : `Sắp xếp: ${defaultLabel}`}
+            {active
+              ? active.label
+              : t('Sắp xếp: {defaultLabel}', { defaultLabel })}
           </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuLabel>Sắp xếp theo</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('Sắp xếp theo')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={active ? field : ''}
           onValueChange={(value) =>
@@ -131,7 +134,7 @@ export function SortMenu({
         {active && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Thứ tự</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('Thứ tự')}</DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={descending ? 'desc' : 'asc'}
               onValueChange={(value) =>
@@ -139,10 +142,10 @@ export function SortMenu({
               }
             >
               <DropdownMenuRadioItem value="asc">
-                <ArrowUp className="size-4" /> Tăng dần
+                <ArrowUp className="size-4" /> {t('Tăng dần')}
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="desc">
-                <ArrowDown className="size-4" /> Giảm dần
+                <ArrowDown className="size-4" /> {t('Giảm dần')}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </>

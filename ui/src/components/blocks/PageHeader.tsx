@@ -1,6 +1,6 @@
 import { createElement, useContext, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { PageIconContext } from './pageIconContext'
+import { PageIconContext, PageToolsContext } from './pageIconContext'
 
 export interface PageHeaderProps {
   title: string
@@ -22,6 +22,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   const RouteIcon = useContext(PageIconContext)
+  const tools = useContext(PageToolsContext)
   const tile =
     icon === false
       ? null
@@ -63,8 +64,11 @@ export function PageHeader({
           )}
         </div>
       </div>
-      {actions && (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      {(actions || tools) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {tools}
+          {actions}
+        </div>
       )}
     </div>
   )

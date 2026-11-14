@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '../shadcn/card'
 import { ToggleGroup, ToggleGroupItem } from '../shadcn/toggle-group'
+import { t } from '@/lib/i18n/core'
 
 export interface ChartCardProps {
   title: string
@@ -61,12 +62,12 @@ export function ChartCard({
                 onValueChange={(next) =>
                   next && setView(next as 'chart' | 'table')
                 }
-                aria-label={`Kiểu hiển thị ${title}`}
+                aria-label={t('Kiểu hiển thị {title}', { title })}
               >
-                <ToggleGroupItem value="chart" aria-label="Biểu đồ">
+                <ToggleGroupItem value="chart" aria-label={t('Biểu đồ')}>
                   <BarChart3 className="size-3.5" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="table" aria-label="Bảng số liệu">
+                <ToggleGroupItem value="table" aria-label={t('Bảng số liệu')}>
                   <Table2 className="size-3.5" />
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -78,7 +79,7 @@ export function ChartCard({
         {isEmpty ? (
           (empty ?? (
             <p className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-              Chưa có dữ liệu cho bộ lọc hiện tại.
+              {t('Chưa có dữ liệu cho bộ lọc hiện tại.')}
             </p>
           ))
         ) : showTable ? (

@@ -15,6 +15,7 @@ import {
 } from './pickerItems'
 import { Label } from '../shadcn/label'
 import './EntityPicker.css'
+import { t } from '@/lib/i18n/core'
 
 const PAGE_SIZE = 20
 const DEBOUNCE_MS = 250
@@ -49,7 +50,7 @@ export function EntityPicker({
   required,
   disabled,
   error,
-  placeholder = 'Gõ mã hoặc tên để tìm…',
+  placeholder = t('Gõ mã hoặc tên để tìm…'),
   name,
   id,
 }: EntityPickerProps) {
@@ -209,7 +210,7 @@ export function EntityPicker({
               <button
                 type="button"
                 className="entity-picker__clear"
-                aria-label={`Bỏ chọn ${label}`}
+                aria-label={t('Bỏ chọn {label}', { label })}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(null)}
               >
@@ -233,16 +234,16 @@ export function EntityPicker({
           >
             <ul id={listId} role="listbox" className="entity-picker__list">
               {loading && items.length === 0 && (
-                <li className="entity-picker__hint">Đang tìm…</li>
+                <li className="entity-picker__hint">{t('Đang tìm…')}</li>
               )}
               {!loading && failed && (
                 <li className="entity-picker__hint">
-                  Không tải được danh sách.
+                  {t('Không tải được danh sách.')}
                 </li>
               )}
               {!loading && !failed && items.length === 0 && (
                 <li className="entity-picker__hint">
-                  Không có kết quả phù hợp.
+                  {t('Không có kết quả phù hợp.')}
                 </li>
               )}
               {items.map((item, index) => (

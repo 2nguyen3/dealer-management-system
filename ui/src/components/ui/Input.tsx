@@ -52,14 +52,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         <ShadcnInput
           ref={ref}
           id={inputId}
-          className={cn('bg-card', endAdornment && 'pr-10', className)}
+          className={cn('bg-card', endAdornment && 'pe-10', className)}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId || helperId || undefined}
           required={required}
           {...props}
         />
         {endAdornment && (
-          <div className="absolute inset-y-0 right-1 flex items-center">
+          <div className="absolute inset-y-0 end-1 flex items-center">
             {endAdornment}
           </div>
         )}
