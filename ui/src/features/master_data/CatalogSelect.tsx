@@ -1,5 +1,6 @@
 import { Select } from '../../components/ui/Select'
 import { useCatalogOptions } from './useCatalogOptions'
+import { t } from '@/lib/i18n/core'
 
 export interface CatalogSelectProps {
   id: string
@@ -40,12 +41,12 @@ export function CatalogSelect({
         ...(emptyLabel !== undefined
           ? [{ value: '', label: emptyLabel }]
           : !value
-            ? [{ value: '', label: loading ? 'Đang tải…' : 'Chọn…' }]
+            ? [{ value: '', label: loading ? t('Đang tải…') : t('Chọn…') }]
             : []),
         ...options,
         ...(known
           ? []
-          : [{ value, label: loading ? 'Đang tải…' : `#${value}` }]),
+          : [{ value, label: loading ? t('Đang tải…') : `#${value}` }]),
       ]}
     />
   )

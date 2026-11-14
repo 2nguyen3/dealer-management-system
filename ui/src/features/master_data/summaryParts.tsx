@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
 import { formatPercent, formatPlain } from '@/lib/chart'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n/core'
 
 /**
  * Animated summary strip above a list. `partial` marks figures computed from
@@ -32,9 +33,9 @@ export function SummaryGrid({
     <section aria-label={label} className="relative">
       <Badge
         variant={partial ? 'info' : 'neutral'}
-        className="absolute -top-2.5 right-3 z-20 bg-card text-[11px]"
+        className="absolute -top-2.5 end-3 z-20 bg-card text-[11px]"
       >
-        {partial ? 'Trang hiện tại' : 'Toàn bộ danh sách'}
+        {partial ? t('Trang hiện tại') : t('Toàn bộ danh sách')}
       </Badge>
       <Stagger
         className={cn('grid grid-cols-2 gap-3 lg:grid-cols-4', className)}
@@ -100,7 +101,7 @@ export function ChartTile({
         className="h-full"
         empty={
           <p className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-            Chưa có số liệu.
+            {t('Chưa có số liệu.')}
           </p>
         }
       >
@@ -125,7 +126,7 @@ export function MiniTable({
       <thead>
         <tr>
           <th scope="col">{head[0]}</th>
-          <th scope="col" className="cell-number text-right">
+          <th scope="col" className="cell-number text-end">
             {head[1]}
           </th>
         </tr>
@@ -134,7 +135,7 @@ export function MiniTable({
         {rows.map(([name, value], index) => (
           <tr key={index}>
             <td>{name}</td>
-            <td className="cell-number text-right tabular-nums">{value}</td>
+            <td className="cell-number text-end tabular-nums">{value}</td>
           </tr>
         ))}
       </tbody>

@@ -11,6 +11,7 @@ import {
   StatTile,
 } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 /** Low stock as the server defines it: current stock below the threshold. */
 function isLow(item: Row): boolean {
@@ -29,30 +30,33 @@ function productSummary(items: Row[]) {
   }))
   return (
     <>
-      <StatTile label="Mặt hàng" value={items.length} icon={<Package />} />
+      <StatTile label={t('Mặt hàng')} value={items.length} icon={<Package />} />
       <StatTile
-        label="Dưới ngưỡng tồn"
+        label={t('Dưới ngưỡng tồn')}
         value={low}
         icon={<PackageX />}
-        hint={low ? 'Cần nhập thêm' : 'Đủ hàng'}
+        hint={low ? t('Cần nhập thêm') : t('Đủ hàng')}
       />
       <MeterTile
-        title="Mặt hàng đủ tồn"
+        title={t('Mặt hàng đủ tồn')}
         ratio={ratioOf(items.length - low, items.length)}
-        caption={`${items.length - low}/${items.length} mặt hàng`}
+        caption={t('{value}/{count} mặt hàng', {
+          value: items.length - low,
+          count: items.length,
+        })}
         color="var(--success)"
         legend={[
-          { key: 'ok', label: 'Đủ hàng', value: items.length - low },
-          { key: 'low', label: 'Dưới ngưỡng', value: low },
+          { key: 'ok', label: t('Đủ hàng'), value: items.length - low },
+          { key: 'low', label: t('Dưới ngưỡng'), value: low },
         ]}
       />
       <ChartTile
-        title="Tồn kho so với ngưỡng"
+        title={t('Tồn kho so với ngưỡng')}
         className="lg:col-span-4"
         table={
           <MiniTable
-            caption="Tồn kho so với ngưỡng"
-            head={['Mã hàng', 'Tồn / ngưỡng']}
+            caption={t('Tồn kho so với ngưỡng')}
+            head={[t('Mã hàng'), t('Tồn / ngưỡng')]}
             rows={items
               .slice(0, STOCK_BARS)
               .map((item) => [
@@ -67,8 +71,8 @@ function productSummary(items: Row[]) {
           xKey="name"
           height={190}
           series={[
-            { key: 'stock', label: 'Tồn hiện tại' },
-            { key: 'threshold', label: 'Ngưỡng tồn thấp' },
+            { key: 'stock', label: t('Tồn hiện tại') },
+            { key: 'threshold', label: t('Ngưỡng tồn thấp') },
           ]}
         />
       </ChartTile>
@@ -78,50 +82,50 @@ function productSummary(items: Row[]) {
 
 const config: MasterConfig = {
   path: '/products',
-  title: 'Danh mục mặt hàng',
-  description: 'Quản lý mặt hàng, đơn vị tính, giá và mức cảnh báo tồn kho.',
+  title: t('Danh mục mặt hàng'),
+  description: t('Quản lý mặt hàng, đơn vị tính, giá và mức cảnh báo tồn kho.'),
   manage: 'product.manage',
   decode: product,
   statuses: ['ACTIVE', 'INACTIVE'],
   filters: [
-    ['unitId', 'Đơn vị tính', { options: '/units' }],
-    ['isLowStock', 'Tồn kho', { boolean: ['Dưới ngưỡng', 'Đủ hàng'] }],
+    ['unitId', t('Đơn vị tính'), { options: '/units' }],
+    ['isLowStock', t('Tồn kho'), { boolean: [t('Dưới ngưỡng'), t('Đủ hàng')] }],
   ],
   sorts: [
-    { field: 'name', label: 'Tên mặt hàng' },
+    { field: 'name', label: t('Tên mặt hàng') },
     {
       field: 'currentStock',
-      label: 'Tồn hiện tại',
+      label: t('Tồn hiện tại'),
       firstDirection: 'desc',
     },
     {
       field: 'currentSellingPrice',
-      label: 'Giá bán',
+      label: t('Giá bán'),
       firstDirection: 'desc',
     },
-    { field: 'id', label: 'Thứ tự tạo' },
+    { field: 'id', label: t('Thứ tự tạo') },
   ],
   summary: productSummary,
   fields: [
-    { key: 'name', label: 'Tên mặt hàng' },
+    { key: 'name', label: t('Tên mặt hàng') },
     {
       key: 'unitId',
-      label: 'Đơn vị tính',
+      label: t('Đơn vị tính'),
       type: 'catalog',
       lookup: { options: '/units' },
     },
-    { key: 'lowStockThreshold', label: 'Ngưỡng tồn thấp', type: 'quantity' },
-    { key: 'status', label: 'Trạng thái', type: 'status' },
+    { key: 'lowStockThreshold', label: t('Ngưỡng tồn thấp'), type: 'quantity' },
+    { key: 'status', label: t('Trạng thái'), type: 'status' },
   ],
   columns: [
-    ['code', 'Mã hàng'],
-    ['name', 'Tên mặt hàng'],
-    ['unitName', 'Đơn vị'],
-    ['currentStock', 'Tồn hiện tại', 'quantity'],
-    ['lowStockThreshold', 'Ngưỡng tồn thấp', 'quantity'],
-    ['currentPurchasePrice', 'Giá nhập', 'money'],
-    ['currentSellingPrice', 'Giá bán', 'money'],
-    ['status', 'Trạng thái', 'status'],
+    ['code', t('Mã hàng')],
+    ['name', t('Tên mặt hàng')],
+    ['unitName', t('Đơn vị')],
+    ['currentStock', t('Tồn hiện tại'), 'quantity'],
+    ['lowStockThreshold', t('Ngưỡng tồn thấp'), 'quantity'],
+    ['currentPurchasePrice', t('Giá nhập'), 'money'],
+    ['currentSellingPrice', t('Giá bán'), 'money'],
+    ['status', t('Trạng thái'), 'status'],
   ],
 }
 export function ProductsPage() {

@@ -12,6 +12,7 @@ import {
   StatTile,
 } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 function agencyTypeSummary(items: Row[]) {
   const limits = items.map((item) => ({
@@ -20,16 +21,16 @@ function agencyTypeSummary(items: Row[]) {
   }))
   return (
     <>
-      <StatTile label="Loại đại lý" value={items.length} icon={<Tags />} />
+      <StatTile label={t('Loại đại lý')} value={items.length} icon={<Tags />} />
       <StatTile
-        label="Tổng đại lý"
+        label={t('Tổng đại lý')}
         value={sumBy(items, (item) => num(item.agencyCount))}
         icon={<Store />}
       />
       <DonutTile
-        title="Đại lý theo loại"
-        centerLabel="đại lý"
-        head={['Loại', 'Số đại lý']}
+        title={t('Đại lý theo loại')}
+        centerLabel={t('đại lý')}
+        head={[t('Loại'), t('Số đại lý')]}
         data={partsBy(
           items,
           (item) => num(item.id),
@@ -38,12 +39,12 @@ function agencyTypeSummary(items: Row[]) {
         )}
       />
       <ChartTile
-        title="Giới hạn nợ theo loại"
+        title={t('Giới hạn nợ theo loại')}
         className="lg:col-span-4"
         table={
           <MiniTable
-            caption="Giới hạn nợ theo loại"
-            head={['Loại', 'Giới hạn nợ']}
+            caption={t('Giới hạn nợ theo loại')}
+            head={[t('Loại'), t('Giới hạn nợ')]}
             rows={items.map((item) => [
               String(item.name),
               formatVND(String(item.maxDebt)),
@@ -56,7 +57,7 @@ function agencyTypeSummary(items: Row[]) {
           xKey="name"
           height={170}
           valueFormatter={formatCompactVND}
-          series={[{ key: 'maxDebt', label: 'Giới hạn nợ' }]}
+          series={[{ key: 'maxDebt', label: t('Giới hạn nợ') }]}
         />
       </ChartTile>
     </>
@@ -65,30 +66,30 @@ function agencyTypeSummary(items: Row[]) {
 
 const config: MasterConfig = {
   path: '/agency-types',
-  title: 'Loại đại lý',
-  description: 'Phân loại đại lý và giới hạn nợ tối đa của từng loại.',
+  title: t('Loại đại lý'),
+  description: t('Phân loại đại lý và giới hạn nợ tối đa của từng loại.'),
   manage: 'agency_type.manage',
   decode: master,
   statuses: ['ACTIVE', 'INACTIVE'],
   sorts: [
-    { field: 'name', label: 'Tên loại' },
-    { field: 'maxDebt', label: 'Giới hạn nợ', firstDirection: 'desc' },
-    { field: 'id', label: 'Thứ tự tạo' },
+    { field: 'name', label: t('Tên loại') },
+    { field: 'maxDebt', label: t('Giới hạn nợ'), firstDirection: 'desc' },
+    { field: 'id', label: t('Thứ tự tạo') },
   ],
   summary: agencyTypeSummary,
   fields: [
-    { key: 'code', label: 'Mã loại' },
-    { key: 'name', label: 'Tên loại đại lý' },
-    { key: 'maxDebt', label: 'Giới hạn nợ (VND)', type: 'money' },
-    { key: 'status', label: 'Trạng thái', type: 'status' },
+    { key: 'code', label: t('Mã loại') },
+    { key: 'name', label: t('Tên loại đại lý') },
+    { key: 'maxDebt', label: t('Giới hạn nợ (VND)'), type: 'money' },
+    { key: 'status', label: t('Trạng thái'), type: 'status' },
   ],
   columns: [
-    ['code', 'Mã'],
-    ['name', 'Tên loại'],
-    ['maxDebt', 'Giới hạn nợ', 'money'],
-    ['agencyCount', 'Tổng đại lý', 'count'],
-    ['activeAgencyCount', 'Đại lý hoạt động', 'count'],
-    ['status', 'Trạng thái', 'status'],
+    ['code', t('Mã')],
+    ['name', t('Tên loại')],
+    ['maxDebt', t('Giới hạn nợ'), 'money'],
+    ['agencyCount', t('Tổng đại lý'), 'count'],
+    ['activeAgencyCount', t('Đại lý hoạt động'), 'count'],
+    ['status', t('Trạng thái'), 'status'],
   ],
 }
 export function AgencyTypesPage() {

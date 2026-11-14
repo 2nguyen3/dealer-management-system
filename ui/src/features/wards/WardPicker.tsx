@@ -1,4 +1,5 @@
 import { EntityPicker, type PickerItem } from '../../components/ui/EntityPicker'
+import { t } from '@/lib/i18n/core'
 
 export interface WardPickerProps {
   id?: string
@@ -21,13 +22,13 @@ export interface WardPickerProps {
  */
 export function WardPicker({
   id,
-  label = 'Phường/xã',
+  label = t('Phường/xã'),
   value,
   onChange,
   required,
   disabled,
   error,
-  placeholder = 'Gõ tên phường/xã để tìm…',
+  placeholder = t('Gõ tên phường/xã để tìm…'),
 }: WardPickerProps) {
   return (
     <EntityPicker

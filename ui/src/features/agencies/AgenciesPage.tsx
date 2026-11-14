@@ -10,6 +10,8 @@ import {
   Store,
   Tags,
 } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { t } from '../../lib/i18n/core'
 import {
   useCallback,
   useEffect,
@@ -74,10 +76,10 @@ import {
 
 /** Contract sort fields of GET /agencies (prefix "-" = descending). */
 const AGENCY_SORTS = [
-  { field: 'name', label: 'Tên đại lý' },
-  { field: 'currentDebt', label: 'Dư nợ' },
-  { field: 'acceptedDate', label: 'Ngày tiếp nhận' },
-  { field: 'id', label: 'Thứ tự tạo' },
+  { field: 'name', label: t('Tên đại lý') },
+  { field: 'currentDebt', label: t('Dư nợ') },
+  { field: 'acceptedDate', label: t('Ngày tiếp nhận') },
+  { field: 'id', label: t('Thứ tự tạo') },
 ] as const
 
 export function AgenciesPage() {
@@ -185,7 +187,7 @@ export function AgenciesPage() {
     } catch (err: unknown) {
       if (!isMountedRef.current) return
       const e = err as { message?: string }
-      setError(e.message || 'Không thể tải danh sách đại lý.')
+      setError(e.message || t('Không thể tải danh sách đại lý.'))
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false)
@@ -290,19 +292,19 @@ export function AgenciesPage() {
     setFormError(null)
 
     if (!formName.trim()) {
-      setFormError('Vui lòng nhập tên đại lý.')
+      setFormError(t('Vui lòng nhập tên đại lý.'))
       return
     }
     if (!formPhone.trim()) {
-      setFormError('Vui lòng nhập số điện thoại.')
+      setFormError(t('Vui lòng nhập số điện thoại.'))
       return
     }
     if (!formWardId) {
-      setFormError('Vui lòng chọn phường/xã.')
+      setFormError(t('Vui lòng chọn phường/xã.'))
       return
     }
     if (!formTypeId) {
-      setFormError('Vui lòng chọn loại đại lý.')
+      setFormError(t('Vui lòng chọn loại đại lý.'))
       return
     }
 
@@ -322,12 +324,21 @@ export function AgenciesPage() {
         },
       })
       setIsCreateOpen(false)
-      setSuccessNotice('Đã tiếp nhận đại lý mới thành công.')
+      setSuccessNotice(t('Đã tiếp nhận đại lý mới thành công.'))
+      notifyNextStep({
+        done: t('Đã tiếp nhận đại lý {name}.', { name: formName.trim() }),
+        next: t(
+          'Đại lý đã hoạt động. Bước tiếp: lập phiếu xuất hàng cho đại lý trong hạn mức nợ của loại đại lý.',
+        ),
+        ...(hasPermission('stock.issue.prepare')
+          ? { to: '/stock-issues' }
+          : {}),
+      })
       invalidateCache('/agencies')
       void loadAgencies()
     } catch (err: unknown) {
       const e = err as { message?: string }
-      setFormError(e.message || 'Không thể tạo hồ sơ đại lý.')
+      setFormError(e.message || t('Không thể tạo hồ sơ đại lý.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -365,19 +376,19 @@ export function AgenciesPage() {
     setFormError(null)
 
     if (!formName.trim()) {
-      setFormError('Vui lòng nhập tên đại lý.')
+      setFormError(t('Vui lòng nhập tên đại lý.'))
       return
     }
     if (!formPhone.trim()) {
-      setFormError('Vui lòng nhập số điện thoại.')
+      setFormError(t('Vui lòng nhập số điện thoại.'))
       return
     }
     if (!formWardId) {
-      setFormError('Vui lòng chọn phường/xã.')
+      setFormError(t('Vui lòng chọn phường/xã.'))
       return
     }
     if (!formTypeId) {
-      setFormError('Vui lòng chọn loại đại lý.')
+      setFormError(t('Vui lòng chọn loại đại lý.'))
       return
     }
 
@@ -391,7 +402,7 @@ export function AgenciesPage() {
         currentEtag = fresh.etag
       }
       if (!currentEtag) {
-        setFormError('Máy chủ chưa cấp ETag. Vui lòng tải lại.')
+        setFormError(t('Máy chủ chưa cấp ETag. Vui lòng tải lại.'))
         return
       }
 
@@ -409,22 +420,26 @@ export function AgenciesPage() {
         },
       })
       setEditAgency(null)
-      setSuccessNotice('Đã cập nhật hồ sơ đại lý thành công.')
+      setSuccessNotice(t('Đã cập nhật hồ sơ đại lý thành công.'))
       invalidateCache('/agencies')
       void loadAgencies()
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string }
       if (e.status === 412) {
         setFormError(
-          'Dữ liệu đại lý đã bị thay đổi bởi người dùng khác. Vui lòng đóng và mở lại để tải dữ liệu mới.',
+          t(
+            'Dữ liệu đại lý đã bị thay đổi bởi người dùng khác. Vui lòng đóng và mở lại để tải dữ liệu mới.',
+          ),
         )
       } else if (e.status === 409) {
         setFormError(
           e.message ||
-            'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc phường/xã đã hết chỗ.',
+            t(
+              'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc phường/xã đã hết chỗ.',
+            ),
         )
       } else {
-        setFormError(e.message || 'Không thể cập nhật thông tin đại lý.')
+        setFormError(e.message || t('Không thể cập nhật thông tin đại lý.'))
       }
     } finally {
       setIsSubmitting(false)
@@ -451,7 +466,7 @@ export function AgenciesPage() {
     setFormError(null)
 
     if (!terminateReason.trim()) {
-      setFormError('Vui lòng nhập lý do ngừng hợp tác.')
+      setFormError(t('Vui lòng nhập lý do ngừng hợp tác.'))
       return
     }
 
@@ -465,7 +480,7 @@ export function AgenciesPage() {
         currentEtag = fresh.etag
       }
       if (!currentEtag) {
-        setFormError('Máy chủ chưa cấp ETag. Vui lòng tải lại.')
+        setFormError(t('Máy chủ chưa cấp ETag. Vui lòng tải lại.'))
         return
       }
 
@@ -478,17 +493,19 @@ export function AgenciesPage() {
         },
       })
       setTerminateAgency(null)
-      setSuccessNotice('Đã ngừng hợp tác với đại lý thành công.')
+      setSuccessNotice(t('Đã ngừng hợp tác với đại lý thành công.'))
       invalidateCache('/agencies')
       void loadAgencies()
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string }
       if (e.status === 412) {
         setFormError(
-          'Hồ sơ đại lý đã bị thay đổi bởi người dùng khác. Vui lòng tải lại.',
+          t(
+            'Hồ sơ đại lý đã bị thay đổi bởi người dùng khác. Vui lòng tải lại.',
+          ),
         )
       } else {
-        setFormError(e.message || 'Không thể ngừng hợp tác với đại lý này.')
+        setFormError(e.message || t('Không thể ngừng hợp tác với đại lý này.'))
       }
     } finally {
       setIsSubmitting(false)
@@ -499,16 +516,19 @@ export function AgenciesPage() {
   const statusBadge = (status: string) =>
     status === 'ACTIVE' ? (
       <Badge variant="success" data-status={status}>
-        Đang hoạt động
+        {t('Đang hoạt động')}
       </Badge>
     ) : (
       <Badge variant="danger" data-status={status}>
-        Ngừng hợp tác
+        {t('Ngừng hợp tác')}
       </Badge>
     )
-  const typeOptions = agencyTypes.map((t) => ({
-    value: String(t.id),
-    label: `${t.name} (Hạn mức: ${formatVND(t.maxDebt)})`,
+  const typeOptions = agencyTypes.map((type) => ({
+    value: String(type.id),
+    label: t('{name} (Hạn mức: {maxDebt})', {
+      name: type.name,
+      maxDebt: formatVND(type.maxDebt),
+    }),
   }))
   const kpis = agencyKpis(wards, agencyTypes)
   const limitOf = (agency: Agency) => debtLimit(agency, agencyTypes)
@@ -522,10 +542,10 @@ export function AgenciesPage() {
     <>
       <Input
         id="agency-form-phone"
-        label="Số điện thoại"
+        label={t('Số điện thoại')}
         value={formPhone}
         onChange={(e) => setFormPhone(e.target.value)}
-        placeholder="Ví dụ: 0901234567"
+        placeholder={t('Ví dụ: 0901234567')}
         inputMode="tel"
         required
       />
@@ -540,10 +560,10 @@ export function AgenciesPage() {
       <div className="sm:col-span-2">
         <Input
           id="agency-form-address"
-          label="Địa chỉ"
+          label={t('Địa chỉ')}
           value={formAddress}
           onChange={(e) => setFormAddress(e.target.value)}
-          placeholder="Số nhà, tên đường..."
+          placeholder={t('Số nhà, tên đường...')}
         />
       </div>
       <WardPicker
@@ -554,7 +574,7 @@ export function AgenciesPage() {
       />
       <Select
         id="agency-form-type"
-        label="Loại đại lý"
+        label={t('Loại đại lý')}
         value={formTypeId}
         onChange={(e) => setFormTypeId(e.target.value)}
         options={typeOptions}
@@ -567,12 +587,13 @@ export function AgenciesPage() {
     <div className="space-y-6">
       <PageHeader
         className="mb-0"
-        title="Hồ sơ đại lý"
+        title={t('Hồ sơ đại lý')}
         actions={
           <>
-            <InfoHint label="Giới thiệu hồ sơ đại lý">
-              Tiếp nhận đại lý, phân loại, phường/xã và theo dõi dư nợ so với
-              hạn mức của loại đại lý.
+            <InfoHint label={t('Giới thiệu hồ sơ đại lý')}>
+              {t(
+                'Tiếp nhận đại lý, phân loại, phường/xã và theo dõi dư nợ so với hạn mức của loại đại lý.',
+              )}
             </InfoHint>
             {canManage && (
               <Button
@@ -580,7 +601,7 @@ export function AgenciesPage() {
                 onClick={openCreateModal}
                 icon={<Plus className="size-4" />}
               >
-                Tiếp nhận đại lý mới
+                {t('Tiếp nhận đại lý mới')}
               </Button>
             )}
           </>
@@ -590,7 +611,7 @@ export function AgenciesPage() {
       {kpis.length > 0 && (
         <Stagger
           role="list"
-          aria-label="Tổng quan đại lý"
+          aria-label={t('Tổng quan đại lý')}
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"
         >
           {kpis.map((kpi) => (
@@ -615,7 +636,7 @@ export function AgenciesPage() {
 
       {pageSummary && (
         <SummaryGrid
-          label="Biểu đồ đại lý trên trang"
+          label={t('Biểu đồ đại lý trên trang')}
           partial={pagePartial}
           className="lg:grid-cols-6"
         >
@@ -633,12 +654,12 @@ export function AgenciesPage() {
                 setSearch(next)
                 restart()
               }}
-              placeholder="Tìm theo tên hoặc số điện thoại..."
+              placeholder={t('Tìm theo tên hoặc số điện thoại...')}
             />
             <div className="lg:w-56">
               <WardPicker
                 id="agency-filter-ward"
-                placeholder="Tất cả phường/xã"
+                placeholder={t('Tất cả phường/xã')}
                 value={filterWard}
                 onChange={(next) => {
                   setFilterWard(next)
@@ -649,31 +670,31 @@ export function AgenciesPage() {
             <div className="lg:w-48">
               <Select
                 id="agency-filter-type"
-                label="Loại đại lý"
+                label={t('Loại đại lý')}
                 value={filterType}
                 onChange={(e) => {
                   setFilterType(e.target.value)
                   restart()
                 }}
                 options={[
-                  { value: '', label: 'Tất cả loại đại lý' },
-                  ...agencyTypes.map((t) => ({
-                    value: String(t.id),
-                    label: t.name,
+                  { value: '', label: t('Tất cả loại đại lý') },
+                  ...agencyTypes.map((type) => ({
+                    value: String(type.id),
+                    label: type.name,
                   })),
                 ]}
               />
             </div>
             <ToggleFilter
-              label="Trạng thái"
+              label={t('Trạng thái')}
               value={filterStatus}
               onChange={(next) => {
                 setFilterStatus(next as typeof filterStatus)
                 restart()
               }}
               options={[
-                { value: 'ACTIVE', label: 'Hoạt động' },
-                { value: 'TERMINATED', label: 'Ngừng hợp tác' },
+                { value: 'ACTIVE', label: t('Hoạt động') },
+                { value: 'TERMINATED', label: t('Ngừng hợp tác') },
               ]}
             />
             <SortMenu
@@ -705,7 +726,7 @@ export function AgenciesPage() {
               onClick={() => void loadAgencies()}
               icon={<RefreshCw className="size-4" />}
             >
-              Tải lại
+              {t('Tải lại')}
             </Button>
           </>
         }
@@ -728,20 +749,28 @@ export function AgenciesPage() {
         }
       >
         {isLoading && agencies.length === 0 ? (
-          <TableSkeleton columns={8} label="Đang tải danh sách đại lý..." />
+          <TableSkeleton
+            columns={8}
+            label={t('Đang tải danh sách đại lý...')}
+          />
         ) : filteredAgencies.length === 0 ? (
           <div className="p-4">
             <EmptyState
               icon={<Store className="size-6" />}
-              title="Không tìm thấy đại lý"
-              description="Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm."
+              title={t('Không tìm thấy đại lý')}
+              description={t(
+                'Không tìm thấy đại lý nào phù hợp với điều kiện tìm kiếm.',
+              )}
             />
           </div>
         ) : (
-          <Table caption="Danh sách đại lý" aria-busy={isLoading || undefined}>
+          <Table
+            caption={t('Danh sách đại lý')}
+            aria-busy={isLoading || undefined}
+          >
             <thead>
               <tr>
-                <th scope="col">Mã đại lý</th>
+                <th scope="col">{t('Mã đại lý')}</th>
                 <SortableHeader
                   field="name"
                   sort={sort.sort}
@@ -750,11 +779,11 @@ export function AgenciesPage() {
                     restart()
                   }}
                 >
-                  Tên đại lý
+                  {t('Tên đại lý')}
                 </SortableHeader>
-                <th scope="col">Điện thoại</th>
-                <th scope="col">Phường/xã</th>
-                <th scope="col">Loại</th>
+                <th scope="col">{t('Điện thoại')}</th>
+                <th scope="col">{t('Phường/xã')}</th>
+                <th scope="col">{t('Loại')}</th>
                 <SortableHeader
                   field="currentDebt"
                   sort={sort.sort}
@@ -764,9 +793,9 @@ export function AgenciesPage() {
                   }}
                   firstDirection="desc"
                   align="right"
-                  className="text-right"
+                  className="text-end"
                 >
-                  Dư nợ
+                  {t('Dư nợ')}
                 </SortableHeader>
                 <SortableHeader
                   field="acceptedDate"
@@ -777,11 +806,11 @@ export function AgenciesPage() {
                   }}
                   firstDirection="desc"
                 >
-                  Ngày tiếp nhận
+                  {t('Ngày tiếp nhận')}
                 </SortableHeader>
-                <th scope="col">Trạng thái</th>
-                <th scope="col" className="cell-actions w-14 text-right">
-                  <span className="sr-only">Thao tác</span>
+                <th scope="col">{t('Trạng thái')}</th>
+                <th scope="col" className="cell-actions w-14 text-end">
+                  <span className="sr-only">{t('Thao tác')}</span>
                 </th>
               </tr>
             </thead>
@@ -812,7 +841,7 @@ export function AgenciesPage() {
                   </td>
                   <td className="whitespace-nowrap">{wardLabel(agency)}</td>
                   <td className="whitespace-nowrap">{typeLabel(agency)}</td>
-                  <td className="cell-number text-right font-semibold whitespace-nowrap tabular-nums">
+                  <td className="cell-number text-end font-semibold whitespace-nowrap tabular-nums">
                     {formatVND(agency.currentDebt)}
                     <DebtUsage
                       debt={num(agency.currentDebt)}
@@ -823,7 +852,7 @@ export function AgenciesPage() {
                     {formatDate(agency.acceptedDate || agency.receptionDate)}
                   </td>
                   <td>{statusBadge(agency.status)}</td>
-                  <td className="cell-actions text-right">
+                  <td className="cell-actions text-end">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <ShadcnButton
@@ -831,7 +860,10 @@ export function AgenciesPage() {
                           variant="ghost"
                           size="icon-sm"
                           className="cursor-pointer text-muted-foreground"
-                          aria-label={`Thao tác ${agency.code} - ${agency.name}`}
+                          aria-label={t('Thao tác {code} - {name}', {
+                            code: agency.code,
+                            name: agency.name,
+                          })}
                         >
                           <MoreHorizontal
                             className="size-4"
@@ -844,7 +876,7 @@ export function AgenciesPage() {
                           onSelect={() => setDetailAgency(agency)}
                         >
                           <Eye aria-hidden="true" />
-                          Xem chi tiết
+                          {t('Xem chi tiết')}
                         </DropdownMenuItem>
                         {canManage && agency.status === 'ACTIVE' && (
                           <>
@@ -852,7 +884,7 @@ export function AgenciesPage() {
                               onSelect={() => void openEditModal(agency)}
                             >
                               <Pencil aria-hidden="true" />
-                              Sửa hồ sơ
+                              {t('Sửa hồ sơ')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -860,7 +892,7 @@ export function AgenciesPage() {
                               onSelect={() => void openTerminateModal(agency)}
                             >
                               <Ban aria-hidden="true" />
-                              Ngừng hợp tác
+                              {t('Ngừng hợp tác')}
                             </DropdownMenuItem>
                           </>
                         )}
@@ -878,7 +910,7 @@ export function AgenciesPage() {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Tiếp nhận đại lý mới"
+        title={t('Tiếp nhận đại lý mới')}
         maxWidth="lg"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4" noValidate>
@@ -886,16 +918,16 @@ export function AgenciesPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
               id="agency-form-name"
-              label="Tên đại lý"
+              label={t('Tên đại lý')}
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="Ví dụ: Đại lý Minh Phát"
+              placeholder={t('Ví dụ: Đại lý Minh Phát')}
               required
               autoFocus
             />
             <DateField
               id="agency-form-accepted-date"
-              label="Ngày tiếp nhận"
+              label={t('Ngày tiếp nhận')}
               value={formAcceptedDate}
               onChange={setFormAcceptedDate}
               required
@@ -909,10 +941,10 @@ export function AgenciesPage() {
               onClick={() => setIsCreateOpen(false)}
               disabled={isSubmitting}
             >
-              Hủy
+              {t('Hủy')}
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              Tiếp nhận
+              {t('Tiếp nhận')}
             </Button>
           </div>
         </form>
@@ -922,7 +954,9 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!editAgency}
         onClose={() => setEditAgency(null)}
-        title={`Chỉnh sửa hồ sơ: ${editAgency?.agency.code || ''}`}
+        title={t('Chỉnh sửa hồ sơ: {value}', {
+          value: editAgency?.agency.code || '',
+        })}
         maxWidth="lg"
       >
         <form onSubmit={handleEditSubmit} className="space-y-4" noValidate>
@@ -931,7 +965,7 @@ export function AgenciesPage() {
             <div className="sm:col-span-2">
               <Input
                 id="agency-form-name"
-                label="Tên đại lý"
+                label={t('Tên đại lý')}
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 required
@@ -947,10 +981,10 @@ export function AgenciesPage() {
               onClick={() => setEditAgency(null)}
               disabled={isSubmitting}
             >
-              Hủy
+              {t('Hủy')}
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              Lưu thay đổi
+              {t('Lưu thay đổi')}
             </Button>
           </div>
         </form>
@@ -960,21 +994,24 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!terminateAgency}
         onClose={() => setTerminateAgency(null)}
-        title={`Ngừng hợp tác đại lý: ${terminateAgency?.agency.name || ''}`}
+        title={t('Ngừng hợp tác đại lý: {value}', {
+          value: terminateAgency?.agency.name || '',
+        })}
         maxWidth="md"
       >
         <form onSubmit={handleTerminateSubmit} className="space-y-4" noValidate>
           {formError && <Alert type="error">{formError}</Alert>}
           <Alert type="warning">
-            Sau khi ngừng hợp tác, đại lý sẽ không thể tiếp tục nhận hàng. Hành
-            động này không thể hoàn tác trực tiếp.
+            {t(
+              'Sau khi ngừng hợp tác, đại lý sẽ không thể tiếp tục nhận hàng. Hành động này không thể hoàn tác trực tiếp.',
+            )}
           </Alert>
           <Input
             id="agency-terminate-reason"
-            label="Lý do ngừng hợp tác"
+            label={t('Lý do ngừng hợp tác')}
             value={terminateReason}
             onChange={(e) => setTerminateReason(e.target.value)}
-            placeholder="Nhập lý do cụ thể..."
+            placeholder={t('Nhập lý do cụ thể...')}
             required
             autoFocus
           />
@@ -985,10 +1022,10 @@ export function AgenciesPage() {
               onClick={() => setTerminateAgency(null)}
               disabled={isSubmitting}
             >
-              Hủy
+              {t('Hủy')}
             </Button>
             <Button type="submit" variant="danger" isLoading={isSubmitting}>
-              Xác nhận ngừng hợp tác
+              {t('Xác nhận ngừng hợp tác')}
             </Button>
           </div>
         </form>
@@ -998,38 +1035,40 @@ export function AgenciesPage() {
       <Modal
         isOpen={!!detailAgency}
         onClose={() => setDetailAgency(null)}
-        title={`Chi tiết đại lý: ${detailAgency?.name || ''}`}
+        title={t('Chi tiết đại lý: {value}', {
+          value: detailAgency?.name || '',
+        })}
         maxWidth="lg"
       >
         {detailAgency && (
           <DetailGrid
             entries={[
               [
-                'Mã đại lý',
+                t('Mã đại lý'),
                 <span key="code" className="font-mono">
                   {detailAgency.code}
                 </span>,
               ],
               [
-                'Tên đại lý',
+                t('Tên đại lý'),
                 <span key="name" className="font-semibold">
                   {detailAgency.name}
                 </span>,
               ],
-              ['Điện thoại', detailAgency.phone || '—'],
+              [t('Điện thoại'), detailAgency.phone || '—'],
               ['Email', detailAgency.email || '—'],
-              ['Địa chỉ', detailAgency.address || '—', true],
-              ['Phường/xã', wardLabel(detailAgency)],
-              ['Loại đại lý', typeLabel(detailAgency)],
+              [t('Địa chỉ'), detailAgency.address || '—', true],
+              [t('Phường/xã'), wardLabel(detailAgency)],
+              [t('Loại đại lý'), typeLabel(detailAgency)],
               [
-                'Ngày tiếp nhận',
+                t('Ngày tiếp nhận'),
                 formatDate(
                   detailAgency.acceptedDate || detailAgency.receptionDate,
                 ),
               ],
-              ['Trạng thái', statusBadge(detailAgency.status)],
+              [t('Trạng thái'), statusBadge(detailAgency.status)],
               [
-                'Dư nợ hiện tại',
+                t('Dư nợ hiện tại'),
                 <span
                   key="debt"
                   className="font-semibold text-destructive tabular-nums"
@@ -1038,7 +1077,7 @@ export function AgenciesPage() {
                 </span>,
               ],
               [
-                'Dư có hiện tại',
+                t('Dư có hiện tại'),
                 <span
                   key="credit"
                   className="font-semibold text-success tabular-nums"
@@ -1049,7 +1088,7 @@ export function AgenciesPage() {
               ...(detailAgency.terminationReason
                 ? ([
                     [
-                      'Lý do ngừng hợp tác',
+                      t('Lý do ngừng hợp tác'),
                       detailAgency.terminationReason,
                       true,
                     ],
@@ -1065,7 +1104,7 @@ export function AgenciesPage() {
 
 /** Ward/commune name of an agency, falling back to its exact id. */
 function wardLabel(agency: Agency): string {
-  return agency.wardName || `Phường/xã #${agency.wardId}`
+  return agency.wardName || t('Phường/xã #{wardId}', { wardId: agency.wardId })
 }
 
 /** Overview tiles derived from the already-loaded agency type catalogue. */
@@ -1074,22 +1113,26 @@ function agencyKpis(wards: Ward[], agencyTypes: AgencyType[]) {
   const items: { label: string; value: number; icon: typeof Store }[] = []
   if (counted.length) {
     items.push({
-      label: 'Đại lý đang hoạt động',
+      label: t('Đại lý đang hoạt động'),
       value: sumBy(counted, (w) => w.activeAgencyCount ?? 0),
       icon: Store,
     })
     items.push({
-      label: 'Phường/xã có đại lý',
+      label: t('Phường/xã có đại lý'),
       value: counted.filter((w) => (w.activeAgencyCount ?? 0) > 0).length,
       icon: MapPin,
     })
   }
   if (agencyTypes.length)
-    items.push({ label: 'Loại đại lý', value: agencyTypes.length, icon: Tags })
+    items.push({
+      label: t('Loại đại lý'),
+      value: agencyTypes.length,
+      icon: Tags,
+    })
   const full = wards.filter((w) => w.remainingSlots !== undefined)
   if (full.length)
     items.push({
-      label: 'Phường/xã đã đủ đại lý',
+      label: t('Phường/xã đã đủ đại lý'),
       value: full.filter((w) => w.remainingSlots === 0).length,
       icon: CircleDashed,
     })
@@ -1103,10 +1146,15 @@ function DebtUsage({ debt, limit }: { debt: number; limit: number | null }) {
   return (
     <Progress
       value={Math.round(ratio * 100)}
-      aria-label={`Đã dùng ${formatPercent(ratio)} hạn mức nợ`}
-      title={`${formatPercent(ratio)} hạn mức ${formatVND(String(limit))}`}
+      aria-label={t('Đã dùng {ratio} hạn mức nợ', {
+        ratio: formatPercent(ratio),
+      })}
+      title={t('{ratio} hạn mức {limit}', {
+        ratio: formatPercent(ratio),
+        limit: formatVND(String(limit)),
+      })}
       className={cn(
-        'mt-1 ml-auto h-1 w-20 bg-muted',
+        'mt-1 ms-auto h-1 w-20 bg-muted',
         ratio >= 0.9
           ? '[&>*]:bg-destructive'
           : ratio >= 0.7
@@ -1125,14 +1173,14 @@ function agencyTypeLabel(agency: Agency): string {
   return (
     agency.typeName ||
     agency.agencyTypeName ||
-    `Loại ${agency.typeId ?? agency.agencyTypeId}`
+    t('Loại {typeId}', { typeId: agency.typeId ?? agency.agencyTypeId })
   )
 }
 
 /** Debt limit of the agency's type (display only); null when unknown. */
 function debtLimit(agency: Agency, agencyTypes: AgencyType[]): number | null {
   const type = agencyTypes.find(
-    (t) => t.id === (agency.typeId ?? agency.agencyTypeId),
+    (item) => item.id === (agency.typeId ?? agency.agencyTypeId),
   )
   const limit = num(agency.maxDebt ?? type?.maxDebt)
   return limit > 0 ? limit : null
@@ -1155,9 +1203,9 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
   return (
     <>
       <DonutTile
-        title="Đại lý theo loại"
-        centerLabel="đại lý"
-        head={['Loại', 'Số đại lý']}
+        title={t('Đại lý theo loại')}
+        centerLabel={t('đại lý')}
+        head={[t('Loại'), t('Số đại lý')]}
         data={partsBy(
           agencies,
           (agency) => agency.typeId ?? agency.agencyTypeId,
@@ -1165,11 +1213,11 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
         )}
       />
       <ChartTile
-        title="Dư nợ theo phường/xã"
+        title={t('Dư nợ theo phường/xã')}
         table={
           <MiniTable
-            caption="Dư nợ theo phường/xã"
-            head={['Phường/xã', 'Dư nợ']}
+            caption={t('Dư nợ theo phường/xã')}
+            head={[t('Phường/xã'), t('Dư nợ')]}
             rows={byWard.map((row) => [row.name, formatVND(String(row.debt))])}
           />
         }
@@ -1179,13 +1227,15 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
           xKey="name"
           height={150}
           valueFormatter={formatCompactVND}
-          series={[{ key: 'debt', label: 'Dư nợ' }]}
+          series={[{ key: 'debt', label: t('Dư nợ') }]}
         />
       </ChartTile>
       <MeterTile
-        title="Hạn mức nợ đã dùng"
+        title={t('Hạn mức nợ đã dùng')}
         ratio={ratioOf(debt, limit)}
-        caption={`${formatPlain(limited.length)} đại lý hoạt động`}
+        caption={t('{count} đại lý hoạt động', {
+          count: formatPlain(limited.length),
+        })}
         color={
           ratioOf(debt, limit) >= 0.9
             ? 'var(--destructive)'
@@ -1194,8 +1244,8 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
               : 'var(--chart-1)'
         }
         legend={[
-          { key: 'debt', label: 'Dư nợ', value: formatCompactVND(debt) },
-          { key: 'limit', label: 'Hạn mức', value: formatCompactVND(limit) },
+          { key: 'debt', label: t('Dư nợ'), value: formatCompactVND(debt) },
+          { key: 'limit', label: t('Hạn mức'), value: formatCompactVND(limit) },
         ]}
       />
     </>

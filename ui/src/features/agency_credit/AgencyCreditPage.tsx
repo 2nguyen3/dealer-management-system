@@ -24,6 +24,7 @@ import { SectionCard, TableSkeleton } from '../payment_receipts/financeUi'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
 import { Balance } from '../receivables/Balance'
 import { SourceStatement } from '../receivables/SourceStatement'
+import { t } from '@/lib/i18n/core'
 
 function lot(value: unknown): Row {
   const data = record(value)
@@ -38,8 +39,8 @@ function lot(value: unknown): Row {
 
 /** Server sort enum for GET /agencies/{id}/credit-lots: createdAt, id (±). */
 const LOT_SORTS = [
-  { field: 'createdAt', label: 'Thời điểm phát sinh' },
-  { field: 'id', label: 'Mã khoản' },
+  { field: 'createdAt', label: t('Thời điểm phát sinh') },
+  { field: 'id', label: t('Mã khoản') },
 ]
 
 function Lots({ agencyId }: { agencyId: string }) {
@@ -51,8 +52,8 @@ function Lots({ agencyId }: { agencyId: string }) {
   )
   return (
     <SectionCard
-      title="Các khoản dư có"
-      description="Dùng theo thứ tự cũ nhất trước."
+      title={t('Các khoản dư có')}
+      description={t('Dùng theo thứ tự cũ nhất trước.')}
       icon={<Coins />}
       actions={
         <SortMenu
@@ -65,14 +66,14 @@ function Lots({ agencyId }: { agencyId: string }) {
       {list.error && <Alert type="error">{list.error}</Alert>}
       <div className="overflow-hidden rounded-lg border">
         {list.loading ? (
-          <TableSkeleton rows={3} label="Đang tải khoản dư có..." />
+          <TableSkeleton rows={3} label={t('Đang tải khoản dư có...')} />
         ) : !list.error && !list.items.length ? (
           <p className="p-4 text-sm text-muted-foreground">
-            Đại lý chưa có khoản dư có nào.
+            {t('Đại lý chưa có khoản dư có nào.')}
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <Table caption="Các khoản dư có">
+            <Table caption={t('Các khoản dư có')}>
               <thead>
                 <tr>
                   <SortableHeader
@@ -80,21 +81,21 @@ function Lots({ agencyId }: { agencyId: string }) {
                     sort={sorter.sort}
                     onSort={sorter.toggle}
                   >
-                    Khoản
+                    {t('Khoản')}
                   </SortableHeader>
-                  <th scope="col">Chứng từ nguồn</th>
-                  <th scope="col">Phiếu thu gốc</th>
+                  <th scope="col">{t('Chứng từ nguồn')}</th>
+                  <th scope="col">{t('Phiếu thu gốc')}</th>
                   <th scope="col" className="cell-number">
-                    Số dư
+                    {t('Số dư')}
                   </th>
                   <th scope="col" className="cell-number">
-                    Đang giữ
+                    {t('Đang giữ')}
                   </th>
                   <th scope="col" className="cell-number">
-                    Khả dụng
+                    {t('Khả dụng')}
                   </th>
                   <th scope="col" className="min-w-32">
-                    Tỷ lệ khả dụng
+                    {t('Tỷ lệ khả dụng')}
                   </th>
                 </tr>
               </thead>
@@ -156,7 +157,7 @@ function LotRatio({
     <div className="flex items-center gap-2">
       <Progress
         value={ratio * 100}
-        aria-label={`Tỷ lệ khả dụng khoản #${id}`}
+        aria-label={t('Tỷ lệ khả dụng khoản #{id}', { id })}
         className="h-1.5 w-20 [&_[data-slot=progress-indicator]]:bg-success"
       />
       <span className="text-xs text-muted-foreground tabular-nums">
@@ -188,9 +189,11 @@ export function AgencyCreditPage() {
   return (
     <div className="page-container space-y-6">
       <PageHeader
-        eyebrow="Tài chính"
-        title="Hạn mức & Dư có đại lý"
-        description="Hạn mức nợ, cơ cấu dư có và từng khoản dư có của đại lý."
+        eyebrow={t('Tài chính')}
+        title={t('Hạn mức & Dư có đại lý')}
+        description={t(
+          'Hạn mức nợ, cơ cấu dư có và từng khoản dư có của đại lý.',
+        )}
         className="mb-0"
       />
       <form
@@ -200,7 +203,7 @@ export function AgencyCreditPage() {
       >
         <EntityPicker
           resource="agencies"
-          label="Đại lý"
+          label={t('Đại lý')}
           value={input}
           onChange={(value, item) => {
             setInput(value)
@@ -209,14 +212,14 @@ export function AgencyCreditPage() {
           required
         />
         <Button type="submit" icon={<Search className="size-4" />}>
-          Xem dư có
+          {t('Xem dư có')}
         </Button>
       </form>
       {error && <Alert type="error">{error}</Alert>}
       {!selected ? (
         <EmptyState
-          title="Chưa chọn đại lý"
-          description="Chọn đại lý ở trên để xem hạn mức và dư có."
+          title={t('Chưa chọn đại lý')}
+          description={t('Chọn đại lý ở trên để xem hạn mức và dư có.')}
         />
       ) : (
         <div className="space-y-6">
@@ -234,7 +237,7 @@ export function AgencyCreditPage() {
                 icon={<BookOpenText className="size-4" />}
                 onClick={() => setStatement(true)}
               >
-                Mở sổ dư có
+                {t('Mở sổ dư có')}
               </Button>
             </div>
           )}
@@ -242,13 +245,13 @@ export function AgencyCreditPage() {
             <SourceStatement
               key={`statement-${selected}`}
               path={`/agencies/${selected}/credit-entries`}
-              title="Sổ dư có"
+              title={t('Sổ dư có')}
               opening="openingCredit"
               closing="closingCredit"
               chart
-              chartTitle="Diễn biến dư có"
-              increaseLabel="Tăng dư có"
-              decreaseLabel="Giảm dư có"
+              chartTitle={t('Diễn biến dư có')}
+              increaseLabel={t('Tăng dư có')}
+              decreaseLabel={t('Giảm dư có')}
             />
           )}
         </div>

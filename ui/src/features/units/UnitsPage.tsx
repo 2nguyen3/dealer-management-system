@@ -6,6 +6,7 @@ import { master } from '../master_data/masterContracts'
 import { countWhere, num } from '../master_data/summaryData'
 import { ChartTile, MiniTable, StatTile } from '../master_data/summaryParts'
 import type { Row } from '../payment_receipts/contracts'
+import { t } from '@/lib/i18n/core'
 
 function unitSummary(items: Row[]) {
   const bars = items.map((item) => ({
@@ -14,18 +15,22 @@ function unitSummary(items: Row[]) {
   }))
   return (
     <>
-      <StatTile label="Đơn vị tính" value={items.length} icon={<Ruler />} />
       <StatTile
-        label="Cho phép số lẻ"
+        label={t('Đơn vị tính')}
+        value={items.length}
+        icon={<Ruler />}
+      />
+      <StatTile
+        label={t('Cho phép số lẻ')}
         value={countWhere(items, (item) => item.allowsFraction === true)}
         icon={<SplitSquareHorizontal />}
       />
       <ChartTile
-        title="Mặt hàng theo đơn vị"
+        title={t('Mặt hàng theo đơn vị')}
         table={
           <MiniTable
-            caption="Mặt hàng theo đơn vị"
-            head={['Đơn vị', 'Số mặt hàng']}
+            caption={t('Mặt hàng theo đơn vị')}
+            head={[t('Đơn vị'), t('Số mặt hàng')]}
             rows={bars.map((bar) => [bar.name, formatPlain(bar.products)])}
           />
         }
@@ -35,7 +40,7 @@ function unitSummary(items: Row[]) {
           xKey="name"
           height={150}
           valueFormatter={formatPlain}
-          series={[{ key: 'products', label: 'Số mặt hàng' }]}
+          series={[{ key: 'products', label: t('Số mặt hàng') }]}
         />
       </ChartTile>
     </>
@@ -44,29 +49,29 @@ function unitSummary(items: Row[]) {
 
 const config: MasterConfig = {
   path: '/units',
-  title: 'Đơn vị tính',
-  description: 'Đơn vị dùng cho mặt hàng và cho phép nhập số lẻ hay không.',
+  title: t('Đơn vị tính'),
+  description: t('Đơn vị dùng cho mặt hàng và cho phép nhập số lẻ hay không.'),
   manage: 'unit.manage',
   decode: master,
   statuses: ['ACTIVE', 'INACTIVE'],
   sorts: [
-    { field: 'code', label: 'Mã đơn vị' },
-    { field: 'name', label: 'Tên đơn vị' },
-    { field: 'id', label: 'Thứ tự tạo' },
+    { field: 'code', label: t('Mã đơn vị') },
+    { field: 'name', label: t('Tên đơn vị') },
+    { field: 'id', label: t('Thứ tự tạo') },
   ],
   summary: unitSummary,
   fields: [
-    { key: 'code', label: 'Mã đơn vị' },
-    { key: 'name', label: 'Tên đơn vị' },
-    { key: 'allowsFraction', label: 'Cho phép số lẻ', type: 'boolean' },
-    { key: 'status', label: 'Trạng thái', type: 'status' },
+    { key: 'code', label: t('Mã đơn vị') },
+    { key: 'name', label: t('Tên đơn vị') },
+    { key: 'allowsFraction', label: t('Cho phép số lẻ'), type: 'boolean' },
+    { key: 'status', label: t('Trạng thái'), type: 'status' },
   ],
   columns: [
-    ['code', 'Mã'],
-    ['name', 'Tên đơn vị'],
-    ['allowsFraction', 'Cho phép số lẻ', 'boolean'],
-    ['productCount', 'Số mặt hàng', 'count'],
-    ['status', 'Trạng thái', 'status'],
+    ['code', t('Mã')],
+    ['name', t('Tên đơn vị')],
+    ['allowsFraction', t('Cho phép số lẻ'), 'boolean'],
+    ['productCount', t('Số mặt hàng'), 'count'],
+    ['status', t('Trạng thái'), 'status'],
   ],
 }
 export function UnitsPage() {
