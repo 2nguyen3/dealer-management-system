@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/core'
 import type { FunctionCode } from '../lib/types'
 
 export interface NavigationPolicy {
@@ -98,63 +99,86 @@ export function allowsNavigation(
   )
 }
 
-export const navigationGroups: { title: string; items: NavigationItem[] }[] = [
+/** Stable group keys; labels are translated, so code never matches on text. */
+export type NavigationGroupKey =
+  'overview' | 'agencies' | 'stock' | 'money' | 'catalogue' | 'admin'
+
+export const navigationGroups: {
+  key: NavigationGroupKey
+  title: string
+  items: NavigationItem[]
+}[] = [
   {
-    title: 'Tổng quan',
+    key: 'overview',
+    title: t('Tổng quan'),
     items: [
-      { path: '/', label: 'Bàn làm việc' },
-      { path: '/dashboard', label: 'Bảng điều khiển' },
-      { path: '/reports', label: 'Báo cáo kinh doanh' },
+      { path: '/', label: t('Bàn làm việc') },
+      { path: '/dashboard', label: t('Bảng điều khiển') },
+      { path: '/reports', label: t('Báo cáo kinh doanh') },
     ],
   },
   {
-    title: 'Đại lý & Hàng hóa',
+    key: 'agencies',
+    title: t('Đại lý & Hàng hóa'),
     items: [
-      { path: '/agencies', label: 'Hồ sơ đại lý' },
-      { path: '/products', label: 'Danh mục mặt hàng' },
-      { path: '/inventory', label: 'Tồn kho & Thẻ kho' },
-      { path: '/agency-credit', label: 'Hạn mức & Dư có' },
+      { path: '/agencies', label: t('Hồ sơ đại lý') },
+      { path: '/products', label: t('Danh mục mặt hàng') },
+      { path: '/inventory', label: t('Tồn kho & Thẻ kho') },
+      { path: '/agency-credit', label: t('Hạn mức & Dư có') },
     ],
   },
   {
-    title: 'Giao dịch kho',
+    key: 'stock',
+    title: t('Giao dịch kho'),
     items: [
-      { path: '/stock-receipts', label: 'Phiếu nhập hàng' },
-      { path: '/stock-issues', label: 'Phiếu xuất hàng' },
-      { path: '/sales-returns', label: 'Phiếu trả hàng' },
-      { path: '/stock-adjustments', label: 'Điều chỉnh kho' },
-      { path: '/stock-counts', label: 'Kiểm kê kho' },
+      { path: '/stock-receipts', label: t('Phiếu nhập hàng') },
+      { path: '/stock-issues', label: t('Phiếu xuất hàng') },
+      { path: '/sales-returns', label: t('Phiếu trả hàng') },
+      { path: '/stock-adjustments', label: t('Điều chỉnh kho') },
+      { path: '/stock-counts', label: t('Kiểm kê kho') },
     ],
   },
   {
-    title: 'Thu tiền & Công nợ',
+    key: 'money',
+    title: t('Thu tiền & Công nợ'),
     items: [
-      { path: '/receivables', label: 'Công nợ đại lý' },
-      { path: '/payment-receipts', label: 'Phiếu thu tiền' },
-      { path: '/upfront-payments', label: 'Xác nhận trả ngay' },
-      { path: '/credit-applications', label: 'Bù trừ dư có' },
-      { path: '/online-payments', label: 'Thanh toán trực tuyến' },
-      { path: '/refunds', label: 'Hoàn tiền đại lý' },
+      { path: '/receivables', label: t('Công nợ đại lý') },
+      { path: '/payment-receipts', label: t('Phiếu thu tiền') },
+      { path: '/upfront-payments', label: t('Xác nhận trả ngay') },
+      { path: '/credit-applications', label: t('Bù trừ dư có') },
+      { path: '/online-payments', label: t('Thanh toán trực tuyến') },
+      { path: '/refunds', label: t('Hoàn tiền đại lý') },
     ],
   },
   {
-    title: 'Danh mục & Quy định',
+    key: 'catalogue',
+    title: t('Danh mục & Quy định'),
     items: [
-      { path: '/agency-types', label: 'Loại đại lý' },
-      { path: '/units', label: 'Đơn vị tính' },
-      { path: '/business-rules', label: 'Thay đổi quy định' },
+      { path: '/agency-types', label: t('Loại đại lý') },
+      { path: '/units', label: t('Đơn vị tính') },
+      { path: '/business-rules', label: t('Thay đổi quy định') },
     ],
   },
   {
-    title: 'Quản trị & Lịch sử',
+    key: 'admin',
+    title: t('Quản trị & Lịch sử'),
     items: [
-      { path: '/users', label: 'Tài khoản người dùng' },
-      { path: '/user-groups', label: 'Nhóm người dùng' },
-      { path: '/permissions', label: 'Phân quyền chức năng' },
-      { path: '/audit-logs', label: 'Nhật ký hệ thống' },
-      { path: '/document-history', label: 'Lịch sử chứng từ' },
-      { path: '/document-corrections', label: 'Sửa sai & Hủy chứng từ' },
-      { path: '/chatbot', label: 'Trợ lý AI', unavailable: true },
+      { path: '/users', label: t('Tài khoản người dùng') },
+      { path: '/user-groups', label: t('Nhóm người dùng') },
+      { path: '/permissions', label: t('Phân quyền chức năng') },
+      { path: '/audit-logs', label: t('Nhật ký hệ thống') },
+      { path: '/document-history', label: t('Lịch sử chứng từ') },
+      { path: '/document-corrections', label: t('Sửa sai & Hủy chứng từ') },
+      { path: '/chatbot', label: t('Trợ lý AI'), unavailable: true },
     ],
   },
 ]
+
+/** Translated page name of a workspace route (falls back to the path). */
+export function routeLabel(path: string): string {
+  if (path === '/profile') return t('Hồ sơ cá nhân')
+  const item = navigationGroups
+    .flatMap((group) => group.items)
+    .find((entry) => entry.path === path)
+  return item ? item.label : path
+}
