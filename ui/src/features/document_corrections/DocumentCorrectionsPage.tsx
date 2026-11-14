@@ -19,6 +19,7 @@ import { Hint } from '../document_history/DocumentParts'
 import { errorMessage } from '../document_history/useDocumentRequests'
 import { DocumentSnapshot } from '../stock_receipts/DocumentSnapshot'
 import { CorrectionDialog } from './CorrectionDialog'
+import { t } from '@/lib/i18n/core'
 
 export function DocumentCorrectionsPage() {
   const { user, allowedFunctions, hasPermission } = useAuth()
@@ -63,9 +64,9 @@ function CorrectionsScreen({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chứng từ"
-        title="Sửa sai và hủy chứng từ"
-        description="Phiên bản mới có lý do cho chứng từ đã ghi sổ."
+        eyebrow={t('Chứng từ')}
+        title={t('Sửa sai và hủy chứng từ')}
+        description={t('Phiên bản mới có lý do cho chứng từ đã ghi sổ.')}
         className="mb-0"
       />
       <DocumentList
@@ -78,15 +79,19 @@ function CorrectionsScreen({
             variant="ghost"
             size="sm"
             icon={<ScanSearch className="size-4" />}
-            aria-label={`Kiểm tra ${row.code}`}
+            aria-label={t('Kiểm tra {code}', { code: row.code })}
           >
-            Kiểm tra
+            {t('Kiểm tra')}
           </Button>
         )}
       />
       <Modal
         isOpen={!!selected && !mode}
-        title={detail ? `Chứng từ ${detail.doc.code}` : 'Kiểm tra chứng từ'}
+        title={
+          detail
+            ? t('Chứng từ {code}', { code: detail.doc.code })
+            : t('Kiểm tra chứng từ')
+        }
         maxWidth="xl"
         onClose={() => setSelected(null)}
         footer={
@@ -94,7 +99,7 @@ function CorrectionsScreen({
             <div className="flex w-full flex-wrap items-center justify-end gap-2">
               <Button
                 variant="ghost"
-                className="mr-auto"
+                className="me-auto"
                 icon={<RefreshCw className="size-4" />}
                 onClick={() => {
                   setDetail(null)
@@ -102,7 +107,7 @@ function CorrectionsScreen({
                   setVersion((value) => value + 1)
                 }}
               >
-                Tải lại
+                {t('Tải lại')}
               </Button>
               {canCancel && (
                 <Button
@@ -111,7 +116,7 @@ function CorrectionsScreen({
                   disabled={!detail.etag}
                   onClick={() => setMode('cancel')}
                 >
-                  Hủy chứng từ
+                  {t('Hủy chứng từ')}
                 </Button>
               )}
               {canCorrect && (
@@ -120,7 +125,7 @@ function CorrectionsScreen({
                   disabled={!detail.etag}
                   onClick={() => setMode('correct')}
                 >
-                  Điều chỉnh
+                  {t('Điều chỉnh')}
                 </Button>
               )}
             </div>
@@ -131,7 +136,7 @@ function CorrectionsScreen({
           {error && <Alert type="error">{error}</Alert>}
           {!detail && !error && (
             <div role="status" className="space-y-4">
-              <span className="sr-only">Đang tải chứng từ...</span>
+              <span className="sr-only">{t('Đang tải chứng từ...')}</span>
               <Skeleton className="h-36 w-full rounded-xl" />
               <Skeleton className="h-40 w-full rounded-xl" />
             </div>
@@ -141,8 +146,9 @@ function CorrectionsScreen({
               <DocumentSnapshot doc={detail.doc} />
               {!canCorrect && !canCancel && (
                 <Hint>
-                  Không sửa/hủy được tại đây (từ kiểm kê, thu trực tuyến hoặc
-                  thiếu quyền).
+                  {t(
+                    'Không sửa/hủy được tại đây (từ kiểm kê, thu trực tuyến hoặc thiếu quyền).',
+                  )}
                 </Hint>
               )}
             </>

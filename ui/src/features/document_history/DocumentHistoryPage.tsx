@@ -41,6 +41,7 @@ import {
 } from './documentContracts'
 import { Fact, FactGrid, InfoTip } from './DocumentParts'
 import { errorMessage, useDocumentPage } from './useDocumentRequests'
+import { t } from '@/lib/i18n/core'
 
 export function DocumentHistoryPage() {
   const { user, allowedFunctions } = useAuth()
@@ -51,9 +52,9 @@ function HistoryScreen() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Chứng từ"
-        title="Lịch sử chứng từ"
-        description="Phiên bản, bản in và PDF của mọi chứng từ."
+        eyebrow={t('Chứng từ')}
+        title={t('Lịch sử chứng từ')}
+        description={t('Phiên bản, bản in và PDF của mọi chứng từ.')}
         className="mb-0"
       />
       <DocumentList
@@ -63,10 +64,10 @@ function HistoryScreen() {
             variant="ghost"
             size="sm"
             icon={<History className="size-4" />}
-            aria-label={`Phiên bản ${row.code}`}
+            aria-label={t('Phiên bản {code}', { code: row.code })}
             onClick={() => setSelected(row)}
           >
-            Phiên bản
+            {t('Phiên bản')}
           </Button>
         )}
       />
@@ -93,7 +94,7 @@ const iconTone: Record<Revision['state'], string> = {
 function TimelineSkeleton() {
   return (
     <div role="status" className="space-y-5">
-      <span className="sr-only">Đang tải phiên bản...</span>
+      <span className="sr-only">{t('Đang tải phiên bản...')}</span>
       {[0, 1, 2].map((item) => (
         <div key={item} className="flex gap-3" aria-hidden="true">
           <Skeleton className="size-8 shrink-0 rounded-full" />
@@ -183,22 +184,28 @@ export function RevisionHistory({
     }
   }
   return (
-    <Modal isOpen title={`Lịch sử ${doc.code}`} onClose={onClose} maxWidth="xl">
+    <Modal
+      isOpen
+      title={t('Lịch sử {code}', { code: doc.code })}
+      onClose={onClose}
+      maxWidth="xl"
+    >
       <div className="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
-        <section aria-label="Dòng thời gian phiên bản" className="min-w-0">
+        <section aria-label={t('Dòng thời gian phiên bản')} className="min-w-0">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-1 text-sm font-semibold text-foreground">
-              Dòng thời gian
-              <InfoTip label="Về phiên bản">
-                Mỗi phiên bản giữ nguyên tên hàng, giá và thông tin đại lý tại
-                thời điểm lập.
+              {t('Dòng thời gian')}
+              <InfoTip label={t('Về phiên bản')}>
+                {t(
+                  'Mỗi phiên bản giữ nguyên tên hàng, giá và thông tin đại lý tại thời điểm lập.',
+                )}
               </InfoTip>
             </h3>
             <ToggleGroup
               type="single"
               size="sm"
               variant="outline"
-              aria-label="Thứ tự phiên bản"
+              aria-label={t('Thứ tự phiên bản')}
               value={order}
               onValueChange={(next) => {
                 if (next !== '-revisionNo' && next !== 'revisionNo') return
@@ -208,11 +215,11 @@ export function RevisionHistory({
             >
               <ToggleGroupItem value="-revisionNo" className="px-2 text-xs">
                 <ArrowDownWideNarrow aria-hidden="true" />
-                Mới nhất
+                {t('Mới nhất')}
               </ToggleGroupItem>
               <ToggleGroupItem value="revisionNo" className="px-2 text-xs">
                 <ArrowUpNarrowWide aria-hidden="true" />
-                Cũ nhất
+                {t('Cũ nhất')}
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -221,7 +228,7 @@ export function RevisionHistory({
               <span className="flex flex-wrap items-center gap-3">
                 {data.error}
                 <Button variant="outline" size="sm" onClick={data.reload}>
-                  Thử lại
+                  {t('Thử lại')}
                 </Button>
               </span>
             </Alert>
@@ -231,7 +238,7 @@ export function RevisionHistory({
             <>
               {!data.page.items.length && (
                 <p className="text-sm text-muted-foreground">
-                  Chưa có phiên bản.
+                  {t('Chưa có phiên bản.')}
                 </p>
               )}
               <ol className="relative space-y-1">
@@ -242,7 +249,7 @@ export function RevisionHistory({
                     <li key={item.id} className="relative flex gap-3 pb-4">
                       {index < items.length - 1 && (
                         <span
-                          className="absolute top-9 bottom-0 left-4 w-px bg-border"
+                          className="absolute top-9 bottom-0 start-4 w-px bg-border"
                           aria-hidden="true"
                         />
                       )}
@@ -281,8 +288,10 @@ export function RevisionHistory({
                           </Button>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                          Ngày CT {formatDate(item.businessDate)} ·{' '}
-                          {formatVND(item.totalAmount)}
+                          {t('Ngày CT {businessDate} · {totalAmount}', {
+                            businessDate: formatDate(item.businessDate),
+                            totalAmount: formatVND(item.totalAmount),
+                          })}
                         </p>
                         {item.reason && (
                           <p className="mt-1 text-[13px] text-foreground">
@@ -291,7 +300,9 @@ export function RevisionHistory({
                         )}
                         <p className="mt-1 text-xs text-muted-foreground tabular-nums">
                           <time dateTime={item.createdAt}>
-                            Tạo lúc {formatDateTime(item.createdAt)}
+                            {t('Tạo lúc {createdAt}', {
+                              createdAt: formatDateTime(item.createdAt),
+                            })}
                           </time>
                         </p>
                       </div>
@@ -319,12 +330,17 @@ export function RevisionHistory({
             </>
           )}
         </section>
-        <section aria-label="Nội dung phiên bản" className="min-w-0 space-y-4">
+        <section
+          aria-label={t('Nội dung phiên bản')}
+          className="min-w-0 space-y-4"
+        >
           {revision ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-foreground">
-                  Nội dung phiên bản v{revision.revisionNo}
+                  {t('Nội dung phiên bản v{revisionNo}', {
+                    revisionNo: revision.revisionNo,
+                  })}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -334,7 +350,7 @@ export function RevisionHistory({
                     disabled={exportBusy}
                     onClick={() => void snapshot(revision, 'text/html')}
                   >
-                    Xem bản in
+                    {t('Xem bản in')}
                   </Button>
                   <Button
                     size="sm"
@@ -342,27 +358,27 @@ export function RevisionHistory({
                     isLoading={exportBusy}
                     onClick={() => void snapshot(revision, 'application/pdf')}
                   >
-                    Tải PDF
+                    {t('Tải PDF')}
                   </Button>
                 </div>
               </div>
               <Card className="gap-0 p-4 shadow-xs">
                 <FactGrid className="lg:grid-cols-3">
-                  <Fact label="Trạng thái">
+                  <Fact label={t('Trạng thái')}>
                     <StatusBadge status={revision.state} />
                   </Fact>
-                  <Fact label="Ngày chứng từ">
+                  <Fact label={t('Ngày chứng từ')}>
                     <span className="tabular-nums">
                       {formatDate(revision.businessDate)}
                     </span>
                   </Fact>
-                  <Fact label="Tổng tiền">
+                  <Fact label={t('Tổng tiền')}>
                     <span className="font-semibold tabular-nums">
                       {formatVND(revision.totalAmount)}
                     </span>
                   </Fact>
                   {revision.agencySnapshot && (
-                    <Fact label="Đại lý" full>
+                    <Fact label={t('Đại lý')} full>
                       <span className="font-medium">
                         {revision.agencySnapshot.name}
                       </span>
@@ -374,7 +390,7 @@ export function RevisionHistory({
                     </Fact>
                   )}
                   {revision.note && (
-                    <Fact label="Ghi chú" full>
+                    <Fact label={t('Ghi chú')} full>
                       {revision.note}
                     </Fact>
                   )}
@@ -383,16 +399,16 @@ export function RevisionHistory({
               <Card className="gap-0 overflow-hidden py-0 shadow-xs">
                 <div className="overflow-x-auto">
                   <Table
-                    caption="Dòng hàng của phiên bản"
+                    caption={t('Dòng hàng của phiên bản')}
                     className="min-w-[520px]"
                   >
                     <thead>
                       <tr>
-                        <th>Mặt hàng</th>
-                        <th className="cell-number">Số lượng</th>
-                        <th>Đơn vị</th>
-                        <th className="cell-number">Đơn giá</th>
-                        <th className="cell-number">Thành tiền</th>
+                        <th>{t('Mặt hàng')}</th>
+                        <th className="cell-number">{t('Số lượng')}</th>
+                        <th>{t('Đơn vị')}</th>
+                        <th className="cell-number">{t('Đơn giá')}</th>
+                        <th className="cell-number">{t('Thành tiền')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -422,7 +438,7 @@ export function RevisionHistory({
               {exportError && <Alert type="error">{exportError}</Alert>}
               {htmlUrl && (
                 <iframe
-                  title={`Bản HTML ${doc.code}`}
+                  title={t('Bản HTML {code}', { code: doc.code })}
                   src={htmlUrl}
                   sandbox=""
                   // Paper preview: the printed snapshot is always a light page.
@@ -433,8 +449,8 @@ export function RevisionHistory({
           ) : (
             <EmptyState
               icon={<History className="size-6" />}
-              title="Chọn một phiên bản"
-              description="Bấm “Xem” trên dòng thời gian."
+              title={t('Chọn một phiên bản')}
+              description={t('Bấm “Xem” trên dòng thời gian.')}
             />
           )}
         </section>

@@ -4,6 +4,7 @@ import { formatDate } from '../../lib/formatters'
 import { statusLabel } from '../../lib/labels'
 import type { DocumentKind, DocumentSummary } from './documentContracts'
 import type { LifecycleStep } from './DocumentParts'
+import { t } from '@/lib/i18n/core'
 
 const STATUS_ORDER = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
 const STATUS_COLORS: Record<(typeof STATUS_ORDER)[number], string> = {
@@ -58,33 +59,33 @@ export function valueByDay(items: readonly DocumentSummary[]) {
 
 const DRAFT: LifecycleStep = {
   key: 'draft',
-  label: 'Lập phiếu',
+  label: t('Lập phiếu'),
   icon: FilePen,
-  hint: 'Bản nháp: còn sửa được, chưa tác động sổ sách.',
+  hint: t('Bản nháp: còn sửa được, chưa tác động sổ sách.'),
 }
 const PENDING: LifecycleStep = {
   key: 'pending',
-  label: 'Chờ xuất',
+  label: t('Chờ xuất'),
   icon: Send,
-  hint: 'Đã nộp và chốt giá; tồn kho được kiểm tra lại khi ghi sổ.',
+  hint: t('Đã nộp và chốt giá; tồn kho được kiểm tra lại khi ghi sổ.'),
 }
 const POSTED: LifecycleStep = {
   key: 'posted',
-  label: 'Ghi sổ',
+  label: t('Ghi sổ'),
   icon: BookCheck,
-  hint: 'Đã ghi vào sổ kho và công nợ.',
+  hint: t('Đã ghi vào sổ kho và công nợ.'),
 }
 const CHANGE: LifecycleStep = {
   key: 'change',
-  label: 'Sửa sai/Hủy',
+  label: t('Sửa sai/Hủy'),
   icon: Undo2,
-  hint: 'Chỉ bằng phiên bản mới có lý do; lịch sử giữ nguyên.',
+  hint: t('Chỉ bằng phiên bản mới có lý do; lịch sử giữ nguyên.'),
 }
 const CANCELLED: LifecycleStep = {
   key: 'cancelled',
-  label: 'Hủy',
+  label: t('Hủy'),
   icon: XCircle,
-  hint: 'Chứng từ đã hủy; tác động sổ sách được đảo lại.',
+  hint: t('Chứng từ đã hủy; tác động sổ sách được đảo lại.'),
 }
 
 /** Steps a document of this kind passes through; only issues wait in PENDING. */

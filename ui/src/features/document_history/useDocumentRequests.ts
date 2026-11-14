@@ -3,11 +3,15 @@ import { ApiError, apiFetch, type RequestOptions } from '../../lib/api'
 import { cachedApiFetch } from '../../lib/cache'
 import { useAuth } from '../authentication/useAuth'
 import { parsePage, type Page } from './documentContracts'
+import { t } from '@/lib/i18n/core'
 
 export function errorMessage(error: unknown) {
   if (error instanceof ApiError && (error.status === 0 || error.status >= 500))
-    return `${error.message} Kết quả chưa rõ. Thử lại cùng nội dung để giữ nguyên khóa yêu cầu; không lập phiếu khác.`
-  return error instanceof Error ? error.message : 'Không thể xử lý yêu cầu.'
+    return t(
+      '{message} Kết quả chưa rõ. Thử lại cùng nội dung để giữ nguyên khóa yêu cầu; không lập phiếu khác.',
+      { message: error.message },
+    )
+  return error instanceof Error ? error.message : t('Không thể xử lý yêu cầu.')
 }
 export function useDocumentMutation() {
   const { user } = useAuth()
@@ -15,7 +19,7 @@ export function useDocumentMutation() {
   const lock = useRef(false)
   const [busy, setBusy] = useState(false)
   async function run(path: string, options: RequestOptions = {}) {
-    if (lock.current) throw new Error('Yêu cầu đang được xử lý.')
+    if (lock.current) throw new Error(t('Yêu cầu đang được xử lý.'))
     const fingerprint = JSON.stringify([
       user?.id,
       path,

@@ -1,4 +1,8 @@
 import { Ban, ChevronDown, FilePen, Undo2, XCircle } from 'lucide-react'
+import { notifyNextStep } from '../../components/guide/notifyNextStep'
+import { WorkflowSteps } from '../../components/guide/WorkflowSteps'
+import { t } from '../../lib/i18n/core'
+import { correctionSteps } from '../guide/workflows'
 import { useId, useState } from 'react'
 import { DateField } from '../../components/blocks/DateField'
 import {
@@ -82,8 +86,8 @@ export function CorrectionDialog({
     if (!allowed || mutation.busy || stale) return
     setError(null)
     try {
-      if (!etag) throw new Error('Cần tải lại phiên bản và ETag hiện hành.')
-      if (!reason.trim()) throw new Error('Cần lý do bắt buộc.')
+      if (!etag) throw new Error(t('Cần tải lại phiên bản và ETag hiện hành.'))
+      if (!reason.trim()) throw new Error(t('Cần lý do bắt buộc.'))
       const body = cancel
         ? { reason: reason.trim() }
         : replacementBody(doc, {
@@ -100,6 +104,15 @@ export function CorrectionDialog({
       )
       invalidateCache(documentKinds[doc.kind].path)
       invalidateCache('/documents')
+      notifyNextStep({
+        done: cancel
+          ? t('Đã hủy {code}.', { code: doc.code })
+          : t('Đã tạo phiên bản thay thế cho {code}.', { code: doc.code }),
+        next: t(
+          'Tồn kho, công nợ và dư có liên quan đã được tính lại theo thứ tự ngày nghiệp vụ. Xem Lịch sử chứng từ để đối chiếu.',
+        ),
+        to: '/document-history',
+      })
       onSaved()
     } catch (failure) {
       setError(errorMessage(failure))
@@ -111,7 +124,9 @@ export function CorrectionDialog({
     <Modal
       isOpen
       title={
-        cancel ? `Hủy chứng từ ${doc.code}` : `Thay thế toàn bộ ${doc.code}`
+        cancel
+          ? t('Hủy chứng từ {code}', { code: doc.code })
+          : t('Thay thế toàn bộ {code}', { code: doc.code })
       }
       maxWidth="xl"
       onClose={() => {
@@ -125,7 +140,7 @@ export function CorrectionDialog({
             disabled={mutation.busy}
             onClick={onClose}
           >
-            Đóng
+            {t('Đóng')}
           </Button>
           <Button
             type="submit"
@@ -141,7 +156,7 @@ export function CorrectionDialog({
             disabled={!allowed || !etag || stale}
             isLoading={mutation.busy}
           >
-            Xác nhận {cancel ? 'hủy' : 'thay thế'}
+            {t('Xác nhận')} {cancel ? t('hủy') : t('thay thế')}
           </Button>
         </>
       }
@@ -149,25 +164,37 @@ export function CorrectionDialog({
       <div className="space-y-4">
         {!allowed && (
           <Alert type="error">
-            Không có quyền hoặc chứng từ không được sửa/hủy. Hủy phiếu xuất đã
-            thu tiền ngay cần thêm quyền ghi sổ phiếu thu.
+            {t(
+              'Không có quyền hoặc chứng từ không được sửa/hủy. Hủy phiếu xuất đã thu tiền ngay cần thêm quyền ghi sổ phiếu thu.',
+            )}
           </Alert>
         )}
+        <WorkflowSteps
+          label={t('Quy trình sửa sai và hủy')}
+          steps={correctionSteps(cancel)}
+        />
         <Alert
           type={cancel ? 'warning' : 'info'}
           title={
             cancel
-              ? 'Hủy là thao tác không hoàn tác'
-              : 'Sửa sai bằng phiên bản mới'
+              ? t('Hủy là thao tác không hoàn tác')
+              : t('Sửa sai bằng phiên bản mới')
           }
         >
           {cancel
-            ? 'Tồn kho và công nợ được kiểm tra lại; tiền đã thu không bị xóa.'
-            : 'Lưu thành phiên bản mới sau khi kiểm tra tồn kho, công nợ.'}
+            ? t(
+                'Tồn kho và công nợ được kiểm tra lại; tiền đã thu không bị xóa.',
+              )
+            : t(
+                'Lưu thành phiên bản mới sau khi kiểm tra tồn kho, công nợ.',
+              )}{' '}
+          {t(
+            'Hệ thống tính lại dây chuyền các chứng từ phía sau; nếu một chứng từ phía sau không còn hợp lệ (tồn âm, thu vượt nợ…) thao tác sẽ bị từ chối.',
+          )}
         </Alert>
         <Collapsible className="group rounded-xl border bg-muted/30">
-          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-3 text-left text-[13px] font-medium text-foreground">
-            Chứng từ hiện tại
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-3 text-start text-[13px] font-medium text-foreground">
+            {t('Chứng từ hiện tại')}
             <ChevronDown
               className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
               aria-hidden="true"
@@ -189,15 +216,18 @@ export function CorrectionDialog({
           {error && <Alert type="error">{error}</Alert>}
           {stale && (
             <Alert type="error">
-              Chứng từ vừa được người khác thay đổi. Đóng biểu mẫu, tải lại và
-              kiểm tra trước khi thực hiện lại.
+              {t(
+                'Chứng từ vừa được người khác thay đổi. Đóng biểu mẫu, tải lại và kiểm tra trước khi thực hiện lại.',
+              )}
             </Alert>
           )}
           <SectionCard
-            title={cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
+            title={cancel ? t('Lý do hủy') : t('Thông tin thay thế')}
             icon={cancel ? <Ban /> : <FilePen />}
             description={
-              cancel ? 'Lưu cùng lịch sử.' : 'Thay toàn bộ phiên bản hiện hành.'
+              cancel
+                ? t('Lưu cùng lịch sử.')
+                : t('Thay toàn bộ phiên bản hiện hành.')
             }
           >
             <fieldset
@@ -205,26 +235,26 @@ export function CorrectionDialog({
               className="grid min-w-0 gap-4 sm:grid-cols-2"
             >
               <legend className="sr-only">
-                {cancel ? 'Lý do hủy' : 'Thông tin thay thế'}
+                {cancel ? t('Lý do hủy') : t('Thông tin thay thế')}
               </legend>
               {!cancel && (
                 <>
                   <DateField
-                    label="Ngày nghiệp vụ mới"
+                    label={t('Ngày nghiệp vụ mới')}
                     disabled={locked}
                     clearable={false}
                     value={date}
                     onChange={setDate}
                   />
                   <Input
-                    label="Ghi chú thay thế"
+                    label={t('Ghi chú thay thế')}
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
                   />
                   {(doc.kind === 'PAYMENT_RECEIPT' ||
                     doc.kind === 'CREDIT_APPLICATION') && (
                     <Input
-                      label="Số tiền thay thế (VNĐ)"
+                      label={t('Số tiền thay thế (VNĐ)')}
                       value={amount}
                       inputMode="numeric"
                       className="tabular-nums"
@@ -233,12 +263,12 @@ export function CorrectionDialog({
                   )}
                   {doc.kind === 'PAYMENT_RECEIPT' && (
                     <Select
-                      label="Phương thức thu"
+                      label={t('Phương thức thu')}
                       value={paymentMethod}
                       onChange={(event) => setPaymentMethod(event.target.value)}
                       options={[
-                        { value: 'CASH', label: 'Tiền mặt' },
-                        { value: 'BANK_TRANSFER', label: 'Chuyển khoản' },
+                        { value: 'CASH', label: t('Tiền mặt') },
+                        { value: 'BANK_TRANSFER', label: t('Chuyển khoản') },
                       ]}
                     />
                   )}
@@ -249,7 +279,7 @@ export function CorrectionDialog({
                   htmlFor={reasonId}
                   className="text-[13px] text-foreground/85"
                 >
-                  Lý do bắt buộc{' '}
+                  {t('Lý do bắt buộc')}{' '}
                   <span className="text-destructive" aria-hidden="true">
                     *
                   </span>
@@ -261,8 +291,8 @@ export function CorrectionDialog({
                   className="bg-card"
                   placeholder={
                     cancel
-                      ? 'Ví dụ: Lập nhầm phiếu, đại lý hủy đơn…'
-                      : 'Ví dụ: Nhập sai số lượng dòng 2…'
+                      ? t('Ví dụ: Lập nhầm phiếu, đại lý hủy đơn…')
+                      : t('Ví dụ: Nhập sai số lượng dòng 2…')
                   }
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}

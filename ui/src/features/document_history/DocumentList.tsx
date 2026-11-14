@@ -32,15 +32,16 @@ import {
 import { DocumentInsights } from './DocumentInsights'
 import { FilterStatus, SegmentedFilter, TableSkeleton } from './DocumentParts'
 import { useDocumentPage } from './useDocumentRequests'
+import { t } from '@/lib/i18n/core'
 
 /** Server default order of every document list (contract `sort` default). */
 export const DOCUMENT_DEFAULT_SORT = '-businessDate'
 /** Contract sort fields of /documents and the four goods-document lists. */
 export const DOCUMENT_SORT_OPTIONS = [
-  { field: 'businessDate', label: 'Ngày chứng từ' },
-  { field: 'totalAmount', label: 'Tổng tiền' },
-  { field: 'createdAt', label: 'Thời điểm lập' },
-  { field: 'id', label: 'Thứ tự lập' },
+  { field: 'businessDate', label: t('Ngày chứng từ') },
+  { field: 'totalAmount', label: t('Tổng tiền') },
+  { field: 'createdAt', label: t('Thời điểm lập') },
+  { field: 'id', label: t('Thứ tự lập') },
 ] as const
 
 const statuses = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
@@ -67,7 +68,7 @@ const emptyDraft = {
 /** Status segments for a list: only stock issues wait in PENDING. */
 function statusSegments(kind?: DocumentKind) {
   return [
-    { value: '', label: 'Tất cả' },
+    { value: '', label: t('Tất cả') },
     ...statuses
       .filter((value) => value !== 'PENDING' || !kind || kind === 'STOCK_ISSUE')
       .map((value) => ({ value, label: statusLabel(value) })),
@@ -113,7 +114,8 @@ export function DocumentList({
   const path = `${kind ? documentKinds[kind].path : '/documents'}?${query}`
   // Version changes trigger only this active list, not unrelated master/ledger reads.
   const data = useDocumentPage(allowed ? path : null, parseSummary, version)
-  if (!allowed) return <Alert type="error">Không có quyền đọc chứng từ.</Alert>
+  if (!allowed)
+    return <Alert type="error">{t('Không có quyền đọc chứng từ.')}</Alert>
   const showKind = !kind
   const showAgency = !kind || !agencyless.includes(kind)
   const showProduct = !kind || !productless.includes(kind)
@@ -145,7 +147,7 @@ export function DocumentList({
     <div className="space-y-4">
       <Card className="gap-0 p-3 shadow-xs sm:p-4">
         <form
-          aria-label="Bộ lọc chứng từ"
+          aria-label={t('Bộ lọc chứng từ')}
           className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[minmax(0,1.6fr)_repeat(auto-fit,minmax(9.5rem,1fr))]"
           onSubmit={(event) => {
             event.preventDefault()
@@ -157,7 +159,7 @@ export function DocumentList({
               htmlFor={searchId}
               className="text-[13px] text-foreground/85"
             >
-              Tìm chứng từ
+              {t('Tìm chứng từ')}
             </Label>
             <InputGroup className="bg-card">
               <InputGroupAddon>
@@ -166,7 +168,7 @@ export function DocumentList({
               <InputGroupInput
                 id={searchId}
                 type="search"
-                placeholder="Mã, đại lý, ghi chú…"
+                placeholder={t('Mã, đại lý, ghi chú…')}
                 value={draft.q}
                 onChange={(event) =>
                   setDraft({ ...draft, q: event.target.value })
@@ -176,13 +178,13 @@ export function DocumentList({
           </div>
           {!kind && (
             <Select
-              label="Loại chứng từ"
+              label={t('Loại chứng từ')}
               value={draft.kind}
               onChange={(event) =>
                 setDraft({ ...draft, kind: event.target.value })
               }
               options={[
-                { value: '', label: 'Tất cả loại' },
+                { value: '', label: t('Tất cả loại') },
                 ...Object.entries(documentKinds)
                   .filter(([key]) =>
                     canReadKind(key as DocumentKind, hasPermission),
@@ -195,8 +197,8 @@ export function DocumentList({
             <EntityPicker
               id="document-filter-agency"
               resource="agencies"
-              label="Đại lý"
-              placeholder="Tất cả"
+              label={t('Đại lý')}
+              placeholder={t('Tất cả')}
               value={draft.agencyId}
               onChange={(agencyId) => setDraft({ ...draft, agencyId })}
             />
@@ -205,20 +207,20 @@ export function DocumentList({
             <EntityPicker
               id="document-filter-product"
               resource="products"
-              label="Mặt hàng"
-              placeholder="Tất cả"
+              label={t('Mặt hàng')}
+              placeholder={t('Tất cả')}
               value={draft.productId}
               onChange={(productId) => setDraft({ ...draft, productId })}
             />
           )}
           <DateField
-            label="Từ ngày"
+            label={t('Từ ngày')}
             value={draft.fromDate}
             max={draft.toDate || undefined}
             onChange={(fromDate) => setDraft({ ...draft, fromDate })}
           />
           <DateField
-            label="Đến ngày (không gồm)"
+            label={t('Đến ngày (không gồm)')}
             value={draft.toDate}
             min={draft.fromDate || undefined}
             onChange={(toDate) => setDraft({ ...draft, toDate })}
@@ -228,7 +230,7 @@ export function DocumentList({
             icon={<Filter className="size-4" />}
             className="w-full"
           >
-            Áp dụng bộ lọc
+            {t('Áp dụng bộ lọc')}
           </Button>
         </form>
       </Card>
@@ -237,7 +239,7 @@ export function DocumentList({
           <span className="flex flex-wrap items-center gap-3">
             {data.error}
             <Button variant="outline" size="sm" onClick={data.reload}>
-              Thử tải lại
+              {t('Thử tải lại')}
             </Button>
           </span>
         </Alert>
@@ -253,11 +255,11 @@ export function DocumentList({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {posted ? (
               <p className="text-sm font-medium text-foreground">
-                Chứng từ đã ghi sổ
+                {t('Chứng từ đã ghi sổ')}
               </p>
             ) : (
               <SegmentedFilter
-                label="Lọc theo trạng thái"
+                label={t('Lọc theo trạng thái')}
                 value={status}
                 options={statusSegments(kind)}
                 onChange={(next) => {
@@ -271,7 +273,7 @@ export function DocumentList({
           <div className="flex items-center gap-2">
             {data.page && (
               <span className="text-xs text-muted-foreground tabular-nums">
-                {data.page.items.length} dòng
+                {t('{count} dòng', { count: data.page.items.length })}
               </span>
             )}
             <SortMenu
@@ -282,24 +284,27 @@ export function DocumentList({
           </div>
         </div>
         {data.loading ? (
-          <TableSkeleton columns={columns} label="Đang tải chứng từ..." />
+          <TableSkeleton columns={columns} label={t('Đang tải chứng từ...')} />
         ) : (
           data.page &&
           (data.page.items.length ? (
             <div className="overflow-x-auto">
-              <Table caption="Danh sách chứng từ" className="min-w-[640px]">
+              <Table
+                caption={t('Danh sách chứng từ')}
+                className="min-w-[640px]"
+              >
                 <thead>
                   <tr>
-                    <th>Mã chứng từ</th>
-                    {showKind && <th>Loại</th>}
-                    {showAgency && <th>Đại lý</th>}
+                    <th>{t('Mã chứng từ')}</th>
+                    {showKind && <th>{t('Loại')}</th>}
+                    {showAgency && <th>{t('Đại lý')}</th>}
                     <SortableHeader
                       field="businessDate"
                       sort={sort}
                       onSort={onSort}
                       firstDirection="desc"
                     >
-                      Ngày
+                      {t('Ngày')}
                     </SortableHeader>
                     <SortableHeader
                       field="totalAmount"
@@ -308,11 +313,11 @@ export function DocumentList({
                       firstDirection="desc"
                       align="right"
                     >
-                      Tổng tiền
+                      {t('Tổng tiền')}
                     </SortableHeader>
-                    <th>Trạng thái</th>
+                    <th>{t('Trạng thái')}</th>
                     <th className="cell-actions">
-                      <span className="sr-only">Thao tác</span>
+                      <span className="sr-only">{t('Thao tác')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -366,8 +371,8 @@ export function DocumentList({
             <div className="p-4">
               <EmptyState
                 icon={<FileSearch className="size-6" />}
-                title="Không có chứng từ phù hợp."
-                description={activeFilters ? 'Thử nới bộ lọc.' : undefined}
+                title={t('Không có chứng từ phù hợp.')}
+                description={activeFilters ? t('Thử nới bộ lọc.') : undefined}
               />
             </div>
           ))

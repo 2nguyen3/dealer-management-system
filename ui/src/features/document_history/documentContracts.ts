@@ -1,16 +1,17 @@
 import type { FunctionCode } from '../../lib/types'
+import { t } from '@/lib/i18n/core'
 
 export const documentKinds = {
   STOCK_RECEIPT: {
     path: '/stock-receipts',
-    title: 'Phiếu nhập hàng',
+    title: t('Phiếu nhập hàng'),
     prepare: 'stock.receipt.prepare',
     post: 'stock.receipt.post',
     read: ['stock.receipt.prepare', 'stock.receipt.post', 'inventory.read'],
   },
   STOCK_ISSUE: {
     path: '/stock-issues',
-    title: 'Phiếu xuất hàng',
+    title: t('Phiếu xuất hàng'),
     prepare: 'stock.issue.prepare',
     post: 'stock.issue.post',
     read: [
@@ -22,7 +23,7 @@ export const documentKinds = {
   },
   STOCK_ADJUSTMENT: {
     path: '/stock-adjustments',
-    title: 'Điều chỉnh kho',
+    title: t('Điều chỉnh kho'),
     prepare: 'stock.adjustment.prepare',
     post: 'stock.adjustment.post',
     read: [
@@ -33,28 +34,28 @@ export const documentKinds = {
   },
   SALES_RETURN: {
     path: '/sales-returns',
-    title: 'Phiếu trả hàng',
+    title: t('Phiếu trả hàng'),
     prepare: 'returns.prepare',
     post: 'returns.post',
     read: ['returns.prepare', 'returns.post', 'debt.read', 'sales.read'],
   },
   PAYMENT_RECEIPT: {
     path: '/payment-receipts',
-    title: 'Phiếu thu tiền',
+    title: t('Phiếu thu tiền'),
     prepare: 'cash.receipt.prepare',
     post: 'cash.receipt.post',
     read: ['cash.receipt.prepare', 'cash.receipt.post', 'debt.read'],
   },
   CREDIT_APPLICATION: {
     path: '/credit-applications',
-    title: 'Bù trừ dư có',
+    title: t('Bù trừ dư có'),
     prepare: 'credit.apply',
     post: 'credit.apply',
     read: ['credit.apply', 'debt.read'],
   },
   REFUND: {
     path: '/refunds',
-    title: 'Hoàn tiền',
+    title: t('Hoàn tiền'),
     prepare: 'cash.refund.prepare',
     post: 'cash.refund.post',
     read: ['cash.refund.prepare', 'cash.refund.post', 'debt.read'],
@@ -175,12 +176,12 @@ export function vietnamToday() {
 }
 export function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('Phản hồi máy chủ không hợp lệ.')
+    throw new Error(t('Phản hồi máy chủ không hợp lệ.'))
   return value as Record<string, unknown>
 }
 function numeric(value: unknown, pattern: RegExp) {
   if (typeof value !== 'string' || !pattern.test(value))
-    throw new Error('Giá trị số từ máy chủ không hợp lệ.')
+    throw new Error(t('Giá trị số từ máy chủ không hợp lệ.'))
 }
 export function parsePage<T>(
   value: unknown,
@@ -200,7 +201,7 @@ export function parsePage<T>(
     ) ||
     (pagination.hasMore && !pagination.nextCursor)
   )
-    throw new Error('Phân trang máy chủ không hợp lệ.')
+    throw new Error(t('Phân trang máy chủ không hợp lệ.'))
   return {
     items: data.items.map(parseItem),
     pagination: pagination as unknown as Page<T>['pagination'],
@@ -218,7 +219,7 @@ export function parseSummary(value: unknown): DocumentSummary {
     !Number.isInteger(row.revisionNo) ||
     (row.revisionNo as number) < 1
   )
-    throw new Error('Tóm tắt chứng từ không hợp lệ.')
+    throw new Error(t('Tóm tắt chứng từ không hợp lệ.'))
   numeric(row.totalAmount, exact.money)
   numeric(row.immediatePayment, exact.money)
   return row as unknown as DocumentSummary
@@ -232,12 +233,12 @@ export function parseLine(value: unknown): DocumentLine {
     typeof row.unitName !== 'string' ||
     !(row.originLineId === null || validId(row.originLineId))
   )
-    throw new Error('Dòng chứng từ không hợp lệ.')
+    throw new Error(t('Dòng chứng từ không hợp lệ.'))
   numeric(row.quantity, exact.signedQuantity)
   numeric(row.unitPrice, exact.money)
   numeric(row.lineAmount, exact.money)
   if (isZero(String(row.quantity)))
-    throw new Error('Số lượng dòng không hợp lệ.')
+    throw new Error(t('Số lượng dòng không hợp lệ.'))
   return row as unknown as DocumentLine
 }
 export function parseRevision(value: unknown): Revision {
@@ -252,7 +253,7 @@ export function parseRevision(value: unknown): Revision {
     !Array.isArray(row.lines) ||
     typeof row.createdAt !== 'string'
   )
-    throw new Error('Phiên bản chứng từ không hợp lệ.')
+    throw new Error(t('Phiên bản chứng từ không hợp lệ.'))
   numeric(row.totalAmount, exact.money)
   numeric(row.immediatePayment, exact.money)
   return { ...row, lines: row.lines.map(parseLine) } as unknown as Revision
@@ -268,7 +269,7 @@ export function parseDocument(value: unknown): DocumentDetail {
     revisionNo: revision.revisionNo,
   })
   if (revision.documentId !== row.id)
-    throw new Error('Phiên bản không thuộc chứng từ.')
+    throw new Error(t('Phiên bản không thuộc chứng từ.'))
   return { ...row, currentRevision: revision } as unknown as DocumentDetail
 }
 export function canReadKind(kind: DocumentKind, has: PermissionCheck) {
@@ -319,12 +320,12 @@ export function inputLines(
   lines: LineInput[],
   correction = false,
 ) {
-  if (!lines.length) throw new Error('Cần ít nhất một dòng hàng.')
+  if (!lines.length) throw new Error(t('Cần ít nhất một dòng hàng.'))
   const seen = new Set<string>()
   return lines.map((line) => {
     const id = kind === 'SALES_RETURN' ? line.originLineId : line.productId
     if (!validId(id) || seen.has(id))
-      throw new Error('Mã dòng/mặt hàng không hợp lệ hoặc trùng lặp.')
+      throw new Error(t('Mã dòng/mặt hàng không hợp lệ hoặc trùng lặp.'))
     seen.add(id)
     const pattern =
       kind === 'STOCK_ADJUSTMENT' ? exact.signedQuantity : exact.quantity
@@ -334,14 +335,16 @@ export function inputLines(
       (kind !== 'STOCK_ADJUSTMENT' && line.quantity.startsWith('-'))
     )
       throw new Error(
-        'Số lượng phải là chuỗi thập phân hợp lệ, khác 0, tối đa 3 chữ số lẻ.',
+        t(
+          'Số lượng phải là chuỗi thập phân hợp lệ, khác 0, tối đa 3 chữ số lẻ.',
+        ),
       )
     if (kind === 'SALES_RETURN')
       return { originLineId: id, quantity: line.quantity }
     if (kind === 'STOCK_RECEIPT') {
       if (!exact.positiveMoney.test(line.unitPrice))
         throw new Error(
-          'Giá nhập phải là số nguyên VNĐ dương, tối đa 18 chữ số.',
+          t('Giá nhập phải là số nguyên VNĐ dương, tối đa 18 chữ số.'),
         )
       return {
         productId: id,
@@ -351,7 +354,7 @@ export function inputLines(
     }
     if (kind === 'STOCK_ISSUE' && correction && line.basePurchasePrice) {
       if (!exact.positiveMoney.test(line.basePurchasePrice))
-        throw new Error('Giá vốn không hợp lệ.')
+        throw new Error(t('Giá vốn không hợp lệ.'))
       return {
         productId: id,
         quantity: line.quantity,
@@ -373,7 +376,7 @@ export function replacementBody(
   },
 ) {
   if (!validDate(values.businessDate) || !values.reason.trim())
-    throw new Error('Cần ngày nghiệp vụ hợp lệ và lý do.')
+    throw new Error(t('Cần ngày nghiệp vụ hợp lệ và lý do.'))
   const header = {
     businessDate: values.businessDate,
     reason: values.reason.trim(),
@@ -381,10 +384,10 @@ export function replacementBody(
   }
   if (doc.kind === 'PAYMENT_RECEIPT' || doc.kind === 'CREDIT_APPLICATION') {
     if (!exact.positiveMoney.test(values.amount))
-      throw new Error('Số tiền phải là chuỗi số nguyên VNĐ dương.')
+      throw new Error(t('Số tiền phải là chuỗi số nguyên VNĐ dương.'))
     if (doc.kind === 'PAYMENT_RECEIPT') {
       if (!['CASH', 'BANK_TRANSFER'].includes(values.paymentMethod))
-        throw new Error('Chỉ sửa phiếu thu thủ công.')
+        throw new Error(t('Chỉ sửa phiếu thu thủ công.'))
       return {
         ...header,
         amount: values.amount,
@@ -394,7 +397,7 @@ export function replacementBody(
     return { ...header, amount: values.amount }
   }
   if (doc.kind === 'REFUND')
-    throw new Error('Không hỗ trợ sửa phiếu hoàn tiền.')
+    throw new Error(t('Không hỗ trợ sửa phiếu hoàn tiền.'))
   return {
     ...header,
     ...(doc.kind === 'STOCK_ISSUE' && doc.currentRevision.sellingPriceRate
