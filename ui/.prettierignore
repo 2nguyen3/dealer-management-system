@@ -1,3 +1,5 @@
 node_modules
 dist
 package-lock.json
+# Hand-tuned animated figure embeds (minified inline CSS/JS)
+public/figures
