@@ -20,7 +20,7 @@ URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=VNPabc&vnp_
 
 
 def projection(**values):
-    now = datetime(2026, 11, 14, 3, 0, tzinfo=UTC)
+    now = datetime.now(UTC).replace(microsecond=0)
     return {
         "id": "7",
         "agencyId": "3",
@@ -61,7 +61,7 @@ def test_pending_rows_carry_amount_words_deadline_and_pay_hint():
     assert labels["Đại lý"] == "Tạp hóa Hồng Phúc <b> (DL-3)"
     assert labels["Số tiền (VNĐ)"] == "1.250.000"
     assert labels["Số tiền bằng chữ"] == "Một triệu hai trăm năm mươi nghìn đồng"
-    assert labels["Hạn thanh toán"] == "14/11/2026 10:30"
+    assert labels["Hạn thanh toán"] == moment(projection()["expiresAt"])
     assert "Phiếu thu" not in labels and "Thời điểm thanh toán" not in labels
     assert note.startswith("Quét mã QR")
     assert payable_url(projection()) == URL
@@ -147,3 +147,13 @@ def test_unsupported_media_is_rejected():
     with pytest.raises(ApiError) as caught:
         print_payment(projection(), "image/png")
     assert caught.value.status == 406
+
+
+def test_overdue_pending_payment_is_labelled_overdue_without_qr():
+    past = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+    payment = projection(expiresAt=past, checkoutUrl=None)
+    _, metadata, note = payment_rows(payment)
+    assert dict(metadata)["Trạng thái"] == "QUÁ HẠN THANH TOÁN"
+    assert note.startswith("Liên kết") and payable_url(payment) is None
+    # Still before the deadline: payable.
+    assert dict(payment_rows(projection())[1])["Trạng thái"] == "ĐANG CHỜ THANH TOÁN"

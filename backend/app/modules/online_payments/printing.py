@@ -8,7 +8,7 @@ consumes an already authorized ``OnlinePayment`` projection (JSON mode) and neve
 fetches the checkout URL.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 from urllib.parse import quote
@@ -60,6 +60,18 @@ def payable_url(payment) -> str | None:
     return url if payment["status"] == "PENDING" and url else None
 
 
+def status_label(payment) -> str:
+    """A PENDING payment past its deadline is shown as overdue, not as payable."""
+    expires = payment.get("expiresAt")
+    if (
+        payment["status"] == "PENDING"
+        and expires
+        and datetime.fromisoformat(str(expires)) <= datetime.now(UTC)
+    ):
+        return "QUÁ HẠN THANH TOÁN"
+    return STATUSES[payment["status"]]
+
+
 def payment_rows(payment):
     """Title, labelled metadata and closing note of an ``OnlinePayment`` projection."""
     title = f"{TITLE} #{payment['id']}"
@@ -67,7 +79,7 @@ def payment_rows(payment):
     if payment.get("agencyCode"):
         agency = f"{agency} ({payment['agencyCode']})"
     metadata = [
-        ("Trạng thái", STATUSES[payment["status"]]),
+        ("Trạng thái", status_label(payment)),
         ("Đại lý", agency),
         ("Số tiền (VNĐ)", number(payment["amount"])),
         ("Số tiền bằng chữ", amount_in_words(payment["amount"])),
