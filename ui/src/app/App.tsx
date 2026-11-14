@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { Skeleton } from '../components/shadcn/skeleton'
+import { GUIDE_TOASTER } from '../components/guide/notifyNextStep'
 import { Toaster } from '../components/shadcn/sonner'
 import { ThemeProvider } from '../components/theme/ThemeProvider'
 import { AuthProvider } from '../features/authentication/AuthContext'
@@ -8,6 +9,7 @@ import { LoginPage } from '../features/authentication/LoginPage'
 import { NotFoundPage } from './NotFoundPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { ShellLayout } from './ShellLayout'
+import { t } from '@/lib/i18n/core'
 
 const HomePage = lazy(() =>
   import('../features/home/HomePage').then((m) => ({ default: m.HomePage })),
@@ -161,7 +163,7 @@ const ResetPasswordPage = lazy(() =>
 
 export function RouteLoading() {
   return (
-    <div className="space-y-6" role="status" aria-label="Đang mở màn hình">
+    <div className="space-y-6" role="status" aria-label={t('Đang mở màn hình')}>
       <div className="space-y-2">
         <Skeleton className="h-7 w-56 max-w-[60%]" />
         <Skeleton className="h-4 w-80 max-w-[80%]" />
@@ -172,7 +174,7 @@ export function RouteLoading() {
         ))}
       </div>
       <Skeleton className="h-72 rounded-xl" />
-      <span className="sr-only">Đang mở màn hình…</span>
+      <span className="sr-only">{t('Đang mở màn hình…')}</span>
     </div>
   )
 }
@@ -200,11 +202,12 @@ export class PageErrorBoundary extends Component<
             />
             <div className="space-y-1.5">
               <h1 className="text-lg font-semibold tracking-tight">
-                Không thể mở màn hình
+                {t('Không thể mở màn hình')}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Giao diện gặp lỗi tải. Dữ liệu chưa gửi sẽ không tự động được
-                ghi nhận.
+                {t(
+                  'Giao diện gặp lỗi tải. Dữ liệu chưa gửi sẽ không tự động được ghi nhận.',
+                )}
               </p>
             </div>
             <button
@@ -212,7 +215,7 @@ export class PageErrorBoundary extends Component<
               className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
               onClick={() => window.location.reload()}
             >
-              Tải lại giao diện
+              {t('Tải lại giao diện')}
             </button>
           </section>
         </div>
@@ -306,6 +309,12 @@ export function App() {
         </AuthProvider>
       </BrowserRouter>
       <Toaster richColors position="top-right" />
+      <Toaster
+        id={GUIDE_TOASTER}
+        position="bottom-right"
+        closeButton
+        visibleToasts={2}
+      />
     </ThemeProvider>
   )
 }

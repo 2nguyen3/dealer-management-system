@@ -5,6 +5,7 @@ import { useAuth } from '../features/authentication/useAuth'
 import type { FunctionCode } from '../lib/types'
 import { AccessDeniedPage } from './AccessDeniedPage'
 import { allowsNavigation, routePermissions } from './navigation'
+import { t } from '@/lib/i18n/core'
 
 export interface ProtectedRouteProps {
   children: ReactNode
@@ -21,7 +22,10 @@ export function ProtectedRoute({
   if (isLoading) {
     return (
       <div className="app-loading-screen">
-        <Spinner size="lg" label="Đang kiểm tra thông tin phiên làm việc..." />
+        <Spinner
+          size="lg"
+          label={t('Đang kiểm tra thông tin phiên làm việc...')}
+        />
       </div>
     )
   }
