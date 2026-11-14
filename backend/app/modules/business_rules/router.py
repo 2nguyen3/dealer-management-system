@@ -12,7 +12,7 @@ from app.modules.business_rules.schemas import BusinessRuleResponse, BusinessRul
 from app.modules.business_rules.service import BusinessRuleService
 
 router = APIRouter(prefix="/business-rules", tags=["Business Rules"], route_class=BusinessRoute)
-READ = {"anyOf": ["rules.manage", "agency.manage", "stock.issue.prepare", "inventory.read"]}
+READ = {"anyOf": ["rules.manage", "agency.manage", "stock.issue.prepare", "stock.issue.post"]}
 WRITE = {"allOf": ["rules.manage"]}
 Reader = Annotated[Principal, Depends(require_permissions(any_of=tuple(READ["anyOf"])))]
 Writer = Annotated[Principal, Depends(require_permissions(all_of=("rules.manage",)))]

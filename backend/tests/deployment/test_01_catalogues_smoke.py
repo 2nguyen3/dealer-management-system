@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.db.seed import DEMO_USERS
+from app.db.seed_data import USERS as SEED_USERS
 
 pytestmark = [pytest.mark.integration, pytest.mark.deployment]
 
@@ -15,7 +15,7 @@ def test_users_and_catalogues_direct_and_nginx(variable, resource):
     base = os.environ.get(variable)
     if not base or not base.startswith("http://127.0.0.1:"):
         pytest.fail("Deployment smoke requires explicit disposable loopback URL")
-    email, _, _, password, _ = DEMO_USERS[0]
+    email, _, _, password, _ = SEED_USERS[0]
     with httpx.Client(
         base_url=base, timeout=float(os.getenv("AUTH_SMOKE_TIMEOUT_SECONDS", "10"))
     ) as client:
@@ -88,7 +88,7 @@ def test_read_only_wards_direct_and_nginx(variable):
     base = os.environ.get(variable)
     if not base or not base.startswith("http://127.0.0.1:"):
         pytest.fail("Deployment smoke requires explicit disposable loopback URL")
-    email, _, _, password, _ = DEMO_USERS[0]
+    email, _, _, password, _ = SEED_USERS[0]
     with httpx.Client(
         base_url=base, timeout=float(os.getenv("AUTH_SMOKE_TIMEOUT_SECONDS", "10"))
     ) as client:

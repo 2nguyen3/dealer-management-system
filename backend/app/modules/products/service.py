@@ -12,7 +12,7 @@ class ProductService(CatalogueService):
     operation = "listProducts"
     sorts = {
         sort: (field,) if field == "id" else (field, "id")
-        for field in ("id", "name", "currentStock", "currentSellingPrice")
+        for field in ("id", "name", "stock", "sellingPrice")
         for sort in (field, "-" + field)
     }
     conflicts = {

@@ -1,10 +1,10 @@
-"""Typed projections of reviewed SQL-owned tables, like the catalogue mappings.
+"""Typed projections of the SQL-owned 0011 tables used by document services.
 
-DDL, generated columns, domains and triggers remain owned by Alembic SQL snapshots.
-These mappings intentionally do not ask autogeneration to recreate those objects.
+DDL, generated columns, domains and triggers remain owned by the Alembic SQL snapshot;
+these lightweight tables are not part of autogeneration metadata.
 """
 
-from sqlalchemy import BigInteger, Date, DateTime, Integer, Numeric, Text, Uuid, column, table
+from sqlalchemy import BigInteger, Date, DateTime, Integer, Numeric, Text, column, table
 
 DOCUMENT = table(
     "document",
@@ -13,68 +13,52 @@ DOCUMENT = table(
         for name in (
             "id",
             "agencyId",
-            "originDocumentId",
-            "currentRevisionId",
-            "businessOrder",
+            "replacesDocumentId",
             "createdBy",
+            "postedBy",
             "cancelledBy",
         )
     ),
-    column("creationKey", Uuid),
-    *(column(name, Text) for name in ("code", "kind", "receiptType", "status", "cancelReason")),
-    *(column(name, DateTime(timezone=True)) for name in ("createdAt", "updatedAt", "cancelledAt")),
-    schema="dms",
-)
-REVISION = table(
-    "document_revision",
-    *(
-        column(name, BigInteger)
-        for name in ("id", "documentId", "createdBy", "readyBy", "postedBy")
-    ),
-    column("revisionNo", Integer),
-    column("businessDate", Date),
-    *(
-        column(name, Numeric)
-        for name in ("totalAmount", "immediatePayment", "sellingPriceRate", "maxDebtSnapshot")
-    ),
     *(
         column(name, Text)
-        for name in (
-            "state",
-            "paymentMethod",
-            "agencyName",
-            "agencyAddress",
-            "agencyPhone",
-            "agencyEmail",
-            "reason",
-            "note",
-        )
+        for name in ("code", "kind", "receiptType", "status", "note", "cancelReason")
     ),
+    column("businessDate", Date),
+    column("totalAmount", Numeric),
+    column("sellingPriceRate", Numeric),
     *(
         column(name, DateTime(timezone=True))
-        for name in ("createdAt", "updatedAt", "readyAt", "postedAt")
+        for name in ("createdAt", "updatedAt", "postedAt", "cancelledAt")
     ),
     schema="dms",
 )
 LINE = table(
     "document_line",
-    *(column(name, BigInteger) for name in ("id", "revisionId", "productId", "originLineId")),
+    *(column(name, BigInteger) for name in ("id", "documentId", "productId")),
     column("lineNo", Integer),
     column("unitId", Integer),
     column("productName", Text),
     column("unitName", Text),
-    *(
-        column(name, Numeric)
-        for name in ("quantity", "unitPrice", "basePurchasePrice", "returnAmount", "lineAmount")
-    ),
+    *(column(name, Numeric) for name in ("quantity", "unitPrice", "lineAmount")),
     *(column(name, DateTime(timezone=True)) for name in ("createdAt", "updatedAt")),
     schema="dms",
 )
-BATCH = table(
-    "posting_batch",
-    *(column(name, BigInteger) for name in ("id", "revisionId", "createdBy")),
-    column("kind", Text),
-    column("idempotencyKey", Uuid),
-    *(column(name, DateTime(timezone=True)) for name in ("createdAt", "updatedAt")),
+AGENCY = table(
+    "agency",
+    column("id", BigInteger),
+    column("typeId", Integer),
+    *(column(name, Text) for name in ("code", "name", "status")),
+    column("debt", Numeric),
+    column("acceptedDate", Date),
     schema="dms",
 )
+PRODUCT = table(
+    "product",
+    column("id", BigInteger),
+    column("unitId", Integer),
+    *(column(name, Text) for name in ("code", "name", "status")),
+    column("stock", Numeric),
+    column("lastPurchasePrice", Numeric),
+    schema="dms",
+)
+APP_USER = table("app_user", column("id", BigInteger), column("fullName", Text), schema="dms")

@@ -30,7 +30,7 @@ def test_five_operations_exact_contract_and_mutations(client, resource, engine):
     assert stale.status_code == 412 and stale.headers["ETag"] == updated.headers["ETag"]
     listed = client.get(collection, params={"q": "Changed", "limit": 1})
     assert listed.status_code == 200 and listed.json()["items"][0] == updated.json()
-    assert_schema(listed.json(), schema + "ListResponse")
+    assert_schema(listed.json(), schema.removesuffix("Response") + "ListResponse")
     if resource == "units":
         assert (
             client.get(collection, params={"allowsFraction": "false", "code": "NEW"}).json()[

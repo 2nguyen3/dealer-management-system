@@ -8,7 +8,6 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 
 from app.db.base import Base, include_name
-from app.db.manifest import INFRASTRUCTURE_TABLES
 from app.modules.auth.models import AppFunction, AuthToken, GroupPermission
 from app.modules.user_groups.models import UserGroup
 from app.modules.users.models import AppUser
@@ -17,75 +16,88 @@ from tests.support.database import migrate
 pytestmark = pytest.mark.integration
 
 
-def test_populated_upgrade_downgrade_reupgrade(database_factory):
-    with database_factory("0002") as engine:
+SIMPLIFIED_TABLES = {
+    "user_group",
+    "app_function",
+    "app_user",
+    "group_permission",
+    "auth_token",
+    "business_rule",
+    "ward",
+    "agency_type",
+    "unit",
+    "agency",
+    "product",
+    "document",
+    "document_line",
+    "online_payment",
+    "payment_event",
+    "audit_log",
+}
+
+
+def schema_shape(connection):
+    inspector = inspect(connection)
+    return {
+        table: sorted(column["name"] for column in inspector.get_columns(table, schema="dms"))
+        for table in inspector.get_table_names(schema="dms")
+    }
+
+
+def test_populated_0010_rebuilds_to_fresh_0011_schema(database_factory):
+    with database_factory() as fresh, fresh.connect() as connection:
+        expected = schema_shape(connection)
+    assert set(expected) == SIMPLIFIED_TABLES
+    with database_factory("0010") as engine:
         with engine.begin() as connection:
             user = connection.scalar(
                 text(
                     'INSERT INTO dms.app_user ("fullName", email, "passwordHash", "groupId") '
-                    "VALUES ('Test', 'test@example.com', 'hash-unchanged', 1) RETURNING id"
+                    "VALUES ('Legacy', 'legacy@example.com', 'hash', 1) RETURNING id"
                 )
-            )
-            for purpose in ("REFRESH", "PASSWORD_RESET"):
-                connection.execute(
-                    text(
-                        'INSERT INTO dms.auth_token ("userId", purpose, '
-                        '"tokenDigest", "expiresAt") '
-                        "VALUES (:user, :purpose, :digest, clock_timestamp()+interval '1 day')"
-                    ),
-                    {"user": user, "purpose": purpose, "digest": (purpose * 32).encode()[:32]},
-                )
-            previous_revocation = connection.scalar(
-                text(
-                    'UPDATE dms.auth_token SET "revokedAt"=clock_timestamp() '
-                    "WHERE purpose='PASSWORD_RESET' RETURNING \"revokedAt\""
-                )
-            )
-            connection.execute(
-                # 0010 must map every legacy district; an unmapped name fails loudly.
-                text("INSERT INTO dms.district (code,name) VALUES ('LEGACY','Quận 1')")
-            )
-            connection.execute(
-                text("INSERT INTO dms.unit (code,name) VALUES ('LEGACY','Legacy unit')")
             )
             connection.execute(
                 text(
-                    'INSERT INTO dms.product (name,"unitId") '
-                    "SELECT 'Legacy product',id FROM dms.unit WHERE code='LEGACY'"
-                )
+                    'INSERT INTO dms.auth_token ("userId", purpose, "tokenDigest", "authVersion",'
+                    ' "sessionId", "expiresAt") VALUES (:user, \'REFRESH\', :digest, 1, '
+                    ":sid, clock_timestamp() + interval '1 day')"
+                ),
+                {"user": user, "digest": b"r" * 32, "sid": uuid4()},
+            )
+            connection.execute(text("INSERT INTO dms.unit (code,name) VALUES ('OLD','Old unit')"))
+            assert connection.scalar(
+                text("SELECT count(*) FROM pg_tables WHERE tablename = 'inventory_balance'")
             )
         migrate(engine.url)
         with engine.connect() as connection:
-            tokens = list(
-                connection.execute(
-                    text(
-                        'SELECT purpose, "authVersion", "sessionId", "revokedAt" '
-                        "FROM dms.auth_token"
-                    )
-                )
+            assert schema_shape(connection) == expected
+            assert connection.scalar(text("SELECT version_num FROM public.alembic_version")) == (
+                "0011"
             )
-            assert all(t.authVersion == 1 and t.revokedAt is not None for t in tokens)
-            assert all((t.purpose == "REFRESH") == (t.sessionId is not None) for t in tokens)
-            assert (
-                next(t.revokedAt for t in tokens if t.purpose == "PASSWORD_RESET")
-                == previous_revocation
-            )
-            assert connection.scalar(text("SELECT name FROM dms.product")) == "Legacy product"
-            assert connection.scalar(text('SELECT "currentStock" FROM dms.inventory_balance')) == 0
-            assert (
-                connection.scalar(text('SELECT "passwordHash" FROM dms.app_user'))
-                == "hash-unchanged"
-            )
-            assert len(inspect(connection).get_table_names(schema="dms")) == 29 + len(
-                INFRASTRUCTURE_TABLES
-            )
-        migrate(engine.url, "0002", downgrade=True)
-        with engine.connect() as connection:
-            assert "sessionId" not in {
-                c["name"] for c in inspect(connection).get_columns("auth_token", schema="dms")
+            for table in ("app_user", "auth_token", "unit", "agency", "product", "document"):
+                assert connection.scalar(text(f"SELECT count(*) FROM dms.{table}")) == 0
+            assert connection.scalar(text("SELECT count(*) FROM dms.ward")) == 168
+            assert set(connection.scalars(text("SELECT code FROM dms.user_group"))) == {
+                "MANAGEMENT",
+                "SALES",
+                "WAREHOUSE",
+                "ACCOUNTING",
             }
+            assert connection.scalar(text("SELECT count(*) FROM dms.app_function")) == 22
+            assert connection.scalar(text("SELECT count(*) FROM dms.group_permission")) == 88
+            assert not connection.scalar(
+                text(
+                    "SELECT count(*) FROM dms.app_function WHERE code IN "
+                    "('inventory.read','cash.upfront.verify','stock.count','credit.apply',"
+                    "'district.manage') OR code LIKE 'returns.%' OR code LIKE 'cash.refund.%' "
+                    "OR code LIKE 'stock.adjustment.%'"
+                )
+            )
+        with pytest.raises(RuntimeError, match="cannot be downgraded"):
+            migrate(engine.url, "0010", downgrade=True)
         migrate(engine.url)
-        migrate(engine.url)
+        with engine.connect() as connection:
+            assert schema_shape(connection) == expected
 
 
 @pytest.mark.parametrize(
@@ -164,7 +176,6 @@ def test_orm_mappings(engine):
         "dms.app_function",
         "dms.group_permission",
         "dms.auth_token",
-        "dms.api_idempotency",
         "dms.ward",
         "dms.agency_type",
         "dms.unit",

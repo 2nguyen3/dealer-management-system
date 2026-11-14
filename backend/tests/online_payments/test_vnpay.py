@@ -8,25 +8,23 @@ from urllib.parse import parse_qsl, urlsplit
 
 import httpx
 import pytest
+from starlette.requests import Request
 
-from app.core.config import Settings
 from app.core.exceptions import ApiError
-from app.modules.online_payments.dependencies import adapter_for
+from app.modules.online_payments import dependencies
 from app.modules.online_payments.vnpay import (
     QUERY_REQUEST,
-    REFUND_REQUEST,
     RESPONSE,
     VnpayAdapter,
+    adapter_for,
     amount_from_vnpay,
     amount_to_vnpay,
-    bind_adapter,
     checked_signature,
     checksum,
     native_time,
-    provider_for,
 )
+from tests.online_payments.harness import SECRET, config
 
-SECRET = "synthetic-native-vnpay-secret"
 NOW = datetime(2026, 10, 25, 4, 5, 6, tzinfo=UTC)
 PAYMENT = {
     "merchantReference": "VNP123",
@@ -35,31 +33,10 @@ PAYMENT = {
     "providerTransactionId": "123456",
     "amount": Decimal(100000),
 }
-REFUND = {
-    "merchantRefundReference": "REF123",
-    "createdAt": NOW,
-    "providerRefundId": "456789",
-    "amount": Decimal(40000),
-}
-
-
-def config(**values):
-    return Settings(
-        _env_file=None,
-        db_host="localhost",
-        db_user="test",
-        db_password="test",
-        auth_signing_key="synthetic-native-key-at-least-32-bytes",
-        vnpay_tmn_code="TEST1234",
-        vnpay_hash_secret=SECRET,
-        vnpay_ipn_url="https://callback.test/ipn",
-        vnpay_return_url="https://callback.test/return",
-        **values,
-    )
 
 
 def adapter(client=None):
-    return VnpayAdapter(config(), client=client, clock=lambda: NOW).bind(PAYMENT, REFUND, 42)
+    return VnpayAdapter(config(), client=client, clock=lambda: NOW).bind(PAYMENT)
 
 
 def proof(**values):
@@ -82,12 +59,7 @@ def proof(**values):
 
 
 def signed(data, *, callback=False):
-    order = (
-        None
-        if callback
-        else RESPONSE
-        + (["PromotionCode", "PromotionAmount"] if data["vnp_Command"] == "querydr" else [])
-    )
+    order = None if callback else RESPONSE + ["PromotionCode", "PromotionAmount"]
     return {**data, "vnp_SecureHash": checksum(data, SECRET, order)}
 
 
@@ -251,7 +223,7 @@ def test_query_request_is_signed_in_official_order_and_session_free():
         {"vnp_TransactionType": "03"},
     ],
 )
-def test_query_rejects_changed_identity_errors_and_refund_proof(change):
+def test_query_rejects_changed_identity_errors_and_non_payment_proof(change):
     with pytest.raises(ApiError):
         adapter(response_client(proof(**change))).query_payment("VNP123")
 
@@ -293,93 +265,80 @@ def test_integer_json_amounts_are_exact_not_float():
     assert native.query_payment("VNP123").amount == 100000
 
 
-def refund_proof(**values):
-    return proof(
-        vnp_TransactionType="03",
-        vnp_TransactionNo="456789",
-        vnp_Amount="4000000",
-        vnp_OrderInfo="Agentra refund REF123",
-        **values,
+def test_adapter_requires_complete_native_credentials():
+    assert isinstance(adapter_for(config()), VnpayAdapter)
+    assert adapter_for(config(), ip_address="198.51.100.2").ip_address == "198.51.100.2"
+    blank = SimpleNamespace(vnpay_tmn_code="", vnpay_hash_secret=config().vnpay_hash_secret)
+    assert adapter_for(blank) is None
+    no_secret = SimpleNamespace(
+        vnpay_tmn_code="TEST1234", vnpay_hash_secret=SimpleNamespace(get_secret_value=str)
     )
+    assert adapter_for(no_secret) is None
 
 
-def test_refund_request_is_stable_signed_and_bound_to_actor_source():
-    client = response_client(refund_proof(vnp_Command="refund"))
-    native = adapter(client)
-    result = native.request_refund("REF123", "VNP123", Decimal(40000))
-    assert result.state == "SUCCESS" and result.providerRefundId == "456789"
-    fields = client.post.call_args.kwargs["json"]
-    assert len(fields["vnp_RequestId"]) == 32
-    assert fields["vnp_CreateBy"] == "42" and fields["vnp_TransactionNo"] == "123456"
-    assert fields["vnp_TransactionDate"] == fields["vnp_CreateDate"] == "20261025110506"
-    assert checked_signature(fields, SECRET, REFUND_REQUEST)
-    native.clock = lambda: NOW + timedelta(days=1)
-    native.request_refund("REF123", "VNP123", Decimal(40000))
-    assert client.post.call_args.kwargs["json"] == fields
+def test_bind_detaches_payment_context():
+    native = VnpayAdapter(config())
+    bound = native.bind(PAYMENT)
+    assert native.payment is None and bound.payment == PAYMENT
+    assert bound.payment is not PAYMENT
+    assert not hasattr(native, "request_refund") and not hasattr(native, "query_refund")
 
 
-def test_full_refund_uses_transaction_type_02():
-    data = refund_proof(vnp_Command="refund")
-    data.update(vnp_TransactionType="02", vnp_Amount="10000000")
-    native = adapter(response_client(data))
-    assert native.request_refund("REF123", "VNP123", Decimal(100000)).state == "SUCCESS"
-    assert native.client.post.call_args.kwargs["json"]["vnp_TransactionType"] == "02"
+def test_api_transport_is_bounded_and_does_not_follow_redirects(monkeypatch):
+    captured = {}
+
+    class Client:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def request(self, method, url, json, headers):
+            captured.update(method=method, url=url, json=json)
+            return httpx.Response(200, json=signed(proof()))
+
+    monkeypatch.setattr(httpx, "AsyncClient", Client)
+    assert adapter().query_payment("VNP123").status == "SUCCESS"
+    assert captured["follow_redirects"] is False and captured["method"] == "POST"
+    assert captured["url"] == config().vnpay_api_url
+    assert captured["json"]["vnp_Command"] == "querydr"
 
 
 @pytest.mark.parametrize(
-    "state,expected", [("05", "PENDING"), ("06", "PENDING"), ("02", "UNKNOWN")]
-)
-def test_refund_nonterminal_statuses_never_release_money(state, expected):
-    result = adapter().refund_evidence(refund_proof(vnp_TransactionStatus=state), "REF123", 40000)
-    assert result.state == expected and result.completedAt is None
-
-
-@pytest.mark.parametrize("pay_date", ["20261025120506", ""])
-def test_verified_refund_rejection_has_terminal_observation_time(pay_date):
-    result = adapter().refund_evidence(
-        refund_proof(vnp_TransactionStatus="09", vnp_PayDate=pay_date), "REF123", 40000
-    )
-    assert result.state == "FAILED" and result.failureReason == "VNPAY declined refund (09)"
-    assert result.completedAt == (NOW + timedelta(hours=1) if pay_date else NOW)
-
-
-@pytest.mark.parametrize(
-    "change",
+    ("vercel", "headers", "expected"),
     [
-        {"vnp_TransactionType": "01"},
-        {"vnp_OrderInfo": "other"},
-        {"vnp_Amount": "4100000"},
-        {"vnp_TransactionNo": "0"},
-        {"vnp_TransactionNo": "invalid"},
-        {"vnp_PayDate": "bad"},
+        (None, [(b"x-forwarded-for", b"198.51.100.2")], "192.0.2.18"),
+        ("0", [(b"x-forwarded-for", b"198.51.100.2")], "192.0.2.18"),
+        ("1", [(b"x-forwarded-for", b"198.51.100.2")], "198.51.100.2"),
+        ("1", [(b"x-forwarded-for", b"2001:db8::2")], "2001:db8::2"),
+        ("1", [(b"x-forwarded-for", b"198.51.100.2, 192.0.2.4")], "192.0.2.18"),
+        ("1", [(b"x-forwarded-for", b"not-an-ip")], "192.0.2.18"),
+        ("1", [(b"x-forwarded-for", b"fe80::1%eth0")], "192.0.2.18"),
+        (
+            "1",
+            [(b"x-forwarded-for", b"198.51.100.2"), (b"x-forwarded-for", b"192.0.2.4")],
+            "192.0.2.18",
+        ),
     ],
 )
-def test_refund_wrong_or_incomplete_proof_rejected(change):
-    data = refund_proof()
-    data.update(change)
-    with pytest.raises(ApiError):
-        adapter().refund_evidence(data, "REF123", 40000)
+def test_checkout_signs_validated_customer_ip(monkeypatch, vercel, headers, expected):
+    if vercel is None:
+        monkeypatch.delenv("VERCEL", raising=False)
+    else:
+        monkeypatch.setenv("VERCEL", vercel)
+    request = Request({"type": "http", "headers": headers, "client": ("192.0.2.18", 1234)})
+    ip = dependencies.payment_client_ip(request)
+    assert ip == expected
+    checkout = adapter_for(config(), ip_address=ip).bind(PAYMENT).create_checkout("VNP123", 1000)
+    assert dict(parse_qsl(urlsplit(checkout.checkoutUrl).query))["vnp_IpAddr"] == expected
 
 
-def test_refund_query_requires_known_refund_identity():
-    native = adapter(response_client(refund_proof()))
-    assert native.query_refund("REF123").state == "SUCCESS"
-    assert native.client.post.call_args.kwargs["json"]["vnp_TransactionNo"] == "456789"
-    native.refund["providerRefundId"] = "other"
-    assert native.query_refund("REF123").state == "UNKNOWN"
-    native.refund["providerRefundId"] = None
-    assert native.query_refund("REF123").state == "UNKNOWN"
-    assert "vnp_TransactionNo" not in native.client.post.call_args.kwargs["json"]
-
-
-def test_composition_keeps_controlled_protocol_separate_and_detaches_context():
-    assert isinstance(adapter_for(config()), VnpayAdapter)
-    assert provider_for(config()) == "VNPAY"
-    assert provider_for(SimpleNamespace(payment_provider="CONTROLLED")) == "CONTROLLED"
-    assert provider_for(SimpleNamespace(payment_provider="")) == ""
-    marker = object()
-    assert bind_adapter(marker, PAYMENT) is marker
-    native = VnpayAdapter(config())
-    bound = bind_adapter(native, PAYMENT)
-    assert native.payment is None and bound.payment == PAYMENT
-    assert bound.refund is None and bound.payment is not PAYMENT
+@pytest.mark.parametrize("client", [None, ("testclient", 1234)])
+def test_no_valid_network_address_has_safe_local_fallback(monkeypatch, client):
+    monkeypatch.delenv("VERCEL", raising=False)
+    request = Request({"type": "http", "headers": [], "client": client})
+    assert dependencies.payment_client_ip(request) == "127.0.0.1"

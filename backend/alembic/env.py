@@ -2,12 +2,10 @@ from alembic import context
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
-from app.common import commands  # noqa: F401
 from app.core.config import get_settings
 from app.db.base import Base, include_name
 from app.modules.agency_types import models as agency_type_models  # noqa: F401
 from app.modules.auth import models  # noqa: F401
-from app.modules.document_core import models as document_models  # noqa: F401
 from app.modules.units import models as unit_models  # noqa: F401
 from app.modules.user_groups import models as group_models  # noqa: F401
 from app.modules.users import models as user_models  # noqa: F401

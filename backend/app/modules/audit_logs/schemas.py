@@ -8,8 +8,8 @@ from app.common.canonical import canonical_value
 from app.common.schemas import ApiModel, Id, Instant, Pagination
 from app.modules.auth.permissions import AuditFunctionCode
 
-# "district"/"districtId" remain for historical audit rows written before revision 0010.
-CATALOGUES = {"user_group", "app_function", "district", "ward", "agency_type", "unit"}
+# Audited tables of the simplified 0011 schema.
+CATALOGUES = {"user_group", "app_function", "ward", "agency_type", "unit"}
 ENTITIES = CATALOGUES | {
     "app_user",
     "group_permission",
@@ -18,61 +18,24 @@ ENTITIES = CATALOGUES | {
     "agency",
     "product",
     "document",
-    "document_revision",
     "document_line",
-    "posting_batch",
-    "inventory_entry",
-    "receivable_entry",
-    "credit_lot",
-    "credit_entry",
-    "credit_application",
-    "refund",
-    "refund_reservation",
-    "refund_attempt",
     "online_payment",
     "payment_event",
-    "upfront_confirmation",
-    "stock_count",
-    "stock_count_line",
-    "agency_balance",
-    "inventory_balance",
 }
-CATALOG_KEYS = {"groupId", "functionId", "unitId", "typeId", "districtId", "wardId"}
+CATALOG_KEYS = {"groupId", "functionId", "unitId", "typeId", "wardId"}
 NUMERIC_KEYS = {
     "maxDebt",
-    "currentDebt",
-    "currentCredit",
-    "currentStock",
-    "currentPurchasePrice",
-    "lowStockThreshold",
+    "debt",
+    "stock",
+    "lastPurchasePrice",
     "sellingPriceRate",
     "quantity",
     "unitPrice",
-    "basePurchasePrice",
     "lineAmount",
     "totalAmount",
     "amount",
-    "paidAmount",
-    "upfrontAmount",
-    "bookQuantity",
-    "countedQuantity",
-    "difference",
-    "priceRate",
-    "cashReceived",
-    "reservedAmount",
-    "immediatePayment",
-    "maxDebtSnapshot",
-    "returnAmount",
 }
-ACTOR_KEYS = {
-    "createdBy",
-    "updatedBy",
-    "readyBy",
-    "postedBy",
-    "cancelledBy",
-    "verifiedBy",
-    "confirmedBy",
-}
+ACTOR_KEYS = {"createdBy", "updatedBy", "postedBy", "cancelledBy"}
 
 
 def sensitive_key(key: str) -> bool:
@@ -120,7 +83,7 @@ def project_snapshot(entity: str, raw: str | None) -> dict | None:
             and (
                 (key == "id" and entity not in CATALOGUES and entity != "business_rule")
                 or (key.endswith("Id") and key not in CATALOG_KEYS)
-                or key in ACTOR_KEYS | {"businessOrder"}
+                or key in ACTOR_KEYS
                 or key in NUMERIC_KEYS
             )
             else public_json(value)

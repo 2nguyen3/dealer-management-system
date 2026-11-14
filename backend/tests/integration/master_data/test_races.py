@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -16,7 +14,7 @@ from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.products.service import ProductService
 from app.modules.units.schemas import UnitUpdate
 from app.modules.units.service import UnitService
-from tests.integration.catalogues.helpers import draft, install_builders, post_stock
+from tests.integration.catalogues.helpers import draft, install_builders, payment, post_stock
 from tests.integration.catalogues.test_races import ordered_race
 from tests.integration.master_data.test_contract import body_for
 
@@ -124,20 +122,26 @@ def test_opposing_moves_and_same_key_termination(client, engine, actor, masters)
         ),
     )
     assert first.wardId == ward and second.wardId == masters[0]
-    key = uuid4()
     match = Preconditions(client.get(one.headers["Location"]).headers["ETag"])
     first, second = ordered_race(
         engine,
         lambda s: service(AgencyService, s, actor).terminate(
-            int(one.json()["id"]), Reason(reason="End"), match, key
+            int(one.json()["id"]), Reason(reason="End"), match
         ),
         lambda s: service(AgencyService, s, actor).terminate(
-            int(one.json()["id"]), Reason(reason="End"), match, key
+            int(one.json()["id"]), Reason(reason="End"), match
         ),
     )
-    assert first == second and first.body["status"] == "TERMINATED"
+    # The waiting duplicate re-reads the terminated row: its tag no longer matches.
+    assert first.status == "TERMINATED" and second == "PRECONDITION_FAILED"
     with engine.connect() as c:
-        assert c.exec_driver_sql("SELECT count(*) FROM dms.api_idempotency").scalar() == 1
+        assert (
+            c.exec_driver_sql(
+                "SELECT count(*) FROM dms.audit_log WHERE \"entityName\"='agency' "
+                "AND \"newData\"->>'status'='TERMINATED'"
+            ).scalar()
+            == 1
+        )
 
 
 @pytest.mark.parametrize("leading", ["use", "use_delete", "unit", "delete"])
@@ -150,7 +154,6 @@ def test_product_first_use_against_unit_change_and_delete(client, engine, actor,
     def use(session):
         install_builders(session, actor)
         document = draft(session, identifier)
-        session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
         session.commit()
         return document
 
@@ -176,10 +179,10 @@ def test_product_first_use_against_unit_change_and_delete(client, engine, actor,
                 service(ProductService, session, actor).delete(identifier, condition)
     elif leading == "unit":
         first, second = ordered_race(engine, change, use)
-        assert first.unitId == other and second == "23514"
+        assert first.unitId == other and second == "MASTER_CONFLICT"
     else:
         first, second = ordered_race(engine, delete, use)
-        assert first == "deleted" and second in ("23503", "P0002")
+        assert first == "deleted" and second == "MASTER_CONFLICT"
 
 
 def test_type_limit_move_and_termination_vs_post(client, engine, actor, masters):
@@ -222,6 +225,14 @@ def test_type_limit_move_and_termination_vs_post(client, engine, actor, masters)
     )
     assert first.maxDebt == 100 and second == "LIMIT_CONFLICT"
 
+    # Settle the debt so termination is allowed, then race it against posting.
+    with Session(engine) as session:
+        install_builders(session, actor)
+        payment(session, int(agency.json()["id"]), 102)
+        session.commit()
+    current = client.get(agency.headers["Location"])
+    assert current.json()["debt"] == "0"
+
     def post(session):
         install_builders(session, actor)
         post_stock(session, pending)
@@ -234,11 +245,19 @@ def test_type_limit_move_and_termination_vs_post(client, engine, actor, masters)
             int(agency.json()["id"]),
             Reason(reason="End"),
             Preconditions(current.headers["ETag"]),
-            uuid4(),
         ),
         post,
     )
-    assert first.body["currentDebt"] == "102" and second == "23514"
+    assert first.status == "TERMINATED" and second == "AGENCY_TERMINATED"
+    with engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT a.debt, d.status FROM dms.agency a, dms.document d WHERE a.id=:a AND "
+                "d.id=:d"
+            ),
+            {"a": int(agency.json()["id"]), "d": pending},
+        ).one()
+        assert row.debt == 0 and row.status == "DRAFT"
 
 
 def test_rate_change_vs_receipt_source_preserves_quotes(client, engine, actor, masters):
@@ -266,4 +285,4 @@ def test_rate_change_vs_receipt_source_preserves_quotes(client, engine, actor, m
         post,
     )
     assert first.sellingPriceRate == 2 and second == "posted"
-    assert client.get(product.headers["Location"]).json()["currentSellingPrice"] == "200"
+    assert client.get(product.headers["Location"]).json()["sellingPrice"] == "200"

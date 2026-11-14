@@ -50,9 +50,8 @@ class AgencyTypeRepository(CatalogueRepository):
     def lock_balances(self, identifier: int):
         return self.session.execute(
             text(
-                'SELECT a.id,a.code,b."currentDebt" FROM dms.agency a '
-                'JOIN dms.agency_balance b ON b."agencyId"=a.id WHERE a."typeId"=:id '
-                "ORDER BY a.id FOR UPDATE OF b"
+                'SELECT a.id,a.code,a.debt FROM dms.agency a WHERE a."typeId"=:id '
+                "ORDER BY a.id FOR UPDATE OF a"
             ),
             {"id": identifier},
         ).all()
@@ -60,7 +59,7 @@ class AgencyTypeRepository(CatalogueRepository):
     def validate_update(self, row: AgencyType, values: dict, balances) -> None:
         if "maxDebt" in values:
             blocking = [
-                {"agencyId": str(id), "agencyCode": code, "currentDebt": str(debt)}
+                {"agencyId": str(id), "agencyCode": code, "debt": str(debt)}
                 for id, code, debt in balances
                 if debt > Decimal(values["maxDebt"])
             ]

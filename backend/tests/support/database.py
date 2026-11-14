@@ -47,19 +47,35 @@ def migrate(url: URL, revision: str = "head", *, downgrade: bool = False) -> Non
 
 @contextmanager
 def database_factory(base: URL):
+    """Disposable databases cloned from one migrated template per revision.
+
+    Revision 0011 drops and rebuilds the fixed ``dms`` schema, so every test gets its
+    own database. Migrating 0001-0011 once and cloning keeps that cheap.
+    """
     admin = create_engine(base.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    prefix = base.database.split("_test", 1)[0] + "_test_"
+    templates: dict[str, str] = {}
+
+    def template(revision: str) -> str:
+        if revision not in templates:
+            name = prefix + "tpl_" + uuid4().hex
+            with admin.connect() as connection:
+                connection.exec_driver_sql(f'CREATE DATABASE "{name}"')
+            migrate(base.set(database=name), revision)
+            templates[revision] = name
+        return templates[revision]
 
     @contextmanager
     def create(revision="head"):
-        name = base.database.split("_test", 1)[0] + "_test_" + uuid4().hex
+        name = prefix + uuid4().hex
+        source = template(revision)
         with admin.connect() as connection:
-            connection.exec_driver_sql(f'CREATE DATABASE "{name}"')
+            connection.exec_driver_sql(f'CREATE DATABASE "{name}" TEMPLATE "{source}"')
         url = base.set(database=name)
         engine = create_engine(
             url, connect_args={"options": "-c lock_timeout=5000 -c statement_timeout=15000"}
         )
         try:
-            migrate(url, revision)
             yield engine
         finally:
             engine.dispose()
@@ -69,6 +85,9 @@ def database_factory(base: URL):
     try:
         yield create
     finally:
+        with admin.connect() as connection:
+            for name in templates.values():
+                connection.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
         admin.dispose()
 
 

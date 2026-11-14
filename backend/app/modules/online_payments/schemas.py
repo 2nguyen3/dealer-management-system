@@ -12,18 +12,19 @@ from app.common.schemas import (
     Pagination,
     PositiveMoney,
 )
-from app.modules.document_core.schemas import Timestamps
 
 PaymentStatus = Literal["PENDING", "SUCCESS", "FAILED", "EXPIRED"]
 
 
 class OnlinePaymentCreate(ApiModel):
     agencyId: Id
-    provider: NonEmptyText
+    provider: NonEmptyText = "VNPAY"
     amount: PositiveMoney
 
 
 class VerifiedPayment(ApiModel):
+    """Provider evidence normalized from a verified VNPAY IPN or payment query."""
+
     eventKey: NonEmptyText
     merchantReference: NonEmptyText
     providerTransactionId: NonEmptyText
@@ -31,14 +32,7 @@ class VerifiedPayment(ApiModel):
     status: PaymentStatus
     paymentTime: Instant = None
 
-    model_config = {
-        "extra": "forbid",
-        "hide_input_in_errors": True,
-        "json_schema_extra": {
-            "if": {"properties": {"status": {"const": "SUCCESS"}}},
-            "then": {"required": ["paymentTime"]},
-        },
-    }
+    model_config = {"extra": "forbid", "hide_input_in_errors": True}
 
     @model_validator(mode="after")
     def require_success_time(self):
@@ -50,6 +44,11 @@ class VerifiedPayment(ApiModel):
 class Checkout(ApiModel):
     checkoutUrl: NonEmptyText
     expiresAt: Instant
+
+
+class Timestamps(ApiModel):
+    createdAt: Instant
+    updatedAt: Instant
 
 
 class OnlinePayment(Timestamps):
@@ -68,6 +67,8 @@ class OnlinePayment(Timestamps):
     }
     id: Id
     agencyId: Id
+    agencyCode: str
+    agencyName: str
     provider: str
     merchantReference: str
     providerTransactionId: NullableText
@@ -76,6 +77,7 @@ class OnlinePayment(Timestamps):
     expiresAt: Instant
     paymentTime: NullableInstant
     receiptDocumentId: Id | None
+    receiptCode: NullableText
     createdBy: Id | None
     checkoutUrl: Annotated[
         str | None, WithJsonSchema({"type": ["string", "null"], "format": "uri"})
@@ -118,11 +120,3 @@ class OnlinePaymentList(ApiModel):
 class PaymentEventList(ApiModel):
     items: list[PaymentEvent]
     pagination: Pagination
-
-
-class WebhookAcknowledgement(ApiModel):
-    accepted: Literal[True]
-    duplicate: bool
-    paymentId: Id
-    status: PaymentStatus
-    receiptDocumentId: Id | None

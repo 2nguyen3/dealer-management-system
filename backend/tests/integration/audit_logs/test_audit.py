@@ -16,14 +16,14 @@ pytestmark = pytest.mark.integration
 
 def test_nested_number_precision_actor_keys_and_provider_redaction():
     raw = (
-        '{"verifiedBy":9007199254740993,"confirmedBy":9007199254740993,'
-        '"readyBy":9007199254740993,"postedBy":9007199254740993,'
-        '"cancelledBy":9007199254740993,"verifiedPayload":{"number":9007199254740993.125,'
+        '{"createdBy":9007199254740993,"updatedBy":9007199254740993,'
+        '"postedBy":9007199254740993,"cancelledBy":9007199254740993,'
+        '"receiptDocumentId":9007199254740993,"verifiedPayload":{"number":9007199254740993.125,'
         '"access_token":"sentinel","clientSecret":"sentinel",'
         '"nested":[{"Authorization":"sentinel","api_key":"sentinel"}]}}'
     )
-    projected = project_snapshot("upfront_confirmation", raw)
-    for key in ("verifiedBy", "confirmedBy", "readyBy", "postedBy", "cancelledBy"):
+    projected = project_snapshot("online_payment", raw)
+    for key in ("createdBy", "updatedBy", "postedBy", "cancelledBy", "receiptDocumentId"):
         assert projected[key] == "9007199254740993"
     rendered = exact_json(projected)
     assert "sentinel" not in rendered
@@ -39,31 +39,31 @@ def test_exact_nested_json_over_real_http(client, engine):
         identifier = c.scalar(
             text(
                 'INSERT INTO dms.audit_log("actorType","functionCode",action,"entityName",'
-                "\"entityKey\",\"newData\") VALUES ('SYSTEM','cash.upfront.verify','INSERT',"
-                "'upfront_confirmation','precision',CAST(:data AS jsonb)) RETURNING id"
+                "\"entityKey\",\"newData\") VALUES ('SYSTEM','payments.online','INSERT',"
+                "'online_payment','precision',CAST(:data AS jsonb)) RETURNING id"
             ),
             {
-                "data": '{"verifiedBy":9007199254740993,"verifiedPayload":'
+                "data": '{"postedBy":9007199254740993,"verifiedPayload":'
                 '{"amount":9007199254740993.125,"refresh_token":"sentinel"}}'
             },
         )
     response = client.get("/api/v1/audit-logs/" + str(identifier))
     assert response.status_code == 200 and "sentinel" not in response.text
     data = json.loads(response.text, parse_float=Decimal)["newData"]
-    assert data["verifiedBy"] == "9007199254740993"
+    assert data["postedBy"] == "9007199254740993"
     assert data["verifiedPayload"]["amount"] == Decimal("9007199254740993.125")
 
 
 def test_exact_projection():
     raw = (
         '{"id":9007199254740993,"unitId":1,"quantity":1.125,'
-        '"unitPrice":600000000000000000,"basePurchasePrice":null,'
+        '"unitPrice":600000000000000000,"lineAmount":null,'
         '"notes":{"quantity":2,"password":"sentinel","values":[true,1.5,null]}}'
     )
     snapshot = project_snapshot("document_line", raw)
     assert snapshot["id"] == "9007199254740993" and snapshot["unitId"] == 1
     assert snapshot["quantity"] == "1.125" and snapshot["unitPrice"] == "600000000000000000"
-    assert snapshot["basePurchasePrice"] is None
+    assert snapshot["lineAmount"] is None
     assert snapshot["notes"] == {"quantity": 2, "values": [True, 1.5, None]}
     assert project_snapshot("unit", '{"id":1,"allowsFraction":false}') == {
         "id": 1,
@@ -75,8 +75,12 @@ def test_exact_projection():
         "sellingPriceRate": "1.02",
     }
     assert project_snapshot(
-        "agency", '{"createdBy":1,"businessOrder":2,"passwordHash":"sentinel"}'
-    ) == {"createdBy": "1", "businessOrder": "2"}
+        "agency", '{"createdBy":1,"debt":-1500000,"passwordHash":"sentinel"}'
+    ) == {"createdBy": "1", "debt": "-1500000"}
+    assert project_snapshot("product", '{"stock":1.5,"lastPurchasePrice":95000}') == {
+        "stock": "1.5",
+        "lastPurchasePrice": "95000",
+    }
 
 
 def test_read_filters_ties_immutable_and_authorization(client, engine, actor):
@@ -107,7 +111,7 @@ def test_read_filters_ties_immutable_and_authorization(client, engine, actor):
     assert entry["oldData"] is None and entry["newData"]["id"] == created.json()["id"]
     detail = client.get("/api/v1/audit-logs/" + entry["id"])
     assert detail.json() == entry
-    assert_schema(detail.json(), "AuditLog")
+    assert_schema(detail.json(), "AuditResponse")
     assert client.get("/api/v1/audit-logs/9999999").status_code == 404
     assert (
         client.get(

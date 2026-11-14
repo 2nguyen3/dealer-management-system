@@ -47,7 +47,7 @@ def test_agency_delete_vs_draft_reference_both_orders(client, engine, actor, mas
     if leading == "reference":
         assert isinstance(first, int) and second == "RESOURCE_IN_USE"
     else:
-        assert first == "deleted" and second == "23503"
+        assert first == "deleted" and second == "MASTER_CONFLICT"
     with Session(engine) as session:
         assert session.scalar(
             text("SELECT count(*) FROM dms.agency WHERE id=:id"), {"id": identifier}

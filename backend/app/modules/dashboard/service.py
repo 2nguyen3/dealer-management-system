@@ -8,22 +8,20 @@ from app.modules.auth.tokens import decode_access_token
 from app.modules.dashboard.repository import DashboardRepository
 from app.modules.dashboard.schemas import DashboardResponse, Month
 
-ADMISSION = (
-    "agency.read",
-    "inventory.read",
-    "sales.read",
-    "debt.read",
-    "stock.issue.post",
-    "cash.upfront.verify",
-)
+DRAFT_READERS = {
+    "stockReceipts": {"stock.receipt.prepare", "stock.receipt.post"},
+    "stockIssues": {"stock.issue.prepare", "stock.issue.post"},
+    "paymentReceipts": {"cash.receipt.prepare", "cash.receipt.post"},
+}
 SECTION_READERS = {
     "agencies": {"agency.read"},
-    "inventory": {"inventory.read"},
     "sales": {"sales.read"},
-    "receivables": {"debt.read"},
-    "pendingIssueCount": {"stock.issue.post", "stock.issue.prepare"},
-    "verifiedUnreceiptedAmount": {"cash.upfront.verify", "cash.receipt.post"},
+    "collections": {"debt.read", "cash.receipt.post"},
+    "debt": {"debt.read"},
+    "drafts": set().union(*DRAFT_READERS.values()),
 }
+# Any section reader is admitted; every section is then projected by its own readers.
+ADMISSION = tuple(sorted(set().union(*SECTION_READERS.values())))
 
 
 def month_bounds(month):
@@ -44,8 +42,6 @@ def month_bounds(month):
         "start": start,
         "end": end,
         "trendStart": f"{months[0]}-01",
-        "receivedStart": f"{start}T00:00:00+07:00",
-        "receivedEnd": f"{end}T00:00:00+07:00",
     }, months
 
 
@@ -77,14 +73,14 @@ class DashboardService:
                         continue
                     if section == "agencies":
                         result[section] = repo.agencies()
-                    elif section == "inventory":
-                        result[section] = repo.inventory(bounds)
                     elif section == "sales":
                         result[section] = repo.sales(bounds, months)
-                    elif section == "receivables":
-                        result[section] = repo.receivables(bounds)
-                    elif section == "pendingIssueCount":
-                        result[section] = repo.pending()
+                    elif section == "collections":
+                        result[section] = repo.collections(bounds)
+                    elif section == "debt":
+                        result[section] = repo.debt()
                     else:
-                        result[section] = repo.verified(bounds)
+                        result[section] = repo.drafts(
+                            [key for key, codes in DRAFT_READERS.items() if allowed & codes]
+                        )
                 return DashboardResponse.model_validate(result)

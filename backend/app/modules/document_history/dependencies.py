@@ -1,3 +1,5 @@
+from functools import partial
+
 from fastapi import Request
 
 from app.common.catalogue_http import (
@@ -14,5 +16,14 @@ def get_history_service(
     session: SessionDependency,
     principal: PrincipalDependency,
     auth: AuthDependency,
-):
-    return make_service(DocumentHistoryService, request, session, principal, auth)
+) -> DocumentHistoryService:
+    def allowed_functions():
+        return auth.get_current_user(principal).allowedFunctions
+
+    return make_service(
+        partial(DocumentHistoryService, allowed_functions=allowed_functions),
+        request,
+        session,
+        principal,
+        auth,
+    )

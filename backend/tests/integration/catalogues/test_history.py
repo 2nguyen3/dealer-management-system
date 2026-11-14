@@ -9,7 +9,7 @@ from app.core.config import Settings
 from app.core.exceptions import ApiError
 from app.db.manifest import COMPATIBLE_HEAD
 from app.db.seed import main as seed_main
-from app.db.verify import check_database, run_regression
+from app.db.verify import check_database
 from tests.integration.catalogues.helpers import (
     agency,
     draft,
@@ -19,7 +19,6 @@ from tests.integration.catalogues.helpers import (
     service_for,
 )
 from tests.integration.catalogues.test_state import create_body, precondition, update_body
-from tests.support.database import migrate
 
 pytestmark = pytest.mark.integration
 
@@ -46,13 +45,12 @@ def test_exact_debt_equality_one_over_terminated_blocker_and_snapshots(engine, a
             {"id": agency_id},
         )
         session.commit()
-        snapshot = session.scalar(
+        posted = session.execute(
             text(
-                'SELECT "maxDebtSnapshot" FROM dms.document_revision r '
-                'JOIN dms.document d ON d."currentRevisionId"=r.id WHERE d.id=:id'
+                'SELECT "totalAmount","sellingPriceRate","updatedAt" FROM dms.document WHERE id=:id'
             ),
             {"id": issue},
-        )
+        ).one()
         # Current quote is 100*1.02 = 102 VND.
         updated = service.update(
             item.id, update_body("agency-types", {"maxDebt": "102"}), precondition(service, item.id)
@@ -72,7 +70,7 @@ def test_exact_debt_equality_one_over_terminated_blocker_and_snapshots(engine, a
             "typeId": item.id,
             "requestedMaxDebt": "101",
             "blockingAgencies": [
-                {"agencyId": str(agency_id), "agencyCode": f"DL-{agency_id}", "currentDebt": "102"}
+                {"agencyId": str(agency_id), "agencyCode": f"DL-{agency_id}", "debt": "102"}
             ],
         }
         with engine.connect() as connection:
@@ -83,24 +81,23 @@ def test_exact_debt_equality_one_over_terminated_blocker_and_snapshots(engine, a
                 == 102
             )
             assert connection.scalar(text("SELECT count(*) FROM dms.audit_log")) == before_audit
+            # The posted issue keeps its frozen total and rate; limits are not snapshots.
             assert (
-                connection.scalar(
+                connection.execute(
                     text(
-                        'SELECT "maxDebtSnapshot" FROM dms.document_revision r '
-                        'JOIN dms.document d ON d."currentRevisionId"=r.id WHERE d.id=:id'
+                        'SELECT "totalAmount","sellingPriceRate","updatedAt" '
+                        "FROM dms.document WHERE id=:id"
                     ),
                     {"id": issue},
-                )
-                == snapshot
-                == 1000
+                ).one()
+                == posted
             )
+            assert posted.totalAmount == 102
 
 
-def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_factory):
+def test_seeded_catalogue_history_guards_and_line_snapshots(database_factory):
     settings = Settings(_env_file=None, db_host="test", db_user="test", db_password="test")
     with database_factory() as engine:
-        # The seed tracks the source head (0010 wards); populate there, then prove the
-        # reviewed downgrade/upgrade chain below preserves the populated history.
         with (
             patch("app.db.seed.build_engine", return_value=engine),
             patch("app.db.seed.get_settings", return_value=settings),
@@ -108,43 +105,37 @@ def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_fact
             seed_main()
         with engine.connect() as connection:
             first = check_database(connection, seeded=True)
-            assert first["document"] == 410 and first["agency"] == 30
-            historical = connection.execute(
-                text(
-                    'SELECT id,"maxDebtSnapshot","agencyName" '
-                    "FROM dms.document_revision ORDER BY id"
-                )
-            ).all()
             lines = connection.execute(
                 text('SELECT id,"productName","unitName" FROM dms.document_line ORDER BY id')
             ).all()
+            documents = connection.execute(
+                text(
+                    'SELECT id,"totalAmount","sellingPriceRate",status FROM dms.document ORDER '
+                    "BY id"
+                )
+            ).all()
             actor = connection.scalar(text("SELECT id FROM dms.app_user ORDER BY id LIMIT 1"))
-        with (
-            patch("app.db.seed.build_engine", return_value=engine),
-            patch("app.db.seed.get_settings", return_value=settings),
-        ):
-            seed_main()
-        with engine.connect() as connection:
-            assert check_database(connection, seeded=True) == first
-            connection.rollback()
-            with connection.begin() as transaction:
-                assert run_regression(connection) == 54
-                transaction.rollback()
         with Session(engine) as session:
-            for resource, table in (
-                ("agency-types", "agency_type"),
-                ("units", "unit"),
-            ):
-                identifier = session.scalar(text(f"SELECT id FROM dms.{table} ORDER BY id LIMIT 1"))
+            for resource, table in (("agency-types", "agency_type"), ("units", "unit")):
+                identifier = session.scalar(
+                    text(
+                        f"SELECT min(t.id) FROM dms.{table} t WHERE EXISTS (SELECT 1 FROM "
+                        + (
+                            'dms.agency a WHERE a."typeId"=t.id)'
+                            if table == "agency_type"
+                            else 'dms.document_line l WHERE l."unitId"=t.id)'
+                        )
+                    )
+                )
                 service = service_for(resource, session, actor)
                 with pytest.raises(ApiError, match="RESOURCE_IN_USE"):
                     service.delete(identifier, precondition(service, identifier))
                 renamed = service.update(
                     identifier,
-                    update_body(resource, {"name": "Historical rename " + resource}),
+                    update_body(resource, {"name": "Đổi tên " + resource}),
                     precondition(service, identifier),
                 )
-                assert renamed.name.startswith("Historical rename")
+                assert renamed.name == "Đổi tên " + resource
                 if resource == "units":
                     with pytest.raises(ApiError, match="MASTER_CONFLICT"):
                         service.update(
@@ -152,29 +143,24 @@ def test_fresh_populated_upgrade_seed_repeat_and_catalogue_history(database_fact
                             update_body(resource, {"allowsFraction": not renamed.allowsFraction}),
                             precondition(service, identifier),
                         )
-            assert (
-                session.execute(
-                    text(
-                        'SELECT id,"maxDebtSnapshot","agencyName" '
-                        "FROM dms.document_revision ORDER BY id"
-                    )
-                ).all()
-                == historical
-            )
+            # Renaming masters never rewrites recorded document snapshots.
             assert (
                 session.execute(
                     text('SELECT id,"productName","unitName" FROM dms.document_line ORDER BY id')
                 ).all()
                 == lines
             )
-        migrate(engine.url, "0004", downgrade=True)
-        with engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT to_regprocedure('dms.lock_recorded_unit_policy()')"))
-                is None
+                session.execute(
+                    text(
+                        'SELECT id,"totalAmount","sellingPriceRate",status '
+                        "FROM dms.document ORDER BY id"
+                    )
+                ).all()
+                == documents
             )
-        migrate(engine.url)
         with engine.connect() as connection:
+            assert check_database(connection, seeded=False)["document"] == first["document"]
             assert (
                 connection.scalar(text("SELECT version_num FROM public.alembic_version"))
                 == COMPATIBLE_HEAD

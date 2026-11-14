@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import Literal
 
 from pydantic import Field
@@ -6,7 +5,6 @@ from pydantic import Field
 from app.common.catalogue import PatchModel
 from app.common.schemas import (
     ApiModel,
-    BusinessDate,
     CatalogId,
     DerivedSellingPrice,
     Id,
@@ -21,23 +19,13 @@ from app.common.schemas import (
 class ProductCreate(ApiModel):
     name: NonEmptyText
     unitId: CatalogId
-    lowStockThreshold: Quantity = Decimal(0)
     status: Literal["ACTIVE", "INACTIVE"] = "ACTIVE"
 
 
 class ProductUpdate(PatchModel):
     name: NonEmptyText = None
     unitId: CatalogId = None
-    lowStockThreshold: Quantity = None
     status: Literal["ACTIVE", "INACTIVE"] = None
-
-
-class PriceSource(ApiModel):
-    documentId: Id
-    documentCode: str
-    revisionNo: int = Field(ge=1)
-    lineId: Id
-    businessDate: BusinessDate
 
 
 class ProductResponse(ApiModel):
@@ -47,13 +35,13 @@ class ProductResponse(ApiModel):
     unitId: CatalogId
     unitName: str
     allowsFraction: bool
-    lowStockThreshold: Quantity
     status: Literal["ACTIVE", "INACTIVE"]
-    currentStock: Quantity = Field(json_schema_extra={"readOnly": True})
-    currentPurchasePrice: Money = Field(json_schema_extra={"readOnly": True})
-    currentSellingPrice: DerivedSellingPrice = Field(json_schema_extra={"readOnly": True})
-    priceSource: PriceSource | None
-    isLowStock: bool
+    stock: Quantity = Field(json_schema_extra={"readOnly": True})
+    lastPurchasePrice: Money | None = Field(json_schema_extra={"readOnly": True})
+    sellingPrice: DerivedSellingPrice | None = Field(
+        json_schema_extra={"readOnly": True},
+        description="round(lastPurchasePrice × sellingPriceRate); null until first receipt.",
+    )
     createdAt: Instant = Field(json_schema_extra={"readOnly": True})
     updatedAt: Instant = Field(json_schema_extra={"readOnly": True})
 

@@ -18,7 +18,7 @@ from app.modules.users.schemas import AdminPasswordReset, UserCreate, UserUpdate
 from tests.integration.catalogues.conftest import CASES
 from tests.integration.catalogues.helpers import (
     agency,
-    count_line,
+    cancel_stock,
     draft,
     install_builders,
     post_stock,
@@ -384,7 +384,7 @@ def test_master_derived_counts_terminated_references_inactive(use_case, resource
 
 
 @pytest.mark.parametrize("resource", ["units"], indirect=True)
-@pytest.mark.parametrize("reference", ["product", "draft", "posted", "cancelled", "count"])
+@pytest.mark.parametrize("reference", ["product", "draft", "posted", "cancelled"])
 def test_unit_all_recorded_reference_and_fraction_guards(
     use_case, engine, actor, reference, resource
 ):
@@ -395,21 +395,12 @@ def test_unit_all_recorded_reference_and_fraction_guards(
     with Session(engine) as session:
         install_builders(session, actor)
         product_id = product(session, item.id)
-        if reference == "count":
-            count_line(session, actor, product_id, item.id)
-        elif reference != "product":
+        if reference != "product":
             document_id = draft(session, product_id)
-            if reference == "posted":
+            if reference in ("posted", "cancelled"):
                 post_stock(session, document_id)
-            elif reference == "cancelled":
-                session.execute(
-                    text(
-                        "UPDATE dms.document SET status='CANCELLED',"
-                        '"cancelledAt"=clock_timestamp(),'
-                        '"cancelledBy"=:actor,"cancelReason"=\'Duplicate\' WHERE id=:id'
-                    ),
-                    {"actor": actor, "id": document_id},
-                )
+            if reference == "cancelled":
+                cancel_stock(session, document_id)
         session.commit()
     assert use_case.get(item.id).productCount == 1
     if reference == "product":
@@ -450,7 +441,7 @@ def test_inactive_and_integer_fraction_receipt_rejection(use_case, engine, actor
         install_builders(session, actor)
         product_id = product(session, item.id)
         session.commit()
-        with pytest.raises(DBAPIError):
+        with pytest.raises(ApiError, match="FRACTION_NOT_ALLOWED"):
             draft(session, product_id, quantity="0.5")
         session.rollback()
         install_builders(session, actor)
@@ -461,46 +452,46 @@ def test_inactive_and_integer_fraction_receipt_rejection(use_case, engine, actor
     )
     with Session(engine) as session:
         install_builders(session, actor)
-        with pytest.raises(DBAPIError):
+        with pytest.raises(ApiError, match="INACTIVE_MASTER"):
             post_stock(session, document_id)
         session.rollback()
     with engine.connect() as connection:
+        row = connection.execute(
+            text('SELECT stock, "lastPurchasePrice" FROM dms.product WHERE id=:id'),
+            {"id": product_id},
+        ).one()
+        assert row.stock == 0 and row.lastPurchasePrice is None
         assert (
             connection.scalar(
-                text('SELECT "currentStock" FROM dms.inventory_balance WHERE "productId"=:id'),
-                {"id": product_id},
+                text("SELECT status FROM dms.document WHERE id=:id"), {"id": document_id}
             )
-            == 0
+            == "DRAFT"
         )
 
 
-@pytest.mark.parametrize("reference", ["draft", "count"])
-def test_unit_historical_only_reference_still_blocks_delete(engine, actor, reference):
-    from tests.support.database import migrate
-
-    # This is a populated legacy fixture: 0005 allowed non-posted product moves.
-    # 0006 must preserve its historical unit references while preventing new moves.
-    migrate(engine.url, "0005", downgrade=True)
+def test_unit_recorded_only_through_lines_still_blocks_delete(engine, actor):
+    """A product moved off a unit keeps the unit referenced by its recorded lines."""
     with Session(engine) as session:
         service = service_for("units", session, actor)
         old = service.create(create_body(service, {"code": "OLD", "name": "Old"}))
         new = service.create(create_body(service, {"code": "NEW", "name": "New"}))
         install_builders(session, actor)
         product_id = product(session, old.id)
-        if reference == "draft":
-            draft(session, product_id)
-        else:
-            count_line(session, actor, product_id, old.id)
-        session.execute(
-            text('UPDATE dms.product SET "unitId"=:unit WHERE id=:id'),
-            {"unit": new.id, "id": product_id},
-        )
         session.commit()
-    migrate(engine.url)
+        draft(session, product_id)
+        session.commit()
+        # The 0011 guard forbids moving a recorded product; a deleted draft frees it.
+        with pytest.raises(DBAPIError) as error:
+            session.execute(
+                text('UPDATE dms.product SET "unitId"=:unit WHERE id=:id'),
+                {"unit": new.id, "id": product_id},
+            )
+        assert error.value.orig.diag.constraint_name == "ck_product_recorded_unit_policy"
+        session.rollback()
     with Session(engine) as session:
         service = service_for("units", session, actor)
-        assert service.get(old.id).productCount == 0
-        assert service.repo.references(old.id)
+        assert service.get(old.id).productCount == 1
+        assert service.repo.recorded(old.id) and service.repo.references(old.id)
         with pytest.raises(ApiError, match="RESOURCE_IN_USE"):
             service.delete(old.id, precondition(service, old.id))
 

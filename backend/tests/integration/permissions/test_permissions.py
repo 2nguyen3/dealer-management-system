@@ -60,9 +60,7 @@ def test_owning_group_deletion_and_grant_write_both_orders(engine, actor, leadin
 
 def test_registry_and_grants_contract(client, engine):
     page = client.get("/api/v1/functions", params={"limit": 100})
-    assert (
-        page.status_code == 200 and len(page.json()["items"]) == 32
-    )  # 0010 retired district.manage
+    assert page.status_code == 200 and len(page.json()["items"]) == 22  # 0011 simplified registry
     assert_schema(page.json(), "FunctionListResponse")
     function = page.json()["items"][0]
     assert client.get(f"/api/v1/functions/{function['id']}").json() == function
@@ -86,7 +84,7 @@ def test_registry_and_grants_contract(client, engine):
     created = client.put(path, json={"isAllowed": True}, headers={"If-None-Match": "*"})
     assert created.status_code == 201, created.text
     assert created.headers["Location"] == path
-    assert_schema(created.json(), "Permission")
+    assert_schema(created.json(), "PermissionResponse")
     assert client.get(path).headers["ETag"] == created.headers["ETag"]
     assert (
         client.put(path, json={"isAllowed": True}, headers={"If-None-Match": "*"}).status_code

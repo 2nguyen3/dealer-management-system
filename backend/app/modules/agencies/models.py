@@ -11,6 +11,7 @@ AGENCY = table(
     column("address", String),
     column("email", String),
     column("acceptedDate", Date),
+    column("debt", Numeric),
     column("status", String),
     column("terminatedAt", DateTime(timezone=True)),
     column("terminationReason", String),
@@ -18,12 +19,5 @@ AGENCY = table(
     column("updatedBy", BigInteger),
     column("createdAt", DateTime(timezone=True)),
     column("updatedAt", DateTime(timezone=True)),
-    schema="dms",
-)
-BALANCE = table(
-    "agency_balance",
-    column("agencyId", BigInteger),
-    column("currentDebt", Numeric),
-    column("currentCredit", Numeric),
     schema="dms",
 )

@@ -2,7 +2,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from unittest.mock import patch
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -37,10 +36,7 @@ def test_acceptance_date_vs_existing_draft_history_both_orders(
             agency_id=int(agency.json()["id"]),
         )
         session.execute(
-            text(
-                "UPDATE dms.document_revision SET \"businessDate\"='2026-01-05' "
-                'WHERE "documentId"=:id'
-            ),
+            text("UPDATE dms.document SET \"businessDate\"='2026-01-05' WHERE id=:id"),
             {"id": issue},
         )
         session.commit()
@@ -54,13 +50,9 @@ def test_acceptance_date_vs_existing_draft_history_both_orders(
 
     def history(session):
         session.execute(
-            text(
-                "UPDATE dms.document_revision SET \"businessDate\"='2026-01-02' "
-                'WHERE "documentId"=:id'
-            ),
+            text("UPDATE dms.document SET \"businessDate\"='2026-01-02' WHERE id=:id"),
             {"id": issue},
         )
-        session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
         session.commit()
         return "history-updated"
 
@@ -77,16 +69,14 @@ def test_acceptance_date_vs_existing_draft_history_both_orders(
         assert (
             c.exec_driver_sql(
                 'SELECT count(*) FROM dms.agency a JOIN dms.document d ON d."agencyId"=a.id '
-                'JOIN dms.document_revision r ON r."documentId"=d.id '
-                'WHERE r."businessDate"<a."acceptedDate"'
+                'WHERE d."businessDate"<a."acceptedDate"'
             ).scalar()
             == 0
         )
 
 
-def test_termination_replay_reauthorizes_after_command_claim_wait(client, engine, actor, masters):
+def test_termination_reauthorizes_after_agency_lock_wait(client, engine, actor, masters):
     agency = client.post("/api/v1/agencies", json=body_for("agencies", masters))
-    key = uuid4()
     acquired, release = Event(), Event()
 
     def original():
@@ -103,17 +93,16 @@ def test_termination_replay_reauthorizes_after_command_claim_wait(client, engine
                     int(agency.json()["id"]),
                     Reason(reason="End"),
                     Preconditions(agency.headers["ETag"]),
-                    key,
                 )
 
     with ThreadPoolExecutor(2) as pool:
         first = pool.submit(original)
         assert acquired.wait(race_timeout(10))
-        replay = pool.submit(
+        waiting = pool.submit(
             client.post,
             agency.headers["Location"] + "/terminate",
             json={"reason": "End"},
-            headers={"If-Match": agency.headers["ETag"], "Idempotency-Key": str(key)},
+            headers={"If-Match": agency.headers["ETag"]},
         )
         try:
             with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as c:
@@ -122,14 +111,14 @@ def test_termination_replay_reauthorizes_after_command_claim_wait(client, engine
                     if c.scalar(
                         text(
                             "SELECT pid FROM pg_stat_activity WHERE datname=:db "
-                            "AND wait_event_type='Lock' AND query LIKE '%api_idempotency%'"
+                            "AND wait_event_type='Lock' AND query LIKE '%business_rule%'"
                         ),
                         {"db": engine.url.database},
                     ):
                         break
                     Event().wait(0.01)
                 else:
-                    pytest.fail("Expected command claim wait")
+                    pytest.fail("Expected a real agency lock wait")
             with engine.begin() as c:
                 c.exec_driver_sql(
                     'UPDATE dms.group_permission SET "isAllowed"=false WHERE "groupId"=1 '
@@ -138,8 +127,14 @@ def test_termination_replay_reauthorizes_after_command_claim_wait(client, engine
                 )
         finally:
             release.set()
-        assert first.result(timeout=race_timeout(15)).body["status"] == "TERMINATED"
-        denied = replay.result(timeout=race_timeout(15))
+        assert first.result(timeout=race_timeout(15)).status == "TERMINATED"
+        denied = waiting.result(timeout=race_timeout(15))
         assert denied.status_code == 403, denied.text
     with engine.connect() as c:
-        assert c.exec_driver_sql("SELECT count(*) FROM dms.api_idempotency").scalar() == 1
+        assert (
+            c.exec_driver_sql(
+                "SELECT count(*) FROM dms.audit_log WHERE \"entityName\"='agency' "
+                "AND \"newData\"->>'status'='TERMINATED'"
+            ).scalar()
+            == 1
+        )

@@ -1,8 +1,6 @@
 from typing import Annotated, Literal
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Request, Response
 
 from app.common.catalogue_http import MatchHeader, responses
 from app.common.preconditions import read_preconditions
@@ -59,7 +57,7 @@ def list_agencies(
     acceptedFrom: BusinessDate | None = None,
     acceptedTo: BusinessDate | None = None,
     sort: Literal[
-        "id", "-id", "name", "-name", "currentDebt", "-currentDebt", "acceptedDate", "-acceptedDate"
+        "id", "-id", "name", "-name", "debt", "-debt", "acceptedDate", "-acceptedDate"
     ] = "id",
 ):
     return service.list(
@@ -155,8 +153,9 @@ def terminate_agency(
     principal: Writer,
     service: Service,
     request: Request,
+    response: Response,
     match: MatchHeader,
-    key: Annotated[UUID, Header(alias="Idempotency-Key")],
 ):
-    result = service.terminate(int(agencyId), body, read_preconditions(request), key)
-    return JSONResponse(result.body, status_code=result.status, headers=result.headers)
+    item = service.terminate(int(agencyId), body, read_preconditions(request))
+    response.headers["ETag"] = service.etag(item)
+    return item

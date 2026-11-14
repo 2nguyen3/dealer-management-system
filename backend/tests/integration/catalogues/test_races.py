@@ -18,7 +18,6 @@ from app.modules.user_groups.service import GroupService, group_etag
 from app.modules.users.schemas import AdminPasswordReset, UserCreate, UserUpdate
 from tests.integration.catalogues.helpers import (
     agency,
-    count_line,
     draft,
     install_builders,
     post_stock,
@@ -285,7 +284,7 @@ def test_catalogue_reference_creation_vs_delete(use_case, resource, engine, acto
         assert outcomes[0] == "deleted" and outcomes[1] in ("23503", "23514", "P0002")
 
 
-@pytest.mark.parametrize("reference", ["draft", "count", "posting"])
+@pytest.mark.parametrize("reference", ["draft", "posting"])
 @pytest.mark.parametrize("first", ["use", "policy"])
 def test_unit_first_recording_or_post_vs_fraction_policy(engine, actor, reference, first):
     with Session(engine) as session:
@@ -308,9 +307,7 @@ def test_unit_first_recording_or_post_vs_fraction_policy(engine, actor, referenc
 
     def use(session):
         install_builders(session, actor)
-        if reference == "count":
-            count_line(session, actor, product_id, item.id, counted="1.5")
-        elif reference == "draft":
+        if reference == "draft":
             draft(session, product_id, quantity="1.5")
         else:
             post_stock(session, document_id)
@@ -332,7 +329,8 @@ def test_unit_first_recording_or_post_vs_fraction_policy(engine, actor, referenc
         else:
             assert following == "MASTER_CONFLICT"
     else:
-        assert following == "23514"
+        # The policy change commits first; the line trigger re-reads the locked unit.
+        assert following == ("FRACTION_NOT_ALLOWED" if reference == "draft" else "INACTIVE_MASTER")
 
 
 @pytest.mark.parametrize("first", ["issue", "limit"])
@@ -349,7 +347,6 @@ def test_issue_posting_vs_type_limit_lowering(engine, actor, first):
         receipt = draft(session, product_id, quantity="10")
         post_stock(session, receipt)
         issue = draft(session, product_id, kind="STOCK_ISSUE", agency_id=agency_id)
-        session.execute(text("SELECT pg_temp.ready(:id)"), {"id": issue})
         session.commit()
         match = service.etag(service.get(item.id))
 
@@ -370,7 +367,7 @@ def test_issue_posting_vs_type_limit_lowering(engine, actor, first):
     if first == "issue":
         assert leading == "posted" and following == "DEBT_LIMIT_BELOW_CURRENT_BALANCE"
     else:
-        assert leading.maxDebt == 0 and following == "23514"
+        assert leading.maxDebt == 0 and following == "DEBT_LIMIT_EXCEEDED"
 
 
 @pytest.mark.parametrize("first", ["assign", "limit"])

@@ -1,5 +1,6 @@
 """Native provider transports; not additional canonical business operations."""
 
+import logging
 from html import escape
 from typing import Annotated
 from urllib.parse import urlencode
@@ -13,6 +14,7 @@ from app.modules.online_payments.dependencies import get_webhook_service
 from app.modules.online_payments.service import OnlinePaymentService
 from app.modules.online_payments.vnpay import VnpayAdapter
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/vnpay", include_in_schema=False)
 HEADERS = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
 
@@ -46,6 +48,8 @@ def vnpay_ipn(
             code, message = "01", "Order not found"
         elif error.code == "PAYMENT_CONFLICT" and "amount" in error.message:
             code, message = "04", "Invalid amount"
+    except Exception:  # VNPAY retries "99"; an IPN never surfaces as HTTP 500
+        logger.exception("VNPAY IPN processing failed")
     return JSONResponse({"RspCode": code, "Message": message}, headers=HEADERS)
 
 

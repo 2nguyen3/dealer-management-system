@@ -68,7 +68,7 @@ def test_repository_mutations_remain_in_caller_transaction(service, engine, oper
 def test_create_update_delete_audit_and_safe_contract(client, engine):
     created = client.post("/api/v1/user-groups", json={"code": "SUPPORT", "name": "Support"})
     assert created.status_code == 201
-    assert_schema(created.json(), "Group")
+    assert_schema(created.json(), "GroupResponse")
     path = created.headers["Location"]
     assert created.json()["userCount"] == 0
     with engine.connect() as connection:

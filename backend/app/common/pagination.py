@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, false, or_
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.common.canonical import canonical_json
@@ -97,15 +97,29 @@ class SortSpec:
     def after(
         self, columns: Mapping[str, ColumnElement], values: Sequence[object]
     ) -> ColumnElement:
-        if len(values) != len(self.fields) or any(value is None for value in values):
+        """Rows strictly after ``values`` in ``ordering``.
+
+        Leading sort fields may be NULL (for example an unpriced product's selling
+        price); PostgreSQL orders NULL last ascending and first descending. The final
+        field is the unique tie-breaker and must be present.
+        """
+        if len(values) != len(self.fields) or not values or values[-1] is None:
             raise cursor_error()
         legs = []
         for index, field in enumerate(self.fields):
-            column = columns[field]
-            comparison = column < values[index] if self.descending else column > values[index]
+            column, value = columns[field], values[index]
+            if value is None:
+                comparison = column.is_not(None) if self.descending else false()
+            elif self.descending:
+                comparison = column < value
+            else:
+                comparison = or_(column > value, column.is_(None))
             legs.append(
                 and_(
-                    *(columns[name] == values[i] for i, name in enumerate(self.fields[:index])),
+                    *(
+                        columns[name].is_not_distinct_from(values[i])
+                        for i, name in enumerate(self.fields[:index])
+                    ),
                     comparison,
                 )
             )

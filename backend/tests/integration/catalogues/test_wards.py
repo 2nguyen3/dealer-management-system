@@ -1,25 +1,18 @@
-"""Real-PostgreSQL tests for the read-only ward catalogue and revision 0010."""
+"""Real-PostgreSQL tests for the read-only ward catalogue and historical revision 0010.
+
+The 0009 -> 0010 mapping tests pin revision 0010: 0011 rebuilds schema dms (no data kept).
+"""
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.common.pagination import CursorCodec
-from app.common.preconditions import Preconditions
-from app.core.exceptions import ApiError
-from app.modules.audit_logs.service import AuditService
-from app.modules.permissions.schemas import PermissionSet
-from app.modules.permissions.service import FunctionService, PermissionService
 from tests.integration.catalogues.helpers import agency
 from tests.support.contract import assert_schema
 from tests.support.database import migrate
 
 pytestmark = pytest.mark.integration
-
-
-def service(kind, session, actor):
-    return kind(session, CursorCodec(b"x" * 32), actor, "ward-test", lambda _: None)
 
 
 def test_catalogue_is_loaded_exactly_and_read_only(engine):
@@ -87,7 +80,7 @@ def test_http_list_filters_cursor_detail_and_404(client, engine):
     assert client.get(path, params={"cursor": "forged"}).status_code == 400
     detail = client.get(f"{path}/{sai_gon['id']}")
     assert detail.status_code == 200 and detail.json() == sai_gon
-    assert_schema(detail.json(), "Ward")
+    assert_schema(detail.json(), "WardResponse")
     etag = detail.headers["ETag"]
     assert client.get(f"{path}/169").status_code == 404
     assert client.post(path, json={"code": "1", "name": "x"}).status_code == 405
@@ -154,7 +147,10 @@ def test_rule_lowering_and_ward_move_capacity(engine, actor):
         )
         connection.execute(text('UPDATE dms.agency SET "wardId"=5 WHERE id=:id'), {"id": mover})
         assert connection.scalar(
-            text('SELECT "wardName" FROM dms.agency_overview WHERE id=:id'), {"id": mover}
+            text(
+                'SELECT w.name FROM dms.agency a JOIN dms.ward w ON w.id=a."wardId" WHERE a.id=:id'
+            ),
+            {"id": mover},
         ) == connection.scalar(text("SELECT name FROM dms.ward WHERE id=5"))
 
 
@@ -197,7 +193,7 @@ def test_populated_upgrade_maps_rewrites_and_downgrade_restores(database_factory
         addresses = seed_legacy(engine, ["Quận 1", "Bình Thạnh", "Nhà Bè"])
         with engine.connect() as connection:
             before_audit = connection.scalar(text("SELECT count(*) FROM dms.audit_log"))
-        migrate(engine.url)
+        migrate(engine.url, "0010")
         with engine.connect() as connection:
             rows = connection.execute(
                 text(
@@ -251,22 +247,19 @@ def test_populated_upgrade_maps_rewrites_and_downgrade_restores(database_factory
             ).all()
             assert migration_audit == [("agency", 4), ("group_permission", 4)]
             assert connection.scalar(text("SELECT count(*) FROM dms.audit_log")) == before_audit + 8
-        actor = None  # Reads and the rejected grant need no persisted actor.
-        with Session(engine) as session:
-            functions = service(FunctionService, session, actor).list(limit=100)
-            assert "district.manage" not in {item.code for item in functions.items}
-            retired = session.scalar(
-                text("SELECT id FROM dms.app_function WHERE code='district.manage'")
-            )
-            with pytest.raises(ApiError, match="NOT_FOUND"):
-                service(PermissionService, session, actor).set(
-                    1, retired, PermissionSet(isAllowed=True), Preconditions(None, True)
+        with engine.connect() as connection:
+            # 0010 history keeps the retired code on its district audit rows only.
+            history = (
+                connection.execute(
+                    text(
+                        'SELECT DISTINCT "entityName" FROM dms.audit_log '
+                        "WHERE \"functionCode\"='district.manage'"
+                    )
                 )
-            history = service(AuditService, session, actor).list(
-                functionCode="district.manage", limit=100
+                .scalars()
+                .all()
             )
-            assert {item.entityName for item in history.items} == {"district"}
-            assert all(item.newData["code"].startswith("D") for item in history.items)
+            assert set(history) == {"district"}
         migrate(engine.url, "0009", downgrade=True)
         with engine.connect() as connection:
             restored = connection.execute(
@@ -297,7 +290,7 @@ def test_populated_upgrade_maps_rewrites_and_downgrade_restores(database_factory
                 connection.scalar(text('SELECT "maxAgenciesPerDistrict" FROM dms.business_rule'))
                 == 4
             )
-        migrate(engine.url)
+        migrate(engine.url, "0010")
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT count(*) FROM dms.ward")) == 168
             assert connection.execute(
@@ -319,7 +312,7 @@ def test_unmapped_district_fails_upgrade_and_unmapped_ward_blocks_downgrade(data
                 "INSERT INTO dms.district (code,name) VALUES ('LEGACY','Quận 2')"
             )
         with pytest.raises(DBAPIError, match="No reviewed ward mapping"):
-            migrate(engine.url)
+            migrate(engine.url, "0010")
         with engine.connect() as connection:
             assert (
                 connection.scalar(text("SELECT version_num FROM public.alembic_version")) == "0009"
@@ -327,7 +320,7 @@ def test_unmapped_district_fails_upgrade_and_unmapped_ward_blocks_downgrade(data
             assert connection.scalar(text("SELECT to_regclass('dms.ward')")) is None
         with engine.begin() as connection:
             connection.exec_driver_sql("DELETE FROM dms.district WHERE code='LEGACY'")
-        migrate(engine.url)
+        migrate(engine.url, "0010")
         with engine.begin() as connection:
             connection.exec_driver_sql(
                 'INSERT INTO dms.agency (name,"typeId","wardId",email,"acceptedDate") '

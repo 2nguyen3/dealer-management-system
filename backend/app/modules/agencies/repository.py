@@ -6,7 +6,7 @@ from sqlalchemy import String, cast, select, text
 from app.common.dates import parse_date
 from app.common.sql_catalogue import SqlCatalogueRepository
 from app.core.exceptions import ApiError
-from app.modules.agencies.models import AGENCY, BALANCE
+from app.modules.agencies.models import AGENCY
 from app.modules.agency_types.models import AgencyType
 from app.modules.wards.models import Ward
 
@@ -18,13 +18,11 @@ class AgencyRepository(SqlCatalogueRepository):
         "typeName": AgencyType.name,
         "wardName": Ward.name,
         "maxDebt": AgencyType.max_debt,
-        "currentDebt": BALANCE.c.currentDebt,
-        "currentCredit": BALANCE.c.currentCredit,
-        "remainingCreditLimit": AgencyType.max_debt - BALANCE.c.currentDebt,
+        "remainingCreditLimit": AgencyType.max_debt - AGENCY.c.debt,
     }
     ranges = {
-        "debtFrom": (BALANCE.c.currentDebt, ge),
-        "debtTo": (BALANCE.c.currentDebt, le),
+        "debtFrom": (AGENCY.c.debt, ge),
+        "debtTo": (AGENCY.c.debt, le),
         "acceptedFrom": (AGENCY.c.acceptedDate, ge),
         "acceptedTo": (AGENCY.c.acceptedDate, lt),
     }
@@ -38,9 +36,9 @@ class AgencyRepository(SqlCatalogueRepository):
                 for name, col in self.columns.items()
             )
         ).select_from(
-            AGENCY.join(AgencyType.__table__, AgencyType.id == AGENCY.c.typeId)
-            .join(Ward.__table__, Ward.id == AGENCY.c.wardId)
-            .join(BALANCE, BALANCE.c.agencyId == AGENCY.c.id)
+            AGENCY.join(AgencyType.__table__, AgencyType.id == AGENCY.c.typeId).join(
+                Ward.__table__, Ward.id == AGENCY.c.wardId
+            )
         )
 
     def masters(self, type_id: int, ward_id: int, *, new_type=False):
@@ -68,12 +66,7 @@ class AgencyRepository(SqlCatalogueRepository):
         if current is None:
             return None
         self.masters(current["typeId"], current["wardId"])
-        row = super().lock(identifier)
-        self.session.execute(
-            text('SELECT "agencyId" FROM dms.agency_balance WHERE "agencyId"=:id FOR UPDATE'),
-            {"id": identifier},
-        )
-        return row
+        return super().lock(identifier)
 
     def capacity(self, ward_id: int, *, exclude: int = 0):
         maximum = self.session.scalar(
@@ -108,7 +101,7 @@ class AgencyRepository(SqlCatalogueRepository):
         ward_id = values.get("wardId", row.wardId)
         maximum = self.masters(type_id, ward_id, new_type=type_id != row.typeId)
         debt = self.session.scalar(
-            text('SELECT "currentDebt" FROM dms.agency_balance WHERE "agencyId"=:id'),
+            text("SELECT debt FROM dms.agency WHERE id=:id"),
             {"id": row.id},
         )
         if debt > maximum:
@@ -118,10 +111,7 @@ class AgencyRepository(SqlCatalogueRepository):
         if "acceptedDate" in values:
             values["acceptedDate"] = parse_date(values["acceptedDate"])
             earliest = self.session.scalar(
-                text(
-                    'SELECT min(r."businessDate") FROM dms.document d '
-                    'JOIN dms.document_revision r ON r."documentId"=d.id WHERE d."agencyId"=:id'
-                ),
+                text('SELECT min("businessDate") FROM dms.document WHERE "agencyId"=:id'),
                 {"id": row.id},
             )
             if earliest is not None and values["acceptedDate"] > earliest:
@@ -134,10 +124,7 @@ class AgencyRepository(SqlCatalogueRepository):
             self.session.scalar(
                 text(
                     'SELECT EXISTS(SELECT 1 FROM dms.document WHERE "agencyId"=:id) '
-                    'OR EXISTS(SELECT 1 FROM dms.online_payment WHERE "agencyId"=:id) '
-                    'OR EXISTS(SELECT 1 FROM dms.credit_lot WHERE "agencyId"=:id) '
-                    'OR EXISTS(SELECT 1 FROM dms.receivable_entry WHERE "agencyId"=:id) '
-                    'OR EXISTS(SELECT 1 FROM dms.credit_entry WHERE "agencyId"=:id)'
+                    'OR EXISTS(SELECT 1 FROM dms.online_payment WHERE "agencyId"=:id)'
                 ),
                 {"id": identifier},
             )

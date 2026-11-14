@@ -8,12 +8,14 @@ from app.common.schemas import CatalogParameter, Cursor, Limit, NonEmptyText
 from app.common.transport import BusinessRoute
 from app.modules.auth.dependencies import require_permissions
 from app.modules.auth.service import Principal
+from app.modules.products.router import READ as PRODUCT_READ
 from app.modules.units.dependencies import get_unit_service
 from app.modules.units.schemas import UnitCreate, UnitListResponse, UnitResponse, UnitUpdate
 from app.modules.units.service import UnitService
 
 router = APIRouter(prefix="/units", tags=["Units"], route_class=BusinessRoute)
-READ = {"anyOf": ["unit.manage", "product.manage", "inventory.read"]}
+# Anyone who can read products can read their units (product list filter/column).
+READ = {"anyOf": ["unit.manage", *PRODUCT_READ["anyOf"]]}
 WRITE = {"allOf": ["unit.manage"]}
 Reader = Annotated[Principal, Depends(require_permissions(any_of=tuple(READ["anyOf"])))]
 Writer = Annotated[Principal, Depends(require_permissions(all_of=tuple(WRITE["allOf"])))]

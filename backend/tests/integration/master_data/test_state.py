@@ -1,25 +1,32 @@
-from uuid import uuid4
-
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from tests.integration.catalogues.helpers import count_line, draft, install_builders, post_stock
+from tests.integration.catalogues.helpers import (
+    cancel_stock,
+    draft,
+    install_builders,
+    payment,
+    post_stock,
+)
 from tests.integration.master_data.test_contract import body_for
 from tests.support.contract import assert_schema
 
 pytestmark = pytest.mark.integration
 
 
-def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, actor, masters):
+def test_product_unit_stock_price_filters_and_cancellation(client, engine, actor, masters):
     path = "/api/v1/products"
-    created = client.post(path, json={**body_for("products", masters), "lowStockThreshold": "1"})
+    created = client.post(path, json=body_for("products", masters))
     assert created.status_code == 201, created.text
     detail = created.headers["Location"]
-    assert created.json()["isLowStock"] and created.json()["priceSource"] is None
-    missing = client.post(path, json={"name": "x", "unitId": 999999})
-    assert missing.status_code == 404
+    fresh = created.json()
+    assert fresh["stock"] == "0" and fresh["lastPurchasePrice"] is None
+    assert fresh["sellingPrice"] is None
+    legacy = {**body_for("products", masters), "lowStockThreshold": "1"}
+    assert client.post(path, json=legacy).status_code == 422
+    assert client.post(path, json={"name": "x", "unitId": 999999}).status_code == 404
     unit = client.post("/api/v1/units", json={"code": "OTHER", "name": "Other"}).json()["id"]
     changed = client.patch(
         detail, json={"unitId": unit}, headers={"If-Match": created.headers["ETag"]}
@@ -35,37 +42,18 @@ def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, acto
         == 200
     )
     assert client.post(path, json={"name": "x", "unitId": unit}).status_code == 409
-    # Re-enable for a genuine persisted near-limit receipt; no cache manipulation.
     unit_detail = client.get("/api/v1/units/" + str(unit))
     client.patch(
         "/api/v1/units/" + str(unit),
         json={"status": "ACTIVE"},
         headers={"If-Match": unit_detail.headers["ETag"]},
     )
+    # Near-limit genuine receipt price; stock/price change only through posting.
     with Session(engine) as session:
         install_builders(session, actor)
-        document = draft(session, int(created.json()["id"]))
-        session.execute(
-            text(
-                'UPDATE dms.document_line SET "unitPrice"=600000000000000000 '
-                'WHERE "revisionId"=(SELECT "currentRevisionId" FROM dms.document WHERE id=:id)'
-            ),
-            {"id": document},
-        )
-        session.execute(
-            text(
-                'UPDATE dms.document_revision SET "totalAmount"=600000000000000000 '
-                'WHERE id=(SELECT "currentRevisionId" FROM dms.document WHERE id=:id)'
-            ),
-            {"id": document},
-        )
+        document = draft(session, int(fresh["id"]), price="600000000000000000")
         post_stock(session, document)
         session.commit()
-        old_lines = session.execute(
-            text(
-                'SELECT id,"unitPrice","productName","unitName" FROM dms.document_line ORDER BY id'
-            )
-        ).all()
     rules = client.get("/api/v1/business-rules")
     assert (
         client.patch(
@@ -76,10 +64,10 @@ def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, acto
         == 200
     )
     product = client.get(detail)
-    assert product.json()["currentStock"] == "1" and not product.json()["isLowStock"]
-    assert product.json()["currentSellingPrice"] == "1200000000000000000"
-    assert product.json()["priceSource"]["documentId"] == str(document)
-    assert_schema(product.json(), "Product")
+    assert product.json()["stock"] == "1"
+    assert product.json()["lastPurchasePrice"] == "600000000000000000"
+    assert product.json()["sellingPrice"] == "1200000000000000000"
+    assert_schema(product.json(), "ProductResponse")
     assert (
         client.patch(
             detail, json={"unitId": masters[1]}, headers={"If-Match": product.headers["ETag"]}
@@ -94,7 +82,6 @@ def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, acto
             "code": product.json()["code"],
             "unitId": unit,
             "status": "ACTIVE",
-            "isLowStock": False,
             "stockFrom": "1",
             "stockTo": "1",
         },
@@ -102,26 +89,11 @@ def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, acto
     assert filtered.json()["items"] == [product.json()]
     assert client.get(path, params={"stockFrom": "2", "stockTo": "1"}).status_code == 422
     assert client.get(path, params={"stockFrom": "1.0001"}).status_code == 422
-    # A second valid receipt with price 1 and the smallest valid rate rounds to zero.
+    # Price 1 with the smallest valid rate rounds the quote to zero.
     small = client.post(path, json={"name": "Small", "unitId": unit}).json()
     with Session(engine) as session:
         install_builders(session, actor)
-        doc = draft(session, int(small["id"]))
-        session.execute(
-            text(
-                'UPDATE dms.document_line SET "unitPrice"=1 '
-                'WHERE "revisionId"=(SELECT "currentRevisionId" FROM dms.document WHERE id=:id)'
-            ),
-            {"id": doc},
-        )
-        session.execute(
-            text(
-                'UPDATE dms.document_revision SET "totalAmount"=1 '
-                'WHERE id=(SELECT "currentRevisionId" FROM dms.document WHERE id=:id)'
-            ),
-            {"id": doc},
-        )
-        post_stock(session, doc)
+        post_stock(session, draft(session, int(small["id"]), price="1"))
         session.commit()
     rules = client.get("/api/v1/business-rules")
     assert (
@@ -132,33 +104,25 @@ def test_product_unit_threshold_ranges_price_source_and_d16(client, engine, acto
         ).status_code
         == 200
     )
-    assert client.get("/api/v1/products/" + small["id"]).json()["currentSellingPrice"] == "0"
-    with engine.connect() as c:
-        assert (
-            c.execute(
-                text(
-                    'SELECT id,"unitPrice","productName","unitName" FROM dms.document_line '
-                    "WHERE id IN (SELECT id FROM dms.document_line ORDER BY id LIMIT 1)"
-                )
-            ).all()
-            == old_lines
-        )
+    assert client.get("/api/v1/products/" + small["id"]).json()["sellingPrice"] == "0"
+    # Cancelling the only receipt restores zero stock and clears the purchase price.
     with Session(engine) as session:
         install_builders(session, actor)
-        session.execute(text("SET CONSTRAINTS ALL DEFERRED"))
-        session.execute(text("SELECT pg_temp.reverse_stock(:id)"), {"id": document})
-        session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+        cancel_stock(session, document)
         session.commit()
-    canceled = client.get(detail)
-    assert canceled.json()["currentStock"] == "0" and canceled.json()["priceSource"] is None
-    assert client.delete(detail, headers={"If-Match": canceled.headers["ETag"]}).status_code == 409
+    cancelled = client.get(detail)
+    assert cancelled.json()["stock"] == "0" and cancelled.json()["lastPurchasePrice"] is None
+    assert cancelled.json()["sellingPrice"] is None
+    assert client.delete(detail, headers={"If-Match": cancelled.headers["ETag"]}).status_code == 409
 
 
-def test_recorded_count_product_and_direct_cache_denial(client, engine, actor, masters):
+def test_recorded_product_and_direct_balance_denial(client, engine, actor, masters):
     product = client.post("/api/v1/products", json=body_for("products", masters))
     path = product.headers["Location"]
+    identifier = int(product.json()["id"])
     with Session(engine) as session:
-        count_line(session, actor, int(product.json()["id"]), masters[1])
+        install_builders(session, actor)
+        draft(session, identifier)
         session.commit()
     other = client.post("/api/v1/units", json={"code": "SECOND", "name": "Second"}).json()["id"]
     assert (
@@ -168,13 +132,20 @@ def test_recorded_count_product_and_direct_cache_denial(client, engine, actor, m
         == 409
     )
     assert client.delete(path, headers={"If-Match": product.headers["ETag"]}).status_code == 409
-    for cache, owner, values in (("inventory_balance", "productId", '"currentStock"=1'),):
-        for command in (
-            f'DELETE FROM dms.{cache} WHERE "{owner}"=:id',
-            f'UPDATE dms.{cache} SET {values} WHERE "{owner}"=:id',
-        ):
-            with pytest.raises(DBAPIError), engine.begin() as c:
-                c.execute(text(command), {"id": int(product.json()["id"])})
+    for command in (
+        "UPDATE dms.product SET stock=1 WHERE id=:id",
+        'UPDATE dms.product SET "lastPurchasePrice"=1 WHERE id=:id',
+        "DELETE FROM dms.product WHERE id=:id",
+    ):
+        with pytest.raises(DBAPIError) as error, engine.begin() as c:
+            c.execute(text(command), {"id": identifier})
+        assert error.value.orig.sqlstate == "23514"
+    with engine.connect() as c:
+        row = c.execute(
+            text('SELECT stock, "lastPurchasePrice" FROM dms.product WHERE id=:id'),
+            {"id": identifier},
+        ).one()
+        assert row.stock == 0 and row.lastPurchasePrice is None
 
 
 def test_agency_master_capacity_contact_history_type_debt_and_termination(
@@ -217,10 +188,15 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
         issue = draft(
             session, int(product["id"]), kind="STOCK_ISSUE", agency_id=int(agency.json()["id"])
         )
+        # Backdated history: acceptance cannot move after this issue.
+        session.execute(
+            text("UPDATE dms.document SET \"businessDate\"='2026-01-02' WHERE id=:id"),
+            {"id": issue},
+        )
         post_stock(session, issue)
         session.commit()
     current = client.get(detail)
-    assert current.json()["currentDebt"] == "102"
+    assert current.json()["debt"] == "102" and current.json()["maxDebt"] is not None
     assert (
         client.patch(
             detail, json={"typeId": low_type}, headers={"If-Match": current.headers["ETag"]}
@@ -259,12 +235,25 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
         == 422
     )
     assert client.get(path, params={"phone": "123"}).json()["items"] == []
-    result = client.post(
+    owing = client.post(
         detail + "/terminate",
         json={"reason": "End with debt"},
-        headers={"If-Match": current.headers["ETag"], "Idempotency-Key": str(uuid4())},
+        headers={"If-Match": current.headers["ETag"]},
     )
-    assert result.status_code == 200 and result.json()["currentDebt"] == "102"
+    assert owing.status_code == 409 and owing.json()["code"] == "AGENCY_HAS_DEBT"
+    assert owing.json()["details"] == {"debt": "102"}
+    with Session(engine) as session:
+        install_builders(session, actor)
+        payment(session, int(agency.json()["id"]), 102)
+        session.commit()
+    settled = client.get(detail)
+    assert settled.json()["debt"] == "0"
+    result = client.post(
+        detail + "/terminate",
+        json={"reason": "End"},
+        headers={"If-Match": settled.headers["ETag"]},
+    )
+    assert result.status_code == 200 and result.json()["debt"] == "0"
     assert result.json()["status"] == "TERMINATED" and result.json()["terminatedAt"] is not None
     assert (
         client.patch(
@@ -279,8 +268,8 @@ def test_agency_master_capacity_contact_history_type_debt_and_termination(
         == 200
     )
     for command in (
-        'DELETE FROM dms.agency_balance WHERE "agencyId"=:id',
-        'UPDATE dms.agency_balance SET "currentDebt"=0 WHERE "agencyId"=:id',
+        "DELETE FROM dms.agency WHERE id=:id",
+        "UPDATE dms.agency SET debt=1 WHERE id=:id",
     ):
         with pytest.raises(DBAPIError), engine.begin() as c:
             c.execute(text(command), {"id": int(agency.json()["id"])})
