@@ -4,15 +4,14 @@ import {
   Banknote,
   Boxes,
   CircleOff,
+  CreditCard,
   FileText,
+  Globe,
   HandCoins,
   PackageCheck,
-  ReceiptText,
-  RotateCcw,
+  PieChart,
   Scale,
-  SlidersHorizontal,
   TrendingUp,
-  Undo2,
   Wallet,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -43,12 +42,12 @@ import { columnLabels } from './display'
 import {
   allZero,
   compositionOf,
-  creditFlow,
   debtFlow,
   flowData,
   inventoryCounts,
   rankRows,
-  returnRatio,
+  salesShare,
+  timelineRows,
   type ChartDatum,
   type Composition,
 } from './insights'
@@ -100,27 +99,22 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
   const totals = page.totals
   switch (kind) {
     case 'sales': {
-      const ratio = returnRatio(totals)
+      const share = salesShare(totals)
       return [
+        moneyKpi(t('Doanh số'), totals, 'salesAmount', <TrendingUp />),
         moneyKpi(
-          t('Doanh số gộp'),
+          t('Doanh số toàn công ty'),
           totals,
-          'salesAmount',
-          <TrendingUp />,
-          t('Toàn công ty: {companyGrossSales}', {
-            companyGrossSales: formatVND(totals?.companyGrossSales ?? '0'),
-          }),
+          'companySalesAmount',
+          <Banknote />,
+          t('Cùng kỳ, mọi đại lý'),
         ),
-        moneyKpi(
-          t('Hàng trả lại'),
-          totals,
-          'returnAmount',
-          <Undo2 />,
-          ratio === null
-            ? FILTERED
-            : t('{ratio} doanh số gộp', { ratio: formatPercent(ratio) }),
-        ),
-        moneyKpi(t('Doanh số thuần'), totals, 'netSalesAmount', <Banknote />),
+        {
+          label: t('Tỷ trọng'),
+          value: share === null ? '—' : formatPercent(share),
+          hint: t('Doanh số đã lọc / toàn công ty'),
+          icon: <PieChart />,
+        },
         countKpi(
           t('Số phiếu xuất'),
           totals?.numberOfIssues ?? 0,
@@ -133,8 +127,16 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
       return [
         moneyKpi(t('Nợ đầu kỳ'), totals, 'openingDebt', <Scale />),
         moneyKpi(t('Phát sinh nợ'), totals, 'debtIncrease', <ArrowUpRight />),
-        moneyKpi(t('Tổng giảm nợ'), totals, 'debtDecrease', <ArrowDownLeft />),
-        moneyKpi(t('Nợ cuối kỳ'), totals, 'closingDebt', <Wallet />),
+        moneyKpi(t('Đã thu'), totals, 'paidAmount', <ArrowDownLeft />),
+        moneyKpi(
+          t('Nợ cuối kỳ'),
+          totals,
+          'closingDebt',
+          <Wallet />,
+          String(totals?.closingDebt ?? '').startsWith('-')
+            ? t('Âm: các đại lý đang trả trước')
+            : FILTERED,
+        ),
       ]
     case 'inventory': {
       const counts = inventoryCounts(page.items)
@@ -142,49 +144,48 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
       return [
         countKpi(t('Mặt hàng'), counts.products, <Boxes />, hint),
         countKpi(t('Có nhập/xuất'), counts.moving, <PackageCheck />, hint),
+        countKpi(t('Có xuất bán'), counts.issued, <TrendingUp />, hint),
         countKpi(t('Hết tồn cuối kỳ'), counts.outOfStock, <CircleOff />, hint),
-        countKpi(
-          t('Có điều chỉnh'),
-          counts.adjusted,
-          <SlidersHorizontal />,
-          hint,
-        ),
       ]
     }
-    case 'product-sales': {
-      const ratio = returnRatio(totals)
+    case 'product-sales':
       return [
-        moneyKpi(t('Doanh số gộp'), totals, 'salesAmount', <TrendingUp />),
-        moneyKpi(
-          t('Hàng trả lại'),
-          totals,
-          'returnAmount',
-          <Undo2 />,
-          ratio === null
-            ? FILTERED
-            : t('{ratio} doanh số gộp', { ratio: formatPercent(ratio) }),
-        ),
-        moneyKpi(t('Doanh số thuần'), totals, 'netSalesAmount', <Banknote />),
+        moneyKpi(t('Doanh số'), totals, 'salesAmount', <TrendingUp />),
         countKpi(
           t('Mặt hàng có giao dịch'),
           page.items.length,
           <Boxes />,
           THIS_PAGE,
         ),
-      ]
-    }
-    case 'cash-and-credit':
-      return [
-        moneyKpi(t('Tiền đã thu'), totals, 'cashReceived', <HandCoins />),
-        moneyKpi(t('Tiền đã hoàn'), totals, 'cashRefunded', <RotateCcw />),
-        moneyKpi(t('Dư có cuối kỳ'), totals, 'closingCredit', <Wallet />),
-        moneyKpi(
-          t('Dư có khả dụng'),
-          totals,
-          'currentAvailableCredit',
-          <ReceiptText />,
-          t('Số dư hiện tại'),
+        countKpi(
+          t('Lượt xuất'),
+          page.items.reduce(
+            (sum, row) => sum + toNumber(row.numberOfIssues),
+            0,
+          ),
+          <FileText />,
+          t('Cộng số phiếu theo mặt hàng · trang này'),
         ),
+      ]
+    case 'collections':
+      return [
+        moneyKpi(
+          t('Tổng thu'),
+          totals,
+          'totalAmount',
+          <HandCoins />,
+          t('{count} phiếu thu', {
+            count: formatPlain(toNumber(totals?.receiptCount ?? 0)),
+          }),
+        ),
+        moneyKpi(t('Tiền mặt'), totals, 'cashAmount', <Banknote />),
+        moneyKpi(
+          t('Chuyển khoản'),
+          totals,
+          'bankTransferAmount',
+          <CreditCard />,
+        ),
+        moneyKpi(t('Trực tuyến'), totals, 'onlineAmount', <Globe />),
       ]
   }
 }
@@ -256,6 +257,24 @@ function flow(
   }
 }
 
+function timeline(
+  kind: ReportKind,
+  items: ReportRow[],
+  title: string,
+  measures: ChartSeries[],
+): ChartSpec {
+  const keys = measures.map((m) => m.key)
+  const data = timelineRows(kind, items, keys)
+  return {
+    title,
+    description: t('{count} ngày · trang này', { count: data.length }),
+    data,
+    keys,
+    nameHeader: t('Ngày'),
+    chart: <GroupedBarChart data={data} series={measures} />,
+  }
+}
+
 function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
   const items = page.items
   switch (kind) {
@@ -264,18 +283,15 @@ function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
         ranked(
           kind,
           items,
-          t('Doanh số thuần theo đại lý'),
-          series('netSalesAmount', 'var(--chart-1)'),
+          t('Doanh số theo đại lý'),
+          series('salesAmount', 'var(--chart-1)'),
           t('Đại lý'),
         ),
-        grouped(
+        ranked(
           kind,
           items,
-          t('Doanh số gộp và hàng trả lại'),
-          [
-            series('salesAmount', 'var(--chart-1)'),
-            series('returnAmount', 'var(--chart-2)'),
-          ],
+          t('Số phiếu xuất theo đại lý'),
+          series('numberOfIssues', 'var(--chart-2)'),
           t('Đại lý'),
         ),
       ]
@@ -302,11 +318,10 @@ function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
         grouped(
           kind,
           items,
-          t('Nhập, xuất và trả lại theo mặt hàng'),
+          t('Nhập và xuất theo mặt hàng'),
           [
             series('receiptQuantity', 'var(--chart-1)'),
             series('issueQuantity', 'var(--chart-2)'),
-            series('returnQuantity', 'var(--chart-3)'),
           ],
           t('Mặt hàng'),
           'issueQuantity',
@@ -317,8 +332,8 @@ function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
         ranked(
           kind,
           items,
-          t('Mặt hàng doanh số thuần cao nhất'),
-          series('netSalesAmount', 'var(--chart-1)'),
+          t('Mặt hàng doanh số cao nhất'),
+          series('salesAmount', 'var(--chart-1)'),
           t('Mặt hàng'),
         ),
         ranked(
@@ -329,20 +344,20 @@ function chartsOf(kind: ReportKind, page: ReportPage): ChartSpec[] {
           t('Mặt hàng'),
         ),
       ]
-    case 'cash-and-credit':
+    case 'collections':
       return [
-        grouped(
+        timeline(kind, items, t('Tiền thu theo ngày'), [
+          series('cashAmount', 'var(--chart-1)'),
+          series('bankTransferAmount', 'var(--chart-2)'),
+          series('onlineAmount', 'var(--chart-3)'),
+        ]),
+        ranked(
           kind,
           items,
-          t('Thu tiền, hoàn tiền và dư có phát sinh'),
-          [
-            series('cashReceived', 'var(--chart-1)'),
-            series('cashRefunded', 'var(--chart-2)'),
-            series('creditCreated', 'var(--chart-3)'),
-          ],
-          t('Đại lý'),
+          t('Ngày thu nhiều nhất'),
+          series('totalAmount', 'var(--chart-1)'),
+          t('Ngày'),
         ),
-        flow(t('Biến động dư có trong kỳ'), page.totals, creditFlow),
       ]
   }
 }

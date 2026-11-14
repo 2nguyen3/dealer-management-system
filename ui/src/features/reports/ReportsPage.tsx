@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight,
+  HandCoins,
   CalendarRange,
   FileBarChart2,
   Package,
@@ -61,7 +61,7 @@ const tabLabels: Record<ReportKind, string> = {
   debt: t('Công nợ'),
   inventory: t('Xuất nhập tồn'),
   'product-sales': t('Doanh số mặt hàng'),
-  'cash-and-credit': t('Thu chi & dư có'),
+  collections: t('Thu tiền'),
 }
 
 const tabIcons: Record<ReportKind, LucideIcon> = {
@@ -69,12 +69,15 @@ const tabIcons: Record<ReportKind, LucideIcon> = {
   debt: Wallet,
   inventory: Warehouse,
   'product-sales': Package,
-  'cash-and-credit': ArrowLeftRight,
+  collections: HandCoins,
 }
 
 const notes: Partial<Record<ReportKind, string>> = {
-  'cash-and-credit': t(
-    'Dư có cuối kỳ tính tại thời điểm cuối kỳ; dư có đang giữ và khả dụng là số dư hiện tại.',
+  collections: t(
+    'Mỗi dòng là một ngày có phiếu thu đã ghi sổ; phiếu đã hủy không được tính.',
+  ),
+  debt: t(
+    'Nợ âm nghĩa là đại lý đang trả trước (thanh toán trực tuyến đến sau khi nợ đã được trả).',
   ),
   inventory: t('Số lượng tính theo đơn vị của từng mặt hàng.'),
 }

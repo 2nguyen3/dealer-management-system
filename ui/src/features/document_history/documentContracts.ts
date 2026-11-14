@@ -1,69 +1,87 @@
 import type { FunctionCode } from '../../lib/types'
 import { t } from '@/lib/i18n/core'
 
+/**
+ * The three document kinds of the simplified model (handoff §3.1) with their
+ * own routes and grants. Read grants mirror each list operation's
+ * `x-permissions.anyOf` in the HTTP contract.
+ */
 export const documentKinds = {
   STOCK_RECEIPT: {
     path: '/stock-receipts',
+    route: '/stock-receipts',
     title: t('Phiếu nhập hàng'),
     prepare: 'stock.receipt.prepare',
     post: 'stock.receipt.post',
-    read: ['stock.receipt.prepare', 'stock.receipt.post', 'inventory.read'],
+    read: [
+      'stock.receipt.prepare',
+      'stock.receipt.post',
+      'product.manage',
+      'reports.read',
+      'documents.correct',
+      'documents.cancel',
+    ],
   },
   STOCK_ISSUE: {
     path: '/stock-issues',
+    route: '/stock-issues',
     title: t('Phiếu xuất hàng'),
     prepare: 'stock.issue.prepare',
     post: 'stock.issue.post',
     read: [
       'stock.issue.prepare',
       'stock.issue.post',
-      'debt.read',
       'sales.read',
+      'debt.read',
+      'reports.read',
+      'documents.correct',
+      'documents.cancel',
     ],
-  },
-  STOCK_ADJUSTMENT: {
-    path: '/stock-adjustments',
-    title: t('Điều chỉnh kho'),
-    prepare: 'stock.adjustment.prepare',
-    post: 'stock.adjustment.post',
-    read: [
-      'stock.adjustment.prepare',
-      'stock.adjustment.post',
-      'inventory.read',
-    ],
-  },
-  SALES_RETURN: {
-    path: '/sales-returns',
-    title: t('Phiếu trả hàng'),
-    prepare: 'returns.prepare',
-    post: 'returns.post',
-    read: ['returns.prepare', 'returns.post', 'debt.read', 'sales.read'],
   },
   PAYMENT_RECEIPT: {
     path: '/payment-receipts',
+    route: '/payment-receipts',
     title: t('Phiếu thu tiền'),
     prepare: 'cash.receipt.prepare',
     post: 'cash.receipt.post',
-    read: ['cash.receipt.prepare', 'cash.receipt.post', 'debt.read'],
+    read: [
+      'cash.receipt.prepare',
+      'cash.receipt.post',
+      'debt.read',
+      'payments.online',
+      'reports.read',
+      'documents.correct',
+      'documents.cancel',
+    ],
   },
-  CREDIT_APPLICATION: {
-    path: '/credit-applications',
-    title: t('Bù trừ dư có'),
-    prepare: 'credit.apply',
-    post: 'credit.apply',
-    read: ['credit.apply', 'debt.read'],
-  },
-  REFUND: {
-    path: '/refunds',
-    title: t('Hoàn tiền'),
-    prepare: 'cash.refund.prepare',
-    post: 'cash.refund.post',
-    read: ['cash.refund.prepare', 'cash.refund.post', 'debt.read'],
-  },
-} as const
+} as const satisfies Record<
+  string,
+  {
+    path: string
+    route: string
+    title: string
+    prepare: FunctionCode
+    post: FunctionCode
+    read: readonly FunctionCode[]
+  }
+>
 export type DocumentKind = keyof typeof documentKinds
-export type GoodsKind =
-  'STOCK_RECEIPT' | 'STOCK_ISSUE' | 'STOCK_ADJUSTMENT' | 'SALES_RETURN'
+export type GoodsKind = 'STOCK_RECEIPT' | 'STOCK_ISSUE'
+export type DocumentStatus = 'DRAFT' | 'POSTED' | 'CANCELLED'
+export type ReceiptType = 'CASH' | 'BANK_TRANSFER' | 'ONLINE'
+/** Receipt types a person may choose; ONLINE is created only by VNPAY IPN. */
+export const MANUAL_RECEIPT_TYPES = ['CASH', 'BANK_TRANSFER'] as const
+export type ManualReceiptType = (typeof MANUAL_RECEIPT_TYPES)[number]
+export const DOCUMENT_STATUSES: readonly DocumentStatus[] = [
+  'DRAFT',
+  'POSTED',
+  'CANCELLED',
+]
+export const RECEIPT_TYPES: readonly ReceiptType[] = [
+  'CASH',
+  'BANK_TRANSFER',
+  'ONLINE',
+]
 export type PermissionCheck = (
   permission: FunctionCode | FunctionCode[],
 ) => boolean
@@ -71,77 +89,74 @@ export interface Page<T> {
   items: T[]
   pagination: { limit: number; hasMore: boolean; nextCursor: string | null }
 }
+
+/** `DocumentSummary` of the contract (list rows). */
 export interface DocumentSummary {
   id: string
   code: string
   kind: DocumentKind
-  status: 'DRAFT' | 'PENDING' | 'POSTED' | 'CANCELLED'
-  agencyId: string | null
-  agencyName: string | null
-  originDocumentId: string | null
-  receiptType: string | null
-  revisionNo: number
+  status: DocumentStatus
   businessDate: string
+  agencyId: string | null
+  agencyCode: string | null
+  agencyName: string | null
+  receiptType: ReceiptType | null
   totalAmount: string
-  immediatePayment: string
+  lineCount: number
+  note: string | null
+  replacesDocumentId: string | null
+  replacedByDocumentId: string | null
+  createdBy: string | null
+  createdByName: string | null
+  postedBy: string | null
+  postedByName: string | null
+  postedAt: string | null
+  cancelledAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+/** One step of a replacement chain (`ChainItem`). */
+export interface ChainItem extends DocumentSummary {
+  cancelReason: string | null
+}
+export interface DocumentReference {
+  id: string
+  code: string
+  status: DocumentStatus
 }
 export interface DocumentLine {
   id: string
+  lineNo: number
   productId: string
+  productCode: string
   productName: string
+  unitId: number
   unitName: string
   quantity: string
   unitPrice: string
   lineAmount: string
-  originLineId: string | null
-  basePurchasePrice: string | null
-  returnAmount: string | null
 }
-export interface Revision {
-  id: string
-  documentId: string
-  revisionNo: number
-  state: 'DRAFT' | 'READY' | 'POSTED'
-  businessDate: string
-  totalAmount: string
-  immediatePayment: string
+/** Full `Document` of the contract (detail and every mutation response). */
+export interface DocumentDetail extends ChainItem {
   sellingPriceRate: string | null
-  paymentMethod: string | null
-  agencySnapshot: {
-    name: string
-    address: string | null
-    phone: string | null
-    email: string
-  } | null
-  reason: string | null
-  note: string | null
-  createdAt: string
+  cancelledBy: string | null
+  cancelledByName: string | null
+  replaces: DocumentReference | null
+  replacedBy: DocumentReference | null
+  onlinePaymentId: string | null
+  /** Agency's CURRENT debt (not part of the ETag); may be negative. */
+  agencyDebt: string | null
+  agencyMaxDebt: string | null
   lines: DocumentLine[]
-}
-export interface DocumentDetail {
-  id: string
-  code: string
-  kind: DocumentKind
-  status: DocumentSummary['status']
-  agencyId: string | null
-  originDocumentId: string | null
-  receiptType: string | null
-  currentRevision: Revision
-  stockCountId?: string | null
-  upfrontConfirmationId?: string | null
-  autoReceiptId?: string | null
-  remainingAtIssue?: string
-  invoiceBalance?: { outstandingAmount: string } | null
-  debtReducedAmount?: string
-  creditCreatedAmount?: string
 }
 
 export const exact = {
   id: /^[1-9][0-9]{0,18}$/,
+  code: /^(PN|PX|PT)-[1-9][0-9]*$/,
   money: /^(0|[1-9][0-9]{0,17})$/,
+  signedMoney: /^-?(0|[1-9][0-9]{0,17})$/,
   positiveMoney: /^[1-9][0-9]{0,17}$/,
   quantity: /^(0|[1-9][0-9]{0,14})(\.[0-9]{1,3})?$/,
-  signedQuantity: /^-?(0|[1-9][0-9]{0,14})(\.[0-9]{1,3})?$/,
   rate: /^(?!0(?:\.0{1,6})?$)(0|[1-9][0-9]{0,2})(\.[0-9]{1,6})?$/,
 }
 export function isZero(value: string) {
@@ -183,6 +198,10 @@ function numeric(value: unknown, pattern: RegExp) {
   if (typeof value !== 'string' || !pattern.test(value))
     throw new Error(t('Giá trị số từ máy chủ không hợp lệ.'))
 }
+const nullableId = (value: unknown) => value === null || validId(value)
+const nullableText = (value: unknown) =>
+  value === null || typeof value === 'string'
+
 export function parsePage<T>(
   value: unknown,
   parseItem: (item: unknown) => T,
@@ -212,197 +231,299 @@ export function parseSummary(value: unknown): DocumentSummary {
   if (
     !validId(row.id) ||
     typeof row.code !== 'string' ||
+    !exact.code.test(row.code) ||
     typeof row.kind !== 'string' ||
     !Object.hasOwn(documentKinds, row.kind) ||
-    !['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'].includes(String(row.status)) ||
+    !DOCUMENT_STATUSES.includes(row.status as DocumentStatus) ||
     !validDate(row.businessDate) ||
-    !Number.isInteger(row.revisionNo) ||
-    (row.revisionNo as number) < 1
+    !nullableId(row.agencyId) ||
+    !nullableText(row.agencyCode) ||
+    !nullableText(row.agencyName) ||
+    !(
+      row.receiptType === null ||
+      RECEIPT_TYPES.includes(row.receiptType as ReceiptType)
+    ) ||
+    !Number.isInteger(row.lineCount) ||
+    (row.lineCount as number) < 0 ||
+    !nullableText(row.note) ||
+    !nullableId(row.replacesDocumentId) ||
+    !nullableId(row.replacedByDocumentId) ||
+    typeof row.createdAt !== 'string'
   )
     throw new Error(t('Tóm tắt chứng từ không hợp lệ.'))
   numeric(row.totalAmount, exact.money)
-  numeric(row.immediatePayment, exact.money)
+  // Goods receipts never carry an agency; issues and payments always do.
+  if ((row.kind === 'STOCK_RECEIPT') !== (row.agencyId === null))
+    throw new Error(t('Tóm tắt chứng từ không hợp lệ.'))
   return row as unknown as DocumentSummary
+}
+export function parseChainItem(value: unknown): ChainItem {
+  const row = parseSummary(value)
+  if (!nullableText((row as unknown as Record<string, unknown>).cancelReason))
+    throw new Error(t('Tóm tắt chứng từ không hợp lệ.'))
+  return row as ChainItem
 }
 export function parseLine(value: unknown): DocumentLine {
   const row = object(value)
   if (
     !validId(row.id) ||
     !validId(row.productId) ||
+    !Number.isInteger(row.lineNo) ||
     typeof row.productName !== 'string' ||
-    typeof row.unitName !== 'string' ||
-    !(row.originLineId === null || validId(row.originLineId))
+    typeof row.unitName !== 'string'
   )
     throw new Error(t('Dòng chứng từ không hợp lệ.'))
-  numeric(row.quantity, exact.signedQuantity)
+  numeric(row.quantity, exact.quantity)
   numeric(row.unitPrice, exact.money)
   numeric(row.lineAmount, exact.money)
   if (isZero(String(row.quantity)))
     throw new Error(t('Số lượng dòng không hợp lệ.'))
   return row as unknown as DocumentLine
 }
-export function parseRevision(value: unknown): Revision {
+function parseReference(value: unknown): DocumentReference | null {
+  if (value === null || value === undefined) return null
   const row = object(value)
   if (
     !validId(row.id) ||
-    !validId(row.documentId) ||
-    !Number.isInteger(row.revisionNo) ||
-    (row.revisionNo as number) < 1 ||
-    !['DRAFT', 'READY', 'POSTED'].includes(String(row.state)) ||
-    !validDate(row.businessDate) ||
-    !Array.isArray(row.lines) ||
-    typeof row.createdAt !== 'string'
+    typeof row.code !== 'string' ||
+    !DOCUMENT_STATUSES.includes(row.status as DocumentStatus)
   )
-    throw new Error(t('Phiên bản chứng từ không hợp lệ.'))
-  numeric(row.totalAmount, exact.money)
-  numeric(row.immediatePayment, exact.money)
-  return { ...row, lines: row.lines.map(parseLine) } as unknown as Revision
+    throw new Error(t('Liên kết chứng từ không hợp lệ.'))
+  return row as unknown as DocumentReference
 }
 export function parseDocument(value: unknown): DocumentDetail {
-  const row = object(value),
-    revision = parseRevision(row.currentRevision)
-  parseSummary({
-    ...row,
-    businessDate: revision.businessDate,
-    totalAmount: revision.totalAmount,
-    immediatePayment: revision.immediatePayment,
-    revisionNo: revision.revisionNo,
-  })
-  if (revision.documentId !== row.id)
-    throw new Error(t('Phiên bản không thuộc chứng từ.'))
-  return { ...row, currentRevision: revision } as unknown as DocumentDetail
+  const row = object(value)
+  const summary = parseChainItem(row)
+  if (!Array.isArray(row.lines)) throw new Error(t('Chứng từ không hợp lệ.'))
+  if (row.agencyDebt !== null && row.agencyDebt !== undefined)
+    numeric(row.agencyDebt, exact.signedMoney)
+  if (row.agencyMaxDebt !== null && row.agencyMaxDebt !== undefined)
+    numeric(row.agencyMaxDebt, exact.money)
+  if (
+    row.sellingPriceRate !== null &&
+    row.sellingPriceRate !== undefined &&
+    (typeof row.sellingPriceRate !== 'string' ||
+      !exact.rate.test(row.sellingPriceRate))
+  )
+    throw new Error(t('Giá trị số từ máy chủ không hợp lệ.'))
+  const replaces = parseReference(row.replaces)
+  const replacedBy = parseReference(row.replacedBy)
+  return {
+    ...summary,
+    sellingPriceRate: (row.sellingPriceRate as string | null) ?? null,
+    cancelledBy: (row.cancelledBy as string | null) ?? null,
+    cancelledByName: (row.cancelledByName as string | null) ?? null,
+    cancelReason: (row.cancelReason as string | null) ?? null,
+    replaces,
+    replacedBy,
+    onlinePaymentId: (row.onlinePaymentId as string | null) ?? null,
+    agencyDebt: (row.agencyDebt as string | null) ?? null,
+    agencyMaxDebt: (row.agencyMaxDebt as string | null) ?? null,
+    lines: row.lines.map(parseLine),
+  }
 }
+export function parseChain(value: unknown): ChainItem[] {
+  const data = object(value)
+  if (!Array.isArray(data.items))
+    throw new Error(t('Chuỗi thay thế không hợp lệ.'))
+  return data.items.map(parseChainItem)
+}
+
 export function canReadKind(kind: DocumentKind, has: PermissionCheck) {
   return documentKinds[kind].read.some((grant) => has(grant))
 }
+
+/** `YYYY-MM` of a business date. */
+export function monthOf(date: string) {
+  return date.slice(0, 7)
+}
+
+/** Why a posted document cannot be cancelled/corrected, or null when it can. */
+export function changeBlock(
+  doc: Pick<DocumentDetail, 'status' | 'businessDate' | 'receiptType'>,
+  today: string = vietnamToday(),
+): string | null {
+  if (doc.status !== 'POSTED') return t('Chỉ hủy hoặc sửa chứng từ đã ghi sổ.')
+  if (doc.receiptType === 'ONLINE')
+    return t(
+      'Phiếu thu trực tuyến do cổng thanh toán xác nhận, không hủy hoặc sửa được.',
+    )
+  if (monthOf(doc.businessDate) !== monthOf(today))
+    return t(
+      'Chỉ hủy hoặc sửa chứng từ có ngày trong tháng hiện tại; tháng cũ đã chốt.',
+    )
+  return null
+}
+
+/**
+ * Whether the user may cancel / correct this document (QĐ8, grants). The
+ * server stays the authority and answers PERIOD_CLOSED/STATE_CONFLICT.
+ */
 export function canChange(
-  doc: DocumentDetail,
+  doc: Pick<DocumentDetail, 'kind' | 'status' | 'businessDate' | 'receiptType'>,
   mode: 'correct' | 'cancel',
   has: PermissionCheck,
+  today: string = vietnamToday(),
 ) {
-  if (
-    doc.kind === 'REFUND' ||
-    doc.status === 'CANCELLED' ||
-    (mode === 'correct' && doc.status !== 'POSTED')
-  )
-    return false
-  if (doc.kind === 'STOCK_ADJUSTMENT' && doc.stockCountId !== null) return false
-  if (
-    doc.kind === 'PAYMENT_RECEIPT' &&
-    (doc.receiptType !== 'DEBT_COLLECTION' ||
-      !['CASH', 'BANK_TRANSFER'].includes(
-        doc.currentRevision.paymentMethod ?? '',
-      ))
-  )
-    return false
-  if (mode === 'correct')
-    return has('documents.correct') && has(documentKinds[doc.kind].post)
-  if (!has('documents.cancel')) return false
-  // The detail exposes evidence identity, not its live state. The server rechecks it.
-  if (
-    doc.kind === 'STOCK_ISSUE' &&
-    (doc.upfrontConfirmationId != null || doc.autoReceiptId != null) &&
-    !has('cash.receipt.post')
-  )
-    return false
-  return true
+  if (changeBlock(doc, today)) return false
+  if (mode === 'cancel') return has('documents.cancel')
+  return has('documents.correct') && has(documentKinds[doc.kind].post)
 }
 
 export interface LineInput {
   productId: string
-  originLineId: string
   quantity: string
   unitPrice: string
-  basePurchasePrice?: string
 }
-export function inputLines(
-  kind: GoodsKind,
-  lines: LineInput[],
-  correction = false,
-) {
+export const emptyLine = (): LineInput => ({
+  productId: '',
+  quantity: '',
+  unitPrice: '',
+})
+
+/** Validated `ReceiptLineInput[]` / `IssueLineInput[]` request lines. */
+export function inputLines(kind: GoodsKind, lines: LineInput[]) {
   if (!lines.length) throw new Error(t('Cần ít nhất một dòng hàng.'))
   const seen = new Set<string>()
   return lines.map((line) => {
-    const id = kind === 'SALES_RETURN' ? line.originLineId : line.productId
-    if (!validId(id) || seen.has(id))
-      throw new Error(t('Mã dòng/mặt hàng không hợp lệ hoặc trùng lặp.'))
+    const id = line.productId
+    if (!validId(id)) throw new Error(t('Vui lòng chọn mặt hàng cho mọi dòng.'))
+    if (seen.has(id))
+      throw new Error(t('Mỗi mặt hàng chỉ được một dòng trên phiếu.'))
     seen.add(id)
-    const pattern =
-      kind === 'STOCK_ADJUSTMENT' ? exact.signedQuantity : exact.quantity
-    if (
-      !pattern.test(line.quantity) ||
-      isZero(line.quantity) ||
-      (kind !== 'STOCK_ADJUSTMENT' && line.quantity.startsWith('-'))
-    )
+    const quantity = line.quantity.trim()
+    if (!exact.quantity.test(quantity) || isZero(quantity))
       throw new Error(
-        t(
-          'Số lượng phải là chuỗi thập phân hợp lệ, khác 0, tối đa 3 chữ số lẻ.',
-        ),
+        t('Số lượng phải là số dương, tối đa 3 chữ số thập phân.'),
       )
-    if (kind === 'SALES_RETURN')
-      return { originLineId: id, quantity: line.quantity }
     if (kind === 'STOCK_RECEIPT') {
-      if (!exact.positiveMoney.test(line.unitPrice))
+      const unitPrice = line.unitPrice.trim()
+      if (!exact.positiveMoney.test(unitPrice))
         throw new Error(
           t('Giá nhập phải là số nguyên VNĐ dương, tối đa 18 chữ số.'),
         )
-      return {
-        productId: id,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-      }
+      return { productId: id, quantity, unitPrice }
     }
-    if (kind === 'STOCK_ISSUE' && correction && line.basePurchasePrice) {
-      if (!exact.positiveMoney.test(line.basePurchasePrice))
-        throw new Error(t('Giá vốn không hợp lệ.'))
-      return {
-        productId: id,
-        quantity: line.quantity,
-        basePurchasePrice: line.basePurchasePrice,
-      }
-    }
-    return { productId: id, quantity: line.quantity }
+    return { productId: id, quantity }
   })
 }
-export function replacementBody(
-  doc: DocumentDetail,
-  values: {
-    businessDate: string
-    reason: string
-    note: string
-    lines: LineInput[]
-    amount: string
-    paymentMethod: string
-  },
-) {
-  if (!validDate(values.businessDate) || !values.reason.trim())
-    throw new Error(t('Cần ngày nghiệp vụ hợp lệ và lý do.'))
-  const header = {
-    businessDate: values.businessDate,
-    reason: values.reason.trim(),
-    note: values.note || null,
-  }
-  if (doc.kind === 'PAYMENT_RECEIPT' || doc.kind === 'CREDIT_APPLICATION') {
-    if (!exact.positiveMoney.test(values.amount))
-      throw new Error(t('Số tiền phải là chuỗi số nguyên VNĐ dương.'))
-    if (doc.kind === 'PAYMENT_RECEIPT') {
-      if (!['CASH', 'BANK_TRANSFER'].includes(values.paymentMethod))
-        throw new Error(t('Chỉ sửa phiếu thu thủ công.'))
-      return {
-        ...header,
-        amount: values.amount,
-        paymentMethod: values.paymentMethod,
-      }
-    }
-    return { ...header, amount: values.amount }
-  }
-  if (doc.kind === 'REFUND')
-    throw new Error(t('Không hỗ trợ sửa phiếu hoàn tiền.'))
+
+/** Editable content of a draft, a new document or a correction. */
+export interface DocumentForm {
+  businessDate: string
+  note: string
+  agencyId: string
+  receiptType: ManualReceiptType
+  amount: string
+  lines: LineInput[]
+  reason: string
+}
+
+export function emptyForm(today: string = vietnamToday()): DocumentForm {
   return {
-    ...header,
-    ...(doc.kind === 'STOCK_ISSUE' && doc.currentRevision.sellingPriceRate
-      ? { sellingPriceRate: doc.currentRevision.sellingPriceRate }
-      : {}),
-    lines: inputLines(doc.kind, values.lines, true),
+    businessDate: today,
+    note: '',
+    agencyId: '',
+    receiptType: 'CASH',
+    amount: '',
+    lines: [emptyLine()],
+    reason: '',
   }
+}
+
+/** Form prefilled from an existing document (draft edit or correction). */
+export function formFromDocument(doc: DocumentDetail): DocumentForm {
+  return {
+    businessDate: doc.businessDate,
+    note: doc.note ?? '',
+    agencyId: doc.agencyId ?? '',
+    receiptType: doc.receiptType === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH',
+    amount: doc.kind === 'PAYMENT_RECEIPT' ? doc.totalAmount : '',
+    lines: doc.lines.length
+      ? doc.lines.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+          unitPrice: doc.kind === 'STOCK_RECEIPT' ? line.unitPrice : '',
+        }))
+      : [emptyLine()],
+    reason: '',
+  }
+}
+
+/**
+ * Request body of `POST /{kind}` / `PUT /{kind}/{id}` (`mode: 'draft'`) or of
+ * `POST /{kind}/{id}/corrections` (`mode: 'correct'`, agency stays fixed).
+ */
+export function documentBody(
+  kind: DocumentKind,
+  form: DocumentForm,
+  mode: 'draft' | 'correct',
+  today: string = vietnamToday(),
+): Record<string, unknown> {
+  if (!validDate(form.businessDate))
+    throw new Error(t('Ngày chứng từ không hợp lệ.'))
+  if (form.businessDate > today)
+    throw new Error(t('Ngày chứng từ không được sau hôm nay.'))
+  const body: Record<string, unknown> = {
+    businessDate: form.businessDate,
+    note: form.note.trim() || null,
+  }
+  if (mode === 'correct') {
+    if (!form.reason.trim()) throw new Error(t('Vui lòng nhập lý do sửa.'))
+    if (monthOf(form.businessDate) !== monthOf(today))
+      throw new Error(t('Phiếu thay thế phải có ngày trong tháng hiện tại.'))
+    body.reason = form.reason.trim()
+  } else if (kind !== 'STOCK_RECEIPT') {
+    if (!validId(form.agencyId)) throw new Error(t('Vui lòng chọn đại lý.'))
+    body.agencyId = form.agencyId
+  }
+  if (kind === 'PAYMENT_RECEIPT') {
+    if (!MANUAL_RECEIPT_TYPES.includes(form.receiptType))
+      throw new Error(t('Hình thức thu không hợp lệ.'))
+    const amount = form.amount.trim()
+    if (!exact.positiveMoney.test(amount))
+      throw new Error(
+        t('Số tiền phải là số nguyên VNĐ dương, tối đa 18 chữ số.'),
+      )
+    body.receiptType = form.receiptType
+    body.amount = amount
+    return body
+  }
+  body.lines = inputLines(kind, form.lines)
+  return body
+}
+
+/** Exact comparison of two whole-VND strings (may be negative). */
+export function compareMoney(a: string, b: string): number {
+  const x = BigInt(a),
+    y = BigInt(b)
+  return x === y ? 0 : x > y ? 1 : -1
+}
+
+/**
+ * Amount to prefill on the payment receipt opened after posting an issue:
+ * the issue total, capped at the agency's debt after posting. Null when the
+ * agency owes nothing (e.g. it had prepaid online).
+ */
+export function receiptAmountAfterIssue(
+  totalAmount: string,
+  agencyDebt: string | null,
+): string | null {
+  if (!exact.money.test(totalAmount) || totalAmount === '0') return null
+  if (agencyDebt === null || !exact.signedMoney.test(agencyDebt))
+    return totalAmount
+  if (compareMoney(agencyDebt, '0') <= 0) return null
+  return compareMoney(agencyDebt, totalAmount) < 0 ? agencyDebt : totalAmount
+}
+
+/** Deep link of a kind's page that opens one document's detail. */
+export function documentLink(kind: DocumentKind, id: string) {
+  return `${documentKinds[kind].route}?document=${encodeURIComponent(id)}`
+}
+
+/** Deep link of the payment-receipt form prefilled for an agency/amount. */
+export function receiptFormLink(agencyId: string, amount: string | null) {
+  const query = new URLSearchParams({ new: '1', agencyId })
+  if (amount) query.set('amount', amount)
+  return `/payment-receipts?${query}`
 }

@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api'
 
 /**
  * Error alert that, for a known API error code with a resolving page, adds a
- * shortcut link (e.g. UPFRONT_REQUIRED → Xác nhận trả ngay).
+ * shortcut link (e.g. DEBT_LIMIT_EXCEEDED → Phiếu thu tiền).
  */
 export function ErrorNotice({
   error,

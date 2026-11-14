@@ -94,14 +94,14 @@ describe('NextActionCallout', () => {
         action={{
           title: 'Xác nhận khoản trả ngay',
           description: 'Kế toán xác nhận',
-          to: '/upfront-payments?issue=1&new=1',
+          to: '/payment-receipts?agency=1&new=1',
         }}
       />,
     )
     const box = screen.getByTestId('next-action')
     expect(box.getAttribute('aria-label')).toBe('Việc cần làm tiếp')
     const link = screen.getByRole('link', { name: 'Mở' })
-    expect(link.getAttribute('href')).toBe('/upfront-payments?issue=1&new=1')
+    expect(link.getAttribute('href')).toBe('/payment-receipts?agency=1&new=1')
   })
 
   it('runs an in-page action when there is no link', () => {
@@ -120,7 +120,7 @@ describe('NextActionCallout', () => {
       <NextActionCallout
         action={{
           title: 'Chờ xác nhận',
-          to: '/upfront-payments',
+          to: '/payment-receipts',
           waitingFor: 'Kế toán',
           tone: 'warning',
         }}
@@ -219,7 +219,7 @@ describe('next-step hints and toasts', () => {
       notifyNextStep({
         done: 'Đã nộp PX-1.',
         next: 'Kế toán xác nhận',
-        to: '/upfront-payments',
+        to: '/payment-receipts',
       }),
     ).toBe(true)
     expect(success).toHaveBeenCalledTimes(1)
@@ -232,7 +232,7 @@ describe('next-step hints and toasts', () => {
       action: { label: 'Mở' },
     })
     options.action.onClick()
-    expect(navigate).toHaveBeenCalledWith('/upfront-payments')
+    expect(navigate).toHaveBeenCalledWith('/payment-receipts')
   })
 
   it('omits the action when the user may not open the target', () => {
@@ -273,11 +273,11 @@ describe('SafeLink and ErrorNotice', () => {
   })
 
   it('adds the resolving shortcut for a known API error and an override target', () => {
-    const error = new ApiError(409, 'UPFRONT_REQUIRED', 'Chưa xác nhận')
-    render(<ErrorNotice error={error} to="/upfront-payments?issue=7&new=1" />)
-    expect(screen.getByText('Chưa xác nhận')).toBeDefined()
+    const error = new ApiError(409, 'DEBT_LIMIT_EXCEEDED', 'Vượt hạn mức')
+    render(<ErrorNotice error={error} to="/payment-receipts?agency=7&new=1" />)
+    expect(screen.getByText('Vượt hạn mức')).toBeDefined()
     const link = screen.getByRole('link')
-    expect(link.getAttribute('href')).toBe('/upfront-payments?issue=7&new=1')
+    expect(link.getAttribute('href')).toBe('/payment-receipts?agency=7&new=1')
   })
 
   it('shows plain errors without a link and nothing for empty text', () => {
@@ -325,6 +325,23 @@ describe('route guides', () => {
     }
   })
 
+  it('has no guide left for the pages removed by the simplification', () => {
+    for (const path of [
+      '/receivables',
+      '/inventory',
+      '/upfront-payments',
+      '/stock-counts',
+      '/stock-adjustments',
+      '/sales-returns',
+      '/credit-applications',
+      '/refunds',
+      '/agency-credit',
+      '/document-corrections',
+    ])
+      expect(GUIDES.has(path), path).toBe(false)
+    expect(GUIDES.size).toBe(routes.length)
+  })
+
   it('resolves nested paths to the parent guide and unknown paths to null', () => {
     expect(guideFor('/stock-issues')?.path).toBe('/stock-issues')
     expect(guideFor('/stock-issues/123')?.path).toBe('/stock-issues')
@@ -346,7 +363,9 @@ describe('route guides', () => {
     const sheet = await screen.findByTestId('guide-sheet')
     expect(sheet.textContent).toContain('Trang này để làm gì')
     expect(sheet.textContent).toContain('Từng bước chi tiết')
-    expect(sheet.textContent).toContain('UPFRONT_REQUIRED')
+    expect(sheet.textContent).toContain('DEBT_LIMIT_EXCEEDED')
+    expect(sheet.textContent).toContain('Lập phiếu thu khi đại lý trả tiền')
+    expect(sheet.textContent).not.toContain('trả ngay')
   })
 
   it('says so when a page has no guide', async () => {

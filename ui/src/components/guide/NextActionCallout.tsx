@@ -4,7 +4,7 @@ import { t } from '@/lib/i18n/core'
 import { cn } from '@/lib/utils'
 
 export interface NextAction {
-  /** Translated headline, e.g. "Chờ xác nhận trả ngay". */
+  /** Translated headline, e.g. "Chờ thu tiền đại lý". */
   title: string
   /** Translated explanation of what must happen next. */
   description?: string

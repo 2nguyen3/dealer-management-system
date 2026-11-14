@@ -84,9 +84,15 @@ import { groupTotals, type FlowStep } from '../payment_receipts/flow'
 import { FlowSteps } from '../payment_receipts/FlowSteps'
 import { PageSummary } from '../payment_receipts/PageSummary'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
-import { paymentFlowSteps } from './paymentFlow'
+import { onlineAmountError, paymentFlowSteps } from './paymentFlow'
+import { DebtPanel } from '../document_history/DebtPanel'
+import { documentLink } from '../document_history/documentContracts'
+import { useAgencyBalance } from '../document_history/useRecords'
+import { SafeLink } from '@/components/guide/SafeLink'
+import { usePathAllowed } from '../guide/usePathAllowed'
 
 const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'EXPIRED'] as const
+const AMOUNT = /^[1-9][0-9]{0,17}$/
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'var(--warning)',
   SUCCESS: 'var(--success)',
@@ -109,8 +115,10 @@ function payment(value: unknown): Row {
   decimal(data.amount)
   text(data.provider)
   text(data.merchantReference)
-  if (!['PENDING', 'SUCCESS', 'FAILED', 'EXPIRED'].includes(text(data.status)))
+  if (!(PAYMENT_STATUSES as readonly string[]).includes(text(data.status)))
     throw new Error('Invalid payment status')
+  if (!AMOUNT.test(String(data.amount)))
+    throw new Error('Invalid payment amount')
   if (data.status === 'SUCCESS') {
     id(data.receiptDocumentId)
     text(data.paymentTime)
@@ -185,6 +193,9 @@ export function OnlinePaymentsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [pendingSetupId, setPendingSetupId] = useState<string | null>(null)
+  const [balanceVersion, setBalanceVersion] = useState(0)
+  const agency = useAgencyBalance(open ? agencyId : '', balanceVersion)
+  const pathAllowed = usePathAllowed()
   const intent = useRef(new Intent())
   const reloadList = useEffectEvent(() => {
     invalidateCache('/online-payments')
@@ -300,7 +311,12 @@ export function OnlinePaymentsPage() {
     try {
       if (!agencyId) throw new Error(t('Vui lòng chọn đại lý thanh toán.'))
       id(agencyId)
-      positiveMoney(amount)
+      if (agency.loading) throw new Error(t('Đang đọc công nợ đại lý...'))
+      const amountError = onlineAmountError(
+        amount,
+        agency.balance?.debt ?? null,
+      )
+      if (amountError) throw new Error(amountError)
       setCreateStep('confirm')
     } catch (failure) {
       setError(message(failure))
@@ -327,6 +343,7 @@ export function OnlinePaymentsPage() {
       const item = payment(response.data)
       const accepted = response.status === 202
       setOpen(true)
+      setBalanceVersion((value) => value + 1)
       setCreateStep(accepted ? 'confirm' : 'handoff')
       setPendingSetupId(accepted ? id(item.id) : null)
       setSelected(id(item.id))
@@ -356,6 +373,8 @@ export function OnlinePaymentsPage() {
       list.reload()
     } catch (failure) {
       setError(message(failure))
+      // PAYMENT_EXCEEDS_DEBT and similar: show the server's current debt.
+      setBalanceVersion((value) => value + 1)
     } finally {
       setBusy(false)
     }
@@ -377,8 +396,10 @@ export function OnlinePaymentsPage() {
       for (const prefix of [
         '/online-payments',
         '/payment-receipts',
+        '/documents',
         '/agencies',
-        '/receivables',
+        '/dashboard',
+        '/reports',
       ])
         invalidateCache(prefix)
       list.reload()
@@ -554,11 +575,7 @@ export function OnlinePaymentsPage() {
                       {String(item.provider)}
                     </div>
                   </td>
-                  <td>
-                    {typeof item.agencyName === 'string'
-                      ? item.agencyName
-                      : `#${String(item.agencyId)}`}
-                  </td>
+                  <td>{agencyText(item)}</td>
                   <td className="tabular-nums">
                     {optionalDateTime(item.createdAt, '—')}
                   </td>
@@ -637,6 +654,16 @@ export function OnlinePaymentsPage() {
                 }}
                 required
               />
+              {agencyId && agency.error && (
+                <Alert type="error">{agency.error}</Alert>
+              )}
+              {agencyId && agency.balance && (
+                <DebtPanel
+                  debt={agency.balance.debt}
+                  maxDebt={agency.balance.maxDebt}
+                  change={AMOUNT.test(amount) ? -BigInt(amount) : null}
+                />
+              )}
               <Input
                 label={t('Số tiền thanh toán (VND nguyên)')}
                 inputMode="numeric"
@@ -644,12 +671,23 @@ export function OnlinePaymentsPage() {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 helperText={
-                  /^[1-9][0-9]{0,17}$/.test(amount)
+                  AMOUNT.test(amount)
                     ? formatVND(amount)
-                    : undefined
+                    : t('Không vượt công nợ hiện tại của đại lý.')
                 }
                 required
               />
+              {agency.balance && BigInt(agency.balance.debt) > 0n && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  icon={false}
+                  onClick={() => setAmount(agency.balance!.debt)}
+                >
+                  {t('Thu toàn bộ nợ')}
+                </Button>
+              )}
               <FormActions>
                 <Button type="button" variant="outline" onClick={closeCreate}>
                   {t('Đóng')}
@@ -671,9 +709,7 @@ export function OnlinePaymentsPage() {
                       key="amount"
                       className="text-lg font-semibold tabular-nums"
                     >
-                      {/^[1-9][0-9]{0,17}$/.test(amount)
-                        ? formatVND(amount)
-                        : amount}
+                      {AMOUNT.test(amount) ? formatVND(amount) : amount}
                     </span>,
                   ],
                   [t('Cổng thanh toán'), 'VNPAY'],
@@ -810,7 +846,7 @@ export function OnlinePaymentsPage() {
                     {String(detail.merchantReference)}
                   </span>,
                 ],
-                [t('Đại lý'), `#${String(detail.agencyId)}`],
+                [t('Đại lý'), agencyText(detail)],
                 [t('Cổng thanh toán'), String(detail.provider)],
                 [
                   t('Mã giao dịch cổng'),
@@ -820,9 +856,11 @@ export function OnlinePaymentsPage() {
                 ],
                 [
                   t('Phiếu thu'),
-                  detail.receiptDocumentId
-                    ? `#${String(detail.receiptDocumentId)}`
-                    : t('Chưa có'),
+                  <ReceiptLink
+                    key="receipt"
+                    payment={detail}
+                    allowed={pathAllowed}
+                  />,
                 ],
                 [
                   t('Thời điểm thanh toán'),
@@ -839,7 +877,7 @@ export function OnlinePaymentsPage() {
               >
                 {t('Kiểm tra trạng thái')}
               </Button>
-              {canManage && detail.status !== 'SUCCESS' && (
+              {canManage && detail.status === 'PENDING' && (
                 <Button variant="outline" disabled={busy} onClick={reconcile}>
                   {t('Đối soát giao dịch hiện tại')}
                 </Button>
@@ -929,6 +967,40 @@ export function OnlinePaymentsPage() {
         )}
       </Modal>
     </div>
+  )
+}
+
+function agencyText(payment: Row) {
+  const name = typeof payment.agencyName === 'string' ? payment.agencyName : ''
+  const code = typeof payment.agencyCode === 'string' ? payment.agencyCode : ''
+  if (name && code) return `${code} · ${name}`
+  return name || code || `#${String(payment.agencyId)}`
+}
+
+/** The automatic receipt (PT-…) of a successful payment, linked when allowed. */
+function ReceiptLink({
+  payment,
+  allowed,
+}: {
+  payment: Row
+  allowed: (path: string) => boolean
+}) {
+  if (
+    typeof payment.receiptDocumentId !== 'string' ||
+    !payment.receiptDocumentId
+  )
+    return <>{t('Chưa có')}</>
+  const label =
+    typeof payment.receiptCode === 'string' && payment.receiptCode
+      ? payment.receiptCode
+      : `#${payment.receiptDocumentId}`
+  const to = documentLink('PAYMENT_RECEIPT', payment.receiptDocumentId)
+  return allowed(to) ? (
+    <SafeLink to={to} className="font-medium text-primary hover:underline">
+      {label}
+    </SafeLink>
+  ) : (
+    <>{label}</>
   )
 }
 

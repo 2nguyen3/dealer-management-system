@@ -37,10 +37,12 @@ export function ReportTable({
   const firstText = columns.findIndex((col) => !isNumeric(col))
   const sortable = onSort ? sortableColumns(kind) : new Set<string>()
   const scales = Object.fromEntries(
-    [...sortable].map((col) => [
-      col,
-      Math.max(0, ...page.items.map((row) => Math.abs(toNumber(row[col])))),
-    ]),
+    [...sortable]
+      .filter(isNumeric)
+      .map((col) => [
+        col,
+        Math.max(0, ...page.items.map((row) => Math.abs(toNumber(row[col])))),
+      ]),
   ) as Record<string, number>
   return (
     <div className="max-h-[32rem] overflow-auto rounded-lg border">
@@ -55,9 +57,9 @@ export function ReportTable({
                   field={col}
                   sort={sort ?? ''}
                   onSort={onSort}
-                  align="right"
+                  align={isNumeric(col) ? 'right' : undefined}
                   firstDirection="desc"
-                  className={cn(HEAD, 'text-end')}
+                  className={cn(HEAD, isNumeric(col) && 'text-end')}
                 >
                   {columnLabels[col] ?? col}
                 </SortableHeader>
@@ -76,7 +78,7 @@ export function ReportTable({
         <tbody>
           {page.items.map((row) => (
             <tr
-              key={String(row.agencyId ?? row.productId)}
+              key={String(row.agencyId ?? row.productId ?? row.businessDate)}
               className="border-b transition-colors last:border-0 hover:bg-muted/40"
             >
               {columns.map((col) => {

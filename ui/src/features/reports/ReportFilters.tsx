@@ -5,7 +5,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group'
 import { Button } from '../../components/ui/Button'
 import { EntityPicker } from '../../components/ui/EntityPicker'
 import { Select } from '../../components/ui/Select'
-import { reports, type ReportQuery } from './contracts'
+import { RECEIPT_TYPES, reports, type ReportQuery } from './contracts'
+import { enumOptions, methodLabel } from '@/lib/labels'
 import { filterLabels, sortLabel } from './display'
 import {
   matchingPreset,
@@ -106,19 +107,30 @@ export function ReportFilters({
           min={draft.fromDate ? shiftDate(draft.fromDate, 1) : undefined}
           onChange={(toDate) => onChange({ ...draft, toDate })}
         />
-        {reports[kind].filters.map((filter) => (
-          <EntityPicker
-            key={`${kind}-${filter}`}
-            id={`report-${filter}`}
-            resource={pickerResource[filter as keyof typeof pickerResource]}
-            label={filterLabels[filter] ?? filter}
-            placeholder={
-              filter === 'wardId' ? t('Tất cả phường/xã') : t('Tất cả')
-            }
-            value={draft.filters[filter] || ''}
-            onChange={(value) => setFilter(filter, value)}
-          />
-        ))}
+        {reports[kind].filters.map((filter) =>
+          filter === 'receiptType' ? (
+            <Select
+              key={`${kind}-${filter}`}
+              id={`report-${filter}`}
+              label={filterLabels[filter] ?? filter}
+              value={draft.filters[filter] || ''}
+              onChange={(e) => setFilter(filter, e.target.value)}
+              options={enumOptions(RECEIPT_TYPES, methodLabel, t('Tất cả'))}
+            />
+          ) : (
+            <EntityPicker
+              key={`${kind}-${filter}`}
+              id={`report-${filter}`}
+              resource={pickerResource[filter as keyof typeof pickerResource]}
+              label={filterLabels[filter] ?? filter}
+              placeholder={
+                filter === 'wardId' ? t('Tất cả phường/xã') : t('Tất cả')
+              }
+              value={draft.filters[filter] || ''}
+              onChange={(value) => setFilter(filter, value)}
+            />
+          ),
+        )}
         <Select
           id="report-sort"
           label={t('Sắp xếp')}

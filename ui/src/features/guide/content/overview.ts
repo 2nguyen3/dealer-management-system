@@ -15,7 +15,7 @@ export const overviewGuides: readonly GuideContent[] = [
         'Tab Yêu thích: lần đầu có sẵn bộ chức năng mặc định theo quyền của bạn. Bấm Thêm chức năng để thêm, nút mũi tên lên/xuống hoặc kéo tay nắm để đổi thứ tự, nút X để bỏ, Khôi phục mặc định để quay lại bộ ban đầu.',
       ),
       msg(
-        'Tab Chức năng nghiệp vụ: xem các khu vực Đại lý & Hàng hóa, Giao dịch kho, Thu tiền & Công nợ, Danh mục & Quy định, Quản trị & Lịch sử; bấm ngôi sao trên thẻ để thêm vào Yêu thích.',
+        'Tab Chức năng nghiệp vụ: xem các khu vực Đại lý & Hàng hóa, Chứng từ, Danh mục & Quy định, Quản trị & Lịch sử; bấm ngôi sao trên thẻ để thêm vào Yêu thích.',
       ),
       msg('Bấm vào một thẻ chức năng để mở trang tương ứng.'),
       msg(
@@ -39,10 +39,10 @@ export const overviewGuides: readonly GuideContent[] = [
     errors: ['FORBIDDEN', 'INVALID_OR_EXPIRED_TOKEN'],
     tips: [
       msg(
-        'Thứ tự nghiệp vụ thường gặp: Phiếu nhập → Phiếu xuất → Xác nhận trả ngay (nếu có) → Ghi sổ → Phiếu thu.',
+        'Thứ tự nghiệp vụ thường gặp: Phiếu nhập → Phiếu xuất (ghi sổ) → Phiếu thu.',
       ),
       msg(
-        'Nháp và chứng từ chờ ghi sổ chưa làm thay đổi tồn kho hay công nợ. Chỉ Ghi sổ mới có hiệu lực.',
+        'Nháp chưa làm thay đổi tồn kho hay nợ. Chỉ Ghi sổ mới có hiệu lực; chứng từ đã ghi sổ chỉ Hủy hoặc Sửa có lý do.',
       ),
     ],
     related: ['/dashboard', '/reports', '/profile'],
@@ -50,15 +50,11 @@ export const overviewGuides: readonly GuideContent[] = [
   {
     path: '/dashboard',
     purpose: msg(
-      'Bảng điều khiển cho cái nhìn nhanh về doanh số, công nợ, dòng tiền, dư có và tồn kho của toàn công ty theo tháng.',
+      'Bảng điều khiển cho cái nhìn nhanh về doanh số, tiền thu, tổng nợ, các đại lý nợ gần hạn mức và chứng từ nháp theo tháng.',
     ),
     roles: [
       msg(
-        'Mỗi khối số liệu chỉ hiện khi bạn có quyền tương ứng: tra cứu đại lý, tồn kho, doanh số hoặc công nợ.',
-      ),
-      msg('Kho (quyền xác nhận xuất): thấy số phiếu xuất đang chờ ghi sổ.'),
-      msg(
-        'Kế toán (quyền xác nhận khoản trả ngay): thấy tiền đã xác minh nhưng chưa thành phiếu thu.',
+        'Mỗi khối số liệu chỉ hiện khi bạn có quyền tương ứng: tra cứu đại lý, doanh số, công nợ hoặc lập/ghi sổ chứng từ.',
       ),
       msg('Quản lý: thấy toàn bộ các khối.'),
     ],
@@ -72,35 +68,31 @@ export const overviewGuides: readonly GuideContent[] = [
     ],
     rules: [
       msg(
-        'Chỉ tính chứng từ đã ghi sổ. Nháp, phiếu chờ ghi sổ và chứng từ đã hủy không được tính.',
+        'Chỉ tính chứng từ đã ghi sổ. Nháp và chứng từ đã hủy không được tính.',
       ),
+      msg('Số liệu tính theo ngày nghiệp vụ của chứng từ.'),
       msg(
-        'Số liệu tính theo ngày nghiệp vụ. Ghi sổ lùi ngày hoặc sửa sai có thể làm thay đổi số liệu tháng trước.',
-      ),
-      msg('Doanh số thuần bằng doanh số gộp trừ hàng trả lại.'),
-      msg('Tổng dư có gồm cả phần đang được giữ chỗ cho yêu cầu hoàn tiền.'),
-      msg(
-        'Tiền đã xác minh nhưng chưa ghi phiếu thu là trả ngay Kế toán đã xác minh, chờ Kho ghi sổ phiếu xuất. Khoản này chưa tính vào thực thu.',
+        'Tổng nợ là tổng nợ hiện tại của các đại lý; đại lý trả trước có nợ âm.',
       ),
     ],
     errors: ['FORBIDDEN', 'NETWORK_ERROR', 'SERVICE_UNAVAILABLE'],
     tips: [
       msg(
-        'Nếu ô Phiếu xuất đang chờ lớn hơn 0, kiểm tra trang Xác nhận trả ngay xem phiếu nào còn chờ Kế toán.',
+        'Đại lý nợ gần hạn mức sẽ bị từ chối khi ghi sổ phiếu xuất tiếp theo; nhắc Kế toán lập phiếu thu trước.',
       ),
     ],
-    related: ['/reports', '/receivables', '/stock-issues', '/upfront-payments'],
+    related: ['/reports', '/agencies', '/stock-issues', '/payment-receipts'],
   },
   {
     path: '/reports',
     purpose: msg(
-      'Lập các báo cáo kinh doanh theo kỳ: doanh số đại lý, công nợ, xuất nhập tồn, doanh số mặt hàng, thu chi và dư có; xuất ra PDF hoặc Excel.',
+      'Lập các báo cáo kinh doanh theo kỳ: doanh số đại lý, công nợ, tồn kho, doanh số mặt hàng và thu tiền; xuất ra PDF hoặc Excel.',
     ),
     roles: [
       msg(
-        'Cần quyền Báo cáo kèm quyền đọc tương ứng: tra cứu doanh số, công nợ hoặc tồn kho.',
+        'Cần quyền Báo cáo; báo cáo doanh số cần thêm quyền tra cứu doanh số, báo cáo công nợ và thu tiền cần thêm quyền tra cứu công nợ.',
       ),
-      msg('Kế toán: mặc định xem được báo cáo doanh số, công nợ, thu chi.'),
+      msg('Kế toán: mặc định xem được báo cáo doanh số, công nợ, thu tiền.'),
       msg('Quản lý: xem được mọi báo cáo.'),
     ],
     flow: [
@@ -111,34 +103,29 @@ export const overviewGuides: readonly GuideContent[] = [
     ],
     steps: [
       msg(
-        'Chọn Loại báo cáo: Doanh số đại lý, Công nợ, Xuất nhập tồn, Doanh số mặt hàng hoặc Thu chi & dư có.',
+        'Chọn Loại báo cáo: Doanh số đại lý, Công nợ, Tồn kho, Doanh số mặt hàng hoặc Thu tiền.',
       ),
-      msg(
-        'Chọn Kỳ báo cáo nhanh, hoặc nhập Từ ngày và Đến trước ngày. Ngày ở ô Đến trước ngày không được tính.',
-      ),
-      msg(
-        'Thêm bộ lọc nếu cần, ví dụ phường/xã cho báo cáo công nợ; chọn Sắp xếp và Số dòng mỗi trang.',
-      ),
+      msg('Chọn tháng hoặc khoảng ngày của kỳ báo cáo.'),
+      msg('Thêm bộ lọc nếu cần, ví dụ đại lý hoặc mặt hàng.'),
       msg('Bấm Áp dụng để tải dữ liệu. Bấm Xóa bộ lọc để làm lại từ đầu.'),
-      msg('Dùng Trang trước và Trang tiếp để xem các trang kết quả.'),
       msg(
         'Bấm Xuất báo cáo rồi chọn Xuất PDF hoặc Xuất XLSX. Tệp gồm toàn bộ kết quả đã lọc, không chỉ trang đang xem.',
       ),
     ],
     rules: [
       msg(
-        'Doanh số là tổng tiền các phiếu xuất đã ghi sổ trong kỳ; tỷ lệ là doanh số của đại lý chia tổng doanh số.',
+        'Doanh số là tổng tiền các phiếu xuất đã ghi sổ trong kỳ; tỷ lệ là doanh số của đại lý chia tổng doanh số tháng.',
       ),
       msg(
-        'Báo cáo công nợ: nợ cuối kỳ bằng nợ đầu kỳ cộng phát sinh tăng trừ phát sinh giảm.',
+        'Công nợ: nợ đầu kỳ + phát sinh (phiếu xuất) − đã trả (phiếu thu) = nợ cuối kỳ. Nợ cuối tháng hiện tại bằng nợ hiện tại của đại lý.',
       ),
       msg(
-        'Phát sinh giảm được tách thành tiền đã thu, hàng trả lại và bù trừ dư có.',
+        'Tồn kho: tồn đầu kỳ + nhập − xuất = tồn cuối kỳ. Tồn cuối kỳ hiện tại bằng tồn của mặt hàng.',
       ),
       msg(
-        'Báo cáo tính theo ngày nghiệp vụ và không khóa sổ kỳ. Nghiệp vụ lùi ngày hoặc sửa sai có thể làm đổi số liệu kỳ cũ.',
+        'Thu tiền được tách theo hình thức: tiền mặt, chuyển khoản, trực tuyến.',
       ),
-      msg('Nháp, phiếu chờ ghi sổ và chứng từ đã hủy không được tính.'),
+      msg('Nháp và chứng từ đã hủy không được tính.'),
     ],
     errors: [
       'INVALID_DATE_RANGE',
@@ -151,7 +138,7 @@ export const overviewGuides: readonly GuideContent[] = [
         'Nếu không thấy một loại báo cáo, nhóm của bạn chưa có quyền đọc tương ứng.',
       ),
     ],
-    related: ['/dashboard', '/receivables', '/inventory'],
+    related: ['/dashboard', '/agencies', '/products'],
   },
   {
     path: '/profile',
@@ -201,7 +188,7 @@ export const overviewGuides: readonly GuideContent[] = [
     steps: [
       msg('Hiện dịch vụ chưa được triển khai nên ô hỏi đáp đang tắt.'),
       msg(
-        'Trong lúc chờ, dùng Bảng điều khiển, Báo cáo kinh doanh, Công nợ đại lý hoặc Tồn kho & Thẻ kho để tra cứu.',
+        'Trong lúc chờ, dùng Bảng điều khiển, Báo cáo kinh doanh, Hồ sơ đại lý hoặc Danh mục mặt hàng để tra cứu.',
       ),
     ],
     rules: [
@@ -215,6 +202,6 @@ export const overviewGuides: readonly GuideContent[] = [
       'NEEDS_AGENCY_SELECTION',
       'NEEDS_CLARIFICATION',
     ],
-    related: ['/dashboard', '/reports', '/receivables', '/inventory'],
+    related: ['/dashboard', '/reports', '/agencies', '/products'],
   },
 ]

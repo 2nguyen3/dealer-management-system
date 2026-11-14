@@ -32,6 +32,8 @@ import {
   changeLocale,
   loadCatalog,
   LOCALE_KEY,
+  reloadWithSplash,
+  showLoadingSplash,
   storedLocale,
   useLocale,
 } from '../lib/i18n/runtime'
@@ -141,6 +143,65 @@ describe('changeLocale', () => {
     expect(outcome).toBe('memory')
     expect(reload).not.toHaveBeenCalled()
     expect(result.current).toBe('en')
+    // The loading splash covered the switch and is gone afterwards.
+    expect(document.querySelector('.boot-splash')).toBeNull()
+  })
+
+  it('reloads behind a loading splash instead of a blank page', () => {
+    const reload = vi.fn()
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    try {
+      reloadWithSplash(reload)
+      const splash = document.querySelector<HTMLElement>('body > .boot-splash')
+      expect(splash?.getAttribute('role')).toBe('status')
+      expect(splash?.getAttribute('aria-busy')).toBe('true')
+      expect(splash?.getAttribute('aria-label')).toBe('Đang chuyển ngôn ngữ…')
+      expect(splash?.querySelector('img')?.getAttribute('src')).toBe(
+        '/assets/brand/agentra-icon.png',
+      )
+      // The page reloads only after the splash had frames to paint.
+      expect(reload).not.toHaveBeenCalled()
+      frames.shift()?.(0)
+      expect(reload).not.toHaveBeenCalled()
+      frames.shift()?.(0)
+      expect(reload).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+      document.querySelectorAll('.boot-splash').forEach((node) => node.remove())
+    }
+  })
+})
+
+describe('showLoadingSplash', () => {
+  afterEach(() => {
+    document.querySelectorAll('.boot-splash').forEach((node) => node.remove())
+  })
+
+  it('adds one accessible splash and reuses it on repeated calls', () => {
+    const first = showLoadingSplash('Loading')
+    const second = showLoadingSplash('Other')
+    expect(second).toBe(first)
+    expect(document.querySelectorAll('body > .boot-splash')).toHaveLength(1)
+    expect(first.getAttribute('aria-label')).toBe('Loading')
+    expect(first.querySelector('.boot-splash__ring')).not.toBeNull()
+    expect(first.querySelector('.boot-splash__bar')).not.toBeNull()
+  })
+
+  it('ignores the start-up splash inside the app root', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<div class="boot-splash"></div>'
+    document.body.append(root)
+    try {
+      const overlay = showLoadingSplash('Loading')
+      expect(overlay.parentElement).toBe(document.body)
+      expect(document.querySelectorAll('.boot-splash')).toHaveLength(2)
+    } finally {
+      root.remove()
+    }
   })
 })
 
@@ -204,14 +265,14 @@ describe('module-level texts', () => {
     const freshCore = await import('../lib/i18n/core')
     freshCore.registerCatalog('en', {
       'Hồ sơ đại lý': 'Agency profiles',
-      'Giao dịch kho': 'Stock transactions',
+      'Chứng từ': 'Documents',
     })
     freshCore.activateLocale('en')
     const navigation = await import('../app/navigation')
     const stock = navigation.navigationGroups.find(
-      (group) => group.key === 'stock',
+      (group) => group.key === 'documents',
     )
-    expect(stock?.title).toBe('Stock transactions')
+    expect(stock?.title).toBe('Documents')
     expect(navigation.routeLabel('/agencies')).toBe('Agency profiles')
     // Untranslated labels fall back to Vietnamese.
     expect(navigation.routeLabel('/units')).toBe('Đơn vị tính')

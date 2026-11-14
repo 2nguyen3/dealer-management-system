@@ -1,44 +1,38 @@
 import type {
-  DocumentLine,
   GoodsKind,
   LineInput,
 } from '../document_history/documentContracts'
+import { formatQuantity } from '../../lib/formatters'
 import {
   lineAmount,
-  quantitySign,
+  scaledQuantity,
   sumAmounts,
 } from '../document_history/lineMath'
-
-export const emptyLine = (): LineInput => ({
-  productId: '',
-  originLineId: '',
-  quantity: '',
-  unitPrice: '',
-})
-
-/** Whether the editor can estimate money for this kind (display only). */
-export function canEstimate(
-  kind: GoodsKind,
-  originLines?: DocumentLine[] | null,
-): boolean {
-  return kind === 'STOCK_RECEIPT' || (kind === 'SALES_RETURN' && !!originLines)
-}
+import type { ProductQuote } from '../document_history/useRecords'
+import { t } from '@/lib/i18n/core'
 
 /**
- * Estimated line amount: receipts use the entered purchase price; returns use
- * the original issue line's price. Issue prices are derived by the server.
+ * Unit price used for a display estimate: receipts use the entered purchase
+ * price; issue prices are quoted by the server from the product's selling
+ * price (QĐ2), so the current `sellingPrice` is only a preview.
  */
+export function estimatePrice(
+  kind: GoodsKind,
+  line: LineInput,
+  quotes: Record<string, ProductQuote> = {},
+): string | null {
+  if (kind === 'STOCK_RECEIPT') return line.unitPrice.trim() || null
+  return quotes[line.productId]?.sellingPrice ?? null
+}
+
+/** Estimated line amount (whole VND), or null when it cannot be estimated. */
 export function estimateLine(
   kind: GoodsKind,
   line: LineInput,
-  originLines?: DocumentLine[] | null,
+  quotes: Record<string, ProductQuote> = {},
 ): bigint | null {
-  if (kind === 'STOCK_RECEIPT') return lineAmount(line.quantity, line.unitPrice)
-  if (kind === 'SALES_RETURN' && originLines) {
-    const origin = originLines.find((item) => item.id === line.originLineId)
-    return origin ? lineAmount(line.quantity, origin.unitPrice) : null
-  }
-  return null
+  const price = estimatePrice(kind, line, quotes)
+  return price === null ? null : lineAmount(line.quantity, price)
 }
 
 export interface EditorSummary {
@@ -46,22 +40,54 @@ export interface EditorSummary {
   /** Lines whose amount could be estimated. */
   pricedLines: number
   subtotal: bigint
-  increases: number
-  decreases: number
 }
 
 export function summarizeLines(
   kind: GoodsKind,
   lines: LineInput[],
-  originLines?: DocumentLine[] | null,
+  quotes: Record<string, ProductQuote> = {},
 ): EditorSummary {
-  const amounts = lines.map((line) => estimateLine(kind, line, originLines))
-  const signs = lines.map((line) => quantitySign(line.quantity))
+  const amounts = lines.map((line) => estimateLine(kind, line, quotes))
   return {
     lineCount: lines.length,
     pricedLines: amounts.filter((value) => value !== null).length,
     subtotal: sumAmounts(amounts),
-    increases: signs.filter((sign) => sign === 1).length,
-    decreases: signs.filter((sign) => sign === -1).length,
   }
+}
+
+/** Debt after adding `amount` to `debt` (exact, both whole VND strings). */
+export function debtAfter(debt: string, amount: bigint): bigint {
+  return BigInt(debt) + amount
+}
+
+/** Stock/pricing warning of an issue line, or null when it looks fine. */
+export function issueLineWarning(
+  line: LineInput,
+  quote: ProductQuote | undefined,
+): string | null {
+  if (!quote) return null
+  if (quote.sellingPrice === null)
+    return t('Mặt hàng chưa từng nhập nên chưa có giá bán, chưa xuất được.')
+  const wanted = scaledQuantity(line.quantity)
+  const stock = scaledQuantity(quote.stock)
+  if (wanted !== null && stock !== null && wanted > stock)
+    return t('Vượt tồn hiện tại ({stock} {unitName}).', {
+      stock: formatQuantity(quote.stock),
+      unitName: quote.unitName,
+    })
+  return null
+}
+
+/**
+ * Most a manual payment receipt may collect (QĐ4): the agency's current
+ * debt, plus the amount of the receipt a correction cancels first. Null
+ * while the debt is unknown.
+ */
+export function paymentLimit(
+  debt: string | null | undefined,
+  reversed: bigint = 0n,
+): bigint | null {
+  if (debt === null || debt === undefined || !/^-?(0|[1-9][0-9]*)$/.test(debt))
+    return null
+  return BigInt(debt) + reversed
 }

@@ -1,206 +1,89 @@
 import {
   BookCheck,
-  ChevronDown,
-  Eye,
-  History,
-  Info,
-  MoreHorizontal,
+  HandCoins,
   PencilLine,
   Plus,
   RefreshCw,
-  Send,
+  Trash2,
   Undo2,
   XCircle,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { DateField } from '../../components/blocks/DateField'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { PageHeader } from '../../components/blocks/PageHeader'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/shadcn/dropdown-menu'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '../../components/shadcn/collapsible'
-import { Separator } from '../../components/shadcn/separator'
 import { Skeleton } from '../../components/shadcn/skeleton'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { EntityPicker } from '../../components/ui/EntityPicker'
-import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
-import { Spinner } from '../../components/ui/Spinner'
 import { ErrorNotice } from '../../components/guide/ErrorNotice'
 import { LockedButton } from '../../components/guide/LockedButton'
 import { NextActionCallout } from '../../components/guide/NextActionCallout'
 import { notifyNextStep } from '../../components/guide/notifyNextStep'
 import { WorkflowSteps } from '../../components/guide/WorkflowSteps'
 import { t } from '../../lib/i18n/core'
-import { apiFetch, ApiError } from '../../lib/api'
+import { ApiError, apiFetch } from '../../lib/api'
 import { invalidateCache } from '../../lib/cache'
-import { formatDate, formatVND } from '../../lib/formatters'
+import { formatVND } from '../../lib/formatters'
 import { useAuth } from '../authentication/useAuth'
-import { RevisionHistory } from '../document_history/DocumentHistoryPage'
+import { CancelDialog } from '../document_history/CancelDialog'
+import { DebtPanel } from '../document_history/DebtPanel'
 import { DocumentList } from '../document_history/DocumentList'
 import {
   canReadKind,
+  changeBlock,
+  documentBody,
   documentKinds,
+  emptyForm,
   exact,
-  inputLines,
+  formFromDocument,
   parseDocument,
-  validDate,
+  receiptAmountAfterIssue,
+  receiptFormLink,
   validId,
-  vietnamToday,
   type DocumentDetail,
-  type DocumentSummary,
-  type GoodsKind,
-  type LineInput,
+  type DocumentForm,
+  type DocumentKind,
 } from '../document_history/documentContracts'
-import { Hint, InfoTip, SectionCard } from '../document_history/DocumentParts'
 import {
   errorMessage,
   useDocumentMutation,
 } from '../document_history/useDocumentRequests'
-import { CorrectionDialog } from '../document_corrections/CorrectionDialog'
-import { usePathAllowed } from '../guide/usePathAllowed'
-import { useUpfrontState } from '../guide/useUpfrontState'
 import {
-  goodsPostEffects,
-  goodsWorkflow,
-  issuePostEffects,
-  positiveMoney,
-  stockIssueWorkflow,
-  upfrontLink,
-} from '../guide/workflows'
+  documentNext,
+  documentNotice,
+  documentSteps,
+  postEffect,
+} from '../document_history/workflow'
+import { usePathAllowed } from '../guide/usePathAllowed'
+import { DocumentFormModal, type FormMode } from './DocumentFormModal'
 import { DocumentSnapshot } from './DocumentSnapshot'
-import { GoodsLineEditor } from './GoodsLineEditor'
-import { canEstimate, emptyLine, summarizeLines } from './lineEstimates'
 
-const descriptions: Record<GoodsKind, string> = {
-  STOCK_RECEIPT: t('Nhập hàng vào kho.'),
-  STOCK_ISSUE: t('Lập → nộp → ghi sổ khi xuất kho.'),
-  SALES_RETURN: t('Nhận hàng trả theo phiếu xuất gốc.'),
-  STOCK_ADJUSTMENT: t('Tăng/giảm tồn kho kèm lý do.'),
+const descriptions: Record<DocumentKind, string> = {
+  STOCK_RECEIPT: t('Lập nháp → ghi sổ: tồn kho tăng, giá nhập cập nhật.'),
+  STOCK_ISSUE: t(
+    'Lập nháp → ghi sổ: tồn kho giảm, công nợ đại lý tăng; thu tiền bằng phiếu thu.',
+  ),
+  PAYMENT_RECEIPT: t('Lập nháp → ghi sổ: công nợ đại lý giảm.'),
 }
-const postEffects: Record<GoodsKind, string> = {
-  STOCK_RECEIPT: t('tăng tồn kho và cập nhật giá nhập hiện hành'),
-  STOCK_ISSUE: t('giảm tồn kho và ghi nhận công nợ cho đại lý'),
-  SALES_RETURN: t('nhập lại hàng và giảm công nợ hoặc ghi có cho đại lý'),
-  STOCK_ADJUSTMENT: t('thay đổi tồn kho theo số lượng điều chỉnh'),
+const eyebrows: Record<DocumentKind, string> = {
+  STOCK_RECEIPT: t('Kho hàng'),
+  STOCK_ISSUE: t('Kho hàng'),
+  PAYMENT_RECEIPT: t('Tài chính'),
 }
-type FormMode = 'create' | 'header' | 'pending'
+/** Lists/balances that change when a document of this kind changes. */
+const affected: Record<DocumentKind, string[]> = {
+  STOCK_RECEIPT: ['/stock-receipts', '/products', '/documents', '/reports'],
+  STOCK_ISSUE: [
+    '/stock-issues',
+    '/products',
+    '/agencies',
+    '/documents',
+    '/reports',
+  ],
+  PAYMENT_RECEIPT: ['/payment-receipts', '/agencies', '/documents', '/reports'],
+}
 
-/** Sticky editor summary: line count, estimated subtotal and the save actions. */
-function EditorSummary({
-  kind,
-  mode,
-  lines,
-  immediatePayment,
-  originLines,
-  busy,
-  onClose,
-}: {
-  kind: GoodsKind
-  mode: FormMode
-  lines: LineInput[]
-  immediatePayment: string
-  originLines?: DocumentDetail['currentRevision']['lines'] | null
-  busy: boolean
-  onClose: () => void
-}) {
-  const summary = summarizeLines(kind, lines, originLines)
-  const priced = canEstimate(kind, originLines)
-  const missing = summary.lineCount - summary.pricedLines
-  const payment = exact.money.test(immediatePayment) ? immediatePayment : null
-  return (
-    <aside
-      aria-label={t('Tóm tắt chứng từ')}
-      className="space-y-4 rounded-xl border bg-card p-4 shadow-xs lg:sticky lg:top-0"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
-          {t('Tóm tắt')}
-        </h3>
-        <InfoTip label={t('Cách tính tóm tắt')}>
-          {kind === 'STOCK_ISSUE'
-            ? t(
-                'Giá bán được hệ thống chốt khi nộp phiếu; tồn kho và trả ngay được kiểm tra lại khi ghi sổ.',
-              )
-            : t('Số tiền chính thức do hệ thống tính khi lưu.')}
-        </InfoTip>
-      </div>
-      {mode === 'header' ? (
-        <p className="text-[13px] text-muted-foreground">
-          {t('Chỉ sửa thông tin chung.')}
-        </p>
-      ) : (
-        <dl className="space-y-2.5 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted-foreground">{t('Số dòng hàng')}</dt>
-            <dd className="font-medium tabular-nums">{summary.lineCount}</dd>
-          </div>
-          {kind === 'STOCK_ADJUSTMENT' && (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted-foreground">{t('Dòng tăng kho')}</dt>
-                <dd className="font-medium text-success tabular-nums">
-                  {summary.increases}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted-foreground">{t('Dòng giảm kho')}</dt>
-                <dd className="font-medium text-destructive tabular-nums">
-                  {summary.decreases}
-                </dd>
-              </div>
-            </>
-          )}
-          {kind === 'STOCK_ISSUE' && (
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t('Trả ngay dự kiến')}</dt>
-              <dd className="font-medium tabular-nums">
-                {payment === null ? '—' : formatVND(payment)}
-              </dd>
-            </div>
-          )}
-          {priced && (
-            <>
-              <Separator />
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="font-medium text-foreground">{t('Tạm tính')}</dt>
-                <dd className="text-lg font-semibold tabular-nums">
-                  {formatVND(summary.subtotal.toString())}
-                </dd>
-              </div>
-              {missing > 0 && (
-                <p className="text-xs text-warning">
-                  {t('{missing} dòng chưa đủ số lượng/đơn giá', { missing })}
-                </p>
-              )}
-            </>
-          )}
-        </dl>
-      )}
-      <div className="grid gap-2">
-        <Button type="submit" isLoading={busy}>
-          {mode === 'pending' ? t('Lưu thay thế') : t('Lưu nháp')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={onClose}
-        >
-          {t('Đóng')}
-        </Button>
-      </div>
-    </aside>
-  )
-}
+type Confirm = 'post' | 'collect' | 'delete'
 
 function DetailSkeleton() {
   return (
@@ -212,18 +95,46 @@ function DetailSkeleton() {
   )
 }
 
-export function GoodsDocumentsPage({ kind }: { kind: GoodsKind }) {
+/** Deep-link intents read from the page URL (`?document=` / `?new=1&…`). */
+function linkIntent(params: URLSearchParams) {
+  const document = params.get('document')
+  const agencyId = params.get('agencyId') ?? ''
+  const amount = params.get('amount') ?? ''
+  return {
+    document: document && validId(document) ? document : null,
+    create: params.get('new') === '1',
+    agencyId: validId(agencyId) ? agencyId : '',
+    amount: exact.positiveMoney.test(amount) ? amount : '',
+  }
+}
+
+/**
+ * Workbench of one document kind: list, detail with the actions its state
+ * allows (draft edit/delete/post; posted cancel/correct with a reason), and
+ * the create/edit/correct form. Shared by receipts, issues and payments.
+ */
+export function DocumentWorkbench({ kind }: { kind: DocumentKind }) {
   const { user, allowedFunctions } = useAuth()
   return (
-    <GoodsDocumentsScreen
+    <WorkbenchScreen
       key={`${kind}:${user?.id}:${allowedFunctions.join(',')}`}
       kind={kind}
     />
   )
 }
-function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
-  const { hasPermission, user, allowedFunctions } = useAuth()
+/** Goods pages (receipts and issues) use the shared workbench. */
+export const GoodsDocumentsPage = DocumentWorkbench
+
+function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
+  const { hasPermission } = useAuth()
+  const navigate = useNavigate()
+  const pathAllowed = usePathAllowed()
+  const [searchParams, setSearchParams] = useSearchParams()
   const config = documentKinds[kind]
+  const readable = canReadKind(kind, hasPermission)
+  const canPrepare = hasPermission(config.prepare)
+  const canPost = hasPermission(config.post)
+  const canCollect = hasPermission('cash.receipt.prepare')
   const [version, setVersion] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
   const [detail, setDetail] = useState<{
@@ -234,34 +145,49 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
   const [detailFailure, setDetailFailure] = useState<unknown>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [create, setCreate] = useState(false)
-  const [editHeader, setEditHeader] = useState(false)
-  const [replacePending, setReplacePending] = useState(false)
-  const [date, setDate] = useState(vietnamToday)
-  const [note, setNote] = useState('')
-  const [reason, setReason] = useState('')
-  const [agencyId, setAgencyId] = useState('')
-  const [originId, setOriginId] = useState('')
-  const [immediatePayment, setImmediatePayment] = useState('0')
-  const [lines, setLines] = useState<LineInput[]>([emptyLine()])
+  const [form, setForm] = useState<{
+    mode: FormMode
+    initial: DocumentForm
+    doc: DocumentDetail | null
+  } | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [source, setSource] = useState<DocumentDetail | null>(null)
-  const [sourceBusy, setSourceBusy] = useState(false)
-  const sourceController = useRef<AbortController | null>(null)
-  const [correction, setCorrection] = useState<'correct' | 'cancel' | null>(
-    null,
-  )
-  const [confirmPost, setConfirmPost] = useState(false)
-  const [history, setHistory] = useState<DocumentSummary | null>(null)
+  const [formFailure, setFormFailure] = useState<unknown>(null)
+  const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cancelFailure, setCancelFailure] = useState<unknown>(null)
   const mutation = useDocumentMutation()
-  const scope = `${user?.id}:${allowedFunctions.join(',')}`
-  const readable = canReadKind(kind, hasPermission)
-  const issueReadable = canReadKind('STOCK_ISSUE', hasPermission)
-  const pathAllowed = usePathAllowed()
-  const upfrontState = useUpfrontState(
-    kind === 'STOCK_ISSUE' ? detail?.doc.upfrontConfirmationId : null,
-    version,
-  )
+
+  // Deep links: open a document, or the prefilled create form (A2 shortcut).
+  const linkKey = searchParams.toString()
+  const [consumedLink, setConsumedLink] = useState<string | null>(null)
+  if (!linkKey && consumedLink !== null) setConsumedLink(null)
+  if (linkKey && consumedLink !== linkKey) {
+    setConsumedLink(linkKey)
+    const intent = linkIntent(searchParams)
+    if (intent.document && readable) {
+      setDetail(null)
+      setDetailError(null)
+      setDetailLoading(true)
+      setSelected(intent.document)
+    } else if (intent.create && canPrepare) {
+      setFormError(null)
+      setFormFailure(null)
+      setForm({
+        mode: 'create',
+        initial: {
+          ...emptyForm(),
+          agencyId: kind === 'STOCK_RECEIPT' ? '' : intent.agencyId,
+          amount: kind === 'PAYMENT_RECEIPT' ? intent.amount : '',
+        },
+        doc: null,
+      })
+    }
+  }
+  useEffect(() => {
+    if (linkKey) setSearchParams({}, { replace: true })
+  }, [linkKey, setSearchParams])
+
   useEffect(() => {
     if (!selected || !readable) return
     const controller = new AbortController()
@@ -279,12 +205,13 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           setDetailError(errorMessage(error))
+          setDetailFailure(error)
           setDetailLoading(false)
         }
       })
     return () => controller.abort()
-  }, [selected, config.path, kind, version, scope, readable])
-  useEffect(() => () => sourceController.current?.abort(), [])
+  }, [selected, config.path, kind, version, readable])
+
   function openDetail(id: string) {
     setDetail(null)
     setDetailError(null)
@@ -292,340 +219,315 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
     setDetailLoading(true)
     setSelected(id)
   }
-  function reload() {
+  function refresh() {
+    for (const prefix of affected[kind]) invalidateCache(prefix)
     setDetail(null)
     setDetailLoading(true)
     setVersion((value) => value + 1)
   }
+  function closeDetail() {
+    if (mutation.busy) return
+    setSelected(null)
+    setDetail(null)
+    setDetailError(null)
+    setConfirm(null)
+    setCancelOpen(false)
+  }
+  function failed(
+    error: unknown,
+    report: (message: string, error: unknown) => void,
+  ) {
+    report(errorMessage(error), error)
+    if (error instanceof ApiError && [412, 428].includes(error.status))
+      setDetail((value) => (value ? { ...value, etag: null } : null))
+  }
   function openForm(mode: FormMode) {
-    const revision = mode === 'create' ? null : detail?.doc.currentRevision
-    setDate(revision?.businessDate ?? vietnamToday())
-    setNote(revision?.note ?? '')
-    setReason('')
     setFormError(null)
-    setImmediatePayment(revision?.immediatePayment ?? '0')
-    setAgencyId('')
-    setOriginId('')
-    setSource(null)
-    setLines(
-      revision
-        ? revision.lines.map((line) => ({
-            productId: line.productId,
-            originLineId: line.originLineId ?? '',
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-          }))
-        : [emptyLine()],
-    )
-    setCreate(mode === 'create')
-    setEditHeader(mode === 'header')
-    setReplacePending(mode === 'pending')
-  }
-  // Demand-loads the chosen original issue once per selection; a newer choice aborts it.
-  async function loadSource(originId: string) {
-    sourceController.current?.abort()
-    if (!validId(originId)) return
-    const controller = new AbortController()
-    sourceController.current = controller
-    setSourceBusy(true)
-    setFormError(null)
-    try {
-      const result = await apiFetch<unknown>(`/stock-issues/${originId}`, {
-        signal: controller.signal,
-      })
-      const doc = parseDocument(result.data)
-      if (doc.kind !== 'STOCK_ISSUE' || doc.status !== 'POSTED')
-        throw new Error(t('Chỉ nhận hàng từ phiếu xuất đã ghi sổ.'))
-      if (!controller.signal.aborted) setSource(doc)
-    } catch (error) {
-      if (!controller.signal.aborted) setFormError(errorMessage(error))
-    } finally {
-      if (!controller.signal.aborted) setSourceBusy(false)
-    }
-  }
-  function chooseOrigin(id: string) {
-    sourceController.current?.abort()
-    setSourceBusy(false)
-    setOriginId(id)
-    setSource(null)
-    // Lines belong to the previous original issue; start over for the new one.
-    setLines([emptyLine()])
-    if (id && issueReadable) void loadSource(id)
-  }
-  async function save() {
-    if (!hasPermission(config.prepare) || mutation.busy) return
-    setFormError(null)
-    try {
-      if (!validDate(date)) throw new Error(t('Ngày nghiệp vụ không hợp lệ.'))
-      if (kind === 'STOCK_ISSUE' && !exact.money.test(immediatePayment))
-        throw new Error(t('Trả ngay phải là chuỗi số nguyên VNĐ.'))
-      if (
-        (kind === 'STOCK_ADJUSTMENT' || replacePending) &&
-        !reason.trim() &&
-        !editHeader
-      )
-        throw new Error(t('Cần lý do nghiệp vụ.'))
-      let path: string = config.path
-      const body: Record<string, unknown> = {
-        businessDate: date,
-        note: note || null,
-      }
-      if (kind === 'STOCK_ISSUE') body.immediatePayment = immediatePayment
-      if (kind === 'STOCK_ADJUSTMENT')
-        body.reason = reason.trim() || detail?.doc.currentRevision.reason
-      if (!editHeader) body.lines = inputLines(kind, lines)
-      if (create && kind === 'STOCK_ISSUE') {
-        if (!validId(agencyId)) throw new Error(t('Vui lòng chọn đại lý.'))
-        body.agencyId = agencyId
-      }
-      if (create && kind === 'SALES_RETURN') {
-        if (!validId(originId))
-          throw new Error(t('Vui lòng chọn phiếu xuất gốc.'))
-        body.originDocumentId = originId
-      }
-      if (editHeader || replacePending) {
-        if (!detail?.etag)
-          throw new Error(t('Cần tải lại phiên bản và ETag trước khi sửa.'))
-        path = `${config.path}/${detail.doc.id}${replacePending ? '/revisions' : ''}`
-        if (replacePending) body.reason = reason.trim()
-      }
-      const saved = await mutation.run(path, {
-        method: editHeader ? 'PATCH' : 'POST',
-        body,
-        ifMatch: create ? undefined : (detail?.etag ?? undefined),
-      })
-      const savedCode =
-        typeof saved?.data === 'object' &&
-        saved.data !== null &&
-        'code' in saved.data &&
-        typeof saved.data.code === 'string'
-          ? saved.data.code
-          : (detail?.doc.code ?? '')
-      notifyNextStep({
-        done: savedCode
-          ? t('Đã lưu nháp {code}.', { code: savedCode })
-          : t('Đã lưu chứng từ.'),
-        next:
-          kind === 'STOCK_ISSUE'
-            ? t('Bước tiếp: mở phiếu, kiểm tra rồi bấm Nộp phiếu để chốt giá.')
-            : t('Bước tiếp: mở phiếu, kiểm tra các dòng rồi Ghi sổ.'),
-      })
-      setCreate(false)
-      setEditHeader(false)
-      setReplacePending(false)
-      setNotice(t('Đã lưu chứng từ.'))
-      invalidateCache(config.path)
-      reload()
-    } catch (error) {
-      setFormError(errorMessage(error))
-      if (error instanceof ApiError && [412, 428].includes(error.status))
-        setDetail((value) => (value ? { ...value, etag: null } : null))
-    }
-  }
-  async function action(actionName: 'submit' | 'post') {
-    if (
-      !detail?.etag ||
-      mutation.busy ||
-      !hasPermission(actionName === 'post' ? config.post : config.prepare)
-    )
+    setFormFailure(null)
+    if (mode === 'create') {
+      setForm({ mode, initial: emptyForm(), doc: null })
       return
+    }
+    if (!detail) return
+    setForm({ mode, initial: formFromDocument(detail.doc), doc: detail.doc })
+  }
+
+  async function post(id: string, etag: string, code: string) {
+    const result = await mutation.run(`${config.path}/${id}/post`, {
+      ifMatch: etag,
+    })
+    const doc = parseDocument(result.data)
+    notifyNextStep(documentNotice('post', kind, doc.code || code))
+    return { doc, etag: result.etag }
+  }
+
+  /** After posting an issue: open the prefilled payment receipt form (A2). */
+  function collect(doc: DocumentDetail) {
+    const amount = receiptAmountAfterIssue(doc.totalAmount, doc.agencyDebt)
+    if (!doc.agencyId || amount === null) {
+      setNotice(
+        t(
+          'Đã ghi sổ {code}. Đại lý không còn nợ nên không cần lập phiếu thu.',
+          {
+            code: doc.code,
+          },
+        ),
+      )
+      return
+    }
+    navigate(receiptFormLink(doc.agencyId, amount))
+  }
+
+  async function save(values: DocumentForm, postNow: boolean) {
+    if (!form || mutation.busy) return
+    setFormError(null)
+    setFormFailure(null)
     try {
-      await mutation.run(`${config.path}/${detail.doc.id}/${actionName}`, {
+      const mode = form.mode
+      const body = documentBody(
+        kind,
+        values,
+        mode === 'correct' ? 'correct' : 'draft',
+      )
+      if (mode !== 'create' && !detail?.etag)
+        throw new Error(t('Cần tải lại chứng từ trước khi sửa.'))
+      const id = form.doc?.id ?? ''
+      const result = await mutation.run(
+        mode === 'create'
+          ? config.path
+          : mode === 'edit'
+            ? `${config.path}/${id}`
+            : `${config.path}/${id}/corrections`,
+        {
+          method: mode === 'edit' ? 'PUT' : 'POST',
+          body,
+          ifMatch: mode === 'create' ? undefined : detail!.etag!,
+        },
+      )
+      const saved = parseDocument(result.data)
+      setForm(null)
+      let postFailure: unknown = null
+      if (mode === 'correct') {
+        notifyNextStep(documentNotice('correct', kind, saved.code))
+        setNotice(
+          t('Đã hủy {old} và lập {code} thay thế.', {
+            old: form.doc?.code ?? '',
+            code: saved.code,
+          }),
+        )
+      } else if (postNow) {
+        try {
+          if (!result.etag)
+            throw new Error(t('Cần tải lại chứng từ trước khi ghi sổ.'))
+          await post(saved.id, result.etag, saved.code)
+          setNotice(t('Đã lưu và ghi sổ {code}.', { code: saved.code }))
+        } catch (error) {
+          postFailure = error
+          setNotice(
+            t('Đã lưu nháp {code} nhưng chưa ghi sổ được.', {
+              code: saved.code,
+            }),
+          )
+        }
+      } else {
+        notifyNextStep(
+          documentNotice(
+            mode === 'edit' ? 'update' : 'create',
+            kind,
+            saved.code,
+          ),
+        )
+        setNotice(t('Đã lưu nháp {code}.', { code: saved.code }))
+      }
+      for (const prefix of affected[kind]) invalidateCache(prefix)
+      setVersion((value) => value + 1)
+      openDetail(saved.id)
+      if (postFailure) {
+        setDetailError(errorMessage(postFailure))
+        setDetailFailure(postFailure)
+      }
+    } catch (error) {
+      failed(error, (message, failure) => {
+        setFormError(message)
+        setFormFailure(failure)
+      })
+    }
+  }
+
+  async function runPost(then: 'stay' | 'collect') {
+    if (!detail?.etag || mutation.busy || !canPost) return
+    setDetailError(null)
+    try {
+      const posted = await post(detail.doc.id, detail.etag, detail.doc.code)
+      setConfirm(null)
+      refresh()
+      if (then === 'collect') collect(posted.doc)
+      else setNotice(t('Đã ghi sổ {code}.', { code: posted.doc.code }))
+    } catch (error) {
+      setConfirm(null)
+      failed(error, (message, failure) => {
+        setDetailError(message)
+        setDetailFailure(failure)
+      })
+    }
+  }
+
+  async function runDelete() {
+    if (!detail?.etag || mutation.busy || !canPrepare) return
+    setDetailError(null)
+    try {
+      await mutation.run(`${config.path}/${detail.doc.id}`, {
+        method: 'DELETE',
         ifMatch: detail.etag,
       })
-      setNotice(
-        actionName === 'post' ? t('Đã ghi sổ chứng từ.') : t('Đã nộp phiếu.'),
-      )
-      announce(actionName, detail.doc)
-      invalidateCache(config.path)
-      reload()
+      notifyNextStep(documentNotice('delete', kind, detail.doc.code))
+      setNotice(t('Đã xóa nháp {code}.', { code: detail.doc.code }))
+      setConfirm(null)
+      setSelected(null)
+      setDetail(null)
+      for (const prefix of affected[kind]) invalidateCache(prefix)
+      setVersion((value) => value + 1)
     } catch (error) {
-      setDetailError(errorMessage(error))
-      setDetailFailure(error)
-      if (error instanceof ApiError && [412, 428].includes(error.status))
-        setDetail({ ...detail, etag: null })
-    } finally {
-      setConfirmPost(false)
-    }
-  }
-  function announce(actionName: 'submit' | 'post', doc: DocumentDetail) {
-    const upfront = doc.currentRevision.immediatePayment
-    if (actionName === 'submit') {
-      const needsUpfront = positiveMoney(upfront)
-      const to = needsUpfront ? upfrontLink(doc.id) : undefined
-      notifyNextStep({
-        done: t('Đã nộp {code}.', { code: doc.code }),
-        next: needsUpfront
-          ? t(
-              'Bước tiếp: Kế toán xác nhận trả ngay {amount}, rồi Kho ghi sổ.',
-              {
-                amount: formatVND(upfront),
-              },
-            )
-          : t('Bước tiếp: Kho ghi sổ phiếu xuất.'),
-        ...(to && pathAllowed(to) ? { to } : {}),
+      setConfirm(null)
+      failed(error, (message, failure) => {
+        setDetailError(message)
+        setDetailFailure(failure)
       })
-      return
     }
-    const to =
-      kind === 'STOCK_ISSUE' || kind === 'SALES_RETURN'
-        ? '/receivables'
-        : '/inventory'
-    notifyNextStep({
-      done: t('Đã ghi sổ {code}.', { code: doc.code }),
-      next:
-        kind === 'STOCK_ISSUE'
-          ? positiveMoney(upfront)
-            ? t(
-                'Tồn kho đã giảm, công nợ đã cập nhật và phiếu thu trả ngay đã được lập.',
-              )
-            : t(
-                'Tồn kho đã giảm và công nợ đại lý đã cập nhật. Thu tiền bằng Phiếu thu khi đại lý thanh toán.',
-              )
-          : kind === 'SALES_RETURN'
-            ? t(
-                'Hàng đã nhập lại kho; công nợ hoặc dư có của đại lý đã cập nhật.',
-              )
-            : t('Tồn kho đã cập nhật. Xem thẻ kho để đối chiếu.'),
-      ...(pathAllowed(to) ? { to } : {}),
-    })
   }
-  const draft =
-    detail?.doc.status === 'DRAFT' &&
-    detail.doc.currentRevision.state === 'DRAFT'
-  const independent =
-    kind !== 'STOCK_ADJUSTMENT' || detail?.doc.stockCountId === null
-  const canPost =
-    !!detail &&
-    independent &&
-    hasPermission(config.post) &&
-    (kind === 'STOCK_ISSUE'
-      ? detail.doc.status === 'PENDING' &&
-        detail.doc.currentRevision.state === 'READY'
-      : draft)
-  const issueFlow =
-    kind === 'STOCK_ISSUE' && detail
-      ? stockIssueWorkflow(detail.doc, upfrontState, {
-          prepare: hasPermission(config.prepare),
-          post: hasPermission(config.post),
-          verify: hasPermission('cash.upfront.verify'),
-        })
-      : null
-  const goodsFlow =
-    kind !== 'STOCK_ISSUE' && detail
-      ? goodsWorkflow(kind, detail.doc, hasPermission(config.post))
-      : null
-  const flow = issueFlow ?? goodsFlow
+
+  async function runCancel(reason: string) {
+    if (!detail?.etag || mutation.busy) return
+    setCancelError(null)
+    setCancelFailure(null)
+    try {
+      const result = await mutation.run(
+        `${config.path}/${detail.doc.id}/cancel`,
+        {
+          body: { reason },
+          ifMatch: detail.etag,
+        },
+      )
+      const doc = parseDocument(result.data)
+      notifyNextStep(documentNotice('cancel', kind, doc.code))
+      setNotice(t('Đã hủy {code}.', { code: doc.code }))
+      setCancelOpen(false)
+      refresh()
+    } catch (error) {
+      failed(error, (message, failure) => {
+        setCancelError(message)
+        setCancelFailure(failure)
+      })
+    }
+  }
+
+  const doc = detail?.doc ?? null
+  const grants = { prepare: canPrepare, post: canPost, collect: canCollect }
+  const flow = doc ? documentSteps(doc, grants) : null
+  const next = doc ? documentNext(doc, grants) : null
   const nextAction =
-    flow?.next?.to && !pathAllowed(flow.next.to)
-      ? { ...flow.next, to: undefined }
-      : (flow?.next ?? null)
-  const formOpen = create || editHeader || replacePending
-  const formMode: FormMode = create
-    ? 'create'
-    : replacePending
-      ? 'pending'
-      : 'header'
-  const originLines =
-    create && kind === 'SALES_RETURN' && issueReadable
-      ? (source?.currentRevision.lines ?? null)
-      : undefined
-  const closeForm = () => {
-    if (!mutation.busy) {
-      setCreate(false)
-      setEditHeader(false)
-      setReplacePending(false)
-      sourceController.current?.abort()
-      setSourceBusy(false)
-    }
-  }
-  const detailActions = detail && (
+    next?.to && !pathAllowed(next.to) ? { ...next, to: undefined } : next
+  const draft = doc?.status === 'DRAFT'
+  const block = doc ? changeBlock(doc) : null
+  const mayCancel = !!doc && hasPermission('documents.cancel')
+  const mayCorrect = !!doc && hasPermission('documents.correct') && canPost
+  const showChange = doc?.status === 'POSTED' && doc.receiptType !== 'ONLINE'
+  const collectAllowed =
+    kind === 'STOCK_ISSUE' && canCollect && pathAllowed('/payment-receipts')
+  const issueChange =
+    doc && kind === 'STOCK_ISSUE' && draft ? BigInt(doc.totalAmount) : null
+
+  const detailActions = doc && (
     <div className="flex w-full flex-wrap items-center justify-end gap-2">
       <Button
         variant="ghost"
         className="me-auto"
         icon={<RefreshCw className="size-4" />}
-        onClick={reload}
+        onClick={refresh}
         disabled={mutation.busy}
       >
         {t('Tải lại')}
       </Button>
-      {detail.doc.status !== 'CANCELLED' && (
-        <Button
+      {draft && canPrepare && (
+        <>
+          <Button
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            icon={<Trash2 className="size-4" />}
+            disabled={!detail?.etag || mutation.busy}
+            onClick={() => setConfirm('delete')}
+          >
+            {t('Xóa nháp')}
+          </Button>
+          <Button
+            variant="outline"
+            icon={<PencilLine className="size-4" />}
+            disabled={!detail?.etag || mutation.busy}
+            onClick={() => openForm('edit')}
+          >
+            {t('Sửa nháp')}
+          </Button>
+        </>
+      )}
+      {draft && canPost && (
+        <>
+          {collectAllowed && (
+            <Button
+              variant="outline"
+              icon={<HandCoins className="size-4" />}
+              disabled={!detail?.etag || mutation.busy}
+              onClick={() => setConfirm('collect')}
+            >
+              {t('Ghi sổ & lập phiếu thu')}
+            </Button>
+          )}
+          <Button
+            icon={<BookCheck className="size-4" />}
+            disabled={!detail?.etag || mutation.busy}
+            onClick={() => setConfirm('post')}
+          >
+            {t('Ghi sổ')}
+          </Button>
+        </>
+      )}
+      {showChange && mayCancel && (
+        <LockedButton
           variant="outline"
           className="text-destructive hover:text-destructive"
           icon={<XCircle className="size-4" />}
-          disabled={mutation.busy}
-          onClick={() => setCorrection('cancel')}
+          disabled={!detail?.etag || mutation.busy}
+          lockedReason={block}
+          onClick={() => {
+            setCancelError(null)
+            setCancelOpen(true)
+          }}
         >
-          {t('Hủy phiếu')}
-        </Button>
-      )}
-      {detail.doc.status === 'POSTED' && (
-        <Button
-          variant="outline"
-          icon={<Undo2 className="size-4" />}
-          disabled={mutation.busy}
-          onClick={() => setCorrection('correct')}
-        >
-          {t('Sửa sai')}
-        </Button>
-      )}
-      {draft && independent && hasPermission(config.prepare) && (
-        <Button
-          variant="outline"
-          icon={<PencilLine className="size-4" />}
-          disabled={!detail.etag || mutation.busy}
-          onClick={() => openForm('header')}
-        >
-          {t('Sửa thông tin nháp')}
-        </Button>
-      )}
-      {kind === 'STOCK_ISSUE' &&
-        detail.doc.status === 'PENDING' &&
-        hasPermission(config.prepare) && (
-          <LockedButton
-            variant="outline"
-            icon={<PencilLine className="size-4" />}
-            disabled={!detail.etag || mutation.busy}
-            lockedReason={issueFlow?.replaceLock}
-            onClick={() => openForm('pending')}
-          >
-            {t('Thay nội dung chờ xuất')}
-          </LockedButton>
-        )}
-      {kind === 'STOCK_ISSUE' && draft && hasPermission(config.prepare) && (
-        <LockedButton
-          icon={<Send className="size-4" />}
-          disabled={!detail.etag}
-          isLoading={mutation.busy}
-          lockedReason={issueFlow?.submitLock}
-          onClick={() => void action('submit')}
-        >
-          {t('Nộp phiếu')}
+          {t('Hủy')}
         </LockedButton>
       )}
-      {canPost && (
+      {showChange && mayCorrect && (
         <LockedButton
-          icon={<BookCheck className="size-4" />}
-          disabled={!detail.etag || mutation.busy}
-          lockedReason={issueFlow?.postLock}
-          onClick={() => setConfirmPost(true)}
+          variant="outline"
+          icon={<Undo2 className="size-4" />}
+          disabled={!detail?.etag || mutation.busy}
+          lockedReason={block}
+          onClick={() => openForm('correct')}
         >
-          {t('Ghi sổ')}
+          {t('Sửa có lý do')}
         </LockedButton>
       )}
     </div>
   )
+
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={t('Kho hàng')}
+        eyebrow={eyebrows[kind]}
         title={config.title}
         description={descriptions[kind]}
         className="mb-0"
         actions={
-          hasPermission(config.prepare) && (
+          canPrepare && (
             <Button
               icon={<Plus className="size-4" />}
               onClick={() => openForm('create')}
@@ -641,312 +543,185 @@ function GoodsDocumentsScreen({ kind }: { kind: GoodsKind }) {
         version={version}
         onRowClick={(row) => openDetail(row.id)}
         actions={(row) => (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t('Chi tiết {code}', { code: row.code })}
-              onClick={() => openDetail(row.id)}
-            >
-              {t('Chi tiết')}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="size-8 p-0"
-                  aria-label={t('Thao tác khác {code}', { code: row.code })}
-                >
-                  <MoreHorizontal className="size-4" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => openDetail(row.id)}>
-                  <Eye aria-hidden="true" />
-                  {t('Xem chi tiết')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setHistory(row)}>
-                  <History aria-hidden="true" />
-                  {t('Lịch sử phiên bản')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t('Chi tiết {code}', { code: row.code })}
+            onClick={() => openDetail(row.id)}
+          >
+            {t('Chi tiết')}
+          </Button>
         )}
       />
       <Modal
         isOpen={!!selected}
         title={
-          detail
-            ? t('Chi tiết {code}', { code: detail.doc.code })
+          doc
+            ? t('Chi tiết {code}', { code: doc.code })
             : t('Chi tiết chứng từ')
         }
-        onClose={() => {
-          if (!mutation.busy) {
-            setSelected(null)
-            setDetail(null)
-            setCorrection(null)
-          }
-        }}
+        onClose={closeDetail}
         maxWidth="xl"
         footer={detailActions || undefined}
       >
         <div className="space-y-4">
           {detailError && (
-            <ErrorNotice
-              error={detailFailure}
-              message={detailError}
-              to={
-                detail &&
-                detailFailure instanceof ApiError &&
-                detailFailure.code === 'UPFRONT_REQUIRED'
-                  ? upfrontLink(detail.doc.id)
-                  : undefined
-              }
-            />
+            <ErrorNotice error={detailFailure} message={detailError} />
           )}
           {detailLoading && <DetailSkeleton />}
-          {detail && (
+          {doc && (
             <>
               {flow && (
                 <WorkflowSteps
                   label={t('Quy trình {document}', {
                     document: config.title.toLowerCase(),
                   })}
-                  steps={flow.steps}
+                  steps={flow}
                 />
               )}
               <NextActionCallout action={nextAction} />
-              <DocumentSnapshot doc={detail.doc} />
-              {kind === 'STOCK_ISSUE' &&
-                detail.doc.currentRevision.state === 'READY' && (
-                  <Hint>
-                    {t(
-                      'Đã chốt giá; tồn kho và trả ngay kiểm tra lại khi ghi sổ.',
-                    )}
-                  </Hint>
-                )}
-              {!independent && (
-                <Hint>
-                  {t('Sinh từ kiểm kê: ghi sổ cùng biên bản, không sửa riêng.')}
-                </Hint>
-              )}
+              <DocumentSnapshot doc={doc} onOpenDocument={openDetail} />
             </>
           )}
         </div>
       </Modal>
       <Modal
-        isOpen={confirmPost && !!detail}
+        isOpen={(confirm === 'post' || confirm === 'collect') && !!doc}
         title={t('Xác nhận ghi sổ')}
         maxWidth="sm"
         onClose={() => {
-          if (!mutation.busy) setConfirmPost(false)
+          if (!mutation.busy) setConfirm(null)
         }}
         footer={
           <>
             <Button
               variant="outline"
               disabled={mutation.busy}
-              onClick={() => setConfirmPost(false)}
+              onClick={() => setConfirm(null)}
             >
               {t('Quay lại')}
             </Button>
             <Button
-              icon={<BookCheck className="size-4" />}
+              icon={
+                confirm === 'collect' ? (
+                  <HandCoins className="size-4" />
+                ) : (
+                  <BookCheck className="size-4" />
+                )
+              }
               isLoading={mutation.busy}
-              onClick={() => void action('post')}
+              onClick={() =>
+                void runPost(confirm === 'collect' ? 'collect' : 'stay')
+              }
             >
-              {t('Xác nhận ghi sổ')}
+              {confirm === 'collect'
+                ? t('Ghi sổ & lập phiếu thu')
+                : t('Xác nhận ghi sổ')}
             </Button>
           </>
         }
       >
-        <p className="text-sm leading-relaxed text-foreground">
-          {t('Ghi sổ')} <strong>{detail?.doc.code}</strong>{' '}
-          {t('sẽ {postEffects}.', { postEffects: postEffects[kind] })}
-        </p>
-        {detail && (
-          <ul
-            className="mt-3 list-disc space-y-1 ps-5 text-[13px] text-foreground"
-            aria-label={t('Hệ quả khi ghi sổ')}
-          >
-            {(kind === 'STOCK_ISSUE'
-              ? issuePostEffects(detail.doc)
-              : goodsPostEffects(kind, detail.doc)
-            ).map((effect) => (
-              <li key={effect}>{effect}</li>
-            ))}
-          </ul>
+        {doc && (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-foreground">
+              {t('Ghi sổ {code}: {effect}', {
+                code: doc.code,
+                effect: postEffect(kind),
+              })}
+            </p>
+            {kind === 'STOCK_ISSUE' &&
+              doc.agencyDebt !== null &&
+              doc.agencyMaxDebt !== null && (
+                <DebtPanel
+                  debt={doc.agencyDebt}
+                  maxDebt={doc.agencyMaxDebt}
+                  change={issueChange}
+                />
+              )}
+            {kind === 'PAYMENT_RECEIPT' &&
+              doc.agencyDebt !== null &&
+              doc.agencyMaxDebt !== null && (
+                <DebtPanel
+                  debt={doc.agencyDebt}
+                  maxDebt={doc.agencyMaxDebt}
+                  change={-BigInt(doc.totalAmount)}
+                  afterLabel={t('Nợ sau khi thu')}
+                />
+              )}
+            {confirm === 'collect' && (
+              <p className="text-[13px] text-muted-foreground">
+                {t(
+                  'Sau khi ghi sổ, mở phiếu thu đã điền sẵn đại lý và số tiền {amount}.',
+                  { amount: formatVND(doc.totalAmount) },
+                )}
+              </p>
+            )}
+            <p className="text-[13px] text-muted-foreground">
+              {t(
+                'Sau khi ghi sổ chỉ hủy hoặc sửa có lý do được, trong tháng hiện tại.',
+              )}
+            </p>
+          </div>
         )}
-        <p className="mt-2 text-[13px] text-muted-foreground">
-          {t('Sau đó chỉ sửa sai/hủy bằng phiên bản mới.')}
-        </p>
       </Modal>
       <Modal
-        isOpen={formOpen}
-        title={
-          create
-            ? t('Tạo {title}', { title: config.title.toLowerCase() })
-            : replacePending
-              ? t('Thay toàn bộ nội dung chờ xuất')
-              : t('Sửa thông tin nháp')
+        isOpen={confirm === 'delete' && !!doc}
+        title={t('Xóa nháp')}
+        maxWidth="sm"
+        onClose={() => {
+          if (!mutation.busy) setConfirm(null)
+        }}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={mutation.busy}
+              onClick={() => setConfirm(null)}
+            >
+              {t('Quay lại')}
+            </Button>
+            <Button
+              variant="danger"
+              icon={<Trash2 className="size-4" />}
+              isLoading={mutation.busy}
+              onClick={() => void runDelete()}
+            >
+              {t('Xóa nháp')}
+            </Button>
+          </>
         }
-        onClose={closeForm}
-        maxWidth="xl"
       >
-        <form
-          noValidate
-          className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void save()
-          }}
-        >
-          <div className="min-w-0 space-y-4">
-            {formError && <Alert type="error">{formError}</Alert>}
-            {replacePending &&
-              kind === 'STOCK_ISSUE' &&
-              positiveMoney(detail?.doc.currentRevision.immediatePayment) && (
-                <Alert type="warning" title={t('Cần xác nhận trả ngay lại')}>
-                  {t(
-                    'Thay nội dung sẽ tạo phiên bản mới ở trạng thái nháp. Xác nhận trả ngay cũ không dùng cho phiên bản mới: nếu phiên bản mới có trả ngay, sau khi nộp lại Kế toán phải xác nhận khoản tiền mới trước khi Kho ghi sổ. Tiền đã ghi nhận riêng không nhập lại vào trả ngay.',
-                  )}
-                </Alert>
-              )}
-            <SectionCard title={t('Thông tin chung')} icon={<Info />}>
-              <fieldset
-                disabled={mutation.busy}
-                className="grid min-w-0 gap-4 sm:grid-cols-2"
-              >
-                <legend className="sr-only">{t('Thông tin chung')}</legend>
-                <DateField
-                  label={t('Ngày nghiệp vụ')}
-                  required
-                  disabled={mutation.busy}
-                  value={date}
-                  onChange={setDate}
-                />
-                {create && kind === 'STOCK_ISSUE' && (
-                  <EntityPicker
-                    resource="agencies"
-                    label={t('Đại lý')}
-                    required
-                    disabled={mutation.busy}
-                    params={{ status: 'ACTIVE' }}
-                    value={agencyId}
-                    onChange={(id) => setAgencyId(id)}
-                  />
-                )}
-                {create &&
-                  kind === 'SALES_RETURN' &&
-                  (issueReadable ? (
-                    <EntityPicker
-                      resource="stock-issues"
-                      label={t('Phiếu xuất gốc')}
-                      required
-                      disabled={mutation.busy}
-                      params={{ status: 'POSTED' }}
-                      value={originId}
-                      onChange={(id) => chooseOrigin(id)}
-                    />
-                  ) : (
-                    <Input
-                      label={t('Mã số phiếu xuất gốc')}
-                      aria-label={t('Mã số phiếu xuất gốc')}
-                      required
-                      value={originId}
-                      onChange={(event) => chooseOrigin(event.target.value)}
-                    />
-                  ))}
-                {kind === 'STOCK_ISSUE' && (
-                  <Input
-                    label={t('Trả ngay dự kiến (VNĐ)')}
-                    aria-label={t('Trả ngay dự kiến (VNĐ)')}
-                    required
-                    inputMode="numeric"
-                    className="tabular-nums"
-                    value={immediatePayment}
-                    onChange={(event) =>
-                      setImmediatePayment(event.target.value)
-                    }
-                  />
-                )}
-                {(kind === 'STOCK_ADJUSTMENT' || replacePending) && (
-                  <Input
-                    label={t('Lý do')}
-                    aria-label={t('Lý do')}
-                    required={!editHeader}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                  />
-                )}
-                <div className="sm:col-span-2">
-                  <Input
-                    label={t('Ghi chú')}
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                  />
-                </div>
-              </fieldset>
-              {sourceBusy && (
-                <Spinner label={t('Đang tải phiếu xuất gốc...')} />
-              )}
-              {source && (
-                <Collapsible className="group mt-4 rounded-lg border bg-muted/30">
-                  <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-start text-[13px] font-medium text-foreground">
-                    {t('Phiếu xuất gốc {code} · {businessDate}', {
-                      code: source.code,
-                      businessDate: formatDate(
-                        source.currentRevision.businessDate,
-                      ),
-                    })}
-                    <ChevronDown
-                      className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
-                      aria-hidden="true"
-                    />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="border-t p-3">
-                    <DocumentSnapshot doc={source} />
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </SectionCard>
-            {!editHeader && (
-              <GoodsLineEditor
-                kind={kind}
-                lines={lines}
-                onChange={setLines}
-                disabled={mutation.busy}
-                originLines={originLines}
-              />
-            )}
-          </div>
-          <EditorSummary
-            kind={kind}
-            mode={formMode}
-            lines={lines}
-            immediatePayment={immediatePayment}
-            originLines={originLines}
-            busy={mutation.busy}
-            onClose={closeForm}
-          />
-        </form>
+        <p className="text-sm text-foreground">
+          {t('Xóa hẳn nháp {code}? Nháp chưa ảnh hưởng tồn kho hay công nợ.', {
+            code: doc?.code ?? '',
+          })}
+        </p>
       </Modal>
-      {correction && detail && (
-        <CorrectionDialog
-          doc={detail.doc}
-          etag={detail.etag}
-          mode={correction}
-          onClose={() => setCorrection(null)}
-          onSaved={() => {
-            setCorrection(null)
-            reload()
+      {form && (
+        <DocumentFormModal
+          kind={kind}
+          mode={form.mode}
+          initial={form.initial}
+          doc={form.doc}
+          busy={mutation.busy}
+          error={formError}
+          failure={formFailure}
+          canPostNow={form.mode !== 'correct' && canPost}
+          onSubmit={(values, postNow) => void save(values, postNow)}
+          onClose={() => {
+            if (!mutation.busy) setForm(null)
           }}
         />
       )}
-      {history && (
-        <RevisionHistory doc={history} onClose={() => setHistory(null)} />
+      {cancelOpen && doc && (
+        <CancelDialog
+          doc={doc}
+          busy={mutation.busy}
+          error={cancelError}
+          failure={cancelFailure}
+          onConfirm={(reason) => void runCancel(reason)}
+          onClose={() => setCancelOpen(false)}
+        />
       )}
     </div>
   )

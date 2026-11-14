@@ -23,16 +23,10 @@ export const PERMISSION_AREAS: readonly {
     key: 'stock',
     label: t('Kho hàng'),
     codes: [
-      { code: 'inventory.read', label: t('Xem tồn kho') },
       { code: 'stock.receipt.prepare', label: t('Lập phiếu nhập') },
       { code: 'stock.receipt.post', label: t('Ghi sổ phiếu nhập') },
       { code: 'stock.issue.prepare', label: t('Lập phiếu xuất') },
       { code: 'stock.issue.post', label: t('Ghi sổ phiếu xuất') },
-      { code: 'stock.count', label: t('Kiểm kê') },
-      { code: 'stock.adjustment.prepare', label: t('Lập điều chỉnh') },
-      { code: 'stock.adjustment.post', label: t('Ghi sổ điều chỉnh') },
-      { code: 'returns.prepare', label: t('Lập trả hàng') },
-      { code: 'returns.post', label: t('Ghi sổ trả hàng') },
     ],
   },
   {
@@ -41,10 +35,6 @@ export const PERMISSION_AREAS: readonly {
     codes: [
       { code: 'cash.receipt.prepare', label: t('Lập phiếu thu') },
       { code: 'cash.receipt.post', label: t('Ghi sổ phiếu thu') },
-      { code: 'cash.upfront.verify', label: t('Xác nhận trả ngay') },
-      { code: 'cash.refund.prepare', label: t('Lập hoàn tiền') },
-      { code: 'cash.refund.post', label: t('Ghi sổ hoàn tiền') },
-      { code: 'credit.apply', label: t('Bù trừ dư có') },
       { code: 'payments.online', label: t('Thanh toán trực tuyến') },
       { code: 'debt.read', label: t('Xem công nợ') },
     ],

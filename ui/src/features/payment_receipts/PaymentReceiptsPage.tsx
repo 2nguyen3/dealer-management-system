@@ -1,5 +1,5 @@
-import { FinancialDocuments } from './FinancialDocuments'
+import { DocumentWorkbench } from '../stock_receipts/GoodsDocumentsPage'
 
 export function PaymentReceiptsPage() {
-  return <FinancialDocuments kind="receipt" />
+  return <DocumentWorkbench kind="PAYMENT_RECEIPT" />
 }

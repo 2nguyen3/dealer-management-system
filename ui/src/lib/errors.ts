@@ -11,10 +11,11 @@ export interface ErrorText {
 }
 
 /**
- * Error codes returned by the backend (scanned from `backend/app` on
- * 2026-11-14), the target OpenAPI contract and client-side codes. Many codes
- * are shared by several screens, so the wording stays general; screens add
- * specific guidance (for example the stock-issue upfront step).
+ * Error codes returned by the backend (every `ApiError(<status>, "<CODE>")`
+ * and conflict map scanned from `backend/app` after the 2026-11 business
+ * simplification), the OpenAPI contract and client-side codes. Many codes are
+ * shared by several screens, so the wording stays general; screens add
+ * specific guidance.
  */
 export const ERROR_TEXTS = {
   // Authentication & access
@@ -122,12 +123,6 @@ export const ERROR_TEXTS = {
     message: msg('Dữ liệu đang được xử lý bởi một yêu cầu khác.'),
     hint: msg('Chờ vài giây rồi thử lại đúng nội dung cũ.'),
   },
-  COMMAND_OUTCOME_UNKNOWN: {
-    message: msg('Chưa rõ kết quả của yêu cầu trước.'),
-    hint: msg(
-      'Thử lại cùng nội dung để hệ thống trả kết quả cũ; không lập chứng từ khác.',
-    ),
-  },
   INTERNAL_ERROR: {
     message: msg('Máy chủ gặp sự cố xử lý.'),
     hint: msg(
@@ -202,30 +197,53 @@ export const ERROR_TEXTS = {
     hint: msg('Chọn giới hạn lớn hơn hoặc bằng số đại lý đang hoạt động.'),
   },
   AGENCY_CONFLICT: {
-    message: msg('Đại lý không hợp lệ cho chứng từ này.'),
+    message: msg('Ngày tiếp nhận không hợp lệ với chứng từ đã có.'),
     hint: msg(
-      'Đại lý phải đang hoạt động và ngày nghiệp vụ không được trước ngày tiếp nhận đại lý.',
+      'Ngày tiếp nhận đại lý không được sau ngày của chứng từ đã lập cho đại lý.',
     ),
   },
   AGENCY_TERMINATED: {
-    message: msg('Đại lý đã chấm dứt hợp tác.'),
+    message: msg('Đại lý đã ngừng hợp tác.'),
     hint: msg('Chọn đại lý khác đang hoạt động.'),
   },
+  AGENCY_HAS_DEBT: {
+    message: msg('Đại lý còn nợ nên chưa thể ngừng hợp tác.'),
+    hint: msg(
+      'Lập phiếu thu cho hết số nợ hiện tại (nợ về 0) rồi ngừng hợp tác.',
+    ),
+    action: { label: msg('Mở Phiếu thu tiền'), to: '/payment-receipts' },
+  },
   DEBT_LIMIT_BELOW_CURRENT_BALANCE: {
-    message: msg('Hạn mức nợ mới thấp hơn công nợ hiện tại của đại lý.'),
-    hint: msg('Thu bớt công nợ trước hoặc chọn hạn mức cao hơn.'),
+    message: msg('Hạn mức nợ mới thấp hơn nợ hiện tại của đại lý.'),
+    hint: msg('Thu bớt nợ trước hoặc chọn hạn mức cao hơn.'),
+  },
+  LIMIT_CONFLICT: {
+    message: msg('Giới hạn mới thấp hơn mức đang sử dụng.'),
+    hint: msg(
+      'Hạn mức nợ của loại đại lý mới phải không nhỏ hơn nợ hiện tại; số đại lý tối đa mỗi phường/xã phải không nhỏ hơn số đại lý đang hoạt động.',
+    ),
   },
 
   // Documents
   STATE_CONFLICT: {
     message: msg('Chứng từ không ở trạng thái cho phép thao tác này.'),
     hint: msg(
-      'Tải lại chi tiết để xem trạng thái hiện tại; có thể người khác vừa nộp, ghi sổ hoặc hủy.',
+      'Tải lại chi tiết để xem trạng thái hiện tại; có thể người khác vừa ghi sổ, hủy hoặc sửa chứng từ.',
     ),
   },
   INVALID_STATE_TRANSITION: {
     message: msg('Chứng từ không ở trạng thái cho phép thao tác này.'),
     hint: msg('Tải lại chi tiết để xem trạng thái hiện tại.'),
+  },
+  PERIOD_CLOSED: {
+    message: msg('Chứng từ thuộc tháng đã khóa sổ.'),
+    hint: msg(
+      'Chỉ hủy hoặc sửa được chứng từ có ngày trong tháng hiện tại. Lập chứng từ mới để điều chỉnh.',
+    ),
+  },
+  REASON_REQUIRED: {
+    message: msg('Cần nhập lý do.'),
+    hint: msg('Hủy hoặc sửa chứng từ đã ghi sổ phải ghi rõ lý do.'),
   },
   EMPTY_DOCUMENT: {
     message: msg('Chứng từ chưa có dòng hàng nào.'),
@@ -239,246 +257,42 @@ export const ERROR_TEXTS = {
     message: msg('Một mặt hàng xuất hiện nhiều lần trong chứng từ.'),
     hint: msg('Gộp các dòng cùng mặt hàng thành một dòng.'),
   },
-  LINE_CONFLICT: {
-    message: msg('Dòng hàng không hợp lệ.'),
+  PRODUCT_NOT_PRICED: {
+    message: msg('Mặt hàng chưa có giá bán vì chưa từng được nhập.'),
     hint: msg(
-      'Số lượng và đơn giá phải dương; dòng điều chỉnh kho có đơn giá bằng 0.',
+      'Ghi sổ một phiếu nhập cho mặt hàng này trước; giá bán = giá nhập gần nhất × tỷ lệ giá bán.',
     ),
-  },
-  INVALID_QUANTITY: {
-    message: msg('Số lượng không hợp lệ với đơn vị tính.'),
-    hint: msg('Đơn vị tính này chỉ nhận số lượng nguyên.'),
-  },
-  INVALID_TOTAL: {
-    message: msg('Tổng tiền chứng từ không hợp lệ.'),
-    hint: msg(
-      'Tổng tiền phải lớn hơn 0 và khoản trả ngay không được vượt tổng tiền phiếu.',
-    ),
-  },
-  TOTAL_OVERFLOW: {
-    message: msg('Tổng tiền vượt giới hạn lưu trữ.'),
-    hint: msg('Tách thành nhiều chứng từ nhỏ hơn.'),
-  },
-  BALANCE_OVERFLOW: {
-    message: msg('Số dư vượt giới hạn lưu trữ.'),
-    hint: msg('Tách thành nhiều chứng từ nhỏ hơn.'),
-  },
-  REASON_REQUIRED: {
-    message: msg('Cần nhập lý do nghiệp vụ.'),
-    hint: msg('Ghi rõ lý do để lưu vết kiểm toán.'),
-  },
-  PRICE_SOURCE_REQUIRED: {
-    message: msg('Mặt hàng chưa có giá nhập.'),
-    hint: msg(
-      'Ghi sổ một phiếu nhập cho mặt hàng này trước để hệ thống tính giá bán.',
-    ),
-    action: { label: msg('Mở Phiếu nhập hàng'), to: '/stock-receipts' },
-  },
-  PURCHASE_PRICE_NOT_ESTABLISHED: {
-    message: msg('Mặt hàng chưa có giá nhập.'),
-    hint: msg('Ghi sổ một phiếu nhập cho mặt hàng này trước.'),
     action: { label: msg('Mở Phiếu nhập hàng'), to: '/stock-receipts' },
   },
   SELLING_PRICE_UNUSABLE: {
     message: msg('Không tính được giá bán hợp lệ cho mặt hàng.'),
-    hint: msg('Kiểm tra giá nhập hiện hành và tỷ lệ giá bán trong quy định.'),
+    hint: msg('Kiểm tra giá nhập gần nhất và tỷ lệ giá bán trong quy định.'),
     action: { label: msg('Mở Thay đổi quy định'), to: '/business-rules' },
   },
   INSUFFICIENT_STOCK: {
-    message: msg('Không đủ tồn kho để xuất.'),
+    message: msg('Không đủ tồn kho.'),
     hint: msg(
-      'Giảm số lượng, ghi sổ phiếu nhập trước, hoặc kiểm tra tồn kho tại ngày nghiệp vụ.',
+      'Số lượng xuất không được vượt tồn hiện tại; hủy phiếu nhập không được làm tồn âm. Giảm số lượng hoặc ghi sổ phiếu nhập trước.',
     ),
-    action: { label: msg('Mở Tồn kho'), to: '/inventory' },
-  },
-  STOCK_CONFLICT: {
-    message: msg('Thao tác làm tồn kho bị âm ở một thời điểm.'),
-    hint: msg('Kiểm tra thẻ kho; giảm số lượng hoặc đổi ngày nghiệp vụ.'),
-    action: { label: msg('Mở Tồn kho'), to: '/inventory' },
-  },
-  HISTORICAL_STOCK_NEGATIVE: {
-    message: msg('Thao tác làm tồn kho trong quá khứ bị âm.'),
-    hint: msg('Kiểm tra thẻ kho; giảm số lượng hoặc đổi ngày nghiệp vụ.'),
-  },
-  STOCK_OVERFLOW: {
-    message: msg('Tồn kho vượt giới hạn lưu trữ.'),
-    hint: msg('Kiểm tra lại số lượng nhập.'),
-  },
-  LIMIT_CONFLICT: {
-    message: msg(
-      'Thao tác vượt giới hạn cho phép (hạn mức nợ hoặc số đại lý tối đa).',
-    ),
-    hint: msg(
-      'Với phiếu xuất: tăng trả ngay, giảm số lượng hoặc thu bớt công nợ trước khi nộp. Với quy định hay loại đại lý: giới hạn mới không được thấp hơn mức đang sử dụng.',
-    ),
+    action: { label: msg('Mở Danh mục mặt hàng'), to: '/products' },
   },
   DEBT_LIMIT_EXCEEDED: {
-    message: msg('Công nợ sau phiếu vượt hạn mức nợ của đại lý.'),
+    message: msg('Nợ sau phiếu xuất vượt hạn mức nợ của đại lý.'),
     hint: msg(
-      'Tăng khoản trả ngay, giảm số lượng, hoặc thu bớt công nợ trước.',
+      'Giảm số lượng, hoặc lập phiếu thu để giảm nợ hiện tại trước khi ghi sổ.',
     ),
-    action: { label: msg('Mở Công nợ đại lý'), to: '/receivables' },
-  },
-  COUNT_LINKED_ADJUSTMENT: {
-    message: msg('Phiếu điều chỉnh sinh từ kiểm kê không sửa riêng được.'),
-    hint: msg('Xử lý trên biên bản kiểm kê tương ứng.'),
-    action: { label: msg('Mở Kiểm kê kho'), to: '/stock-counts' },
-  },
-  CORRECTION_CONFLICT: {
-    message: msg('Sửa sai làm lịch sử chứng từ không còn hợp lệ.'),
-    hint: msg(
-      'Các chứng từ phía sau phụ thuộc vào chứng từ này (tồn kho, công nợ, dư có). Sửa hoặc hủy chứng từ phía sau trước.',
-    ),
-  },
-  REVERSAL_CONFLICT: {
-    message: msg('Chỉ đảo được chứng từ đang có hiệu lực.'),
-    hint: msg('Tải lại để xem chứng từ đã bị sửa hoặc hủy chưa.'),
-  },
-  HISTORICAL_EVIDENCE_IMMUTABLE: {
-    message: msg('Bằng chứng đã ghi nhận không thể sửa.'),
-    hint: msg('Lập chứng từ điều chỉnh thay vì sửa bằng chứng cũ.'),
-  },
-  HISTORICAL_RECEIVABLE_NEGATIVE: {
-    message: msg('Thao tác làm công nợ trong quá khứ bị âm.'),
-    hint: msg('Kiểm tra các phiếu thu và bù trừ phía sau.'),
-  },
-
-  // Stock counts
-  EMPTY_COUNT: {
-    message: msg('Biên bản kiểm kê chưa có dòng đếm nào.'),
-    hint: msg('Thêm số đếm thực tế cho ít nhất một mặt hàng.'),
-  },
-  RECOUNT_PRODUCTS: {
-    message: msg(
-      'Đếm lại phải gồm đúng mọi mặt hàng đã có, mỗi mặt hàng một lần.',
-    ),
-    hint: msg('Nhập lại số đếm cho toàn bộ danh sách mặt hàng hiện có.'),
-  },
-  STALE_STOCK_SNAPSHOT: {
-    message: msg('Số tồn trên sổ đã thay đổi kể từ lúc đếm.'),
-    hint: msg(
-      'Có chứng từ kho mới được ghi sổ. Đếm lại toàn bộ để lấy số sổ sách mới rồi xác nhận.',
-    ),
+    action: { label: msg('Mở Phiếu thu tiền'), to: '/payment-receipts' },
   },
 
   // Money
   PAYMENT_EXCEEDS_DEBT: {
-    message: msg('Số tiền thu vượt công nợ hiện tại của đại lý.'),
-    hint: msg(
-      'Nhập số tiền không lớn hơn công nợ; phần thừa nên ghi nhận thành dư có.',
-    ),
-    action: { label: msg('Mở Công nợ đại lý'), to: '/receivables' },
-  },
-  PAYMENT_EXCEEDS_CURRENT_DEBT: {
-    message: msg('Số tiền thu vượt công nợ hiện tại của đại lý.'),
-    hint: msg('Nhập số tiền không lớn hơn công nợ.'),
-  },
-  COLLECTION_EXCEEDS_ALLOCATABLE_DEBT: {
-    message: msg('Số tiền thu vượt công nợ có thể phân bổ.'),
-    hint: msg('Nhập số tiền không lớn hơn công nợ còn lại.'),
-  },
-  FIFO_REALLOCATION_INSUFFICIENT_DEBT: {
-    message: msg('Không đủ công nợ để phân bổ lại theo thứ tự hóa đơn.'),
-    hint: msg('Kiểm tra các phiếu thu và bù trừ phía sau.'),
+    message: msg('Số tiền thu vượt nợ hiện tại của đại lý.'),
+    hint: msg('Nhập số tiền lớn hơn 0 và không lớn hơn nợ hiện tại.'),
+    action: { label: msg('Mở Hồ sơ đại lý'), to: '/agencies' },
   },
   WHOLE_VND_REQUIRED: {
     message: msg('Số tiền phải là số nguyên VND.'),
     hint: msg('Bỏ phần thập phân.'),
-  },
-  RECEIPT_CONFLICT: {
-    message: msg('Chỉ sửa được phiếu thu công nợ đang ở trạng thái nháp.'),
-    hint: msg(
-      'Phiếu thu tự động từ phiếu xuất hoặc đã ghi sổ phải sửa qua Sửa sai & Hủy chứng từ.',
-    ),
-    action: {
-      label: msg('Mở Sửa sai & Hủy chứng từ'),
-      to: '/document-corrections',
-    },
-  },
-  AUTO_RECEIPT_INDEPENDENT_MUTATION_FORBIDDEN: {
-    message: msg('Phiếu thu tự động không sửa riêng được.'),
-    hint: msg('Sửa sai phiếu xuất gốc để phiếu thu được tính lại.'),
-  },
-  PAYMENT_SOURCE_CONFLICT: {
-    message: msg('Phiếu thu tự động không khớp với phiếu xuất gốc.'),
-    hint: msg('Tải lại phiếu xuất gốc rồi thực hiện lại.'),
-  },
-  UPFRONT_REQUIRED: {
-    message: msg('Phiếu xuất có khoản trả ngay nhưng chưa được xác nhận.'),
-    hint: msg(
-      'Kế toán cần xác nhận tiền trả ngay đã thực nhận cho đúng phiên bản phiếu này, rồi mới ghi sổ được. Sửa và nộp lại phiếu không thay cho bước xác nhận.',
-    ),
-    action: { label: msg('Mở Xác nhận trả ngay'), to: '/upfront-payments' },
-  },
-  UPFRONT_CONFIRMATION_REQUIRED: {
-    message: msg('Phiếu xuất có khoản trả ngay nhưng chưa được xác nhận.'),
-    hint: msg('Kế toán cần xác nhận tiền trả ngay trước khi ghi sổ.'),
-    action: { label: msg('Mở Xác nhận trả ngay'), to: '/upfront-payments' },
-  },
-  UPFRONT_CONFLICT: {
-    message: msg('Khoản trả ngay không khớp hoặc đã được xử lý.'),
-    hint: msg(
-      'Số tiền phải đúng bằng khoản trả ngay của phiếu và mỗi phiên bản chỉ xác nhận một lần. Muốn thay nội dung phiếu đã có tiền xác nhận, Kế toán ghi nhận tiền riêng trước.',
-    ),
-    action: { label: msg('Mở Xác nhận trả ngay'), to: '/upfront-payments' },
-  },
-  UPFRONT_REVISION_MISMATCH: {
-    message: msg('Xác nhận trả ngay thuộc phiên bản phiếu cũ.'),
-    hint: msg('Xác nhận lại cho phiên bản hiện tại của phiếu xuất.'),
-  },
-  VERIFIED_CASH_IMMUTABLE: {
-    message: msg('Khoản tiền đã xác nhận không thể sửa.'),
-    hint: msg('Dùng Ghi nhận tiền riêng nếu khoản tiền không dùng cho phiếu.'),
-  },
-  INSUFFICIENT_CREDIT: {
-    message: msg('Dư có khả dụng của đại lý không đủ.'),
-    hint: msg('Giảm số tiền hoặc chọn lô dư có khác.'),
-    action: { label: msg('Mở Hạn mức & Dư có'), to: '/agency-credit' },
-  },
-  INSUFFICIENT_AVAILABLE_CREDIT: {
-    message: msg('Dư có khả dụng của đại lý không đủ.'),
-    hint: msg('Giảm số tiền hoặc chọn lô dư có khác.'),
-    action: { label: msg('Mở Hạn mức & Dư có'), to: '/agency-credit' },
-  },
-  CREDIT_RESERVED: {
-    message: msg('Dư có đang được giữ chỗ cho một yêu cầu hoàn tiền.'),
-    hint: msg(
-      'Hoàn tất hoặc hủy yêu cầu hoàn tiền đang giữ chỗ trước khi thay đổi.',
-    ),
-    action: { label: msg('Mở Hoàn tiền đại lý'), to: '/refunds' },
-  },
-  REFUND_CONFLICT: {
-    message: msg('Bằng chứng chi tiền khác với lần ghi nhận trước.'),
-    hint: msg('Tải lại yêu cầu hoàn tiền để xem bằng chứng đã ghi nhận.'),
-  },
-  REFUND_SOURCE_CONFLICT: {
-    message: msg('Nguồn hoàn tiền không hợp lệ.'),
-    hint: msg(
-      'Hoàn online cần giao dịch trực tuyến gốc thành công; ngày chi không được trước phiếu thu gốc; khoản đã chi không thể đổi.',
-    ),
-  },
-  REFUND_EXCEEDS_ORIGINAL_RECEIPT: {
-    message: msg('Số tiền hoàn vượt khoản thu gốc.'),
-    hint: msg('Giảm số tiền hoàn.'),
-  },
-  PAID_REFUND_IMMUTABLE: {
-    message: msg('Yêu cầu hoàn tiền đã chi nên không thể hủy hay sửa.'),
-  },
-  REFUND_OUTCOME_UNKNOWN: {
-    message: msg('Chưa rõ kết quả hoàn tiền tại cổng thanh toán.'),
-    hint: msg('Bấm đối soát để hỏi lại cổng thanh toán.'),
-  },
-  RETURN_QUANTITY_CONFLICT: {
-    message: msg('Số lượng trả vượt số lượng đã bán.'),
-    hint: msg('Tổng các lần trả của mỗi dòng không được vượt số lượng xuất.'),
-  },
-  RETURN_QUANTITY_EXCEEDED: {
-    message: msg('Số lượng trả vượt số lượng đã bán.'),
-    hint: msg('Giảm số lượng trả.'),
-  },
-  RETURN_SOURCE_CONFLICT: {
-    message: msg('Dòng trả không khớp với phiếu xuất gốc.'),
-    hint: msg('Chọn lại phiếu xuất gốc đã ghi sổ và các dòng của phiếu đó.'),
   },
 
   // Online payments
@@ -501,18 +315,6 @@ export const ERROR_TEXTS = {
   INVALID_SIGNATURE: {
     message: msg('Chữ ký từ cổng thanh toán không hợp lệ.'),
     hint: msg('Không coi giao dịch là thành công; đối soát lại với cổng.'),
-  },
-  INVALID_WEBHOOK_SIGNATURE: {
-    message: msg('Chữ ký từ cổng thanh toán không hợp lệ.'),
-    hint: msg('Không coi giao dịch là thành công; đối soát lại với cổng.'),
-  },
-  PROVIDER_AMOUNT_MISMATCH: {
-    message: msg('Số tiền từ cổng thanh toán không khớp.'),
-    hint: msg('Đối soát lại giao dịch trước khi xử lý tiếp.'),
-  },
-  PROVIDER_REFERENCE_NOT_FOUND: {
-    message: msg('Cổng thanh toán không tìm thấy giao dịch hoàn tiền.'),
-    hint: msg('Giao dịch chưa được tạo ở cổng; có thể gửi lại yêu cầu hoàn.'),
   },
   VNPAY_AMOUNT_INVALID: {
     message: msg('Số tiền nằm ngoài giới hạn VNPAY cho phép.'),

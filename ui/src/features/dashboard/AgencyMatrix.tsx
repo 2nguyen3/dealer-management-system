@@ -37,7 +37,7 @@ export function AgencyMatrix({
   onSelect: (row: MatrixRow) => void
 }) {
   const columns = matrixColumns.filter((column) => sources[column.source])
-  const fallback: MatrixColumn = columns[0]?.key ?? 'netSalesAmount'
+  const fallback: MatrixColumn = columns[0]?.key ?? 'salesAmount'
   // Client-side order of the fully loaded agency rows; default: first column ↓.
   const [sort, setSort] = useState<SortValue>(`-${fallback}`)
   const field = sort.replace(/^-/, '')

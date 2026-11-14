@@ -60,7 +60,7 @@ export function vietnamMonth(now = new Date()): string {
 }
 
 export type ReportKind =
-  'sales' | 'debt' | 'inventory' | 'product-sales' | 'cash-and-credit'
+  'sales' | 'debt' | 'inventory' | 'product-sales' | 'collections'
 export type ReportRow = Record<string, string | number>
 export interface ReportPage {
   fromDate: string
@@ -70,6 +70,9 @@ export interface ReportPage {
   pagination: { limit: number; hasMore: boolean; nextCursor: string | null }
   totals?: ReportRow
 }
+
+/** Collection channels of a payment receipt (report filter `receiptType`). */
+export const RECEIPT_TYPES = ['CASH', 'BANK_TRANSFER', 'ONLINE'] as const
 
 export const agencyIdentity = {
   agencyId: id,
@@ -83,43 +86,31 @@ export const productIdentity = {
   unitId: catalogId,
   unitName: text,
 }
-export const salesAmounts = {
-  salesAmount: money,
-  returnAmount: money,
-  netSalesAmount: signedMoney,
-}
+/** Debt flow of an agency; opening/closing may be negative (prepaid). */
 export const debtAmounts = {
-  openingDebt: money,
+  openingDebt: signedMoney,
   debtIncrease: money,
-  cashApplied: money,
-  returnsApplied: money,
-  creditApplied: money,
-  debtDecrease: money,
-  closingDebt: money,
+  paidAmount: money,
+  closingDebt: signedMoney,
 }
-export const cashAmounts = {
-  cashReceived: money,
-  cashRefunded: money,
-  verifiedUnreceiptedAmount: money,
-  openingCredit: money,
-  creditCreated: money,
-  creditApplied: money,
-  creditRefunded: money,
-  closingCredit: money,
-  currentReservedCredit: money,
-  currentAvailableCredit: money,
+export const collectionAmounts = {
+  receiptCount: count,
+  cashAmount: money,
+  bankTransferAmount: money,
+  onlineAmount: money,
+  totalAmount: money,
 }
 export const productSalesRules = {
   ...productIdentity,
-  ...salesAmounts,
+  numberOfIssues: count,
   soldQuantity: quantity,
-  returnedQuantity: quantity,
+  salesAmount: money,
 }
 export const rowRules: Record<ReportKind, Record<string, Rule>> = {
   sales: {
     ...agencyIdentity,
-    ...salesAmounts,
     numberOfIssues: count,
+    salesAmount: money,
     salesRate: (v) =>
       typeof v === 'string' &&
       /^(?:(?:0|[1-9][0-9]?)(?:\.[0-9]{1,4})?|100(?:\.0{1,4})?)$/.test(v),
@@ -127,21 +118,23 @@ export const rowRules: Record<ReportKind, Record<string, Rule>> = {
   debt: { ...agencyIdentity, ...debtAmounts },
   inventory: {
     ...productIdentity,
-    openingStock: quantity,
+    openingStock: signedQuantity,
     receiptQuantity: quantity,
     issueQuantity: quantity,
-    returnQuantity: quantity,
-    adjustmentQuantity: signedQuantity,
-    closingStock: quantity,
+    closingStock: signedQuantity,
   },
   'product-sales': productSalesRules,
-  'cash-and-credit': { ...agencyIdentity, ...cashAmounts },
+  collections: { businessDate, ...collectionAmounts },
 }
 const totalRules: Partial<Record<ReportKind, Record<string, Rule>>> = {
-  sales: { ...salesAmounts, numberOfIssues: count, companyGrossSales: money },
+  sales: {
+    numberOfIssues: count,
+    salesAmount: money,
+    companySalesAmount: money,
+  },
   debt: debtAmounts,
-  'product-sales': salesAmounts,
-  'cash-and-credit': cashAmounts,
+  'product-sales': { salesAmount: money },
+  collections: collectionAmounts,
 }
 
 export function parseReport(
@@ -181,7 +174,13 @@ export function parseReport(
 
 export const reports: Record<
   ReportKind,
-  { label: string; permission: string; filters: string[]; sorts: string[] }
+  {
+    label: string
+    /** Extra grant beside `reports.read` (the contract's `x-required-permission`). */
+    permission: string
+    filters: string[]
+    sorts: string[]
+  }
 > = {
   sales: {
     label: t('Doanh số đại lý (BM6.1)'),
@@ -192,19 +191,26 @@ export const reports: Record<
       '-agencyId',
       'salesAmount',
       '-salesAmount',
-      'netSalesAmount',
-      '-netSalesAmount',
+      'numberOfIssues',
+      '-numberOfIssues',
     ],
   },
   debt: {
     label: t('Công nợ (BM6.2)'),
     permission: 'debt.read',
     filters: ['agencyId', 'typeId', 'wardId'],
-    sorts: ['agencyId', '-agencyId', 'closingDebt', '-closingDebt'],
+    sorts: [
+      'agencyId',
+      '-agencyId',
+      'closingDebt',
+      '-closingDebt',
+      'debtIncrease',
+      '-debtIncrease',
+    ],
   },
   inventory: {
     label: t('Xuất nhập tồn'),
-    permission: 'inventory.read',
+    permission: 'reports.read',
     filters: ['productId'],
     sorts: ['productId', '-productId', 'closingStock', '-closingStock'],
   },
@@ -221,18 +227,11 @@ export const reports: Record<
       '-soldQuantity',
     ],
   },
-  'cash-and-credit': {
-    label: t('Thu chi và dư có'),
+  collections: {
+    label: t('Thu tiền theo ngày'),
     permission: 'debt.read',
-    filters: ['agencyId'],
-    sorts: [
-      'agencyId',
-      '-agencyId',
-      'cashReceived',
-      '-cashReceived',
-      'closingCredit',
-      '-closingCredit',
-    ],
+    filters: ['agencyId', 'receiptType'],
+    sorts: ['businessDate', '-businessDate', 'totalAmount', '-totalAmount'],
   },
 }
 
@@ -247,36 +246,26 @@ export const labels: Record<string, string> = {
   unitName: t('Đơn vị'),
   typeId: t('ID loại đại lý'),
   wardId: t('ID phường/xã'),
+  receiptType: t('Hình thức thu'),
   numberOfIssues: t('Số phiếu xuất'),
-  salesAmount: t('Doanh số gộp (VND)'),
-  returnAmount: t('Trả hàng (VND)'),
-  netSalesAmount: t('Doanh số thuần (VND)'),
+  salesAmount: t('Doanh số (VND)'),
   salesRate: t('Tỷ lệ (%)'),
-  companyGrossSales: t('Doanh số gộp toàn doanh nghiệp (VND)'),
+  companySalesAmount: t('Doanh số toàn doanh nghiệp (VND)'),
   openingDebt: t('Nợ đầu kỳ (VND)'),
-  debtIncrease: t('Tăng nợ (VND)'),
-  cashApplied: t('Tiền giảm nợ (VND)'),
-  returnsApplied: t('Trả hàng giảm nợ (VND)'),
-  creditApplied: t('Dư có đã bù trừ (VND)'),
-  debtDecrease: t('Tổng giảm nợ (VND)'),
+  debtIncrease: t('Phát sinh nợ (VND)'),
+  paidAmount: t('Đã thu (VND)'),
   closingDebt: t('Nợ cuối kỳ (VND)'),
   openingStock: t('Tồn đầu'),
   receiptQuantity: t('Nhập'),
   issueQuantity: t('Xuất'),
-  returnQuantity: t('Trả'),
-  adjustmentQuantity: t('Điều chỉnh có dấu'),
   closingStock: t('Tồn cuối'),
   soldQuantity: t('Số lượng bán'),
-  returnedQuantity: t('Số lượng trả'),
-  cashReceived: t('Tiền thực thu (VND)'),
-  cashRefunded: t('Tiền thực hoàn (VND)'),
-  verifiedUnreceiptedAmount: t('Đã xác minh chưa ghi phiếu thu (VND)'),
-  openingCredit: t('Dư có đầu kỳ (VND)'),
-  creditCreated: t('Dư có phát sinh (VND)'),
-  creditRefunded: t('Dư có đã hoàn (VND)'),
-  closingCredit: t('Dư có cuối kỳ (VND)'),
-  currentReservedCredit: t('Dư có đang dành hiện tại (VND)'),
-  currentAvailableCredit: t('Dư có khả dụng hiện tại (VND)'),
+  businessDate: t('Ngày'),
+  receiptCount: t('Số phiếu thu'),
+  cashAmount: t('Tiền mặt (VND)'),
+  bankTransferAmount: t('Chuyển khoản (VND)'),
+  onlineAmount: t('Trực tuyến (VND)'),
+  totalAmount: t('Tổng thu (VND)'),
 }
 
 export interface ReportQuery {
@@ -311,9 +300,11 @@ export function reportPath(
     const value = query.filters[key]
     if (!value) continue
     const valid =
-      key === 'typeId' || key === 'wardId'
-        ? /^[1-9][0-9]{0,9}$/.test(value) && BigInt(value) <= 2147483647n
-        : id(value)
+      key === 'receiptType'
+        ? (RECEIPT_TYPES as readonly string[]).includes(value)
+        : key === 'typeId' || key === 'wardId'
+          ? /^[1-9][0-9]{0,9}$/.test(value) && BigInt(value) <= 2147483647n
+          : id(value)
     if (!valid)
       throw new Error(
         t('{value} không hợp lệ.', {

@@ -25,7 +25,7 @@ const MESSAGES = extractMessages(SOURCES)
 
 describe('message extraction', () => {
   it('finds the interface messages, including guide and error texts', () => {
-    expect(MESSAGES.size).toBeGreaterThan(2000)
+    expect(MESSAGES.size).toBeGreaterThan(1500)
     expect(MESSAGES.has('Hướng dẫn')).toBe(true)
     for (const entry of Object.values(ERROR_TEXTS))
       expect(MESSAGES.has(entry.message), entry.message).toBe(true)

@@ -29,44 +29,49 @@ export function snapshotFixture(month: string) {
     month,
     asOf: '2026-10-30T07:39:22+00:00',
     agencies: { total: 30, active: 24 },
-    inventory: {
-      productCount: 24,
-      lowStockProductCount: 3,
-      receivedAmount: '5000000',
-    },
     sales: {
-      gross: '1600',
-      returns: '100',
-      net: '1500',
+      salesAmount: '1500',
+      issueCount: 12,
       monthlyTrend: [
-        {
-          month: shift(month, -1),
-          gross: '1100',
-          returns: '200',
-          net: '1000',
-        },
-        { month, gross: '1600', returns: '100', net: '1500' },
+        { month: shift(month, -1), salesAmount: '1000', issueCount: 8 },
+        { month, salesAmount: '1500', issueCount: 12 },
       ],
       topProducts: [
         {
           ...products[0],
-          salesAmount: '900',
-          returnAmount: '0',
-          netSalesAmount: '900',
+          numberOfIssues: 5,
           soldQuantity: '9',
-          returnedQuantity: '0',
+          salesAmount: '900',
         },
       ],
     },
-    receivables: {
-      currentDebt: HUGE,
-      currentCredit: '10',
-      cashReceived: '700',
-      cashRefunded: '20',
-      topAgencies: [{ ...agencies[0], currentDebt: '999999999999999999' }],
+    collections: {
+      receiptCount: 6,
+      totalAmount: '700',
+      cashAmount: '400',
+      bankTransferAmount: '200',
+      onlineAmount: '100',
     },
-    pendingIssueCount: 4,
-    verifiedUnreceiptedAmount: '250',
+    debt: {
+      totalDebt: HUGE,
+      prepaidAmount: '50',
+      agenciesInDebt: 17,
+      topAgencies: [
+        {
+          ...agencies[0],
+          debt: '999999999999999999',
+          maxDebt: '999999999999999999',
+          debtRatio: '100',
+        },
+        {
+          ...agencies[1],
+          debt: '-50',
+          maxDebt: '1000',
+          debtRatio: null,
+        },
+      ],
+    },
+    drafts: { stockReceipts: 1, stockIssues: 2, paymentReceipts: 3 },
   }
 }
 
@@ -74,19 +79,6 @@ export function shift(month: string, offset: number): string {
   const [y = 0, m = 1] = month.split('-').map(Number)
   const index = y * 12 + m - 1 + offset
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`
-}
-
-const zeroCash = {
-  cashReceived: '0',
-  cashRefunded: '0',
-  verifiedUnreceiptedAmount: '0',
-  openingCredit: '0',
-  creditCreated: '0',
-  creditApplied: '0',
-  creditRefunded: '0',
-  closingCredit: '0',
-  currentReservedCredit: '0',
-  currentAvailableCredit: '0',
 }
 
 function rowsFor(kind: string, params: URLSearchParams) {
@@ -100,37 +92,28 @@ function rowsFor(kind: string, params: URLSearchParams) {
         items: byAgency([
           {
             ...agencies[1]!,
-            salesAmount: '1200',
-            returnAmount: '50',
-            netSalesAmount: '1150',
             numberOfIssues: 6,
+            salesAmount: '1200',
             salesRate: '60',
           },
           {
             ...agencies[0]!,
-            salesAmount: '800',
-            returnAmount: '0',
-            netSalesAmount: '800',
             numberOfIssues: 3,
+            salesAmount: '800',
             salesRate: '40',
           },
         ]),
         totals: {
-          salesAmount: '2000',
-          returnAmount: '50',
-          netSalesAmount: '1950',
           numberOfIssues: 9,
-          companyGrossSales: '2000',
+          salesAmount: '2000',
+          companySalesAmount: '2000',
         },
       }
     case 'debt': {
       const debt = (closing: string) => ({
         openingDebt: '100',
         debtIncrease: '500',
-        cashApplied: '0',
-        returnsApplied: '0',
-        creditApplied: '0',
-        debtDecrease: '0',
+        paidAmount: '0',
         closingDebt: closing,
       })
       return {
@@ -145,43 +128,46 @@ function rowsFor(kind: string, params: URLSearchParams) {
       const rows = [
         {
           ...products[0]!,
-          salesAmount: '1300',
-          returnAmount: '0',
-          netSalesAmount: '1300',
+          numberOfIssues: 7,
           soldQuantity: '13',
-          returnedQuantity: '0',
+          salesAmount: '1300',
         },
         {
           ...products[1]!,
-          salesAmount: '700',
-          returnAmount: '50',
-          netSalesAmount: '650',
+          numberOfIssues: 2,
           soldQuantity: '7',
-          returnedQuantity: '1',
+          salesAmount: '700',
         },
       ].filter((row) => !productId || row.productId === productId)
+      return { items: rows, totals: { salesAmount: '2000' } }
+    }
+    case 'collections': {
+      const amounts =
+        agencyId === '2'
+          ? { cash: '100', bank: '0', online: '0' }
+          : { cash: '400', bank: '200', online: '100' }
+      const total = String(
+        Number(amounts.cash) + Number(amounts.bank) + Number(amounts.online),
+      )
+      const day = {
+        businessDate: '2026-10-05',
+        receiptCount: 2,
+        cashAmount: amounts.cash,
+        bankTransferAmount: amounts.bank,
+        onlineAmount: amounts.online,
+        totalAmount: total,
+      }
       return {
-        items: rows,
+        items: [day],
         totals: {
-          salesAmount: '2000',
-          returnAmount: '50',
-          netSalesAmount: '1950',
+          receiptCount: 2,
+          cashAmount: amounts.cash,
+          bankTransferAmount: amounts.bank,
+          onlineAmount: amounts.online,
+          totalAmount: total,
         },
       }
     }
-    case 'cash-and-credit':
-      return {
-        items: byAgency([
-          { ...agencies[0]!, ...zeroCash, cashReceived: '600' },
-          { ...agencies[1]!, ...zeroCash, cashReceived: '100' },
-        ]),
-        totals: {
-          ...zeroCash,
-          cashReceived: agencyId === '2' ? '100' : '700',
-          cashRefunded: '20',
-          creditCreated: '30',
-        },
-      }
     default:
       return {
         items: products
@@ -191,8 +177,6 @@ function rowsFor(kind: string, params: URLSearchParams) {
             openingStock: '10',
             receiptQuantity: '5',
             issueQuantity: '3',
-            returnQuantity: '0',
-            adjustmentQuantity: '0',
             closingStock: String(12 - index * 10),
           })),
       }

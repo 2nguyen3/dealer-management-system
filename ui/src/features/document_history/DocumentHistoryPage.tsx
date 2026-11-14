@@ -1,46 +1,39 @@
 import {
-  ArrowDownWideNarrow,
-  ArrowUpNarrowWide,
+  ArrowDown,
   BookCheck,
   Download,
-  FileClock,
-  FileCheck2,
-  GitCommitVertical,
-  History,
+  ExternalLink,
+  FilePen,
+  GitBranch,
   Printer,
+  XCircle,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '../../components/blocks/PageHeader'
-import { Card } from '../../components/shadcn/card'
 import { Skeleton } from '../../components/shadcn/skeleton'
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from '../../components/shadcn/toggle-group'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
-import { EmptyState } from '../../components/ui/EmptyState'
 import { Modal } from '../../components/ui/Modal'
-import { Pagination } from '../../components/ui/Pagination'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { Table } from '../../components/ui/Table'
-import { apiDownload } from '../../lib/api'
-import {
-  formatDate,
-  formatDateTime,
-  formatQuantity,
-  formatVND,
-} from '../../lib/formatters'
+import { SafeLink } from '../../components/guide/SafeLink'
+import { apiDownload, apiFetch } from '../../lib/api'
+import { formatDate, formatVND } from '../../lib/formatters'
+import { kindLabel } from '../../lib/labels'
 import { useAuth } from '../authentication/useAuth'
+import { usePathAllowed } from '../guide/usePathAllowed'
+import { DocumentSnapshot } from '../stock_receipts/DocumentSnapshot'
 import { DocumentList } from './DocumentList'
 import {
-  parseRevision,
+  documentLink,
+  parseChain,
+  parseDocument,
+  type ChainItem,
+  type DocumentDetail,
   type DocumentSummary,
-  type Revision,
 } from './documentContracts'
-import { Fact, FactGrid, InfoTip } from './DocumentParts'
-import { errorMessage, useDocumentPage } from './useDocumentRequests'
+import { InfoTip } from './DocumentParts'
+import { errorMessage } from './useDocumentRequests'
 import { t } from '@/lib/i18n/core'
 
 export function DocumentHistoryPage() {
@@ -54,7 +47,9 @@ function HistoryScreen() {
       <PageHeader
         eyebrow={t('Chứng từ')}
         title={t('Lịch sử chứng từ')}
-        description={t('Phiên bản, bản in và PDF của mọi chứng từ.')}
+        description={t(
+          'Chuỗi thay thế, bản in và PDF của phiếu nhập, phiếu xuất và phiếu thu.',
+        )}
         className="mb-0"
       />
       <DocumentList
@@ -63,39 +58,37 @@ function HistoryScreen() {
           <Button
             variant="ghost"
             size="sm"
-            icon={<History className="size-4" />}
-            aria-label={t('Phiên bản {code}', { code: row.code })}
+            icon={<GitBranch className="size-4" />}
+            aria-label={t('Lịch sử {code}', { code: row.code })}
             onClick={() => setSelected(row)}
           >
-            {t('Phiên bản')}
+            {t('Lịch sử')}
           </Button>
         )}
       />
       {selected && (
-        <RevisionHistory doc={selected} onClose={() => setSelected(null)} />
+        <DocumentChain doc={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   )
 }
 
-/** Icon for a revision event: creation, readiness or posting. */
-function revisionIcon(item: Revision) {
-  if (item.state === 'POSTED') return BookCheck
-  if (item.state === 'READY') return FileCheck2
-  return item.revisionNo === 1 ? FileClock : GitCommitVertical
+function chainIcon(item: ChainItem) {
+  if (item.status === 'CANCELLED') return XCircle
+  if (item.status === 'POSTED') return BookCheck
+  return FilePen
 }
-
-const iconTone: Record<Revision['state'], string> = {
+const iconTone: Record<ChainItem['status'], string> = {
   POSTED: 'bg-success/12 text-success ring-success/30',
-  READY: 'bg-info/12 text-info ring-info/30',
+  CANCELLED: 'bg-destructive/12 text-destructive ring-destructive/30',
   DRAFT: 'bg-muted text-muted-foreground ring-border',
 }
 
 function TimelineSkeleton() {
   return (
     <div role="status" className="space-y-5">
-      <span className="sr-only">{t('Đang tải phiên bản...')}</span>
-      {[0, 1, 2].map((item) => (
+      <span className="sr-only">{t('Đang tải chuỗi thay thế...')}</span>
+      {[0, 1].map((item) => (
         <div key={item} className="flex gap-3" aria-hidden="true">
           <Skeleton className="size-8 shrink-0 rounded-full" />
           <div className="flex-1 space-y-2">
@@ -108,29 +101,70 @@ function TimelineSkeleton() {
   )
 }
 
-export function RevisionHistory({
+/**
+ * Replacement chain of a document (original → replacement → …, from
+ * `GET /documents/{id}/chain`), the content of the chosen step and its
+ * print/PDF. Documents are read-only here; drafts are edited on their page.
+ */
+export function DocumentChain({
   doc,
   onClose,
 }: {
-  doc: DocumentSummary
+  doc: Pick<DocumentSummary, 'id' | 'code' | 'kind'>
   onClose: () => void
 }) {
-  const [cursors, setCursors] = useState([''])
-  const [order, setOrder] = useState<'-revisionNo' | 'revisionNo'>(
-    '-revisionNo',
-  )
-  const query = new URLSearchParams({ limit: '25', sort: order })
-  if (cursors.at(-1)) query.set('cursor', cursors.at(-1)!)
-  const data = useDocumentPage(
-    `/documents/${doc.id}/revisions?${query}`,
-    parseRevision,
-  )
-  const [revision, setRevision] = useState<Revision | null>(null)
+  const pathAllowed = usePathAllowed()
+  const [reload, setReload] = useState(0)
+  const [chain, setChain] = useState<{
+    key: string
+    items: ChainItem[] | null
+    error: string | null
+  }>({ key: '', items: null, error: null })
+  const chainKey = `${doc.id}:${reload}`
+  const [chosen, setChosen] = useState(doc.id)
+  const [detail, setDetail] = useState<{
+    id: string
+    doc: DocumentDetail | null
+    error: string | null
+  }>({ id: '', doc: null, error: null })
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState(false)
   const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
   const active = useRef<AbortController | null>(null)
   const urls = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch<unknown>(`/documents/${doc.id}/chain`, {
+      signal: controller.signal,
+    })
+      .then((result) => {
+        const items = parseChain(result.data)
+        if (!controller.signal.aborted)
+          setChain({ key: chainKey, items, error: null })
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setChain({ key: chainKey, items: null, error: errorMessage(error) })
+      })
+    return () => controller.abort()
+  }, [doc.id, chainKey])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch<unknown>(`/documents/${chosen}`, { signal: controller.signal })
+      .then((result) => {
+        const parsed = parseDocument(result.data)
+        if (!controller.signal.aborted)
+          setDetail({ id: chosen, doc: parsed, error: null })
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setDetail({ id: chosen, doc: null, error: errorMessage(error) })
+      })
+    return () => controller.abort()
+  }, [chosen, reload])
+
   useEffect(
     () => () => {
       active.current?.abort()
@@ -138,8 +172,22 @@ export function RevisionHistory({
     },
     [],
   )
-  async function snapshot(
-    item: Revision,
+
+  function clearPreview() {
+    if (htmlUrl) {
+      URL.revokeObjectURL(htmlUrl)
+      urls.current.delete(htmlUrl)
+      setHtmlUrl(null)
+    }
+  }
+  function choose(id: string) {
+    if (id === chosen) return
+    clearPreview()
+    setExportError(null)
+    setChosen(id)
+  }
+  async function print(
+    target: DocumentDetail,
     media: 'text/html' | 'application/pdf',
   ) {
     if (active.current) return
@@ -148,23 +196,20 @@ export function RevisionHistory({
     setExportBusy(true)
     setExportError(null)
     try {
-      const result = await apiDownload(
-        `/documents/${doc.id}/print?revisionNo=${item.revisionNo}`,
-        { headers: { Accept: media }, signal: controller.signal },
-      )
+      const result = await apiDownload(`/documents/${target.id}/print`, {
+        headers: { Accept: media },
+        signal: controller.signal,
+      })
       if (controller.signal.aborted) return
       const url = URL.createObjectURL(result.data)
       urls.current.add(url)
       if (media === 'text/html') {
-        if (htmlUrl) {
-          URL.revokeObjectURL(htmlUrl)
-          urls.current.delete(htmlUrl)
-        }
+        clearPreview()
         setHtmlUrl(url)
       } else {
         const anchor = document.createElement('a')
         anchor.href = url
-        anchor.download = `${doc.code}-v${item.revisionNo}.pdf`
+        anchor.download = `${target.code}.pdf`
         anchor.click()
         // Keep URLs until dialog cleanup so the browser can finish consuming them.
       }
@@ -175,14 +220,12 @@ export function RevisionHistory({
       active.current = null
     }
   }
-  function view(item: Revision) {
-    setRevision(item)
-    if (htmlUrl) {
-      URL.revokeObjectURL(htmlUrl)
-      urls.current.delete(htmlUrl)
-      setHtmlUrl(null)
-    }
-  }
+
+  const items = chain.key === chainKey ? chain.items : null
+  const chainError = chain.key === chainKey ? chain.error : null
+  const current = detail.id === chosen ? detail.doc : null
+  const currentError = detail.id === chosen ? detail.error : null
+  const pageLink = current ? documentLink(current.kind, current.id) : null
   return (
     <Modal
       isOpen
@@ -191,164 +234,141 @@ export function RevisionHistory({
       maxWidth="xl"
     >
       <div className="grid gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
-        <section aria-label={t('Dòng thời gian phiên bản')} className="min-w-0">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1 text-sm font-semibold text-foreground">
-              {t('Dòng thời gian')}
-              <InfoTip label={t('Về phiên bản')}>
-                {t(
-                  'Mỗi phiên bản giữ nguyên tên hàng, giá và thông tin đại lý tại thời điểm lập.',
-                )}
-              </InfoTip>
-            </h3>
-            <ToggleGroup
-              type="single"
-              size="sm"
-              variant="outline"
-              aria-label={t('Thứ tự phiên bản')}
-              value={order}
-              onValueChange={(next) => {
-                if (next !== '-revisionNo' && next !== 'revisionNo') return
-                setOrder(next)
-                setCursors([''])
-              }}
-            >
-              <ToggleGroupItem value="-revisionNo" className="px-2 text-xs">
-                <ArrowDownWideNarrow aria-hidden="true" />
-                {t('Mới nhất')}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="revisionNo" className="px-2 text-xs">
-                <ArrowUpNarrowWide aria-hidden="true" />
-                {t('Cũ nhất')}
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-          {data.error && (
+        <section aria-label={t('Chuỗi thay thế')} className="min-w-0">
+          <h3 className="mb-3 flex items-center gap-1 text-sm font-semibold text-foreground">
+            {t('Chuỗi thay thế')}
+            <InfoTip label={t('Về chuỗi thay thế')}>
+              {t(
+                'Sửa có lý do hủy phiếu cũ và lập phiếu mới thay thế; chuỗi đi từ phiếu gốc tới phiếu đang có hiệu lực.',
+              )}
+            </InfoTip>
+          </h3>
+          {chainError && (
             <Alert type="error">
               <span className="flex flex-wrap items-center gap-3">
-                {data.error}
-                <Button variant="outline" size="sm" onClick={data.reload}>
+                {chainError}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setReload((value) => value + 1)}
+                >
                   {t('Thử lại')}
                 </Button>
               </span>
             </Alert>
           )}
-          {data.loading && <TimelineSkeleton />}
-          {data.page && (
-            <>
-              {!data.page.items.length && (
-                <p className="text-sm text-muted-foreground">
-                  {t('Chưa có phiên bản.')}
-                </p>
-              )}
-              <ol className="relative space-y-1">
-                {data.page.items.map((item, index, items) => {
-                  const Icon = revisionIcon(item)
-                  const current = revision?.id === item.id
-                  return (
-                    <li key={item.id} className="relative flex gap-3 pb-4">
-                      {index < items.length - 1 && (
-                        <span
-                          className="absolute top-9 bottom-0 start-4 w-px bg-border"
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span
-                        className={cn(
-                          'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full ring-1',
-                          iconTone[item.state],
-                        )}
+          {!items && !chainError && <TimelineSkeleton />}
+          {items && (
+            <ol className="relative space-y-1" aria-label={t('Các phiếu')}>
+              {items.map((item, index) => {
+                const Icon = chainIcon(item)
+                const selected = item.id === chosen
+                return (
+                  <li key={item.id} className="relative flex gap-3 pb-4">
+                    {index < items.length - 1 && (
+                      <ArrowDown
+                        className="absolute start-2 bottom-0 size-4 text-muted-foreground"
                         aria-hidden="true"
-                      >
-                        <Icon className="size-4" />
-                      </span>
-                      <div
-                        className={cn(
-                          'min-w-0 flex-1 rounded-lg border px-3 py-2 transition-colors',
-                          current
-                            ? 'border-primary/40 bg-primary/5'
-                            : 'border-transparent hover:bg-muted/50',
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground">
-                              v{item.revisionNo}
-                            </span>
-                            <StatusBadge status={item.state} />
+                      />
+                    )}
+                    <span
+                      className={cn(
+                        'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full ring-1',
+                        iconTone[item.status],
+                      )}
+                      aria-hidden="true"
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <div
+                      className={cn(
+                        'min-w-0 flex-1 rounded-lg border px-3 py-2 transition-colors',
+                        selected
+                          ? 'border-primary/40 bg-primary/5'
+                          : 'border-transparent hover:bg-muted/50',
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">
+                            {item.code}
                           </span>
-                          <Button
-                            variant={current ? 'secondary' : 'ghost'}
-                            size="sm"
-                            aria-label={`Xem v${item.revisionNo}`}
-                            aria-pressed={current}
-                            onClick={() => view(item)}
-                          >
-                            Xem
-                          </Button>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                          {t('Ngày CT {businessDate} · {totalAmount}', {
-                            businessDate: formatDate(item.businessDate),
-                            totalAmount: formatVND(item.totalAmount),
-                          })}
-                        </p>
-                        {item.reason && (
-                          <p className="mt-1 text-[13px] text-foreground">
-                            {item.reason}
-                          </p>
-                        )}
-                        <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                          <time dateTime={item.createdAt}>
-                            {t('Tạo lúc {createdAt}', {
-                              createdAt: formatDateTime(item.createdAt),
-                            })}
-                          </time>
-                        </p>
+                          <StatusBadge status={item.status} />
+                        </span>
+                        <Button
+                          variant={selected ? 'secondary' : 'ghost'}
+                          size="sm"
+                          aria-label={t('Xem {code}', { code: item.code })}
+                          aria-pressed={selected}
+                          onClick={() => choose(item.id)}
+                        >
+                          {t('Xem')}
+                        </Button>
                       </div>
-                    </li>
-                  )
-                })}
-              </ol>
-              {(data.page.pagination.hasMore || cursors.length > 1) && (
-                <div className="-mx-4 lg:mx-0">
-                  <Pagination
-                    hasNext={data.page.pagination.hasMore}
-                    hasPrevious={cursors.length > 1}
-                    totalShowing={data.page.items.length}
-                    onNext={() => {
-                      if (data.page?.pagination.nextCursor)
-                        setCursors([
-                          ...cursors,
-                          data.page.pagination.nextCursor,
-                        ])
-                    }}
-                    onPrevious={() => setCursors(cursors.slice(0, -1))}
-                  />
-                </div>
-              )}
-            </>
+                      <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                        {t('Ngày CT {businessDate} · {totalAmount}', {
+                          businessDate: formatDate(item.businessDate),
+                          totalAmount: formatVND(item.totalAmount),
+                        })}
+                      </p>
+                      {index === 0 && items.length > 1 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t('Phiếu gốc')}
+                        </p>
+                      )}
+                      {item.cancelReason && (
+                        <p className="mt-1 text-[13px] text-foreground">
+                          {t('Lý do: {reason}', { reason: item.cancelReason })}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+          {items && items.length === 1 && (
+            <p className="text-xs text-muted-foreground">
+              {t('Phiếu chưa từng được sửa có lý do.')}
+            </p>
           )}
         </section>
         <section
-          aria-label={t('Nội dung phiên bản')}
+          aria-label={t('Nội dung chứng từ')}
           className="min-w-0 space-y-4"
         >
-          {revision ? (
+          {currentError && <Alert type="error">{currentError}</Alert>}
+          {!current && !currentError && (
+            <div role="status" className="space-y-3">
+              <span className="sr-only">{t('Đang tải chứng từ...')}</span>
+              <Skeleton className="h-36 w-full rounded-xl" />
+            </div>
+          )}
+          {current && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-foreground">
-                  {t('Nội dung phiên bản v{revisionNo}', {
-                    revisionNo: revision.revisionNo,
+                  {t('{kind} {code}', {
+                    kind: kindLabel(current.kind),
+                    code: current.code,
                   })}
                 </h3>
                 <div className="flex flex-wrap gap-2">
+                  {pageLink && pathAllowed(pageLink) && (
+                    <SafeLink
+                      to={pageLink}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      {t('Mở ở trang phiếu')}
+                    </SafeLink>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     icon={<Printer className="size-4" />}
                     disabled={exportBusy}
-                    onClick={() => void snapshot(revision, 'text/html')}
+                    onClick={() => void print(current, 'text/html')}
                   >
                     {t('Xem bản in')}
                   </Button>
@@ -356,102 +376,24 @@ export function RevisionHistory({
                     size="sm"
                     icon={<Download className="size-4" />}
                     isLoading={exportBusy}
-                    onClick={() => void snapshot(revision, 'application/pdf')}
+                    onClick={() => void print(current, 'application/pdf')}
                   >
                     {t('Tải PDF')}
                   </Button>
                 </div>
               </div>
-              <Card className="gap-0 p-4 shadow-xs">
-                <FactGrid className="lg:grid-cols-3">
-                  <Fact label={t('Trạng thái')}>
-                    <StatusBadge status={revision.state} />
-                  </Fact>
-                  <Fact label={t('Ngày chứng từ')}>
-                    <span className="tabular-nums">
-                      {formatDate(revision.businessDate)}
-                    </span>
-                  </Fact>
-                  <Fact label={t('Tổng tiền')}>
-                    <span className="font-semibold tabular-nums">
-                      {formatVND(revision.totalAmount)}
-                    </span>
-                  </Fact>
-                  {revision.agencySnapshot && (
-                    <Fact label={t('Đại lý')} full>
-                      <span className="font-medium">
-                        {revision.agencySnapshot.name}
-                      </span>
-                      {revision.agencySnapshot.address && (
-                        <span className="block text-xs text-muted-foreground">
-                          {revision.agencySnapshot.address}
-                        </span>
-                      )}
-                    </Fact>
-                  )}
-                  {revision.note && (
-                    <Fact label={t('Ghi chú')} full>
-                      {revision.note}
-                    </Fact>
-                  )}
-                </FactGrid>
-              </Card>
-              <Card className="gap-0 overflow-hidden py-0 shadow-xs">
-                <div className="overflow-x-auto">
-                  <Table
-                    caption={t('Dòng hàng của phiên bản')}
-                    className="min-w-[520px]"
-                  >
-                    <thead>
-                      <tr>
-                        <th>{t('Mặt hàng')}</th>
-                        <th className="cell-number">{t('Số lượng')}</th>
-                        <th>{t('Đơn vị')}</th>
-                        <th className="cell-number">{t('Đơn giá')}</th>
-                        <th className="cell-number">{t('Thành tiền')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revision.lines.map((line) => (
-                        <tr key={line.id}>
-                          <td className="font-medium text-foreground">
-                            {line.productName}
-                          </td>
-                          <td className="cell-number">
-                            {formatQuantity(line.quantity)}
-                          </td>
-                          <td className="text-muted-foreground">
-                            {line.unitName}
-                          </td>
-                          <td className="cell-number">
-                            {formatVND(line.unitPrice)}
-                          </td>
-                          <td className="cell-number font-medium">
-                            {formatVND(line.lineAmount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </Card>
+              <DocumentSnapshot doc={current} onOpenDocument={choose} />
               {exportError && <Alert type="error">{exportError}</Alert>}
               {htmlUrl && (
                 <iframe
-                  title={t('Bản HTML {code}', { code: doc.code })}
+                  title={t('Bản HTML {code}', { code: current.code })}
                   src={htmlUrl}
                   sandbox=""
-                  // Paper preview: the printed snapshot is always a light page.
+                  // Paper preview: the printed document is always a light page.
                   className="h-[60vh] w-full rounded-lg border bg-white"
                 />
               )}
             </>
-          ) : (
-            <EmptyState
-              icon={<History className="size-6" />}
-              title={t('Chọn một phiên bản')}
-              description={t('Bấm “Xem” trên dòng thời gian.')}
-            />
           )}
         </section>
       </div>

@@ -8,37 +8,29 @@ import { t } from '@/lib/i18n/core'
 export function errorMessage(error: unknown) {
   if (error instanceof ApiError && (error.status === 0 || error.status >= 500))
     return t(
-      '{message} Kết quả chưa rõ. Thử lại cùng nội dung để giữ nguyên khóa yêu cầu; không lập phiếu khác.',
+      '{message} Kết quả chưa rõ. Tải lại chứng từ để kiểm tra trước khi thử lại.',
       { message: error.message },
     )
   return error instanceof Error ? error.message : t('Không thể xử lý yêu cầu.')
 }
+
+/**
+ * One document mutation at a time. Document routes have no idempotency key
+ * (handoff A4): drafts and state changes are guarded by If-Match instead, so
+ * a stale or repeated request is refused with 412/409, never applied twice.
+ */
 export function useDocumentMutation() {
-  const { user } = useAuth()
-  const current = useRef<{ fingerprint: string; key: string } | null>(null)
   const lock = useRef(false)
   const [busy, setBusy] = useState(false)
   async function run(path: string, options: RequestOptions = {}) {
     if (lock.current) throw new Error(t('Yêu cầu đang được xử lý.'))
-    const fingerprint = JSON.stringify([
-      user?.id,
-      path,
-      options.method ?? 'POST',
-      options.ifMatch,
-      options.body,
-    ])
-    if (current.current?.fingerprint !== fingerprint)
-      current.current = { fingerprint, key: crypto.randomUUID() }
     lock.current = true
     setBusy(true)
     try {
-      const result = await apiFetch<unknown>(path, {
+      return await apiFetch<unknown>(path, {
         ...options,
         method: options.method ?? 'POST',
-        idempotencyKey: current.current.key,
       })
-      current.current = null
-      return result
     } finally {
       lock.current = false
       setBusy(false)

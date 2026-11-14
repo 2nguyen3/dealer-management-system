@@ -2,11 +2,10 @@
 // untouched: these helpers only format the exact strings returned by the server.
 import { formatDate, formatQuantity, formatVND } from '../../lib/formatters'
 import {
-  cashAmounts,
+  collectionAmounts,
   debtAmounts,
   reports,
   rowRules,
-  salesAmounts,
   type ReportKind,
 } from './contracts'
 import { t } from '@/lib/i18n/core'
@@ -21,35 +20,24 @@ export const columnLabels: Record<string, string> = {
   productName: t('Mặt hàng'),
   unitName: t('Đơn vị'),
   numberOfIssues: t('Số phiếu xuất'),
-  salesAmount: t('Doanh số gộp'),
-  returnAmount: t('Hàng trả lại'),
-  netSalesAmount: t('Doanh số thuần'),
+  salesAmount: t('Doanh số'),
   salesRate: t('Tỷ lệ doanh số'),
-  companyGrossSales: t('Doanh số gộp toàn công ty'),
+  companySalesAmount: t('Doanh số toàn công ty'),
   openingDebt: t('Nợ đầu kỳ'),
   debtIncrease: t('Phát sinh nợ'),
-  cashApplied: t('Thu tiền trừ nợ'),
-  returnsApplied: t('Trả hàng trừ nợ'),
-  creditApplied: t('Cấn trừ dư có'),
-  debtDecrease: t('Tổng giảm nợ'),
+  paidAmount: t('Đã thu'),
   closingDebt: t('Nợ cuối kỳ'),
   openingStock: t('Tồn đầu kỳ'),
   receiptQuantity: t('Nhập'),
   issueQuantity: t('Xuất'),
-  returnQuantity: t('Trả lại'),
-  adjustmentQuantity: t('Điều chỉnh'),
   closingStock: t('Tồn cuối kỳ'),
   soldQuantity: t('Số lượng bán'),
-  returnedQuantity: t('Số lượng trả'),
-  cashReceived: t('Tiền đã thu'),
-  cashRefunded: t('Tiền đã hoàn'),
-  verifiedUnreceiptedAmount: t('Đã xác nhận, chưa lập phiếu thu'),
-  openingCredit: t('Dư có đầu kỳ'),
-  creditCreated: t('Dư có phát sinh'),
-  creditRefunded: t('Dư có đã hoàn'),
-  closingCredit: t('Dư có cuối kỳ'),
-  currentReservedCredit: t('Dư có đang giữ'),
-  currentAvailableCredit: t('Dư có khả dụng'),
+  businessDate: t('Ngày'),
+  receiptCount: t('Số phiếu thu'),
+  cashAmount: t('Tiền mặt'),
+  bankTransferAmount: t('Chuyển khoản'),
+  onlineAmount: t('Trực tuyến'),
+  totalAmount: t('Tổng thu'),
 }
 
 /** Filter parameter → picker label. Parameter names are unchanged. */
@@ -58,6 +46,7 @@ export const filterLabels: Record<string, string> = {
   typeId: t('Loại đại lý'),
   wardId: t('Phường/xã'),
   productId: t('Mặt hàng'),
+  receiptType: t('Hình thức thu'),
 }
 
 const sortSubjects: Record<string, string> = {
@@ -72,16 +61,19 @@ export function sortLabel(sort: string): string {
   const subject = sortSubjects[key]
   if (subject)
     return `${subject}: ${descending ? t('mới thêm trước') : t('cũ trước')}`
+  if (key === 'businessDate')
+    return `${columnLabels.businessDate}: ${descending ? t('mới nhất trước') : t('cũ nhất trước')}`
   return `${columnLabels[key] ?? key}: ${descending ? t('cao đến thấp') : t('thấp đến cao')}`
 }
 
-export type ValueKind = 'money' | 'quantity' | 'count' | 'percent' | 'text'
+export type ValueKind =
+  'money' | 'quantity' | 'count' | 'percent' | 'date' | 'text'
 
 const moneyKeys = new Set([
-  ...Object.keys(salesAmounts),
   ...Object.keys(debtAmounts),
-  ...Object.keys(cashAmounts),
-  'companyGrossSales',
+  ...Object.keys(collectionAmounts).filter((key) => key !== 'receiptCount'),
+  'salesAmount',
+  'companySalesAmount',
 ])
 const quantityKeys = new Set(
   Object.keys(rowRules.inventory)
@@ -92,8 +84,9 @@ const quantityKeys = new Set(
 export function valueKind(key: string): ValueKind {
   if (moneyKeys.has(key)) return 'money'
   if (quantityKeys.has(key)) return 'quantity'
-  if (key === 'numberOfIssues') return 'count'
+  if (key === 'numberOfIssues' || key === 'receiptCount') return 'count'
   if (key === 'salesRate') return 'percent'
+  if (key === 'businessDate') return 'date'
   return 'text'
 }
 
@@ -109,13 +102,16 @@ export function displayValue(key: string, value: unknown): string {
       return formatQuantity(raw)
     case 'percent':
       return `${formatQuantity(raw)} %`
+    case 'date':
+      return formatDate(raw)
     default:
       return raw
   }
 }
 
 export function isNumeric(key: string): boolean {
-  return valueKind(key) !== 'text'
+  const kind = valueKind(key)
+  return kind !== 'text' && kind !== 'date'
 }
 
 export function visibleColumns(kind: ReportKind): string[] {

@@ -7,27 +7,13 @@ import { t } from '@/lib/i18n/core'
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 const STATUS_LABELS: Record<string, string> = {
-  // Lifecycle of documents/revisions
+  // Lifecycle of documents (DRAFT → POSTED → CANCELLED)
   DRAFT: t('Nháp'),
-  READY: t('Sẵn sàng'),
   PENDING: t('Chờ xử lý'),
-  SUBMITTED: t('Đã gửi'),
-  CONFIRMED: t('Đã xác nhận'),
-  VERIFIED: t('Đã xác minh'),
   POSTED: t('Đã ghi sổ'),
-  PAID: t('Đã thanh toán'),
-  UNPAID: t('Chưa thanh toán'),
-  PARTIALLY_PAID: t('Thanh toán một phần'),
   CANCELED: t('Đã hủy'),
   CANCELLED: t('Đã hủy'),
-  CONSUMED: t('Đã sử dụng'),
-  RELEASED: t('Đã giải phóng'),
-  RECEIVED_SEPARATELY: t('Đã thu riêng'),
-  // Settlement
-  SETTLED: t('Đã tất toán'),
-  PARTIAL: t('Tất toán một phần'),
-  UNSETTLED: t('Chưa tất toán'),
-  // Provider/payment attempts
+  // Online payments (PENDING → SUCCESS | FAILED | EXPIRED)
   SUCCESS: t('Thành công'),
   FAILED: t('Thất bại'),
   EXPIRED: t('Hết hạn'),
@@ -37,28 +23,14 @@ const STATUS_LABELS: Record<string, string> = {
   INACTIVE: t('Ngừng hoạt động'),
   LOCKED: t('Đã khóa'),
   TERMINATED: t('Đã chấm dứt'),
-  DISCONTINUED: t('Ngừng kinh doanh'),
 }
 
 const STATUS_TONES: Record<string, Tone> = {
   DRAFT: 'neutral',
-  READY: 'info',
   PENDING: 'warning',
-  SUBMITTED: 'info',
-  CONFIRMED: 'info',
-  VERIFIED: 'info',
   POSTED: 'success',
-  PAID: 'success',
-  UNPAID: 'warning',
-  PARTIALLY_PAID: 'warning',
   CANCELED: 'danger',
   CANCELLED: 'danger',
-  CONSUMED: 'neutral',
-  RELEASED: 'neutral',
-  RECEIVED_SEPARATELY: 'info',
-  SETTLED: 'success',
-  PARTIAL: 'warning',
-  UNSETTLED: 'warning',
   SUCCESS: 'success',
   FAILED: 'danger',
   EXPIRED: 'neutral',
@@ -67,24 +39,12 @@ const STATUS_TONES: Record<string, Tone> = {
   INACTIVE: 'neutral',
   LOCKED: 'danger',
   TERMINATED: 'danger',
-  DISCONTINUED: 'neutral',
 }
 
 const KIND_LABELS: Record<string, string> = {
   STOCK_RECEIPT: t('Phiếu nhập hàng'),
   STOCK_ISSUE: t('Phiếu xuất hàng'),
   PAYMENT_RECEIPT: t('Phiếu thu tiền'),
-  SALES_RETURN: t('Phiếu trả hàng'),
-  STOCK_ADJUSTMENT: t('Phiếu điều chỉnh kho'),
-  CREDIT_APPLICATION: t('Cấn trừ dư có'),
-  REFUND: t('Hoàn tiền'),
-  // Ledger entry kinds
-  CHARGE: t('Ghi nợ'),
-  PAYMENT: t('Thanh toán'),
-  CREDIT: t('Ghi có'),
-  OFFSET: t('Cấn trừ'),
-  RETURN: t('Trả hàng'),
-  CREATED: t('Khởi tạo'),
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -93,10 +53,11 @@ const METHOD_LABELS: Record<string, string> = {
   ONLINE: t('Trực tuyến (VNPAY)'),
 }
 
+/** `receiptType` of a payment receipt; ONLINE is created only by VNPAY. */
 const RECEIPT_TYPE_LABELS: Record<string, string> = {
-  AUTO_FROM_ISSUE: t('Thu kèm phiếu xuất'),
-  DEBT_COLLECTION: t('Thu công nợ'),
-  RECEIVED_UNAPPLIED: t('Thu chưa phân bổ'),
+  CASH: t('Tiền mặt'),
+  BANK_TRANSFER: t('Chuyển khoản'),
+  ONLINE: t('Trực tuyến (VNPAY)'),
 }
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -113,7 +74,7 @@ function lookup(map: Record<string, string>, value: unknown): string {
   return map[key] ?? key
 }
 
-/** Vietnamese label for a lifecycle/settlement/provider/master status value. */
+/** Vietnamese label for a document/online-payment/master status value. */
 export function statusLabel(value: unknown): string {
   return lookup(STATUS_LABELS, value)
 }
@@ -123,7 +84,7 @@ export function statusTone(value: unknown): Tone {
   return STATUS_TONES[String(value)] ?? 'neutral'
 }
 
-/** Vietnamese label for a document or ledger-entry kind. */
+/** Vietnamese label for a document kind. */
 export function kindLabel(value: unknown): string {
   return lookup(KIND_LABELS, value)
 }

@@ -107,16 +107,14 @@ export const adminGuides: readonly GuideContent[] = [
     ],
     rules: [
       msg(
-        'Mặc định Kinh doanh: tiếp nhận đại lý, lập và nộp phiếu xuất, xem doanh số, công nợ.',
+        'Mặc định Kinh doanh: tiếp nhận đại lý, lập phiếu xuất, xem doanh số, công nợ.',
       ),
       msg(
-        'Mặc định Kho: phiếu nhập, ghi sổ phiếu xuất, trả hàng, kiểm kê, lập điều chỉnh kho, mặt hàng, đơn vị tính.',
+        'Mặc định Kho: phiếu nhập, ghi sổ phiếu xuất, mặt hàng, đơn vị tính.',
       ),
+      msg('Mặc định Kế toán: phiếu thu, thanh toán trực tuyến, báo cáo.'),
       msg(
-        'Mặc định Kế toán: phiếu thu, xác nhận trả ngay, bù trừ dư có, hoàn tiền, thanh toán trực tuyến, báo cáo.',
-      ),
-      msg(
-        'Sửa sai, hủy chứng từ, duyệt điều chỉnh kho, thay đổi quy định và quản trị: mặc định chỉ nhóm Quản lý.',
+        'Hủy, sửa có lý do chứng từ đã ghi sổ, thay đổi quy định và quản trị: mặc định chỉ nhóm Quản lý.',
       ),
       msg(
         'Quyền được kiểm tra lại ở mỗi thao tác; menu cập nhật sau khi người dùng tải lại trang.',
@@ -156,96 +154,32 @@ export const adminGuides: readonly GuideContent[] = [
   {
     path: '/document-history',
     purpose: msg(
-      'Lịch sử chứng từ cho tìm mọi loại chứng từ, xem từng phiên bản, bản in và tải PDF.',
+      'Lịch sử chứng từ cho tìm mọi phiếu nhập, phiếu xuất, phiếu thu, xem chuỗi thay thế khi phiếu được sửa có lý do, xem bản in và tải PDF.',
     ),
     roles: [
       msg('Mọi người dùng: chỉ thấy loại chứng từ mà mình có quyền đọc.'),
     ],
     steps: [
       msg(
-        'Nhập Tìm chứng từ theo mã, đại lý hoặc ghi chú; chọn Loại chứng từ, Đại lý, Mặt hàng.',
+        'Nhập Tìm chứng từ theo mã, đại lý hoặc ghi chú; chọn Loại chứng từ, Trạng thái, Đại lý.',
       ),
+      msg('Chọn khoảng ngày rồi bấm Áp dụng bộ lọc.'),
       msg(
-        'Chọn Từ ngày và Đến ngày (không gồm ngày cuối), rồi bấm Áp dụng bộ lọc.',
-      ),
-      msg(
-        'Chọn một chứng từ để xem Dòng thời gian phiên bản; bấm Xem trên một phiên bản để xem nội dung và dòng hàng.',
+        'Chọn một chứng từ để xem nội dung, dòng hàng và chuỗi thay thế (phiếu cũ bị hủy → phiếu mới thay thế).',
       ),
       msg('Bấm Xem bản in hoặc Tải PDF để in chứng từ.'),
     ],
     rules: [
       msg(
-        'Chứng từ không bao giờ bị xóa. Mỗi lần sửa sai tạo phiên bản mới có lý do; phiên bản cũ được giữ nguyên.',
+        'Chứng từ đã ghi sổ không bao giờ bị xóa. Hủy giữ phiếu với trạng thái Đã hủy và lý do; Sửa có lý do tạo phiếu mới mã mới thay cho phiếu cũ.',
       ),
-      msg('Chứng từ đã hủy vẫn được lưu và tra cứu được.'),
+      msg(
+        'Trang này chỉ để tra cứu; hủy hoặc sửa thực hiện trên trang của từng loại chứng từ.',
+      ),
     ],
     errors: ['FORBIDDEN', 'NOT_FOUND', 'NOT_ACCEPTABLE'],
-    related: ['/document-corrections', '/audit-logs'],
-  },
-  {
-    path: '/document-corrections',
-    purpose: msg(
-      'Sửa sai & Hủy chứng từ là nơi tập trung để sửa hoặc hủy chứng từ đã ghi sổ, bằng một phiên bản mới có lý do.',
-    ),
-    roles: [
-      msg(
-        'Quản lý: Điều chỉnh (quyền sửa chứng từ đã xác nhận, kèm quyền ghi sổ của loại chứng từ đó).',
-      ),
-      msg(
-        'Quản lý: Hủy chứng từ (quyền hủy chứng từ; hủy phiếu xuất có trả ngay cần thêm quyền xác nhận thu).',
-      ),
-    ],
-    flow: [
-      { label: msg('Tìm chứng từ đã ghi sổ'), role: msg('Quản lý') },
-      { label: msg('Kiểm tra nội dung hiện tại'), role: msg('Quản lý') },
-      { label: msg('Điều chỉnh hoặc hủy, kèm lý do'), role: msg('Quản lý') },
-      {
-        label: msg('Hệ thống đảo bút toán cũ, kiểm tra lại tồn kho và công nợ'),
-      },
-    ],
-    steps: [
-      msg(
-        'Danh sách chỉ gồm chứng từ đã ghi sổ. Lọc theo loại, đại lý hoặc ngày.',
-      ),
-      msg('Bấm Kiểm tra trên chứng từ cần xử lý.'),
-      msg(
-        'Bấm Điều chỉnh, nhập Thông tin thay thế (ngày nghiệp vụ mới, dòng hàng, số tiền thay thế…) và Lý do bắt buộc, rồi bấm Xác nhận thay thế.',
-      ),
-      msg('Hoặc bấm Hủy chứng từ, nhập Lý do bắt buộc, rồi bấm Xác nhận hủy.'),
-      msg('Nếu báo dữ liệu đã thay đổi, bấm Tải lại rồi làm lại.'),
-    ],
-    rules: [
-      msg(
-        'Không áp dụng cho hoàn tiền, phiếu thu tự động, phiếu thu trực tuyến, phiếu thu riêng và điều chỉnh sinh từ kiểm kê.',
-      ),
-      msg(
-        'Sửa phiếu xuất giữ nguyên tiền trả ngay; tổng mới không được nhỏ hơn trả ngay.',
-      ),
-      msg(
-        'Hủy phiếu xuất bị chặn nếu còn phiếu trả hàng có hiệu lực; tiền trả ngay của phiếu đó chuyển thành phiếu thu riêng.',
-      ),
-      msg(
-        'Bị từ chối nếu làm tồn kho âm, công nợ vượt hạn mức, hoặc mất nguồn của khoản hoàn tiền.',
-      ),
-      msg(
-        'Sửa hoặc hủy có thể phân bổ lại tiền thu giữa các hóa đơn. Hủy không hoàn tác được.',
-      ),
-    ],
-    errors: [
-      'CORRECTION_CONFLICT',
-      'STOCK_CONFLICT',
-      'RETURN_SOURCE_CONFLICT',
-      'LIMIT_CONFLICT',
-      'RECEIPT_CONFLICT',
-      'REASON_REQUIRED',
-    ],
-    tips: [
-      msg(
-        'Chứng từ chưa ghi sổ (nháp, chờ xuất) xử lý ngay trên trang của loại chứng từ đó bằng nút Hủy phiếu.',
-      ),
-    ],
     related: [
-      '/document-history',
+      '/stock-receipts',
       '/stock-issues',
       '/payment-receipts',
       '/audit-logs',

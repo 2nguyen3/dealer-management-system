@@ -34,11 +34,6 @@ const AgenciesPage = lazy(() =>
     default: m.AgenciesPage,
   })),
 )
-const AgencyCreditPage = lazy(() =>
-  import('../features/agency_credit/AgencyCreditPage').then((m) => ({
-    default: m.AgencyCreditPage,
-  })),
-)
 const AgencyTypesPage = lazy(() =>
   import('../features/agency_types/AgencyTypesPage').then((m) => ({
     default: m.AgencyTypesPage,
@@ -54,24 +49,9 @@ const BusinessRulesPage = lazy(() =>
     default: m.BusinessRulesPage,
   })),
 )
-const CreditApplicationsPage = lazy(() =>
-  import('../features/credit_applications/CreditApplicationsPage').then(
-    (m) => ({ default: m.CreditApplicationsPage }),
-  ),
-)
 const DocumentHistoryPage = lazy(() =>
   import('../features/document_history/DocumentHistoryPage').then((m) => ({
     default: m.DocumentHistoryPage,
-  })),
-)
-const DocumentCorrectionsPage = lazy(() =>
-  import('../features/document_corrections/DocumentCorrectionsPage').then(
-    (m) => ({ default: m.DocumentCorrectionsPage }),
-  ),
-)
-const InventoryPage = lazy(() =>
-  import('../features/inventory/InventoryPage').then((m) => ({
-    default: m.InventoryPage,
   })),
 )
 const OnlinePaymentsPage = lazy(() =>
@@ -94,31 +74,6 @@ const ProductsPage = lazy(() =>
     default: m.ProductsPage,
   })),
 )
-const ReceivablesPage = lazy(() =>
-  import('../features/receivables/ReceivablesPage').then((m) => ({
-    default: m.ReceivablesPage,
-  })),
-)
-const RefundsPage = lazy(() =>
-  import('../features/refunds/RefundsPage').then((m) => ({
-    default: m.RefundsPage,
-  })),
-)
-const SalesReturnsPage = lazy(() =>
-  import('../features/sales_returns/SalesReturnsPage').then((m) => ({
-    default: m.SalesReturnsPage,
-  })),
-)
-const StockAdjustmentsPage = lazy(() =>
-  import('../features/stock_adjustments/StockAdjustmentsPage').then((m) => ({
-    default: m.StockAdjustmentsPage,
-  })),
-)
-const StockCountsPage = lazy(() =>
-  import('../features/stock_counts/StockCountsPage').then((m) => ({
-    default: m.StockCountsPage,
-  })),
-)
 const StockIssuesPage = lazy(() =>
   import('../features/stock_issues/StockIssuesPage').then((m) => ({
     default: m.StockIssuesPage,
@@ -131,11 +86,6 @@ const StockReceiptsPage = lazy(() =>
 )
 const UnitsPage = lazy(() =>
   import('../features/units/UnitsPage').then((m) => ({ default: m.UnitsPage })),
-)
-const UpfrontPaymentsPage = lazy(() =>
-  import('../features/upfront_payments/UpfrontPaymentsPage').then((m) => ({
-    default: m.UpfrontPaymentsPage,
-  })),
 )
 const UserGroupsPage = lazy(() =>
   import('../features/user_groups/UserGroupsPage').then((m) => ({
@@ -267,11 +217,6 @@ export function App() {
                     element={<DocumentHistoryPage />}
                   />
                   <Route
-                    path="/document-corrections"
-                    element={<DocumentCorrectionsPage />}
-                  />
-                  <Route path="/inventory" element={<InventoryPage />} />
-                  <Route
                     path="/stock-receipts"
                     element={<StockReceiptsPage />}
                   />
@@ -281,26 +226,9 @@ export function App() {
                     element={<PaymentReceiptsPage />}
                   />
                   <Route
-                    path="/upfront-payments"
-                    element={<UpfrontPaymentsPage />}
-                  />
-                  <Route
                     path="/online-payments"
                     element={<OnlinePaymentsPage />}
                   />
-                  <Route path="/receivables" element={<ReceivablesPage />} />
-                  <Route path="/sales-returns" element={<SalesReturnsPage />} />
-                  <Route
-                    path="/credit-applications"
-                    element={<CreditApplicationsPage />}
-                  />
-                  <Route path="/refunds" element={<RefundsPage />} />
-                  <Route
-                    path="/stock-adjustments"
-                    element={<StockAdjustmentsPage />}
-                  />
-                  <Route path="/stock-counts" element={<StockCountsPage />} />
-                  <Route path="/agency-credit" element={<AgencyCreditPage />} />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

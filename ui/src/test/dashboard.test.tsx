@@ -8,7 +8,10 @@ import {
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
-import { dashboardAdmission } from '../features/dashboard/contracts'
+import {
+  dashboardAdmission,
+  sectionGrants,
+} from '../features/dashboard/contracts'
 import {
   buildMatrix,
   buildReportQuery,
@@ -74,17 +77,17 @@ describe('dashboard model', () => {
 
   it('derives month-over-month deltas and refuses gaps or zero bases', () => {
     const trend = snapshotFixture('2026-10').sales.monthlyTrend
-    expect(trendDelta(trend, '2026-10', 'net')).toBeCloseTo(0.5)
-    expect(trendDelta(trend, '2026-10', 'returns')).toBeCloseTo(-0.5)
-    expect(trendDelta(trend, '2026-11', 'net')).toBeNull()
+    expect(trendDelta(trend, '2026-10', 'salesAmount')).toBeCloseTo(0.5)
+    expect(trendDelta(trend, '2026-10', 'issueCount')).toBeCloseTo(0.5)
+    expect(trendDelta(trend, '2026-11', 'salesAmount')).toBeNull()
     expect(
       trendDelta(
         [
-          { month: '2026-09', gross: '0', returns: '0', net: '0' },
-          { month: '2026-10', gross: '5', returns: '0', net: '5' },
+          { month: '2026-09', salesAmount: '0', issueCount: 0 },
+          { month: '2026-10', salesAmount: '5', issueCount: 1 },
         ],
         '2026-10',
-        'net',
+        'salesAmount',
       ),
     ).toBeNull()
   })
@@ -108,7 +111,10 @@ describe('dashboard model', () => {
     expect(params('product-sales').get('agencyId')).toBe('2')
     expect(params('product-sales').get('productId')).toBeNull()
     expect(params('product-sales').get('limit')).toBe('10')
-    expect(params('cash-and-credit').get('typeId')).toBeNull()
+    expect(params('collections').get('typeId')).toBeNull()
+    expect(params('collections').get('agencyId')).toBe('2')
+    expect(params('collections').get('sort')).toBe('businessDate')
+    expect(params('sales').get('sort')).toBe('-salesAmount')
     expect(params('inventory').get('sort')).toBe('closingStock')
     expect(() =>
       reportPath(
@@ -128,7 +134,45 @@ describe('dashboard model', () => {
     expect(rows.map((row) => row.agencyCode)).toEqual(['DL-02', 'DL-01'])
     expect(rows[0]!.values.closingDebt).toBeUndefined()
     expect(rows[0]!.values.numberOfIssues).toBe('6')
+    expect(rows[0]!.values.salesAmount).toBe('1200')
+    const debt = reportResponse(
+      '/reports/debt?fromDate=2026-10-01&toDate=2026-11-01&limit=100',
+    )
+    const merged = buildMatrix(sales as never, debt as never)
+    expect(merged.find((row) => row.agencyId === '1')!.values).toEqual({
+      salesAmount: '800',
+      numberOfIssues: '3',
+      debtIncrease: '500',
+      paidAmount: '0',
+      closingDebt: '7000',
+    })
     expect(buildMatrix(null, null)).toEqual([])
+  })
+
+  it('admits exactly the contract grants and maps each section to its readers', () => {
+    expect([...dashboardAdmission].sort()).toEqual([
+      'agency.read',
+      'cash.receipt.post',
+      'cash.receipt.prepare',
+      'debt.read',
+      'sales.read',
+      'stock.issue.post',
+      'stock.issue.prepare',
+      'stock.receipt.post',
+      'stock.receipt.prepare',
+    ])
+    expect(Object.keys(sectionGrants)).toEqual([
+      'agencies',
+      'sales',
+      'collections',
+      'debt',
+      'drafts',
+    ])
+    expect(sectionGrants.collections).toEqual([
+      'debt.read',
+      'cash.receipt.post',
+    ])
+    expect(dashboardAdmission).not.toContain('inventory.read')
   })
 })
 
@@ -147,31 +191,35 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
     expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toBe(
       `/dashboard?month=${vietnamMonth()}`,
     )
-    const net = kpi('Doanh số thuần')
-    expect(net.textContent).toContain('(1.500 ₫)')
-    expect(net.textContent).toContain(`+${formatPercent(0.5)}`)
-    expect(net.textContent).toContain('so với tháng trước')
-    const returns = kpi('Hàng trả lại')
-    expect(returns.textContent).toContain(formatPercent(-0.5))
-    // Fewer returns is good: the pill uses the positive tone.
-    expect(
-      within(returns)
-        .getByText(formatPercent(-0.5), { exact: false })
-        .className.includes('text-success'),
-    ).toBe(true)
-    expect(kpi('Công nợ hiện tại').textContent).toContain(
-      `(${formatVND(HUGE)})`,
-    )
+    const sales = kpi('Doanh số')
+    expect(sales.textContent).toContain('(1.500 ₫)')
+    expect(sales.textContent).toContain(`+${formatPercent(0.5)}`)
+    expect(sales.textContent).toContain('so với tháng trước')
+    expect(kpi('Phiếu xuất đã ghi sổ').textContent).toContain('12')
+    const collected = kpi('Tiền đã thu')
+    expect(collected.textContent).toContain('(700 ₫)')
+    expect(collected.textContent).toContain('6 phiếu thu trong tháng')
+    const debt = kpi('Tổng công nợ')
+    expect(debt.textContent).toContain(`(${formatVND(HUGE)})`)
+    expect(debt.textContent).toContain('17 đại lý đang nợ · trả trước 50 ₫')
     expect(screen.queryByText(HUGE)).toBeNull()
     expect(kpi('Đại lý hoạt động').textContent).toContain('24 / 30')
-    expect(kpi('Mặt hàng tồn thấp').textContent).toContain('3')
-    expect(kpi('Phiếu xuất đang chờ').textContent).toContain('4')
-    expect(kpi('Đã xác minh, chưa ghi phiếu thu').textContent).toContain(
-      '(250 ₫)',
-    )
+    const drafts = kpi('Phiếu nháp chưa ghi sổ')
+    expect(drafts.textContent).toContain('6')
+    expect(drafts.textContent).toContain('PN 1 · PX 2 · PT 3')
+    for (const removed of [
+      'Doanh số thuần',
+      'Hàng trả lại',
+      'Mặt hàng tồn thấp',
+      'Phiếu xuất đang chờ',
+      'Đã xác minh, chưa ghi phiếu thu',
+      'Công nợ hiện tại',
+    ])
+      expect(screen.queryByText(removed), removed).toBeNull()
     // No report access: no report-only visuals and no slicer catalogues.
     expect(screen.queryByText('Ma trận đại lý')).toBeNull()
-    expect(screen.queryByText('Doanh số thuần theo đại lý')).toBeNull()
+    expect(screen.queryByText('Doanh số theo đại lý')).toBeNull()
+    expect(screen.queryByText('Sức khỏe tồn kho')).toBeNull()
     expect(screen.queryByLabelText('Loại đại lý')).toBeNull()
     expect(container.querySelector('.font-mono')).toBeNull()
   })
@@ -217,26 +265,90 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
         (cell) => cell.textContent,
       ),
     )
-    expect(rows[1]).toEqual([
-      monthText(vietnamMonth()),
-      '1.600 ₫',
-      '100 ₫',
-      '1.500 ₫',
-    ])
+    expect(rows[1]).toEqual([monthText(vietnamMonth()), '1.500 ₫', '12'])
     expect(card('Mặt hàng bán chạy').textContent).toContain('Toàn công ty')
     showTable('Đại lý nợ nhiều nhất')
-    const debtCell = within(card('Đại lý nợ nhiều nhất')).getByText(
-      '999.999.999.999.999.999 ₫',
-    )
+    const debtCard = card('Đại lý nợ nhiều nhất')
+    const debtCell = within(debtCard).getByText('999.999.999.999.999.999 ₫')
     expect(debtCell.className).toContain('cell-number')
+    // A prepaid agency (negative debt) is not listed among debtors.
+    expect(debtCard.textContent).not.toContain('Đại lý Bình Minh')
+    expect(debtCard.textContent).not.toContain('-50 ₫')
+  })
+
+  it('renders the collections donut and its exact table from the snapshot', async () => {
+    render(<DashboardPage />)
+    await screen.findByText(/Cập nhật lúc/)
+    const donut = card('Cơ cấu thu tiền')
+    expect(donut.textContent).toContain('Tiền mặt')
+    expect(donut.textContent).toContain(formatPercent(400 / 700))
+    showTable('Cơ cấu thu tiền')
+    const rows = Array.from(
+      card('Cơ cấu thu tiền').querySelectorAll('tbody tr'),
+    ).map((row) =>
+      Array.from(row.querySelectorAll('th, td')).map(
+        (cell) => cell.textContent,
+      ),
+    )
+    expect(rows).toEqual([
+      ['Tiền mặt', '400 ₫'],
+      ['Chuyển khoản', '200 ₫'],
+      ['Trực tuyến', '100 ₫'],
+      ['Tổng thu', '700 ₫'],
+    ])
+  })
+
+  it('omits the prepaid hint at zero and sums only the drafts the server sent', async () => {
+    mockDashboardApi({
+      '/dashboard': (path) => {
+        const base = snapshotFixture(
+          new URL(path, 'http://test').searchParams.get('month')!,
+        )
+        return {
+          ...base,
+          debt: { ...base.debt, prepaidAmount: '0' },
+          drafts: { stockIssues: 2 },
+        }
+      },
+    })
+    render(<DashboardPage />)
+    await screen.findByText(/Cập nhật lúc/)
+    const debt = kpi('Tổng công nợ')
+    expect(debt.textContent).toContain('17 đại lý đang nợ')
+    expect(debt.textContent).not.toContain('trả trước')
+    const drafts = kpi('Phiếu nháp chưa ghi sổ')
+    expect(drafts.textContent).toContain('PX 2')
+    expect(drafts.textContent).not.toContain('PN')
+    expect(drafts.textContent).not.toContain('PT')
+  })
+
+  it('shows an empty collections donut when nothing was collected', async () => {
+    mockDashboardApi({
+      '/dashboard': (path) => ({
+        ...snapshotFixture(
+          new URL(path, 'http://test').searchParams.get('month')!,
+        ),
+        collections: {
+          receiptCount: 0,
+          totalAmount: '0',
+          cashAmount: '0',
+          bankTransferAmount: '0',
+          onlineAmount: '0',
+        },
+      }),
+    })
+    render(<DashboardPage />)
+    expect(await screen.findByText('Chưa thu tiền trong tháng')).toBeTruthy()
+    expect(kpi('Tiền đã thu').textContent).toContain('0 phiếu thu trong tháng')
   })
 
   it.each(
     [
       [],
-      ['stock.issue.prepare'],
-      ['cash.receipt.post'],
       ['product.manage'],
+      ['reports.read'],
+      ['documents.cancel', 'documents.correct', 'payments.online'],
+      ['inventory.read'],
     ].map((grants) => ({ grants })),
   )('denies admission without source grants $grants', ({ grants }) => {
     auth.allowedFunctions = grants
@@ -255,27 +367,29 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
       render(<DashboardPage />)
       await screen.findByText(/Cập nhật lúc/)
       if (grant !== 'sales.read') {
-        expect(screen.queryByText('Doanh số thuần')).toBeNull()
+        expect(screen.queryByText('Doanh số', { selector: 'p' })).toBeNull()
         expect(screen.queryByText('Xu hướng doanh số')).toBeNull()
         expect(screen.queryByText('Mặt hàng bán chạy')).toBeNull()
         expect(callsTo('/reports/sales')).toEqual([])
         expect(callsTo('/reports/product-sales')).toEqual([])
       }
       if (grant !== 'debt.read') {
-        expect(screen.queryByText('Công nợ hiện tại')).toBeNull()
+        expect(screen.queryByText('Tổng công nợ')).toBeNull()
         expect(screen.queryByText('Đại lý nợ nhiều nhất')).toBeNull()
         expect(callsTo('/reports/debt')).toEqual([])
-        expect(callsTo('/reports/cash-and-credit')).toEqual([])
+        expect(callsTo('/reports/collections')).toEqual([])
       }
-      if (grant !== 'inventory.read') {
-        expect(screen.queryByText('Mặt hàng tồn thấp')).toBeNull()
-        expect(screen.queryByText('Sức khỏe tồn kho')).toBeNull()
-        expect(callsTo('/reports/inventory')).toEqual([])
-      }
-      if (grant !== 'stock.issue.post')
-        expect(screen.queryByText('Phiếu xuất đang chờ')).toBeNull()
-      if (grant !== 'cash.upfront.verify')
-        expect(screen.queryByText('Đã xác minh, chưa ghi phiếu thu')).toBeNull()
+      if (!sectionGrants.collections.includes(grant)) {
+        expect(screen.queryByText('Tiền đã thu')).toBeNull()
+        expect(screen.queryByText('Cơ cấu thu tiền')).toBeNull()
+      } else expect(kpi('Tiền đã thu')).toBeTruthy()
+      if (!sectionGrants.drafts.includes(grant))
+        expect(screen.queryByText('Phiếu nháp chưa ghi sổ')).toBeNull()
+      else expect(kpi('Phiếu nháp chưa ghi sổ')).toBeTruthy()
+      if (grant !== 'agency.read')
+        expect(screen.queryByText('Đại lý hoạt động')).toBeNull()
+      // reports.read alone is enough for the inventory report.
+      expect(callsTo('/reports/inventory').length).toBe(1)
     },
   )
 
@@ -289,9 +403,9 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
     render(<DashboardPage />)
     await screen.findByText(/Cập nhật lúc/)
     expect(screen.getByText(/Chưa có dữ liệu cho:/).textContent).toBe(
-      'Chưa có dữ liệu cho: Đại lý, Tồn kho, Doanh số, Công nợ và tiền, Phiếu xuất đang chờ, Tiền đã xác minh chưa ghi phiếu thu.',
+      'Chưa có dữ liệu cho: Đại lý, Doanh số, Thu tiền, Công nợ, Phiếu nháp.',
     )
-    expect(screen.queryByText('Công nợ hiện tại')).toBeNull()
+    expect(screen.queryByText('Tổng công nợ')).toBeNull()
     expect(screen.queryByText('0 ₫')).toBeNull()
   })
 
@@ -299,9 +413,9 @@ describe('executive dashboard — snapshot only', { timeout: 20000 }, () => {
     vi.mocked(api.apiFetch).mockRejectedValueOnce(new Error('HTTP 403'))
     render(<DashboardPage />)
     expect((await screen.findAllByText(/HTTP 403/)).length).toBeGreaterThan(0)
-    expect(screen.queryByText('Doanh số thuần')).toBeNull()
+    expect(screen.queryByText('Tổng công nợ')).toBeNull()
     fireEvent.click(screen.getAllByText('Thử lại')[0]!)
-    await screen.findByText('Doanh số thuần', { selector: 'p' })
+    await screen.findByText('Tổng công nợ', { selector: 'p' })
   })
 
   it('refetches immediately for a new month and aborts the old request', async () => {
@@ -364,7 +478,7 @@ describe(
         'sales',
         'debt',
         'product-sales',
-        'cash-and-credit',
+        'collections',
         'inventory',
       ]) {
         const calls = callsTo(`/reports/${kind}?`)
@@ -372,7 +486,10 @@ describe(
         expect(calls[0]!.get('fromDate')).toBe(fromDate)
         expect(calls[0]!.get('toDate')).toBe(toDate)
       }
-      expect(callsTo('/reports/sales?')[0]!.get('sort')).toBe('-netSalesAmount')
+      expect(callsTo('/reports/sales?')[0]!.get('sort')).toBe('-salesAmount')
+      expect(callsTo('/reports/collections?')[0]!.get('sort')).toBe(
+        'businessDate',
+      )
       expect(callsTo('/reports/debt?')[0]!.get('limit')).toBe('100')
       // Matrix: conditional data bars, totals row, numeric cells.
       const matrix = card('Ma trận đại lý')
@@ -385,8 +502,12 @@ describe(
         matrix.querySelectorAll<HTMLElement>('tbody td > span[aria-hidden]'),
       ).map((bar) => bar.style.width)
       expect(bars).toContain('calc(100% - 8px)')
-      showTable('Dòng tiền và dư có')
-      expect(card('Dòng tiền và dư có').textContent).toContain('700 ₫')
+      showTable('Thu tiền theo hình thức')
+      const channels = card('Thu tiền theo hình thức').textContent
+      expect(channels).toContain('400 ₫')
+      expect(channels).toContain('200 ₫')
+      expect(channels).toContain('Trực tuyến')
+      expect(card('Sức khỏe tồn kho')).toBeTruthy()
     })
 
     it('keeps other visuals when one report fails, then retries only that one', async () => {
@@ -402,13 +523,13 @@ describe(
       expect(debtCard.textContent).toContain(
         'Không tải được đại lý nợ nhiều nhất',
       )
-      await within(card('Doanh số thuần theo đại lý')).findByLabelText(
-        'Kiểu hiển thị Doanh số thuần theo đại lý',
+      await within(card('Doanh số theo đại lý')).findByLabelText(
+        'Kiểu hiển thị Doanh số theo đại lý',
       )
-      expect(card('Doanh số thuần theo đại lý').textContent).not.toContain(
+      expect(card('Doanh số theo đại lý').textContent).not.toContain(
         'Không tải được',
       )
-      expect(kpi('Doanh số thuần')).toBeTruthy()
+      expect(kpi('Tổng công nợ')).toBeTruthy()
       const salesCalls = callsTo('/reports/sales?').length
       fail = false
       fireEvent.click(within(debtCard).getByText('Thử lại'))
@@ -425,7 +546,7 @@ describe(
       render(<DashboardPage />)
       await within(card('Ma trận đại lý')).findByText('Đại lý Bình Minh')
       expect(screen.getByText('Không tải được chỉ số tổng quan')).toBeTruthy()
-      expect(screen.queryByText('Doanh số thuần', { selector: 'p' })).toBeNull()
+      expect(screen.queryByText('Tổng công nợ', { selector: 'p' })).toBeNull()
     })
 
     it('applies a type slicer to sales/debt reports and shows a chip', async () => {
@@ -485,9 +606,9 @@ describe(
       )
       expect(callsTo('/reports/product-sales?')[1]!.get('agencyId')).toBe('2')
       await waitFor(() =>
-        expect(callsTo('/reports/cash-and-credit?').length).toBe(2),
+        expect(callsTo('/reports/collections?').length).toBe(2),
       )
-      expect(callsTo('/reports/cash-and-credit?')[1]!.get('agencyId')).toBe('2')
+      expect(callsTo('/reports/collections?')[1]!.get('agencyId')).toBe('2')
       // Highlight (not a server filter) on the visuals that plot agencies.
       expect(callsTo('/reports/sales?').length).toBe(1)
       const matrix = card('Ma trận đại lý')
@@ -497,9 +618,12 @@ describe(
       const focus = await screen.findByRole('region', {
         name: 'Đối tượng đang chọn',
       })
-      expect(focus.textContent).toContain('1.150 ₫')
+      expect(focus.textContent).toContain('Doanh số của đại lý')
+      expect(focus.textContent).toContain('1.200 ₫')
       expect(focus.textContent).toContain('3.000 ₫')
-      await waitFor(() => expect(focus.textContent).toContain('100 ₫'))
+      await waitFor(() =>
+        expect(focus.textContent).toContain('Đã thu từ đại lý100 ₫'),
+      )
 
       fireEvent.click(screen.getByLabelText('Bỏ lọc Đại lý'))
       expect(
@@ -570,7 +694,7 @@ describe(
           return {
             ...base,
             sales: { ...base.sales, monthlyTrend: [], topProducts: [] },
-            receivables: { ...base.receivables, topAgencies: [] },
+            debt: { ...base.debt, topAgencies: [] },
           }
         },
         '/reports/': (path) => reportResponse(path, true),

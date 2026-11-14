@@ -1,54 +1,46 @@
-import { renderHook, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import type { DocumentLine } from '../features/document_history/documentContracts'
 import {
+  collectLink,
   correctionSteps,
   dirtyRules,
-  financialNext,
-  financialNotice,
+  documentChangeNotice,
   goodsPostEffects,
   goodsWorkflow,
   issuePostEffects,
+  issuePostedNotice,
   masterNotice,
   positiveMoney,
+  receiptNext,
+  receiptNotice,
   reconcileNotice,
   reportSteps,
   ruleSteps,
   stockIssueWorkflow,
   subtractMoney,
-  upfrontLink,
-  type UpfrontState,
 } from '../features/guide/workflows'
-import { useUpfrontState } from '../features/guide/useUpfrontState'
-import * as api from '../lib/api'
-import { detail, revision } from './goodsFixtures'
 
-const all = { prepare: true, post: true, verify: true }
-const none = { prepare: false, post: false, verify: false }
+const all = { prepare: true, post: true, collect: true }
+const none = { prepare: false, post: false, collect: false }
 
-function issue(
-  status: 'DRAFT' | 'PENDING' | 'POSTED' | 'CANCELLED',
-  immediatePayment: string,
-  upfrontConfirmationId: string | null = null,
-  lines = true,
-) {
-  const state =
-    status === 'DRAFT' ? 'DRAFT' : status === 'PENDING' ? 'READY' : 'POSTED'
-  return detail('STOCK_ISSUE', {
-    id: '778',
-    code: 'PX-9',
-    status,
-    upfrontConfirmationId,
-    currentRevision: revision({
-      state,
-      totalAmount: '5000000',
-      immediatePayment,
-      ...(lines ? {} : { lines: [] }),
-    }),
-  })
+const line: DocumentLine = {
+  id: '1',
+  lineNo: 1,
+  productId: '7',
+  productCode: 'MH-7',
+  productName: 'Nước mắm Phú Quốc',
+  unitId: 2,
+  unitName: 'Hộp',
+  quantity: '1.001',
+  unitPrice: '50000',
+  lineAmount: '50050',
+}
+
+type Status = 'DRAFT' | 'POSTED' | 'CANCELLED'
+function issue(status: Status, lines: DocumentLine[] = [line]) {
+  return { code: 'PX-9', status, lines, agencyId: '101' }
 }
 const states = (steps: { state: string }[]) => steps.map((step) => step.state)
-
-afterEach(() => vi.restoreAllMocks())
 
 describe('money helpers', () => {
   it('accepts only exact positive integer money strings', () => {
@@ -69,234 +61,123 @@ describe('money helpers', () => {
     expect(subtractMoney('', '1')).toBeNull()
   })
 
-  it('builds the upfront deep link with an encoded issue id', () => {
-    expect(upfrontLink('778')).toBe('/upfront-payments?issue=778&new=1')
-    expect(upfrontLink('a&b')).toBe('/upfront-payments?issue=a%26b&new=1')
+  it('builds the payment-receipt deep link with an encoded agency id', () => {
+    expect(collectLink('101')).toBe('/payment-receipts?agency=101&new=1')
+    expect(collectLink('a&b')).toBe('/payment-receipts?agency=a%26b&new=1')
+    expect(collectLink(null)).toBe('/payment-receipts')
+    expect(collectLink('')).toBe('/payment-receipts')
   })
 })
 
 describe('stockIssueWorkflow', () => {
-  it('draft without upfront skips the upfront step and asks to submit', () => {
-    const flow = stockIssueWorkflow(issue('DRAFT', '0'), 'NONE', all)
-    expect(states(flow.steps)).toEqual(['current', 'todo', 'skipped', 'todo'])
-    expect(flow.upfront).toBe('')
-    expect(flow.next?.title).toBe('Nộp phiếu để chốt giá')
-    expect(flow.next?.description).toBe('Sau khi nộp, Kho ghi sổ để xuất hàng.')
-    expect(flow.postLock).toMatch(/phải được nộp/)
-    expect(flow.submitLock).toBeNull()
-    expect(flow.replaceLock).toBeNull()
+  it('draft: no upfront step, posting is the next action', () => {
+    const flow = stockIssueWorkflow(issue('DRAFT'), all)
+    expect(flow.steps.map((step) => step.key)).toEqual([
+      'draft',
+      'post',
+      'collect',
+    ])
+    expect(states(flow.steps)).toEqual(['current', 'todo', 'todo'])
+    expect(flow.postLock).toBeNull()
+    expect(flow.next?.title).toBe('Ghi sổ để xuất hàng')
+    expect(flow.steps[1]?.hint).toMatch(/giá nhập gần nhất × tỷ lệ giá bán/)
   })
 
-  it('draft without lines cannot be submitted; without rights it names the role', () => {
-    const flow = stockIssueWorkflow(
-      issue('DRAFT', '0', null, false),
-      'NONE',
-      none,
-    )
-    expect(flow.submitLock).toMatch(/chưa có dòng hàng/)
+  it('draft without lines cannot be posted; without rights it names the role', () => {
+    const flow = stockIssueWorkflow(issue('DRAFT', []), none)
+    expect(flow.postLock).toMatch(/chưa có dòng hàng/)
     expect(flow.next).toEqual({
       title: 'Phiếu đang là nháp',
-      waitingFor: 'Kinh doanh',
+      waitingFor: 'Kho',
     })
   })
 
-  it('ready issue with unverified upfront blocks posting and deep-links accounting', () => {
-    const flow = stockIssueWorkflow(issue('PENDING', '1250000'), 'NONE', all)
-    expect(states(flow.steps)).toEqual(['done', 'done', 'current', 'blocked'])
-    expect(flow.upfront).toBe('1250000')
-    expect(flow.postLock).toBe(
-      'Chưa có xác nhận trả ngay 1.250.000 ₫. Kế toán cần xác nhận tiền thực nhận trước khi ghi sổ.',
-    )
+  it('posted: the next step is a payment receipt for the same agency', () => {
+    const flow = stockIssueWorkflow(issue('POSTED'), all)
+    expect(states(flow.steps)).toEqual(['done', 'done', 'current'])
+    expect(flow.postLock).toMatch(/nháp/)
     expect(flow.next).toMatchObject({
-      title: 'Xác nhận khoản trả ngay 1.250.000 ₫',
-      to: '/upfront-payments?issue=778&new=1',
-      tone: 'warning',
+      title: 'Lập phiếu thu khi đại lý trả tiền',
+      to: '/payment-receipts?agency=101&new=1',
+      actionLabel: 'Lập phiếu thu',
     })
-    // Warehouse without verify rights waits for accounting instead.
-    const waiting = stockIssueWorkflow(issue('PENDING', '1250000'), 'NONE', {
+    expect(flow.next?.description).toMatch(/PX-9/)
+    const waiting = stockIssueWorkflow(issue('POSTED'), {
       ...all,
-      verify: false,
+      collect: false,
     })
-    expect(waiting.next?.waitingFor).toBe('Kế toán')
-    expect(waiting.next?.to).toBeUndefined()
-  })
-
-  it('verified upfront unlocks posting and refuses replacing the pending content', () => {
-    const flow = stockIssueWorkflow(
-      issue('PENDING', '1250000', '31'),
-      'VERIFIED',
-      all,
-    )
-    expect(states(flow.steps)).toEqual(['done', 'done', 'done', 'current'])
-    expect(flow.postLock).toBeNull()
-    expect(flow.replaceLock).toMatch(/Ghi nhận tiền riêng/)
-    expect(flow.next?.title).toBe('Sẵn sàng ghi sổ')
-    const noPost = stockIssueWorkflow(
-      issue('PENDING', '1250000', '31'),
-      'VERIFIED',
-      { ...all, post: false },
-    )
-    expect(noPost.next?.waitingFor).toBe('Kho')
-  })
-
-  it('while the confirmation loads, predicts nothing that blocks the server', () => {
-    const flow = stockIssueWorkflow(
-      issue('PENDING', '1250000', '31'),
-      'UNKNOWN',
-      all,
-    )
-    expect(flow.postLock).toBeNull()
-    expect(flow.replaceLock).toBeNull()
-  })
-
-  it('separately received money blocks posting until a new revision', () => {
-    const flow = stockIssueWorkflow(
-      issue('PENDING', '1250000', '31'),
-      'RECEIVED_SEPARATELY',
-      all,
-    )
-    expect(states(flow.steps)).toEqual(['done', 'done', 'blocked', 'blocked'])
-    expect(flow.postLock).toMatch(/ghi nhận riêng thành phiếu thu/)
-    expect(flow.replaceLock).toBeNull()
-    expect(flow.next).toMatchObject({
-      title: 'Cần lập lại phiên bản phiếu',
-      tone: 'warning',
+    expect(waiting.next).toEqual({
+      title: 'Chờ thu tiền đại lý',
+      waitingFor: 'Kế toán',
     })
-    expect(flow.next?.description).toMatch(/chỉ nhập trả ngay nếu/)
   })
 
-  it.each<[string, UpfrontState, string[]]>([
-    ['POSTED', 'CONSUMED', ['done', 'done', 'done', 'done']],
-    ['CANCELLED', 'NONE', ['done', 'skipped', 'skipped', 'skipped']],
-  ])('%s issues have no next action', (status, upfront, expected) => {
-    const flow = stockIssueWorkflow(
-      issue(status as 'POSTED' | 'CANCELLED', '1250000', '31'),
-      upfront,
-      all,
-    )
-    expect(states(flow.steps)).toEqual(expected)
+  it('cancelled issues skip the remaining steps and have no next action', () => {
+    const flow = stockIssueWorkflow(issue('CANCELLED'), all)
+    expect(states(flow.steps)).toEqual(['done', 'skipped', 'skipped'])
+    expect(flow.steps[0]?.hint).toBe('Phiếu đã hủy.')
     expect(flow.next).toBeNull()
   })
 
-  it('lists posting consequences with exact remaining debt', () => {
-    const doc = issue('PENDING', '1250000')
-    const effects = issuePostEffects(doc)
-    expect(effects[0]).toBe('Tồn kho Historical product: −1,001 Hộp')
-    expect(effects).toContain(
-      'Công nợ đại lý tăng 5.000.000 ₫ (giá đã chốt khi nộp).',
+  it('lists posting consequences: stock out, price fixed, debt limit', () => {
+    const effects = issuePostEffects(issue('DRAFT'))
+    expect(effects[0]).toBe('Tồn kho Nước mắm Phú Quốc: −1,001 Hộp')
+    expect(effects).toHaveLength(3)
+    expect(effects[1]).toMatch(/nợ của đại lý tăng/)
+    expect(issuePostEffects(issue('DRAFT', []))).toHaveLength(2)
+  })
+
+  it('the posted toast points to a payment receipt', () => {
+    expect(issuePostedNotice({ code: 'PX-9', agencyId: '101' })).toEqual({
+      done: 'Đã ghi sổ PX-9.',
+      next: 'Tồn kho đã giảm, nợ đại lý đã tăng. Bước tiếp: lập phiếu thu khi đại lý trả tiền.',
+      to: '/payment-receipts?agency=101&new=1',
+    })
+    expect(issuePostedNotice({ code: '', agencyId: null }).done).toBe(
+      'Đã ghi sổ chứng từ.',
     )
-    expect(effects.at(-1)).toBe(
-      'Tự lập phiếu thu 1.250.000 ₫ từ khoản trả ngay đã xác nhận; công nợ còn tăng thêm 3.750.000 ₫.',
-    )
-    expect(issuePostEffects(issue('PENDING', '0'))).toHaveLength(2)
   })
 })
 
-describe('goods workflows', () => {
-  it('receipt draft → post with price consequences', () => {
-    const flow = goodsWorkflow('STOCK_RECEIPT', detail(), true)
+describe('stock receipt workflow', () => {
+  it('draft → post with price consequences', () => {
+    const flow = goodsWorkflow({ status: 'DRAFT' }, true)
     expect(states(flow.steps)).toEqual(['current', 'todo'])
     expect(flow.next?.title).toBe('Ghi sổ khi đã kiểm tra đủ dòng hàng')
-    const effects = goodsPostEffects('STOCK_RECEIPT', detail())
-    expect(effects[0]).toBe('Tồn kho Historical product: +1,001 Hộp')
+    const effects = goodsPostEffects({ lines: [line] })
+    expect(effects[0]).toBe('Tồn kho Nước mắm Phú Quốc: +1,001 Hộp')
     expect(effects).toHaveLength(3)
-  })
-
-  it('count-generated adjustments are posted with the count, not separately', () => {
-    const flow = goodsWorkflow(
-      'STOCK_ADJUSTMENT',
-      detail('STOCK_ADJUSTMENT', { stockCountId: '5' }),
-      true,
-    )
-    expect(states(flow.steps)).toEqual(['done', 'blocked'])
-    expect(flow.next).toBeNull()
+    expect(goodsPostEffects({ lines: [] })).toHaveLength(2)
   })
 
   it('posted/cancelled have no next step; without rights the role is named', () => {
-    expect(
-      goodsWorkflow(
-        'SALES_RETURN',
-        detail('SALES_RETURN', { status: 'POSTED' }),
-        true,
-      ).next,
-    ).toBeNull()
-    const cancelled = goodsWorkflow(
-      'STOCK_RECEIPT',
-      detail('STOCK_RECEIPT', { status: 'CANCELLED' }),
-      true,
-    )
+    expect(goodsWorkflow({ status: 'POSTED' }, true).next).toBeNull()
+    const cancelled = goodsWorkflow({ status: 'CANCELLED' }, true)
     expect(states(cancelled.steps)).toEqual(['done', 'skipped'])
-    expect(
-      goodsWorkflow('STOCK_RECEIPT', detail(), false).next?.waitingFor,
-    ).toBe('Kho')
-  })
-
-  it('adjustment effects keep the sign of the quantity', () => {
-    const doc = detail('STOCK_ADJUSTMENT', {
-      currentRevision: revision({
-        lines: [{ ...revision().lines[0]!, quantity: '-2' }],
-      }),
-    })
-    expect(goodsPostEffects('STOCK_ADJUSTMENT', doc)).toEqual([
-      'Tồn kho Historical product: -2 Hộp',
-    ])
-    expect(
-      goodsPostEffects('SALES_RETURN', detail('SALES_RETURN')).at(-1),
-    ).toMatch(/dư có/)
+    expect(cancelled.next).toBeNull()
+    expect(goodsWorkflow({ status: 'DRAFT' }, false).next?.waitingFor).toBe(
+      'Kho',
+    )
   })
 })
 
-describe('financial guidance', () => {
-  it('describes each receipt/credit/refund action', () => {
-    expect(financialNotice('receipt', 'create', 'PT-1').done).toBe(
-      'Đã tạo nháp PT-1.',
-    )
-    expect(financialNotice('receipt', 'post', 'PT-1').to).toBe('/receivables')
-    expect(financialNotice('credit', 'post', 'BT-1').to).toBe('/agency-credit')
-    expect(financialNotice('refund', 'create', '').done).toBe(
-      'Đã tạo nháp chứng từ.',
-    )
-    expect(financialNotice('refund', 'submit', 'HT-1').next).toMatch(
-      /Xác nhận đã chi tiền/,
-    )
-    expect(financialNotice('refund', 'confirm-paid', 'HT-1').to).toBe(
-      '/agency-credit',
-    )
-    expect(financialNotice('refund', 'attempts', 'HT-1').next).toMatch(
-      /Đối soát/,
-    )
-    expect(financialNotice('refund', 'reconcile', 'HT-1').done).toBe(
-      'Đã đối soát với cổng thanh toán.',
-    )
-    expect(financialNotice('refund', 'cancel', 'HT-1').next).toBeUndefined()
-    expect(financialNotice('refund', 'unknown-action', 'HT-1').done).toBe(
-      'Đã thực hiện thao tác.',
-    )
+describe('payment receipt guidance', () => {
+  it('describes each receipt action without FIFO allocation', () => {
+    expect(receiptNotice('create', 'PT-1').done).toBe('Đã tạo nháp PT-1.')
+    const posted = receiptNotice('post', 'PT-1')
+    expect(posted.to).toBe('/agencies')
+    expect(posted.next).not.toMatch(/FIFO|hóa đơn/)
+    expect(receiptNotice('delete', '').done).toBe('Đã xóa nháp chứng từ.')
   })
 
-  it('suggests the next step only for drafts the user can act on', () => {
-    const can = { post: true, manual: true, reserved: false, unknown: false }
-    expect(financialNext('receipt', { status: 'POSTED' }, can)).toBeNull()
-    expect(
-      financialNext('receipt', { status: 'DRAFT' }, { ...can, manual: false }),
-    ).toBeNull()
-    expect(financialNext('receipt', { status: 'DRAFT' }, can)?.title).toBe(
-      'Ghi sổ để cập nhật công nợ',
+  it('suggests posting only for drafts; the amount must not exceed the debt', () => {
+    expect(receiptNext({ status: 'POSTED' }, { post: true })).toBeNull()
+    const next = receiptNext({ status: 'DRAFT' }, { post: true })
+    expect(next?.title).toBe('Ghi sổ để giảm nợ')
+    expect(next?.description).toMatch(/không vượt nợ hiện tại/)
+    expect(receiptNext({ status: 'DRAFT' }, { post: false })?.waitingFor).toBe(
+      'Kế toán',
     )
-    expect(
-      financialNext('credit', { status: 'DRAFT' }, { ...can, post: false })
-        ?.waitingFor,
-    ).toBe('Kế toán')
-    expect(financialNext('refund', { status: 'DRAFT' }, can)?.title).toBe(
-      'Giữ chỗ quỹ hoàn tiền',
-    )
-    expect(
-      financialNext('refund', { status: 'DRAFT' }, { ...can, reserved: true })
-        ?.title,
-    ).toBe('Chi tiền cho đại lý')
-    expect(
-      financialNext('refund', { status: 'DRAFT' }, { ...can, unknown: true }),
-    ).toMatchObject({ title: 'Chờ kết quả hoàn trực tuyến', tone: 'warning' })
   })
 
   it('reconcile toasts follow the gateway status', () => {
@@ -308,13 +189,28 @@ describe('financial guidance', () => {
   })
 })
 
-describe('other rails', () => {
-  it('correction rail differs for cancel and correct', () => {
+describe('cancel and correction', () => {
+  it('rail differs for cancel and correct', () => {
     expect(correctionSteps(true)[1]?.label).toBe('Hủy (nhập lý do)')
-    expect(correctionSteps(false)[1]?.label).toBe('Sửa (phiên bản mới)')
+    expect(correctionSteps(false)[1]?.label).toBe(
+      'Sửa (nhập lý do và nội dung mới)',
+    )
     expect(states(correctionSteps(false))).toEqual(['done', 'current', 'todo'])
+    expect(correctionSteps(true)[0]?.hint).toMatch(/tháng hiện tại/)
   })
 
+  it('toasts name the old and new codes', () => {
+    expect(documentChangeNotice('cancel', 'PX-9').done).toBe('Đã hủy PX-9.')
+    expect(documentChangeNotice('correct', 'PX-9', 'PX-12').done).toBe(
+      'Đã sửa PX-9 thành PX-12.',
+    )
+    expect(documentChangeNotice('correct', '', undefined).done).toBe(
+      'Đã sửa chứng từ thành phiếu mới.',
+    )
+  })
+})
+
+describe('other rails', () => {
   it('business-rule rail follows dirty/saved state', () => {
     const saved = { capacity: '4', rate: '1.02' }
     expect(dirtyRules('4', '1.02', saved)).toBe(false)
@@ -351,58 +247,5 @@ describe('other rails', () => {
       'todo',
     ])
     expect(states(reportSteps(true, false, true))[2]).toBe('done')
-  })
-})
-
-describe('useUpfrontState', () => {
-  it('is NONE without a confirmation and reads the record state', async () => {
-    const fetch = vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      data: { state: 'VERIFIED' },
-      status: 200,
-      etag: null,
-    })
-    const none = renderHook(() => useUpfrontState(null))
-    expect(none.result.current).toBe('NONE')
-    expect(fetch).not.toHaveBeenCalled()
-    const { result } = renderHook(() => useUpfrontState('31'))
-    expect(result.current).toBe('UNKNOWN')
-    await waitFor(() => expect(result.current).toBe('VERIFIED'))
-    expect(fetch).toHaveBeenCalledWith(
-      '/upfront-confirmations/31',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    )
-  })
-
-  it('falls back to UNKNOWN for failures and unexpected states', async () => {
-    vi.spyOn(api, 'apiFetch').mockResolvedValueOnce({
-      data: { state: 'HACKED' },
-      status: 200,
-      etag: null,
-    })
-    const odd = renderHook(() => useUpfrontState('1'))
-    await waitFor(() => expect(api.apiFetch).toHaveBeenCalledTimes(1))
-    expect(odd.result.current).toBe('UNKNOWN')
-    vi.mocked(api.apiFetch).mockRejectedValueOnce(new Error('offline'))
-    const failed = renderHook(() => useUpfrontState('2'))
-    await waitFor(() => expect(api.apiFetch).toHaveBeenCalledTimes(2))
-    expect(failed.result.current).toBe('UNKNOWN')
-  })
-
-  it('reloads when the version changes and aborts on unmount', async () => {
-    const fetch = vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      data: { state: 'CONSUMED' },
-      status: 200,
-      etag: null,
-    })
-    const { result, rerender, unmount } = renderHook(
-      ({ version }) => useUpfrontState('31', version),
-      { initialProps: { version: 0 } },
-    )
-    await waitFor(() => expect(result.current).toBe('CONSUMED'))
-    rerender({ version: 1 })
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
-    const signal = fetch.mock.calls[1]![1]!.signal!
-    unmount()
-    expect(signal.aborted).toBe(true)
   })
 })

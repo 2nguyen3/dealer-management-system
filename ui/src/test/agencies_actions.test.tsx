@@ -43,7 +43,9 @@ const agencies: Agency[] = [
     wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
-    currentDebt: '15000000',
+    debt: '15000000',
+    maxDebt: '50000000',
+    remainingCreditLimit: '35000000',
     status: 'ACTIVE',
   } as Agency,
   {
@@ -55,8 +57,24 @@ const agencies: Agency[] = [
     wardName: 'Phường Sài Gòn',
     typeId: 1,
     typeName: 'Đại lý cấp 1',
-    currentDebt: '0',
+    debt: '0',
+    maxDebt: '50000000',
+    remainingCreditLimit: '50000000',
     status: 'TERMINATED',
+  } as Agency,
+  {
+    id: '103',
+    code: 'DL-103',
+    name: 'Đại lý Trả Trước',
+    phone: '0923456789',
+    wardId: 2,
+    wardName: 'Phường Sài Gòn',
+    typeId: 1,
+    typeName: 'Đại lý cấp 1',
+    debt: '-200000',
+    maxDebt: '50000000',
+    remainingCreditLimit: '50200000',
+    status: 'ACTIVE',
   } as Agency,
 ]
 
@@ -158,6 +176,62 @@ describe('AgenciesPage row actions and overview', () => {
       await screen.findByRole('heading', { name: 'Chỉnh sửa hồ sơ: DL-101' }),
     ).toBeTruthy()
     expect(apiModule.apiFetch).toHaveBeenCalledWith('/agencies/101')
+  })
+
+  it('shows current debt, maximum debt and a prepaid balance', async () => {
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    expect(
+      screen.getByRole('columnheader', { name: /Nợ hiện tại/ }),
+    ).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Nợ tối đa' })).toBeTruthy()
+    expect(
+      screen.queryByRole('columnheader', { name: /Dư nợ|Dư có/ }),
+    ).toBeNull()
+    const prepaid = screen.getByText('Đại lý Trả Trước').closest('tr')!
+    expect(prepaid.textContent).toContain('Trả trước')
+    openMenu('DL-101')
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Xem chi tiết' }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    const text = dialog.textContent ?? ''
+    expect(text).toContain('Nợ hiện tại')
+    expect(text).toContain('15.000.000')
+    expect(text).toContain('Nợ tối đa')
+    expect(text).toContain('Còn được nợ')
+    expect(text).toContain('35.000.000')
+    expect(text).not.toContain('Dư có')
+  })
+
+  it('warns before terminating an agency with debt and shows the 409 reason', async () => {
+    failCreate = new ApiError(
+      409,
+      'AGENCY_HAS_DEBT',
+      apiModule.ERROR_CODE_MESSAGES.AGENCY_HAS_DEBT!,
+    )
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    openMenu('DL-101')
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Ngừng hợp tác' }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('Chỉ ngừng hợp tác được khi nợ bằng 0')
+    fireEvent.change(within(dialog).getByLabelText(/Lý do/), {
+      target: { value: 'Đóng cửa hàng' },
+    })
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Xác nhận ngừng hợp tác' }),
+    )
+    await waitFor(() =>
+      expect(posted.at(-1)?.path).toBe('/agencies/101/terminate'),
+    )
+    expect(
+      await within(dialog).findByText(
+        apiModule.ERROR_CODE_MESSAGES.AGENCY_HAS_DEBT!,
+      ),
+    ).toBeTruthy()
   })
 
   it('opens the terminate dialog from the menu with a required reason', async () => {

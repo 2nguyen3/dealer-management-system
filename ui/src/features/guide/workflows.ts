@@ -1,11 +1,8 @@
 import type { NextAction } from '@/components/guide/NextActionCallout'
 import type { StepState, WorkflowStep } from '@/components/guide/WorkflowSteps'
-import { formatQuantity, formatVND } from '@/lib/formatters'
+import { formatQuantity } from '@/lib/formatters'
 import { msg, t } from '@/lib/i18n/core'
-import type {
-  DocumentDetail,
-  GoodsKind,
-} from '../document_history/documentContracts'
+import type { DocumentDetail } from '../document_history/documentContracts'
 
 /**
  * Pure "server state → process position" models for the business workflows.
@@ -49,14 +46,11 @@ export function subtractMoney(a: string, b: string): string | null {
   return (BigInt(a) - BigInt(b)).toString()
 }
 
-/** State of the upfront confirmation attached to the issue's current revision. */
-export type UpfrontState =
-  'NONE' | 'VERIFIED' | 'CONSUMED' | 'RECEIVED_SEPARATELY' | 'UNKNOWN'
-
 export interface IssueAbilities {
   prepare: boolean
   post: boolean
-  verify: boolean
+  /** May prepare a payment receipt (the step after posting). */
+  collect: boolean
 }
 
 export interface IssueWorkflow {
@@ -64,91 +58,36 @@ export interface IssueWorkflow {
   next: NextAction | null
   /** Why "Ghi sổ" cannot succeed yet (null = predicted OK). */
   postLock: string | null
-  /** Why "Nộp phiếu" cannot succeed yet. */
-  submitLock: string | null
-  /** Why "Thay nội dung chờ xuất" is refused by the server. */
-  replaceLock: string | null
-  /** Upfront amount that must be verified ('' when none). */
-  upfront: string
-}
-
-/** Deep link that opens the upfront form with this issue preselected. */
-export function upfrontLink(documentId: string): string {
-  return `/upfront-payments?issue=${encodeURIComponent(documentId)}&new=1`
 }
 
 /**
- * Stock issue: Nháp → Nộp (giá chốt, hạn mức) → Xác nhận trả ngay (only when
- * immediatePayment > 0) → Ghi sổ. `upfront` is the state of the confirmation
- * of the CURRENT revision (detail `upfrontConfirmationId` + its record).
+ * Deep link that opens a new payment receipt for an agency
+ * (`/payment-receipts?agency=<id>&new=1`); the plain list without an agency.
+ */
+export function collectLink(agencyId: string | null | undefined): string {
+  return agencyId
+    ? `/payment-receipts?agency=${encodeURIComponent(agencyId)}&new=1`
+    : '/payment-receipts'
+}
+
+/**
+ * Stock issue: Lập nháp → Ghi sổ xuất kho (price fixed at posting from the
+ * latest purchase price × selling-price rate; stock and debt-limit checks)
+ * → Lập phiếu thu when the agency pays. A posted issue changes only through
+ * Hủy or Sửa có lý do.
  */
 export function stockIssueWorkflow(
-  doc: Pick<
-    DocumentDetail,
-    'id' | 'code' | 'status' | 'currentRevision' | 'upfrontConfirmationId'
-  >,
-  upfront: UpfrontState,
+  doc: Pick<DocumentDetail, 'code' | 'status' | 'lines' | 'agencyId'>,
   can: IssueAbilities,
 ): IssueWorkflow {
-  const revision = doc.currentRevision
-  const amount = positiveMoney(revision.immediatePayment)
-    ? revision.immediatePayment
-    : ''
-  const needsUpfront = amount !== ''
-  // While the confirmation record loads (UNKNOWN), predict nothing: the server decides.
-  const verified =
-    upfront === 'VERIFIED' ||
-    upfront === 'CONSUMED' ||
-    (upfront === 'UNKNOWN' && !!doc.upfrontConfirmationId)
-  const separated = upfront === 'RECEIVED_SEPARATELY'
-  const draft = doc.status === 'DRAFT' && revision.state === 'DRAFT'
-  const ready = doc.status === 'PENDING' && revision.state === 'READY'
+  const draft = doc.status === 'DRAFT'
   const posted = doc.status === 'POSTED'
   const cancelled = doc.status === 'CANCELLED'
-  const money = formatVND(amount || '0')
-
-  const upfrontHint = needsUpfront
-    ? t(
-        'Kế toán xác nhận đã thực nhận {amount} cho đúng phiên bản đang chờ xuất.',
-        { amount: money },
-      )
-    : t('Phiếu không có khoản trả ngay nên bỏ qua bước này.')
-  const cancelledHint = t('Phiếu đã hủy.')
-
-  const states: Record<'draft' | 'submit' | 'upfront' | 'post', StepState> =
-    cancelled
-      ? {
-          draft: 'done',
-          submit: 'skipped',
-          upfront: 'skipped',
-          post: 'skipped',
-        }
-      : posted
-        ? {
-            draft: 'done',
-            submit: 'done',
-            upfront: needsUpfront ? 'done' : 'skipped',
-            post: 'done',
-          }
-        : ready
-          ? {
-              draft: 'done',
-              submit: 'done',
-              upfront: !needsUpfront
-                ? 'skipped'
-                : verified
-                  ? 'done'
-                  : separated
-                    ? 'blocked'
-                    : 'current',
-              post: !needsUpfront || verified ? 'current' : 'blocked',
-            }
-          : {
-              draft: 'current',
-              submit: 'todo',
-              upfront: needsUpfront ? 'todo' : 'skipped',
-              post: 'todo',
-            }
+  const states: Record<'draft' | 'post' | 'collect', StepState> = cancelled
+    ? { draft: 'done', post: 'skipped', collect: 'skipped' }
+    : posted
+      ? { draft: 'done', post: 'done', collect: 'current' }
+      : { draft: 'current', post: 'todo', collect: 'todo' }
 
   const steps = [
     step(
@@ -157,364 +96,205 @@ export function stockIssueWorkflow(
       states.draft,
       ROLES.sales,
       cancelled
-        ? cancelledHint
-        : t('Chọn đại lý, ngày, các dòng hàng và khoản trả ngay (nếu có).'),
-    ),
-    step(
-      'submit',
-      msg('Nộp phiếu'),
-      states.submit,
-      ROLES.sales,
-      t('Hệ thống chốt giá bán, kiểm tra tồn kho và hạn mức nợ của đại lý.'),
-    ),
-    step(
-      'upfront',
-      msg('Xác nhận trả ngay'),
-      states.upfront,
-      ROLES.accounting,
-      separated
-        ? t(
-            'Khoản tiền đã thành phiếu thu riêng, không còn gắn với phiếu này. Thay nội dung phiếu (phiên bản mới); không nhập lại số tiền đã thu vào trả ngay để tránh tính hai lần.',
-          )
-        : upfrontHint,
+        ? t('Phiếu đã hủy.')
+        : t('Chọn đại lý, ngày và các dòng hàng (mặt hàng, số lượng).'),
     ),
     step(
       'post',
       msg('Ghi sổ xuất kho'),
       states.post,
       ROLES.warehouse,
-      needsUpfront
-        ? t('Trừ tồn kho, ghi công nợ và tự lập phiếu thu cho khoản trả ngay.')
-        : t('Trừ tồn kho và ghi công nợ cho đại lý.'),
+      t(
+        'Hệ thống chốt đơn giá = giá nhập gần nhất × tỷ lệ giá bán, trừ tồn kho và cộng nợ; số lượng không vượt tồn, nợ sau phiếu không vượt hạn mức.',
+      ),
+    ),
+    step(
+      'collect',
+      msg('Lập phiếu thu'),
+      states.collect,
+      ROLES.accounting,
+      t(
+        'Khi đại lý trả tiền, lập phiếu thu với số tiền không vượt nợ hiện tại.',
+      ),
     ),
   ]
 
-  let postLock: string | null = null
-  if (!ready)
-    postLock = t('Phiếu phải được nộp (trạng thái Sẵn sàng) trước khi ghi sổ.')
-  else if (needsUpfront && separated)
-    postLock = t(
-      'Khoản trả ngay đã được ghi nhận riêng thành phiếu thu. Thay nội dung phiếu (phiên bản mới) rồi nộp lại trước khi ghi sổ.',
-    )
-  else if (needsUpfront && !verified)
-    postLock = t(
-      'Chưa có xác nhận trả ngay {amount}. Kế toán cần xác nhận tiền thực nhận trước khi ghi sổ.',
-      { amount: money },
-    )
-
-  const submitLock =
-    draft && revision.lines.length === 0
-      ? t('Phiếu chưa có dòng hàng. Sửa nháp để thêm ít nhất một dòng.')
-      : null
-
-  const replaceLock =
-    ready && upfront === 'VERIFIED'
-      ? t(
-          'Phiếu đã có tiền trả ngay được xác nhận cho phiên bản này. Muốn thay nội dung, Kế toán phải Ghi nhận tiền riêng trước (tiền thành phiếu thu riêng).',
-        )
+  const postLock = !draft
+    ? t('Chỉ ghi sổ được phiếu đang là nháp.')
+    : doc.lines.length === 0
+      ? t('Phiếu chưa có dòng hàng. Thêm ít nhất một dòng trước khi ghi sổ.')
       : null
 
   let next: NextAction | null = null
-  if (draft) {
-    next = can.prepare
-      ? {
-          title: t('Nộp phiếu để chốt giá'),
-          description: needsUpfront
-            ? t(
-                'Sau khi nộp, Kế toán xác nhận khoản trả ngay {amount}, rồi Kho ghi sổ.',
-                { amount: money },
-              )
-            : t('Sau khi nộp, Kho ghi sổ để xuất hàng.'),
-        }
-      : {
-          title: t('Phiếu đang là nháp'),
-          waitingFor: t(ROLES.sales),
-        }
-  } else if (ready && needsUpfront && !verified) {
-    next = separated
-      ? {
-          title: t('Cần lập lại phiên bản phiếu'),
-          description: t(
-            'Khoản trả ngay đã thành phiếu thu riêng nên không dùng cho phiếu này nữa. Thay nội dung chờ xuất và nộp lại; chỉ nhập trả ngay nếu đại lý trả thêm tiền mới.',
-          ),
-          tone: 'warning',
-        }
-      : can.verify
-        ? {
-            title: t('Xác nhận khoản trả ngay {amount}', { amount: money }),
-            description: t(
-              'Ghi nhận tiền thực nhận cho phiên bản đang chờ xuất của {code}. Sau đó Kho mới ghi sổ được.',
-              { code: doc.code },
-            ),
-            to: upfrontLink(doc.id),
-            actionLabel: t('Mở form xác nhận'),
-            tone: 'warning',
-          }
-        : {
-            title: t('Chờ xác nhận khoản trả ngay {amount}', { amount: money }),
-            description: t(
-              'Kế toán ghi nhận tiền thực nhận trên trang Xác nhận trả ngay. Sửa và nộp lại phiếu không thay cho bước này.',
-            ),
-            waitingFor: t(ROLES.accounting),
-            tone: 'warning',
-          }
-  } else if (ready) {
+  if (draft)
     next = can.post
       ? {
-          title: t('Sẵn sàng ghi sổ'),
-          description: t('Kiểm tra lại số lượng rồi bấm Ghi sổ để xuất kho.'),
+          title: t('Ghi sổ để xuất hàng'),
+          description: t(
+            'Kiểm tra số lượng rồi bấm Ghi sổ. Đơn giá được chốt lúc ghi sổ; sau đó chỉ Hủy hoặc Sửa có lý do.',
+          ),
         }
-      : { title: t('Sẵn sàng ghi sổ'), waitingFor: t(ROLES.warehouse) }
-  }
+      : { title: t('Phiếu đang là nháp'), waitingFor: t(ROLES.warehouse) }
+  else if (posted)
+    next = can.collect
+      ? {
+          title: t('Lập phiếu thu khi đại lý trả tiền'),
+          description: t(
+            'Nợ của đại lý đã tăng theo {code}. Phiếu thu làm giảm nợ hiện tại.',
+            { code: doc.code },
+          ),
+          to: collectLink(doc.agencyId),
+          actionLabel: t('Lập phiếu thu'),
+        }
+      : { title: t('Chờ thu tiền đại lý'), waitingFor: t(ROLES.accounting) }
 
-  return { steps, next, postLock, submitLock, replaceLock, upfront: amount }
+  return { steps, next, postLock }
 }
 
 /** Plain-language consequences of posting a stock issue (confirm dialog). */
-export function issuePostEffects(
-  doc: Pick<DocumentDetail, 'currentRevision'>,
-): string[] {
-  const revision = doc.currentRevision
-  const lines = revision.lines.map((line) =>
-    t('Tồn kho {product}: −{quantity} {unit}', {
-      product: line.productName,
-      quantity: formatQuantity(line.quantity),
-      unit: line.unitName,
-    }),
-  )
-  const effects = [...lines]
-  effects.push(
-    t('Công nợ đại lý tăng {total} (giá đã chốt khi nộp).', {
-      total: formatVND(revision.totalAmount),
-    }),
-  )
-  if (positiveMoney(revision.immediatePayment)) {
-    const rest = subtractMoney(revision.totalAmount, revision.immediatePayment)
-    effects.push(
-      t(
-        'Tự lập phiếu thu {amount} từ khoản trả ngay đã xác nhận; công nợ còn tăng thêm {rest}.',
-        {
-          amount: formatVND(revision.immediatePayment),
-          rest: rest === null ? '—' : formatVND(rest),
-        },
-      ),
-    )
+export function issuePostEffects(doc: Pick<DocumentDetail, 'lines'>): string[] {
+  return [
+    ...doc.lines.map((line) =>
+      t('Tồn kho {product}: −{quantity} {unit}', {
+        product: line.productName,
+        quantity: formatQuantity(line.quantity),
+        unit: line.unitName,
+      }),
+    ),
+    t(
+      'Đơn giá xuất được chốt = giá nhập gần nhất × tỷ lệ giá bán; nợ của đại lý tăng đúng tổng tiền phiếu.',
+    ),
+    t('Nếu nợ sau phiếu vượt hạn mức của loại đại lý, ghi sổ bị từ chối.'),
+  ]
+}
+
+/** Toast after posting a stock issue: the next step is a payment receipt. */
+export function issuePostedNotice(
+  doc: Pick<DocumentDetail, 'code' | 'agencyId'>,
+): { done: string; next: string; to: string } {
+  return {
+    done: t('Đã ghi sổ {code}.', { code: doc.code || t('chứng từ') }),
+    next: t(
+      'Tồn kho đã giảm, nợ đại lý đã tăng. Bước tiếp: lập phiếu thu khi đại lý trả tiền.',
+    ),
+    to: collectLink(doc.agencyId),
   }
-  return effects
 }
 
-/** Consequences of posting the other goods documents. */
-export function goodsPostEffects(
-  kind: Exclude<GoodsKind, 'STOCK_ISSUE'>,
-  doc: Pick<DocumentDetail, 'currentRevision'>,
-): string[] {
-  const lines = doc.currentRevision.lines
-  if (kind === 'STOCK_RECEIPT')
-    return [
-      ...lines.map((line) =>
-        t('Tồn kho {product}: +{quantity} {unit}', {
-          product: line.productName,
-          quantity: formatQuantity(line.quantity),
-          unit: line.unitName,
-        }),
-      ),
-      t('Giá nhập hiện hành của các mặt hàng được cập nhật theo phiếu này.'),
-      t(
-        'Giá bán khi nộp phiếu xuất sau này = giá nhập × tỷ lệ giá bán trong quy định.',
-      ),
-    ]
-  if (kind === 'SALES_RETURN')
-    return [
-      ...lines.map((line) =>
-        t('Tồn kho {product}: +{quantity} {unit}', {
-          product: line.productName,
-          quantity: formatQuantity(line.quantity),
-          unit: line.unitName,
-        }),
-      ),
-      t(
-        'Giảm công nợ của phiếu xuất gốc; phần vượt số nợ còn lại thành dư có cho đại lý.',
-      ),
-    ]
-  return lines.map((line) =>
-    t('Tồn kho {product}: {sign}{quantity} {unit}', {
-      product: line.productName,
-      sign: line.quantity.startsWith('-') ? '' : '+',
-      quantity: formatQuantity(line.quantity),
-      unit: line.unitName,
-    }),
-  )
+/** Consequences of posting a stock receipt. */
+export function goodsPostEffects(doc: Pick<DocumentDetail, 'lines'>): string[] {
+  return [
+    ...doc.lines.map((line) =>
+      t('Tồn kho {product}: +{quantity} {unit}', {
+        product: line.productName,
+        quantity: formatQuantity(line.quantity),
+        unit: line.unitName,
+      }),
+    ),
+    t('Giá nhập gần nhất của các mặt hàng được cập nhật theo phiếu này.'),
+    t('Giá bán = giá nhập gần nhất × tỷ lệ giá bán trong quy định.'),
+  ]
 }
 
-/** Draft → Ghi sổ for receipts, returns and independent adjustments. */
+/** Lập nháp → Ghi sổ for stock receipts. */
 export function goodsWorkflow(
-  kind: Exclude<GoodsKind, 'STOCK_ISSUE'>,
-  doc: Pick<DocumentDetail, 'status' | 'stockCountId'>,
+  doc: Pick<DocumentDetail, 'status'>,
   canPost: boolean,
 ): { steps: WorkflowStep[]; next: NextAction | null } {
-  const role = kind === 'SALES_RETURN' ? ROLES.sales : ROLES.warehouse
-  const postRole = kind === 'SALES_RETURN' ? ROLES.warehouse : ROLES.warehouse
-  const fromCount = kind === 'STOCK_ADJUSTMENT' && !!doc.stockCountId
   const posted = doc.status === 'POSTED'
   const cancelled = doc.status === 'CANCELLED'
-  const firstLabel =
-    kind === 'SALES_RETURN'
-      ? msg('Chọn phiếu xuất gốc & lập nháp')
-      : msg('Lập nháp')
   const steps = [
     step(
       'draft',
-      firstLabel,
-      fromCount ? 'done' : cancelled || posted ? 'done' : 'current',
-      fromCount ? ROLES.warehouse : role,
-      fromCount ? t('Sinh tự động từ biên bản kiểm kê.') : undefined,
+      msg('Lập nháp'),
+      cancelled || posted ? 'done' : 'current',
+      ROLES.warehouse,
     ),
     step(
       'post',
       msg('Ghi sổ'),
-      posted ? 'done' : cancelled ? 'skipped' : fromCount ? 'blocked' : 'todo',
-      postRole,
-      fromCount
-        ? t('Được ghi sổ cùng biên bản kiểm kê, không ghi sổ riêng.')
-        : cancelled
-          ? t('Phiếu đã hủy.')
-          : undefined,
+      posted ? 'done' : cancelled ? 'skipped' : 'todo',
+      ROLES.warehouse,
+      cancelled
+        ? t('Phiếu đã hủy.')
+        : t('Cộng tồn kho và cập nhật giá nhập gần nhất.'),
     ),
   ]
   const next: NextAction | null =
-    posted || cancelled || fromCount
+    posted || cancelled
       ? null
       : canPost
         ? {
             title: t('Ghi sổ khi đã kiểm tra đủ dòng hàng'),
             description: t(
-              'Sau khi ghi sổ, chỉ sửa được bằng Sửa sai hoặc Hủy chứng từ.',
+              'Sau khi ghi sổ, chỉ thay đổi được bằng Hủy hoặc Sửa có lý do.',
             ),
           }
-        : { title: t('Phiếu đang là nháp'), waitingFor: t(postRole) }
+        : { title: t('Phiếu đang là nháp'), waitingFor: t(ROLES.warehouse) }
   return { steps, next }
 }
 
-export type FinancialVariant = 'receipt' | 'credit' | 'refund'
-
-/** Bottom-right toast text after a receipt / credit / refund action. */
-export function financialNotice(
-  variant: FinancialVariant,
-  action: string,
+/** Bottom-right toast text after a payment receipt action. */
+export function receiptNotice(
+  action: 'create' | 'post' | 'delete',
   code: string,
 ): { done: string; next?: string; to?: string } {
   const ref = code || t('chứng từ')
   if (action === 'create')
     return {
       done: t('Đã tạo nháp {code}.', { code: ref }),
-      next:
-        variant === 'refund'
-          ? t(
-              'Bước tiếp: mở yêu cầu và bấm Giữ chỗ quỹ để khóa dư có cho khoản hoàn này.',
-            )
-          : variant === 'credit'
-            ? t(
-                'Bước tiếp: kiểm tra số tiền rồi Ghi sổ để trừ dư có vào công nợ.',
-              )
-            : t(
-                'Bước tiếp: kiểm tra số tiền rồi Ghi sổ; công nợ chỉ giảm sau khi ghi sổ.',
-              ),
+      next: t(
+        'Bước tiếp: kiểm tra số tiền rồi Ghi sổ; nợ đại lý chỉ giảm sau khi ghi sổ.',
+      ),
     }
   if (action === 'post')
-    return variant === 'credit'
-      ? {
-          done: t('Đã bù trừ dư có {code}.', { code: ref }),
-          next: t('Dư có giảm và các hóa đơn còn nợ cũ nhất được trừ trước.'),
-          to: '/agency-credit',
-        }
-      : {
-          done: t('Đã ghi sổ {code}.', { code: ref }),
-          next: t(
-            'Tiền đã phân bổ vào hóa đơn cũ nhất trước (FIFO); công nợ đại lý đã giảm.',
-          ),
-          to: '/receivables',
-        }
-  if (action === 'submit')
     return {
-      done: t('Đã giữ chỗ quỹ cho {code}.', { code: ref }),
-      next: t(
-        'Bước tiếp: chi tiền cho đại lý rồi bấm Xác nhận đã chi tiền, hoặc gửi Yêu cầu hoàn trực tuyến.',
-      ),
+      done: t('Đã ghi sổ {code}.', { code: ref }),
+      next: t('Nợ hiện tại của đại lý đã giảm đúng số tiền thu.'),
+      to: '/agencies',
     }
-  if (action === 'confirm-paid')
-    return {
-      done: t('Đã ghi nhận chi tiền {code}.', { code: ref }),
-      next: t('Yêu cầu hoàn tiền đã hoàn tất; dư có của đại lý đã giảm.'),
-      to: '/agency-credit',
-    }
-  if (action === 'attempts')
-    return {
-      done: t('Đã gửi yêu cầu hoàn trực tuyến {code}.', { code: ref }),
-      next: t(
-        'Chờ cổng thanh toán xác nhận; nếu lâu chưa có kết quả, bấm Đối soát lần thử hiện tại.',
-      ),
-    }
-  if (action === 'reconcile')
-    return {
-      done: t('Đã đối soát với cổng thanh toán.'),
-      next: t('Xem trạng thái mới nhất của lần hoàn trong chi tiết.'),
-    }
-  if (action === 'cancel') return { done: t('Đã hủy {code}.', { code: ref }) }
-  return { done: t('Đã thực hiện thao tác.') }
+  return { done: t('Đã xóa nháp {code}.', { code: ref }) }
 }
 
-/** "Việc cần làm tiếp" for receipts, credit applications and refunds. */
-export function financialNext(
-  variant: FinancialVariant,
-  item: {
-    status: string
-    reservedAmount?: string
-    latestAttemptState?: string | null
-  },
-  can: { post: boolean; manual: boolean; reserved: boolean; unknown: boolean },
+/** "Việc cần làm tiếp" for a payment receipt. */
+export function receiptNext(
+  item: Pick<DocumentDetail, 'status'>,
+  can: { post: boolean },
 ): NextAction | null {
   if (item.status !== 'DRAFT') return null
-  if (variant === 'receipt' && !can.manual) return null
-  const role = variant === 'credit' ? ROLES.accounting : ROLES.accounting
-  if (variant === 'refund') {
-    if (can.unknown)
-      return {
-        title: t('Chờ kết quả hoàn trực tuyến'),
-        description: t(
-          'Không hủy hoặc tạo lần mới; bấm Đối soát lần thử hiện tại để hỏi lại cổng.',
-        ),
-        tone: 'warning',
-        ...(can.post ? {} : { waitingFor: t(role) }),
-      }
-    if (!can.reserved)
-      return can.post
-        ? {
-            title: t('Giữ chỗ quỹ hoàn tiền'),
-            description: t(
-              'Khóa số dư có của đại lý cho yêu cầu này trước khi chi tiền.',
-            ),
-          }
-        : { title: t('Chờ giữ chỗ quỹ'), waitingFor: t(role) }
-    return can.post
-      ? {
-          title: t('Chi tiền cho đại lý'),
-          description: t(
-            'Chi tiền mặt/chuyển khoản rồi Xác nhận đã chi tiền; với hoàn online, gửi Yêu cầu hoàn trực tuyến.',
-          ),
-        }
-      : { title: t('Chờ chi tiền cho đại lý'), waitingFor: t(role) }
-  }
   return can.post
     ? {
-        title: t('Ghi sổ để cập nhật công nợ'),
-        description:
-          variant === 'credit'
-            ? t('Bù trừ chỉ có hiệu lực sau khi ghi sổ.')
-            : t(
-                'Công nợ chỉ giảm sau khi ghi sổ; tiền trừ vào hóa đơn cũ nhất trước.',
-              ),
+        title: t('Ghi sổ để giảm nợ'),
+        description: t(
+          'Số tiền phải lớn hơn 0 và không vượt nợ hiện tại của đại lý; nợ chỉ giảm sau khi ghi sổ.',
+        ),
       }
-    : { title: t('Phiếu đang là nháp'), waitingFor: t(role) }
+    : { title: t('Phiếu đang là nháp'), waitingFor: t(ROLES.accounting) }
+}
+
+/** Toast after cancelling or correcting ("sửa có lý do") a posted document. */
+export function documentChangeNotice(
+  action: 'cancel' | 'correct',
+  code: string,
+  newCode?: string,
+): { done: string; next: string } {
+  const ref = code || t('chứng từ')
+  return action === 'cancel'
+    ? {
+        done: t('Đã hủy {code}.', { code: ref }),
+        next: t(
+          'Ảnh hưởng của phiếu (tồn kho, nợ) đã được đảo lại; lý do được lưu trong lịch sử.',
+        ),
+      }
+    : {
+        done: t('Đã sửa {code} thành {newCode}.', {
+          code: ref,
+          newCode: newCode || t('phiếu mới'),
+        }),
+        next: t(
+          'Phiếu cũ đã bị hủy và thay bằng phiếu mới đã ghi sổ; xem chuỗi thay thế trong Lịch sử chứng từ.',
+        ),
+      }
 }
 
 /** Toast after "đối soát" of an online payment, by server status. */
@@ -526,7 +306,7 @@ export function reconcileNotice(status: unknown): {
   if (status === 'SUCCESS')
     return {
       done: t('Cổng thanh toán xác nhận giao dịch thành công.'),
-      next: t('Phiếu thu đã được lập tự động và công nợ đại lý đã giảm.'),
+      next: t('Phiếu thu đã được lập tự động và nợ đại lý đã giảm.'),
       to: '/payment-receipts',
     }
   if (status === 'FAILED')
@@ -549,29 +329,37 @@ export function reconcileNotice(status: unknown): {
   }
 }
 
-/** Rail of the correction / cancellation dialog (the user is at step 2). */
+/** Rail of the cancel / "sửa có lý do" dialog (the user is at step 2). */
 export function correctionSteps(cancel: boolean): WorkflowStep[] {
   return [
-    step('pick', msg('Chọn chứng từ đã ghi sổ'), 'done', ROLES.management),
+    step(
+      'pick',
+      msg('Chọn chứng từ đã ghi sổ'),
+      'done',
+      ROLES.management,
+      t('Chỉ chứng từ có ngày trong tháng hiện tại.'),
+    ),
     step(
       'change',
-      cancel ? msg('Hủy (nhập lý do)') : msg('Sửa (phiên bản mới)'),
+      cancel
+        ? msg('Hủy (nhập lý do)')
+        : msg('Sửa (nhập lý do và nội dung mới)'),
       'current',
       ROLES.management,
       cancel
-        ? t('Hủy không hoàn tác; lý do được lưu vào nhật ký.')
-        : t(
-            'Nhập lại toàn bộ nội dung đúng; phiên bản cũ được giữ trong lịch sử.',
-          ),
+        ? t('Hủy không hoàn tác; lý do được lưu vào lịch sử.')
+        : t('Nhập lại nội dung đúng; phiếu cũ được giữ trong chuỗi thay thế.'),
     ),
     step(
-      'replay',
-      msg('Hệ thống tính lại'),
+      'apply',
+      msg('Hệ thống đảo ảnh hưởng'),
       'todo',
       undefined,
-      t(
-        'Tồn kho, công nợ, dư có của các chứng từ phía sau được tính lại theo ngày nghiệp vụ.',
-      ),
+      cancel
+        ? t('Tồn kho và nợ đại lý được đảo đúng theo phiếu bị hủy.')
+        : t(
+            'Phiếu cũ bị hủy và phiếu mới (mã mới) được ghi sổ trong cùng một lần; nếu phiếu mới vi phạm quy định thì không có gì thay đổi.',
+          ),
     ),
   ]
 }
@@ -609,7 +397,9 @@ export function ruleSteps(dirty: boolean, saved: boolean): WorkflowStep[] {
       msg('Lưu quy định'),
       saved && !dirty ? 'done' : 'todo',
       ROLES.management,
-      t('Chỉ áp dụng cho chứng từ lập sau; giá trên chứng từ cũ không đổi.'),
+      t(
+        'Giá bán mới áp dụng cho phiếu xuất ghi sổ sau; phiếu đã ghi sổ giữ đơn giá đã chốt.',
+      ),
     ),
   ]
 }
@@ -638,7 +428,7 @@ export function masterNotice(
     return {
       done: t('Đã thêm mặt hàng.'),
       next: t(
-        'Bước tiếp: ghi sổ một phiếu nhập để mặt hàng có giá nhập và tồn kho.',
+        'Bước tiếp: ghi sổ một phiếu nhập để mặt hàng có tồn kho, giá nhập và giá bán.',
       ),
       to: '/stock-receipts',
     }

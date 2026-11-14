@@ -41,16 +41,16 @@ export function describeItem(
   let label = code && name ? `${code} — ${name}` : (code ?? name ?? `#${id}`)
   let detail: string | undefined
   if (resource === 'products') {
-    const stock = text(row.currentStock)
+    const stock = text(row.stock)
     if (stock !== undefined)
       detail = t('Tồn {stock} {text}', {
         stock: formatQuantity(stock),
         text: text(row.unitName) ?? '',
       }).trim()
   } else if (resource === 'agencies') {
-    const debt = text(row.currentDebt)
+    const debt = text(row.debt)
     if (debt !== undefined)
-      detail = t('Dư nợ {debt}', { debt: formatVND(debt) })
+      detail = t('Nợ hiện tại {debt}', { debt: formatVND(debt) })
   } else if (resource === 'wards') {
     // Ward names already carry their kind ("Phường …", "Xã …", "Đặc khu …").
     label = name ?? code ?? `#${id}`

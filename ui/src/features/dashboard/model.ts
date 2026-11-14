@@ -98,15 +98,15 @@ export const reportPlan: Record<
   ReportKind,
   { sort: string; limit: string; server: FilterKey[] }
 > = {
-  sales: { sort: '-netSalesAmount', limit: '100', server: ['typeId'] },
+  sales: { sort: '-salesAmount', limit: '100', server: ['typeId'] },
   debt: {
     sort: '-closingDebt',
     limit: '100',
     server: ['typeId', 'wardId'],
   },
   'product-sales': { sort: '-salesAmount', limit: '10', server: ['agencyId'] },
-  'cash-and-credit': {
-    sort: '-cashReceived',
+  collections: {
+    sort: 'businessDate',
     limit: '100',
     server: ['agencyId'],
   },
@@ -158,7 +158,7 @@ export type TrendPoint = NonNullable<Dashboard['sales']>['monthlyTrend'][number]
 export function trendDelta(
   points: TrendPoint[],
   selectedMonth: string,
-  field: 'gross' | 'returns' | 'net',
+  field: 'salesAmount' | 'issueCount',
 ): number | null {
   const current = points.find((point) => point.month === selectedMonth)
   const previous = points.find(
@@ -178,11 +178,10 @@ export interface MatrixRow {
 }
 
 export type MatrixColumn =
-  | 'netSalesAmount'
-  | 'returnAmount'
+  | 'salesAmount'
   | 'numberOfIssues'
   | 'debtIncrease'
-  | 'debtDecrease'
+  | 'paidAmount'
   | 'closingDebt'
 
 export const matrixColumns: {
@@ -192,14 +191,8 @@ export const matrixColumns: {
   kind: 'money' | 'count'
 }[] = [
   {
-    key: 'netSalesAmount',
-    label: t('Doanh số thuần'),
-    source: 'sales',
-    kind: 'money',
-  },
-  {
-    key: 'returnAmount',
-    label: t('Hàng trả lại'),
+    key: 'salesAmount',
+    label: t('Doanh số'),
     source: 'sales',
     kind: 'money',
   },
@@ -215,7 +208,7 @@ export const matrixColumns: {
     source: 'debt',
     kind: 'money',
   },
-  { key: 'debtDecrease', label: t('Giảm nợ'), source: 'debt', kind: 'money' },
+  { key: 'paidAmount', label: t('Đã thu'), source: 'debt', kind: 'money' },
   { key: 'closingDebt', label: t('Nợ cuối kỳ'), source: 'debt', kind: 'money' },
 ]
 

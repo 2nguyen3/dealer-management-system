@@ -41,7 +41,7 @@ describe('favouritable functions', () => {
   })
 
   it('rejects the Portal, the AI assistant, profile and unknown paths', () => {
-    expect(isFavoritable('/receivables')).toBe(true)
+    expect(isFavoritable('/payment-receipts')).toBe(true)
     for (const path of ['/', '/chatbot', '/profile', '/nope', ''])
       expect(isFavoritable(path)).toBe(false)
   })
@@ -51,41 +51,18 @@ describe('role defaults', () => {
   it('derives an accounting deck from accounting permissions', () => {
     expect(
       defaultFavorites(
-        holding(
-          'cash.receipt.prepare',
-          'cash.upfront.verify',
-          'debt.read',
-          'reports.read',
-          'sales.read',
-        ),
+        holding('debt.read', 'agency.read', 'reports.read', 'sales.read'),
       ),
-    ).toEqual([
-      '/payment-receipts',
-      '/upfront-payments',
-      '/receivables',
-      '/reports',
-    ])
+    ).toEqual(['/payment-receipts', '/agencies', '/reports'])
   })
 
   it('derives a warehouse deck and never adds a function the user may not open', () => {
     const deck = defaultFavorites(
-      holding(
-        'stock.receipt.prepare',
-        'stock.issue.prepare',
-        'inventory.read',
-        'stock.count',
-        'reports.read',
-      ),
+      holding('stock.receipt.prepare', 'stock.issue.prepare', 'reports.read'),
     )
-    expect(deck.slice(0, 4)).toEqual([
-      '/stock-receipts',
-      '/stock-issues',
-      '/stock-counts',
-      '/inventory',
-    ])
-    expect(deck).toContain('/reports')
-    // reports.read alone does not open /reports (it needs a read scope too).
-    expect(defaultFavorites(holding('reports.read'))).not.toContain('/reports')
+    expect(deck).toEqual(['/stock-receipts', '/stock-issues', '/reports'])
+    // agency.manage maps to /agencies; the deck never adds /users without it.
+    expect(defaultFavorites(holding('agency.manage'))).toEqual(['/agencies'])
   })
 
   it('caps the deck and falls back to the first permitted functions', () => {
@@ -101,6 +78,32 @@ describe('stored deck', () => {
     expect(
       parseFavorites('["/units","/chatbot","/units","/x",3,"/agencies"]'),
     ).toEqual(['/units', '/agencies'])
+    expect(parseFavorites('[]')).toEqual([])
+  })
+
+  it('drops removed functions from a deck saved before the simplification', () => {
+    const stale = JSON.stringify([
+      '/receivables',
+      '/units',
+      '/inventory',
+      '/refunds',
+      '/payment-receipts',
+      '/upfront-payments',
+    ])
+    expect(parseFavorites(stale)).toEqual(['/units', '/payment-receipts'])
+    localStorage.setItem(favoritesKey('u1'), stale)
+    expect(readFavorites('u1')).toEqual(['/units', '/payment-receipts'])
+    expect(
+      resolveDeck(readFavorites('u1') ?? [], holding('unit.manage')),
+    ).toEqual({ visible: ['/units'], hidden: 1 })
+  })
+
+  it('falls back to the role defaults when every saved function was removed', () => {
+    const stale = '["/receivables","/inventory","/refunds","/stock-counts"]'
+    expect(parseFavorites(stale)).toBeNull()
+    localStorage.setItem(favoritesKey('u1'), stale)
+    expect(readFavorites('u1')).toBeNull()
+    // A deck the user emptied on purpose stays empty.
     expect(parseFavorites('[]')).toEqual([])
   })
 
@@ -171,6 +174,19 @@ describe('list operations', () => {
       ),
     ).toEqual({ visible: ['/units', '/document-history'], hidden: 1 })
     expect(resolveDeck([], () => true)).toEqual({ visible: [], hidden: 0 })
+  })
+
+  it('drops removed functions from an in-memory deck without counting them', () => {
+    expect(
+      resolveDeck(
+        ['/receivables', '/units', '/inventory', '/users'],
+        holding('unit.manage'),
+      ),
+    ).toEqual({ visible: ['/units'], hidden: 1 })
+    expect(resolveDeck(['/refunds'], () => true)).toEqual({
+      visible: [],
+      hidden: 0,
+    })
   })
 })
 

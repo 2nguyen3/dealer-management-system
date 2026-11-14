@@ -20,23 +20,26 @@ import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Table } from '../../components/ui/Table'
 import { formatDate, formatVND } from '../../lib/formatters'
-import { kindLabel, statusLabel } from '../../lib/labels'
+import { kindLabel, methodLabel, statusLabel } from '../../lib/labels'
 import { useAuth } from '../authentication/useAuth'
 import {
   canReadKind,
+  DOCUMENT_STATUSES,
   documentKinds,
   parseSummary,
+  RECEIPT_TYPES,
   type DocumentKind,
   type DocumentSummary,
 } from './documentContracts'
 import { DocumentInsights } from './DocumentInsights'
 import { FilterStatus, SegmentedFilter, TableSkeleton } from './DocumentParts'
+import { replacementSuffix } from './insightsModel'
 import { useDocumentPage } from './useDocumentRequests'
 import { t } from '@/lib/i18n/core'
 
 /** Server default order of every document list (contract `sort` default). */
 export const DOCUMENT_DEFAULT_SORT = '-businessDate'
-/** Contract sort fields of /documents and the four goods-document lists. */
+/** Contract sort fields of /documents and the three per-kind lists. */
 export const DOCUMENT_SORT_OPTIONS = [
   { field: 'businessDate', label: t('Ngày chứng từ') },
   { field: 'totalAmount', label: t('Tổng tiền') },
@@ -44,18 +47,10 @@ export const DOCUMENT_SORT_OPTIONS = [
   { field: 'id', label: t('Thứ tự lập') },
 ] as const
 
-const statuses = ['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'] as const
-// Receipts and adjustments never carry an agency; issues/returns/money kinds do.
-const agencyless: readonly DocumentKind[] = [
-  'STOCK_RECEIPT',
-  'STOCK_ADJUSTMENT',
-]
-// Money-only kinds have no product lines to filter by.
-const productless: readonly DocumentKind[] = [
-  'PAYMENT_RECEIPT',
-  'CREDIT_APPLICATION',
-  'REFUND',
-]
+// Goods receipts never carry an agency; issues and payment receipts do.
+const agencyless: readonly DocumentKind[] = ['STOCK_RECEIPT']
+// Payment receipts have no product lines to filter by.
+const productless: readonly DocumentKind[] = ['PAYMENT_RECEIPT']
 const emptyDraft = {
   q: '',
   kind: '',
@@ -63,28 +58,25 @@ const emptyDraft = {
   toDate: '',
   agencyId: '',
   productId: '',
+  receiptType: '',
 }
 
-/** Status segments for a list: only stock issues wait in PENDING. */
-function statusSegments(kind?: DocumentKind) {
+/** Status segments of every document list: draft, posted, cancelled. */
+function statusSegments() {
   return [
     { value: '', label: t('Tất cả') },
-    ...statuses
-      .filter((value) => value !== 'PENDING' || !kind || kind === 'STOCK_ISSUE')
-      .map((value) => ({ value, label: statusLabel(value) })),
+    ...DOCUMENT_STATUSES.map((value) => ({ value, label: statusLabel(value) })),
   ]
 }
 
 export function DocumentList({
   kind,
-  posted = false,
   version = 0,
   actions,
   onRowClick,
   insights = true,
 }: {
   kind?: DocumentKind
-  posted?: boolean
   version?: number
   actions: (row: DocumentSummary) => ReactNode
   /** Primary row action; the row stays keyboard-reachable via `actions`. */
@@ -106,10 +98,9 @@ export function DocumentList({
         canReadKind(item as DocumentKind, hasPermission),
       )
   const query = new URLSearchParams(filters)
-  if (status && !posted) query.set('status', status)
+  if (status) query.set('status', status)
   query.set('limit', String(limit))
   query.set('sort', sort || DOCUMENT_DEFAULT_SORT)
-  if (posted) query.set('status', 'POSTED')
   if (cursors.at(-1)) query.set('cursor', cursors.at(-1)!)
   const path = `${kind ? documentKinds[kind].path : '/documents'}?${query}`
   // Version changes trigger only this active list, not unrelated master/ledger reads.
@@ -119,13 +110,24 @@ export function DocumentList({
   const showKind = !kind
   const showAgency = !kind || !agencyless.includes(kind)
   const showProduct = !kind || !productless.includes(kind)
+  const showReceiptType =
+    kind === 'PAYMENT_RECEIPT' || (!kind && draft.kind === 'PAYMENT_RECEIPT')
+  const showTypeColumn = kind === 'PAYMENT_RECEIPT'
   const activeFilters =
     [...new URLSearchParams(filters).keys()].length + (status ? 1 : 0)
-  const columns = 5 + (showKind ? 1 : 0) + (showAgency ? 1 : 0)
+  const columns =
+    5 + (showKind ? 1 : 0) + (showAgency ? 1 : 0) + (showTypeColumn ? 1 : 0)
   function apply(next: typeof draft) {
     const params = new URLSearchParams()
+    const payments =
+      kind === 'PAYMENT_RECEIPT' || (!kind && next.kind === 'PAYMENT_RECEIPT')
     for (const [name, value] of Object.entries(next))
-      if (value && (!kind || name !== 'kind')) params.set(name, value)
+      if (
+        value &&
+        (!kind || name !== 'kind') &&
+        (name !== 'receiptType' || payments)
+      )
+        params.set(name, value)
     setCursors([''])
     setFilters(params.toString())
   }
@@ -203,6 +205,22 @@ export function DocumentList({
               onChange={(agencyId) => setDraft({ ...draft, agencyId })}
             />
           )}
+          {showReceiptType && (
+            <Select
+              label={t('Hình thức thu')}
+              value={draft.receiptType}
+              onChange={(event) =>
+                setDraft({ ...draft, receiptType: event.target.value })
+              }
+              options={[
+                { value: '', label: t('Tất cả') },
+                ...RECEIPT_TYPES.map((value) => ({
+                  value,
+                  label: methodLabel(value),
+                })),
+              ]}
+            />
+          )}
           {showProduct && (
             <EntityPicker
               id="document-filter-product"
@@ -253,21 +271,15 @@ export function DocumentList({
       <Card className="gap-0 overflow-hidden py-0 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {posted ? (
-              <p className="text-sm font-medium text-foreground">
-                {t('Chứng từ đã ghi sổ')}
-              </p>
-            ) : (
-              <SegmentedFilter
-                label={t('Lọc theo trạng thái')}
-                value={status}
-                options={statusSegments(kind)}
-                onChange={(next) => {
-                  setStatus(next)
-                  setCursors([''])
-                }}
-              />
-            )}
+            <SegmentedFilter
+              label={t('Lọc theo trạng thái')}
+              value={status}
+              options={statusSegments()}
+              onChange={(next) => {
+                setStatus(next)
+                setCursors([''])
+              }}
+            />
             <FilterStatus count={activeFilters} onReset={reset} />
           </div>
           <div className="flex items-center gap-2">
@@ -298,6 +310,7 @@ export function DocumentList({
                     <th>{t('Mã chứng từ')}</th>
                     {showKind && <th>{t('Loại')}</th>}
                     {showAgency && <th>{t('Đại lý')}</th>}
+                    {showTypeColumn && <th>{t('Hình thức')}</th>}
                     <SortableHeader
                       field="businessDate"
                       sort={sort}
@@ -338,6 +351,11 @@ export function DocumentList({
                             (row.agencyId ? `#${row.agencyId}` : '—')}
                         </td>
                       )}
+                      {showTypeColumn && (
+                        <td className="whitespace-nowrap">
+                          {methodLabel(row.receiptType)}
+                        </td>
+                      )}
                       <td className="whitespace-nowrap tabular-nums">
                         {formatDate(row.businessDate)}
                       </td>
@@ -347,11 +365,7 @@ export function DocumentList({
                       <td>
                         <StatusBadge
                           status={row.status}
-                          suffix={
-                            row.revisionNo > 1
-                              ? `v${row.revisionNo}`
-                              : undefined
-                          }
+                          suffix={replacementSuffix(row)}
                         />
                       </td>
                       <td

@@ -206,65 +206,6 @@ function recordErrorStatus(error: unknown): number {
     : 0
 }
 
-export interface FinancialDocument {
-  id: string
-  code: string
-  kind: string
-  agencyId: string
-  originDocumentId: string | null
-  receiptType: string | null
-  status: string
-  currentRevision: {
-    id: string
-    businessDate: string
-    totalAmount: string
-    paymentMethod: string | null
-    agencySnapshot: { name: string } | null
-    note: string | null
-    reason: string | null
-  }
-  reservedAmount?: string
-  refundedAmount?: string
-  latestAttemptId?: string | null
-  latestAttemptState?: string | null
-}
-
-export function documentDetail(value: unknown): FinancialDocument {
-  const data = record(value)
-  const revision = record(data.currentRevision)
-  id(data.id)
-  id(data.agencyId)
-  id(revision.id)
-  text(data.code)
-  text(data.kind)
-  if (!['DRAFT', 'PENDING', 'POSTED', 'CANCELLED'].includes(text(data.status)))
-    throw new Error('Invalid document status')
-  businessDate(revision.businessDate)
-  decimal(revision.totalAmount)
-  if (data.kind === 'REFUND') {
-    decimal(data.reservedAmount)
-    decimal(data.refundedAmount)
-    if (
-      data.latestAttemptState !== null &&
-      !['PENDING', 'UNKNOWN', 'SUCCESS', 'FAILED'].includes(
-        text(data.latestAttemptState),
-      )
-    )
-      throw new Error('Invalid attempt state')
-  }
-  return data as unknown as FinancialDocument
-}
-
-export function documentSummary(value: unknown): Row {
-  const data = record(value)
-  id(data.id)
-  text(data.code)
-  text(data.status)
-  businessDate(data.businessDate)
-  decimal(data.totalAmount)
-  return data
-}
-
 /** The calendar day after a `YYYY-MM-DD` business date (exclusive upper bound). */
 export function nextDay(value: string): string {
   const date = new Date(`${businessDate(value)}T00:00:00Z`)

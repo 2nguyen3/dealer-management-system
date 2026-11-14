@@ -77,7 +77,7 @@ import {
 /** Contract sort fields of GET /agencies (prefix "-" = descending). */
 const AGENCY_SORTS = [
   { field: 'name', label: t('Tên đại lý') },
-  { field: 'currentDebt', label: t('Dư nợ') },
+  { field: 'debt', label: t('Nợ hiện tại') },
   { field: 'acceptedDate', label: t('Ngày tiếp nhận') },
   { field: 'id', label: t('Thứ tự tạo') },
 ] as const
@@ -248,10 +248,7 @@ export function AgenciesPage() {
       if (filterWard && String(agency.wardId) !== filterWard) {
         return false
       }
-      if (
-        filterType &&
-        String(agency.typeId ?? agency.agencyTypeId) !== filterType
-      ) {
+      if (filterType && String(agency.typeId) !== filterType) {
         return false
       }
       if (filterStatus && agency.status !== filterStatus) {
@@ -351,7 +348,7 @@ export function AgenciesPage() {
     setFormEmail(agencyItem.email || '')
     setFormAddress(agencyItem.address || '')
     setFormWardId(String(agencyItem.wardId))
-    setFormTypeId(String(agencyItem.typeId ?? agencyItem.agencyTypeId ?? ''))
+    setFormTypeId(String(agencyItem.typeId))
     setEditAgency({ agency: agencyItem, etag: null })
 
     // Fetch fresh agency details to obtain authoritative ETag
@@ -364,7 +361,7 @@ export function AgenciesPage() {
       setFormEmail(res.data.email || '')
       setFormAddress(res.data.address || '')
       setFormWardId(String(res.data.wardId))
-      setFormTypeId(String(res.data.typeId ?? res.data.agencyTypeId ?? ''))
+      setFormTypeId(String(res.data.typeId))
     } catch {
       // If fetching fails, keep the in-memory values and wait for submission
     }
@@ -435,7 +432,7 @@ export function AgenciesPage() {
         setFormError(
           e.message ||
             t(
-              'Xung đột dữ liệu: Hạn mức nợ mới thấp hơn dư nợ hiện tại hoặc phường/xã đã hết chỗ.',
+              'Xung đột dữ liệu: nợ tối đa của loại đại lý mới thấp hơn nợ hiện tại hoặc phường/xã đã hết chỗ.',
             ),
         )
       } else {
@@ -506,6 +503,10 @@ export function AgenciesPage() {
         )
       } else {
         setFormError(e.message || t('Không thể ngừng hợp tác với đại lý này.'))
+      }
+      if (e.status === 409) {
+        invalidateCache('/agencies')
+        void loadAgencies()
       }
     } finally {
       setIsSubmitting(false)
@@ -592,7 +593,7 @@ export function AgenciesPage() {
           <>
             <InfoHint label={t('Giới thiệu hồ sơ đại lý')}>
               {t(
-                'Tiếp nhận đại lý, phân loại, phường/xã và theo dõi dư nợ so với hạn mức của loại đại lý.',
+                'Tiếp nhận đại lý, phân loại, phường/xã và theo dõi nợ hiện tại so với nợ tối đa của loại đại lý.',
               )}
             </InfoHint>
             {canManage && (
@@ -750,7 +751,7 @@ export function AgenciesPage() {
       >
         {isLoading && agencies.length === 0 ? (
           <TableSkeleton
-            columns={8}
+            columns={9}
             label={t('Đang tải danh sách đại lý...')}
           />
         ) : filteredAgencies.length === 0 ? (
@@ -785,7 +786,7 @@ export function AgenciesPage() {
                 <th scope="col">{t('Phường/xã')}</th>
                 <th scope="col">{t('Loại')}</th>
                 <SortableHeader
-                  field="currentDebt"
+                  field="debt"
                   sort={sort.sort}
                   onSort={(field, first) => {
                     sort.toggle(field, first)
@@ -795,8 +796,11 @@ export function AgenciesPage() {
                   align="right"
                   className="text-end"
                 >
-                  {t('Dư nợ')}
+                  {t('Nợ hiện tại')}
                 </SortableHeader>
+                <th scope="col" className="text-end">
+                  {t('Nợ tối đa')}
+                </th>
                 <SortableHeader
                   field="acceptedDate"
                   sort={sort.sort}
@@ -842,14 +846,22 @@ export function AgenciesPage() {
                   <td className="whitespace-nowrap">{wardLabel(agency)}</td>
                   <td className="whitespace-nowrap">{typeLabel(agency)}</td>
                   <td className="cell-number text-end font-semibold whitespace-nowrap tabular-nums">
-                    {formatVND(agency.currentDebt)}
+                    {formatVND(agency.debt)}
+                    {num(agency.debt) < 0 && (
+                      <div className="text-xs font-normal text-success">
+                        {t('Trả trước')}
+                      </div>
+                    )}
                     <DebtUsage
-                      debt={num(agency.currentDebt)}
+                      debt={num(agency.debt)}
                       limit={limitOf(agency)}
                     />
                   </td>
+                  <td className="cell-number text-end whitespace-nowrap text-muted-foreground tabular-nums">
+                    {limitOf(agency) === null ? '—' : formatVND(agency.maxDebt)}
+                  </td>
                   <td className="whitespace-nowrap tabular-nums">
-                    {formatDate(agency.acceptedDate || agency.receptionDate)}
+                    {formatDate(agency.acceptedDate)}
                   </td>
                   <td>{statusBadge(agency.status)}</td>
                   <td className="cell-actions text-end">
@@ -1003,9 +1015,17 @@ export function AgenciesPage() {
           {formError && <Alert type="error">{formError}</Alert>}
           <Alert type="warning">
             {t(
-              'Sau khi ngừng hợp tác, đại lý sẽ không thể tiếp tục nhận hàng. Hành động này không thể hoàn tác trực tiếp.',
+              'Sau khi ngừng hợp tác, đại lý không dùng được cho chứng từ mới. Hành động này không thể hoàn tác trực tiếp.',
             )}
           </Alert>
+          {terminateAgency && num(terminateAgency.agency.debt) !== 0 && (
+            <Alert type="error">
+              {t(
+                'Đại lý đang có nợ hiện tại {debt}. Chỉ ngừng hợp tác được khi nợ bằng 0: lập phiếu thu cho hết nợ trước.',
+                { debt: formatVND(terminateAgency.agency.debt) },
+              )}
+            </Alert>
+          )}
           <Input
             id="agency-terminate-reason"
             label={t('Lý do ngừng hợp tác')}
@@ -1060,29 +1080,28 @@ export function AgenciesPage() {
               [t('Địa chỉ'), detailAgency.address || '—', true],
               [t('Phường/xã'), wardLabel(detailAgency)],
               [t('Loại đại lý'), typeLabel(detailAgency)],
-              [
-                t('Ngày tiếp nhận'),
-                formatDate(
-                  detailAgency.acceptedDate || detailAgency.receptionDate,
-                ),
-              ],
+              [t('Ngày tiếp nhận'), formatDate(detailAgency.acceptedDate)],
               [t('Trạng thái'), statusBadge(detailAgency.status)],
               [
-                t('Dư nợ hiện tại'),
+                t('Nợ hiện tại'),
                 <span
                   key="debt"
-                  className="font-semibold text-destructive tabular-nums"
+                  className={cn(
+                    'font-semibold tabular-nums',
+                    num(detailAgency.debt) < 0
+                      ? 'text-success'
+                      : 'text-destructive',
+                  )}
                 >
-                  {formatVND(detailAgency.currentDebt)}
+                  {formatVND(detailAgency.debt)}
+                  {num(detailAgency.debt) < 0 && ` (${t('trả trước')})`}
                 </span>,
               ],
+              [t('Nợ tối đa'), formatVND(detailAgency.maxDebt)],
               [
-                t('Dư có hiện tại'),
-                <span
-                  key="credit"
-                  className="font-semibold text-success tabular-nums"
-                >
-                  {formatVND(detailAgency.currentCredit)}
+                t('Còn được nợ'),
+                <span key="remaining" className="tabular-nums">
+                  {formatVND(detailAgency.remainingCreditLimit)}
                 </span>,
               ],
               ...(detailAgency.terminationReason
@@ -1170,19 +1189,13 @@ function DebtUsage({ debt, limit }: { debt: number; limit: number | null }) {
  * ward/commune and overall debt-limit usage of active agencies.
  */
 function agencyTypeLabel(agency: Agency): string {
-  return (
-    agency.typeName ||
-    agency.agencyTypeName ||
-    t('Loại {typeId}', { typeId: agency.typeId ?? agency.agencyTypeId })
-  )
+  return agency.typeName || t('Loại {typeId}', { typeId: agency.typeId })
 }
 
 /** Debt limit of the agency's type (display only); null when unknown. */
 function debtLimit(agency: Agency, agencyTypes: AgencyType[]): number | null {
-  const type = agencyTypes.find(
-    (item) => item.id === (agency.typeId ?? agency.agencyTypeId),
-  )
-  const limit = num(agency.maxDebt ?? type?.maxDebt)
+  const type = agencyTypes.find((item) => item.id === agency.typeId)
+  const limit = num(agency.maxDebt || type?.maxDebt)
   return limit > 0 ? limit : null
 }
 
@@ -1192,13 +1205,13 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
   const limitOf = (agency: Agency) => debtLimit(agency, agencyTypes)
   const active = agencies.filter((agency) => agency.status === 'ACTIVE')
   const limited = active.filter((agency) => limitOf(agency) !== null)
-  const debt = sumBy(limited, (agency) => num(agency.currentDebt))
+  const debt = sumBy(limited, (agency) => Math.max(0, num(agency.debt)))
   const limit = sumBy(limited, (agency) => limitOf(agency) ?? 0)
   const byWard = partsBy(
     agencies,
     (agency) => agency.wardId,
     wardLabel,
-    (agency) => num(agency.currentDebt),
+    (agency) => num(agency.debt),
   ).map((part) => ({ name: part.label, debt: part.value }))
   return (
     <>
@@ -1206,18 +1219,14 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
         title={t('Đại lý theo loại')}
         centerLabel={t('đại lý')}
         head={[t('Loại'), t('Số đại lý')]}
-        data={partsBy(
-          agencies,
-          (agency) => agency.typeId ?? agency.agencyTypeId,
-          typeLabel,
-        )}
+        data={partsBy(agencies, (agency) => agency.typeId, typeLabel)}
       />
       <ChartTile
-        title={t('Dư nợ theo phường/xã')}
+        title={t('Nợ theo phường/xã')}
         table={
           <MiniTable
-            caption={t('Dư nợ theo phường/xã')}
-            head={[t('Phường/xã'), t('Dư nợ')]}
+            caption={t('Nợ theo phường/xã')}
+            head={[t('Phường/xã'), t('Nợ hiện tại')]}
             rows={byWard.map((row) => [row.name, formatVND(String(row.debt))])}
           />
         }
@@ -1227,7 +1236,7 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
           xKey="name"
           height={150}
           valueFormatter={formatCompactVND}
-          series={[{ key: 'debt', label: t('Dư nợ') }]}
+          series={[{ key: 'debt', label: t('Nợ hiện tại') }]}
         />
       </ChartTile>
       <MeterTile
@@ -1244,7 +1253,11 @@ function agencyPageSummary(agencies: Agency[], agencyTypes: AgencyType[]) {
               : 'var(--chart-1)'
         }
         legend={[
-          { key: 'debt', label: t('Dư nợ'), value: formatCompactVND(debt) },
+          {
+            key: 'debt',
+            label: t('Nợ hiện tại'),
+            value: formatCompactVND(debt),
+          },
           { key: 'limit', label: t('Hạn mức'), value: formatCompactVND(limit) },
         ]}
       />

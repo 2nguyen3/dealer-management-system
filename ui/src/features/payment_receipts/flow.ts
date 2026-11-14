@@ -1,6 +1,5 @@
 import { toNumber } from '@/lib/chart'
-import type { FinancialDocument, Row } from './contracts'
-import { t } from '@/lib/i18n/core'
+import type { Row } from './contracts'
 
 /** Visual state of one lifecycle step. Derived only from server data. */
 export type FlowState =
@@ -29,106 +28,6 @@ export function flowProgress(steps: readonly FlowStep[]): number {
   if (!steps.length) return 0
   const done = steps.filter((step) => step.state === 'done').length
   return Math.round((done / steps.length) * 100)
-}
-
-function build(
-  labels: readonly (readonly [key: string, label: string])[],
-  states: readonly FlowState[],
-  hints: Partial<Record<number, string>> = {},
-): FlowStep[] {
-  return labels.map(([key, label], index) => ({
-    key,
-    label,
-    state: states[index] ?? 'upcoming',
-    ...(hints[index] ? { hint: hints[index] } : {}),
-  }))
-}
-
-const SETTLED = ['done', 'done', 'done'] as const
-
-/**
- * Draft → post lifecycle of a receipt, credit application or refund, derived
- * from the server document status (and, for refunds, reservation/attempt state).
- */
-export function documentLifecycle(
-  variant: 'receipt' | 'credit' | 'refund',
-  item: Pick<
-    FinancialDocument,
-    'status' | 'reservedAmount' | 'latestAttemptState'
-  >,
-): FlowStep[] {
-  const { status } = item
-  if (variant === 'refund') {
-    const labels = [
-      ['draft', t('Lập yêu cầu')],
-      ['reserve', t('Giữ chỗ quỹ')],
-      ['payout', t('Chi tiền cho đại lý')],
-      ['done', t('Hoàn tất')],
-    ] as const
-    if (status === 'POSTED')
-      return build(labels, ['done', 'done', 'done', 'done'])
-    if (status === 'CANCELLED')
-      return build(labels, ['done', 'failed', 'skipped', 'skipped'], {
-        1: t('Phiếu bị hủy'),
-      })
-    const reserved =
-      typeof item.reservedAmount === 'string' &&
-      toNumber(item.reservedAmount) > 0
-    if (!reserved && status === 'DRAFT')
-      return build(labels, ['done', 'current', 'upcoming', 'upcoming'])
-    const attempt = item.latestAttemptState
-    if (attempt === 'FAILED')
-      return build(labels, ['done', 'done', 'failed', 'upcoming'], {
-        2: t('Lần hoàn trực tuyến thất bại'),
-      })
-    return build(labels, ['done', 'done', 'current', 'upcoming'], {
-      2:
-        attempt === 'PENDING' || attempt === 'UNKNOWN'
-          ? t('Chờ cổng xác nhận')
-          : undefined,
-    })
-  }
-  const labels =
-    variant === 'credit'
-      ? ([
-          ['draft', t('Lập nháp')],
-          ['post', t('Bù trừ dư có')],
-          ['debt', t('Công nợ giảm')],
-        ] as const)
-      : ([
-          ['draft', t('Lập nháp')],
-          ['post', t('Ghi sổ')],
-          ['debt', t('Công nợ cập nhật')],
-        ] as const)
-  if (status === 'POSTED') return build(labels, SETTLED)
-  if (status === 'CANCELLED')
-    return build(labels, ['done', 'failed', 'skipped'], {
-      1: t('Phiếu bị hủy'),
-    })
-  return build(labels, ['done', 'current', 'upcoming'], {
-    1: status === 'PENDING' ? t('Đang xử lý') : undefined,
-  })
-}
-
-/**
- * Upfront confirmation lifecycle: verified cash waits for the stock issue to
- * post (→ receipt), or is received separately as its own receipt.
- * Returns `null` for a state the server contract does not define.
- */
-export function upfrontLifecycle(state: unknown): FlowStep[] | null {
-  const labels = [
-    ['verify', t('Xác minh tiền')],
-    ['issue', t('Phiếu xuất ghi sổ')],
-    ['receipt', t('Lập phiếu thu')],
-  ] as const
-  if (state === 'VERIFIED')
-    return build(labels, ['done', 'current', 'upcoming'])
-  if (state === 'CONSUMED') return build(labels, SETTLED)
-  if (state === 'RECEIVED_SEPARATELY')
-    return build(labels, ['done', 'skipped', 'done'], {
-      1: t('Thu riêng, không gắn phiếu xuất'),
-    })
-  return null
 }
 
 export interface GroupTotal {

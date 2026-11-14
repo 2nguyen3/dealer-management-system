@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { paymentFlowSteps } from '../features/online_payments/paymentFlow'
 import {
-  documentLifecycle,
+  onlineAmountError,
+  paymentFlowSteps,
+} from '../features/online_payments/paymentFlow'
+import {
   flowOutcome,
   flowProgress,
   groupTotals,
-  upfrontLifecycle,
   type FlowStep,
 } from '../features/payment_receipts/flow'
-import {
-  limitUsage,
-  usageBuckets,
-} from '../features/receivables/statementModel'
 
 const states = (steps: FlowStep[] | null) => steps?.map((step) => step.state)
 
@@ -87,109 +84,13 @@ describe('flowOutcome / flowProgress boundaries', () => {
   })
 
   it('does not count skipped steps as done', () => {
-    const steps = upfrontLifecycle('RECEIVED_SEPARATELY')!
+    const steps: FlowStep[] = [
+      { key: 'a', label: 'A', state: 'done' },
+      { key: 'b', label: 'B', state: 'skipped' },
+      { key: 'c', label: 'C', state: 'done' },
+    ]
     expect(flowProgress(steps)).toBe(67)
     expect(flowOutcome(steps)).toBe('active')
-  })
-})
-
-describe('documentLifecycle', () => {
-  const doc = (
-    status: string,
-    reservedAmount?: string,
-    latestAttemptState: string | null = null,
-  ) => ({ status, reservedAmount, latestAttemptState })
-
-  it.each(['receipt', 'credit'] as const)(
-    'maps %s DRAFT → POSTED and CANCELLED',
-    (variant) => {
-      expect(states(documentLifecycle(variant, doc('DRAFT')))).toEqual([
-        'done',
-        'current',
-        'upcoming',
-      ])
-      expect(states(documentLifecycle(variant, doc('POSTED')))).toEqual([
-        'done',
-        'done',
-        'done',
-      ])
-      const cancelled = documentLifecycle(variant, doc('CANCELLED'))
-      expect(states(cancelled)).toEqual(['done', 'failed', 'skipped'])
-      expect(cancelled[1]?.hint).toBe('Phiếu bị hủy')
-      expect(documentLifecycle(variant, doc('PENDING'))[1]?.hint).toBe(
-        'Đang xử lý',
-      )
-    },
-  )
-
-  it('labels a credit application as an offset, not a cash posting', () => {
-    expect(
-      documentLifecycle('credit', doc('DRAFT')).map((step) => step.label),
-    ).toEqual(['Lập nháp', 'Bù trừ dư có', 'Công nợ giảm'])
-  })
-
-  it('follows refund reservation and payout attempts', () => {
-    expect(states(documentLifecycle('refund', doc('DRAFT', '0')))).toEqual([
-      'done',
-      'current',
-      'upcoming',
-      'upcoming',
-    ])
-    expect(states(documentLifecycle('refund', doc('DRAFT', '50000')))).toEqual([
-      'done',
-      'done',
-      'current',
-      'upcoming',
-    ])
-    const unknown = documentLifecycle(
-      'refund',
-      doc('DRAFT', '50000', 'UNKNOWN'),
-    )
-    expect(unknown[2]?.hint).toBe('Chờ cổng xác nhận')
-    const failed = documentLifecycle('refund', doc('DRAFT', '50000', 'FAILED'))
-    expect(states(failed)).toEqual(['done', 'done', 'failed', 'upcoming'])
-    expect(states(documentLifecycle('refund', doc('POSTED', '0')))).toEqual([
-      'done',
-      'done',
-      'done',
-      'done',
-    ])
-    expect(
-      states(documentLifecycle('refund', doc('CANCELLED', '50000'))),
-    ).toEqual(['done', 'failed', 'skipped', 'skipped'])
-  })
-
-  it('treats a missing reservation as not reserved', () => {
-    expect(states(documentLifecycle('refund', doc('DRAFT')))).toEqual([
-      'done',
-      'current',
-      'upcoming',
-      'upcoming',
-    ])
-  })
-})
-
-describe('upfrontLifecycle', () => {
-  it('maps VERIFIED, CONSUMED and RECEIVED_SEPARATELY', () => {
-    expect(states(upfrontLifecycle('VERIFIED'))).toEqual([
-      'done',
-      'current',
-      'upcoming',
-    ])
-    expect(states(upfrontLifecycle('CONSUMED'))).toEqual([
-      'done',
-      'done',
-      'done',
-    ])
-    expect(states(upfrontLifecycle('RECEIVED_SEPARATELY'))).toEqual([
-      'done',
-      'skipped',
-      'done',
-    ])
-  })
-
-  it.each(['verified', 'PENDING', null, 3])('rejects %s', (state) => {
-    expect(upfrontLifecycle(state)).toBeNull()
   })
 })
 
@@ -223,42 +124,35 @@ describe('groupTotals', () => {
   })
 })
 
-describe('limitUsage / usageBuckets', () => {
-  it('computes debt over limit', () => {
-    expect(limitUsage('15000000', '50000000')).toBe(0.3)
-    expect(limitUsage('50000000', '50000000')).toBe(1)
+describe('onlineAmountError (amount <= current debt)', () => {
+  it('admits a positive whole amount up to the current debt', () => {
+    expect(onlineAmountError('1', '1')).toBeNull()
+    expect(onlineAmountError('500000', '1250000')).toBeNull()
+    expect(onlineAmountError('1250000', '1250000')).toBeNull()
   })
 
-  it.each([
-    ['100', '0'],
-    ['100', undefined],
-    [undefined, '100'],
-    ['100', 100],
-  ])('returns null without a usable limit: %s / %s', (debt, limit) => {
-    expect(limitUsage(debt, limit)).toBeNull()
+  it('rejects an amount above the debt and names the debt', () => {
+    const error = onlineAmountError('1250001', '1250000')
+    expect(error).toMatch(/vượt công nợ hiện tại/)
+    expect(error).toMatch(/1\.250\.000/)
   })
 
-  it('buckets agencies at the 50/80/100 % boundaries', () => {
-    const rows = [
-      ['49', '100'],
-      ['50', '100'],
-      ['79', '100'],
-      ['80', '100'],
-      ['99', '100'],
-      ['100', '100'],
-      ['150', '100'],
-      ['10', '0'],
-      ['10', null],
-    ].map(([currentDebt, maxDebt]) => ({ currentDebt, maxDebt }))
-    expect(
-      usageBuckets(rows).map((bucket) => [bucket.key, bucket.count]),
-    ).toEqual([
-      ['low', 1],
-      ['mid', 2],
-      ['high', 2],
-      ['over', 2],
-      ['none', 2],
-    ])
-    expect(usageBuckets([]).every((bucket) => bucket.count === 0)).toBe(true)
+  it.each(['0', '-5', '1.5', '01', '', '1'.repeat(19), 'abc'])(
+    'rejects malformed amount %s',
+    (amount) => {
+      expect(onlineAmountError(amount, '1000')).toMatch(/số nguyên VND dương/)
+    },
+  )
+
+  it('rejects when the agency owes nothing or has prepaid', () => {
+    expect(onlineAmountError('1', '0')).toMatch(/không còn nợ/)
+    expect(onlineAmountError('1', '-200000')).toMatch(/không còn nợ/)
   })
+
+  it.each([null, 'x', '1.5'])(
+    'rejects an unread or invalid debt %s',
+    (debt) => {
+      expect(onlineAmountError('1', debt)).toMatch(/Chưa đọc được công nợ/)
+    },
+  )
 })

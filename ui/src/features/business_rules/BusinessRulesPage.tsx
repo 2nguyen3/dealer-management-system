@@ -104,12 +104,14 @@ export function BusinessRulesPage() {
       for (const prefix of ['/business-rules', '/products'])
         invalidateCache(prefix)
       setNotice(
-        t('Đã cập nhật quy định. Giá trên các chứng từ đã lập không thay đổi.'),
+        t(
+          'Đã cập nhật quy định. Đơn giá trên các phiếu xuất đã ghi sổ không thay đổi.',
+        ),
       )
       notifyNextStep({
         done: t('Đã lưu quy định mới.'),
         next: t(
-          'Phiếu xuất nộp từ bây giờ dùng tỷ lệ giá bán mới; tiếp nhận đại lý dùng giới hạn mới.',
+          'Phiếu xuất ghi sổ từ bây giờ dùng tỷ lệ giá bán mới; tiếp nhận đại lý dùng giới hạn mới.',
         ),
       })
     } catch (failure) {
@@ -132,7 +134,7 @@ export function BusinessRulesPage() {
         actions={
           <InfoHint label={t('Giới thiệu quy định')}>
             {t(
-              'Quy định chung cho việc tiếp nhận đại lý và tính giá bán. Thay đổi chỉ ảnh hưởng tới các chứng từ lập sau khi lưu.',
+              'Quy định chung cho việc tiếp nhận đại lý và tính giá bán. Thay đổi chỉ ảnh hưởng tới các chứng từ ghi sổ sau khi lưu.',
             )}
           </InfoHint>
         }

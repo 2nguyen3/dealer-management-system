@@ -47,7 +47,9 @@ export function savedDeck(userId: string): string[] | null {
 }
 
 /** Replaces a user's deck in memory and storage; notifies every view. */
-export function saveDeck(userId: string, paths: string[] | null): void {
+export function saveDeck(userId: string, list: string[] | null): void {
+  // Functions removed from the application are never saved again.
+  const paths = list && list.filter(isFavoritable)
   decks.set(userId, paths)
   if (paths) writeFavorites(userId, paths)
   else

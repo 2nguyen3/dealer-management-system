@@ -17,7 +17,11 @@ describe('labels', () => {
     expect(statusLabel('CANCELED')).toBe(statusLabel('CANCELLED'))
     expect(kindLabel('STOCK_ISSUE')).toBe('Phiếu xuất hàng')
     expect(methodLabel('BANK_TRANSFER')).toBe('Chuyển khoản')
-    expect(receiptTypeLabel('DEBT_COLLECTION')).toBe('Thu công nợ')
+    expect(receiptTypeLabel('ONLINE')).toBe('Trực tuyến (VNPAY)')
+    expect(kindLabel('PAYMENT_RECEIPT')).toBe('Phiếu thu tiền')
+    // Kinds and statuses of removed features fall back to the raw value.
+    expect(kindLabel('REFUND')).toBe('REFUND')
+    expect(statusLabel('READY')).toBe('READY')
     expect(auditActionLabel('INSERT')).toBe('Tạo mới')
   })
 

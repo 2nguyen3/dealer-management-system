@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { navigationGroups } from '../app/navigation'
 import { ApiError } from '../lib/api'
 import { describeError, ERROR_TEXTS } from '../lib/errors'
 import {
@@ -117,39 +118,52 @@ describe('locale registry', () => {
 })
 
 /** The 61 codes scanned from backend/app on 2026-11-14 (handoff §3.3). */
-const HANDOFF_CODES =
-  `ACCOUNT_LOCKED AGENCY_CONFLICT BALANCE_OVERFLOW COMMAND_OUTCOME_UNKNOWN
-COUNT_LINKED_ADJUSTMENT CREDIT_RESERVED DEBT_LIMIT_BELOW_CURRENT_BALANCE DUPLICATE_PRODUCT
-EMPTY_COUNT EMPTY_DOCUMENT FORBIDDEN IDEMPOTENCY_KEY_REUSED INACTIVE_MASTER INSUFFICIENT_CREDIT
-INSUFFICIENT_STOCK INTERNAL_ERROR INVALID_CREDENTIALS INVALID_CURSOR INVALID_JSON
-INVALID_PROVIDER_RESPONSE INVALID_QUANTITY INVALID_SIGNATURE INVALID_TOTAL LIMIT_CONFLICT
-LINE_CONFLICT MASTER_CONFLICT NOT_ACCEPTABLE NOT_FOUND PAYMENT_CONFLICT PAYMENT_EXCEEDS_DEBT
-PAYMENT_SOURCE_CONFLICT PRECONDITION_FAILED PRECONDITION_REQUIRED PRICE_SOURCE_REQUIRED
-PROVIDER_REFERENCE_NOT_FOUND PROVIDER_UNAVAILABLE RATE_LIMIT_EXCEEDED REASON_REQUIRED
-RECEIPT_CONFLICT RECOUNT_PRODUCTS REFUND_CONFLICT REFUND_SOURCE_CONFLICT RESOURCE_BUSY
-RESOURCE_IN_USE RETURN_QUANTITY_CONFLICT RETURN_SOURCE_CONFLICT REVERSAL_CONFLICT
-SELLING_PRICE_UNUSABLE STALE_STOCK_SNAPSHOT STATE_CONFLICT STOCK_CONFLICT STOCK_OVERFLOW
-TOTAL_OVERFLOW UNSUPPORTED_MEDIA_TYPE UNSUPPORTED_PROVIDER UPFRONT_CONFLICT UPFRONT_REQUIRED
-USED_UNIT_IMMUTABLE VALIDATION_FAILED VNPAY_AMOUNT_INVALID WARD_CAPACITY_EXCEEDED`.split(
-    /\s+/,
-  )
+/**
+ * Every code the simplified backend can return: each `ApiError(<status>,
+ * "<CODE>")`, conflict-map entry and auth error scanned from `backend/app`.
+ */
+const BACKEND_CODES =
+  `ACCOUNT_LOCKED AGENCY_CONFLICT AGENCY_HAS_DEBT AGENCY_TERMINATED BAD_REQUEST
+DEBT_LIMIT_BELOW_CURRENT_BALANCE DEBT_LIMIT_EXCEEDED DUPLICATE DUPLICATE_PRODUCT
+EMPTY_DOCUMENT FORBIDDEN FRACTION_NOT_ALLOWED IDEMPOTENCY_KEY_REUSED INACTIVE_MASTER
+INSUFFICIENT_STOCK INTERNAL_ERROR INVALID_CREDENTIALS INVALID_CURSOR INVALID_FIELD
+INVALID_OR_EXPIRED_TOKEN INVALID_PROVIDER_RESPONSE INVALID_SIGNATURE LIMIT_CONFLICT
+MALFORMED_REQUEST MASTER_CONFLICT NOT_ACCEPTABLE NOT_FOUND PAYMENT_CONFLICT
+PAYMENT_EXCEEDS_DEBT PERIOD_CLOSED PRECONDITION_FAILED PRECONDITION_REQUIRED
+PRODUCT_NOT_PRICED PROVIDER_UNAVAILABLE RATE_LIMIT_EXCEEDED REASON_REQUIRED
+RESOURCE_BUSY RESOURCE_IN_USE SELLING_PRICE_UNUSABLE SERVICE_UNAVAILABLE
+STATE_CONFLICT UNSUPPORTED_MEDIA_TYPE UNSUPPORTED_PROVIDER USED_UNIT_IMMUTABLE
+VALIDATION_FAILED VNPAY_AMOUNT_INVALID WARD_CAPACITY_EXCEEDED`.split(/\s+/)
 
-/** Codes found by the re-scan that were missing from the handoff list. */
-const RESCAN_CODES = [
-  'BAD_REQUEST',
+/** Codes of features removed by the simplification: no longer described. */
+const REMOVED_CODES = [
+  'UPFRONT_REQUIRED',
+  'UPFRONT_CONFIRMATION_REQUIRED',
+  'UPFRONT_CONFLICT',
+  'VERIFIED_CASH_IMMUTABLE',
+  'INSUFFICIENT_CREDIT',
+  'CREDIT_RESERVED',
+  'REFUND_CONFLICT',
+  'PAID_REFUND_IMMUTABLE',
+  'RETURN_QUANTITY_CONFLICT',
+  'RETURN_SOURCE_CONFLICT',
+  'COUNT_LINKED_ADJUSTMENT',
+  'EMPTY_COUNT',
+  'RECOUNT_PRODUCTS',
+  'STALE_STOCK_SNAPSHOT',
+  'COLLECTION_EXCEEDS_ALLOCATABLE_DEBT',
+  'FIFO_REALLOCATION_INSUFFICIENT_DEBT',
+  'RECEIPT_CONFLICT',
+  'PRICE_SOURCE_REQUIRED',
   'CORRECTION_CONFLICT',
-  'INVALID_FIELD',
-  'INVALID_OR_EXPIRED_TOKEN',
-  'MALFORMED_REQUEST',
-  'REFERENCE_NOT_FOUND',
-  'SERVICE_UNAVAILABLE',
-  'DUPLICATE',
+  'STOCK_CONFLICT',
+  'COMMAND_OUTCOME_UNKNOWN',
 ]
 
 describe('error catalogue', () => {
   it('covers every backend code with a message and a hint', () => {
-    expect(HANDOFF_CODES).toHaveLength(61)
-    for (const code of [...HANDOFF_CODES, ...RESCAN_CODES]) {
+    expect(BACKEND_CODES).toHaveLength(47)
+    for (const code of BACKEND_CODES) {
       const text = describeError(code)
       expect(text, code).not.toBeNull()
       expect(text?.message.trim(), code).not.toBe('')
@@ -157,16 +171,27 @@ describe('error catalogue', () => {
     }
   })
 
-  it('keeps every action pointing at an application route', () => {
+  it('drops the codes of removed features', () => {
+    for (const code of REMOVED_CODES)
+      expect(describeError(code), code).toBeNull()
+  })
+
+  it('keeps every action pointing at a menu route', () => {
+    const routes = new Set(
+      navigationGroups.flatMap((group) => group.items.map((item) => item.path)),
+    )
     for (const [code, entry] of Object.entries(ERROR_TEXTS)) {
       const action = (entry as { action?: { label: string; to: string } })
         .action
       if (!action) continue
-      expect(action.to.startsWith('/'), code).toBe(true)
+      expect(routes.has(action.to), `${code} ${action.to}`).toBe(true)
       expect(action.label.trim(), code).not.toBe('')
     }
-    expect(describeError('UPFRONT_REQUIRED')?.action?.to).toBe(
-      '/upfront-payments',
+    expect(describeError('AGENCY_HAS_DEBT')?.action?.to).toBe(
+      '/payment-receipts',
+    )
+    expect(describeError('PRODUCT_NOT_PRICED')?.action?.to).toBe(
+      '/stock-receipts',
     )
   })
 
@@ -186,9 +211,12 @@ describe('error catalogue', () => {
   })
 
   it('attaches hint and action to ApiError only for known codes', () => {
-    const known = new ApiError(409, 'UPFRONT_REQUIRED', 'x')
+    const known = new ApiError(409, 'DEBT_LIMIT_EXCEEDED', 'x')
     expect(known.hint).toBeTruthy()
-    expect(known.action?.to).toBe('/upfront-payments')
+    expect(known.action?.to).toBe('/payment-receipts')
+    const removed = new ApiError(409, 'UPFRONT_REQUIRED', 'Server text')
+    expect(removed.hint).toBeUndefined()
+    expect(removed.action).toBeUndefined()
     const unknown = new ApiError(409, 'SOMETHING_NEW', 'Server text')
     expect(unknown.message).toBe('Server text')
     expect(unknown.hint).toBeUndefined()

@@ -30,12 +30,7 @@ import { huge, reportFixture } from './reportFixtures'
 
 const auth = vi.hoisted(() => ({
   user: { id: '1' },
-  allowedFunctions: [
-    'reports.read',
-    'sales.read',
-    'debt.read',
-    'inventory.read',
-  ],
+  allowedFunctions: ['reports.read', 'sales.read', 'debt.read'],
 }))
 vi.mock('../features/authentication/useAuth', () => ({ useAuth: () => auth }))
 
@@ -51,7 +46,7 @@ const tabNames: Record<ReportKind, string> = {
   debt: 'Công nợ',
   inventory: 'Xuất nhập tồn',
   'product-sales': 'Doanh số mặt hàng',
-  'cash-and-credit': 'Thu chi & dư có',
+  collections: 'Thu tiền',
 }
 
 function apply() {
@@ -127,12 +122,7 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     vi.restoreAllMocks()
     pickerRows = []
     auth.user = { id: '1' }
-    auth.allowedFunctions = [
-      'reports.read',
-      'sales.read',
-      'debt.read',
-      'inventory.read',
-    ]
+    auth.allowedFunctions = ['reports.read', 'sales.read', 'debt.read']
     vi.spyOn(api, 'apiFetch').mockImplementation(
       async (path) => route(path) as never,
     )
@@ -170,7 +160,12 @@ describe('authoritative reports', { timeout: 20000 }, () => {
       const product = kind === 'inventory' || kind === 'product-sales'
       expect(
         within(region).getByRole('cell', {
-          name: product ? 'MH-01' : 'DL-101',
+          name:
+            kind === 'collections'
+              ? '05/10/2026'
+              : product
+                ? 'MH-01'
+                : 'DL-101',
         }),
       ).toBeTruthy()
       expect(screen.queryByRole('columnheader', { name: 'ID' })).toBeNull()
@@ -185,7 +180,7 @@ describe('authoritative reports', { timeout: 20000 }, () => {
       // KPI strip and three chart cards (two measures + composition) with a
       // table view each.
       const kpis = within(region).getByRole('group', { name: 'Chỉ số chính' })
-      expect(kpis.children).toHaveLength(4)
+      expect(kpis.children).toHaveLength(kind === 'product-sales' ? 3 : 4)
       expect(
         within(region).getAllByRole('radio', { name: 'Bảng số liệu' }),
       ).toHaveLength(3)
@@ -198,22 +193,31 @@ describe('authoritative reports', { timeout: 20000 }, () => {
         expect(within(footer as HTMLElement).getByText('999')).toBeTruthy()
         const rate = screen.getByText('0,0001 %')
         expect(rate.className).toContain('cell-number')
-        expect(
-          screen.getByText(`Toàn công ty: ${formatVND(huge + '00')}`),
-        ).toBeTruthy()
-        expect(screen.getAllByText('-1 ₫').length).toBeGreaterThan(1)
+        expect(within(kpis).getByText('Doanh số toàn công ty')).toBeTruthy()
+        expect(kpis.textContent).toContain(`(${formatVND(huge + '00')})`)
+        expect(within(kpis).getByText('Tỷ trọng')).toBeTruthy()
+        expect(screen.getByText('Tỷ trọng trong doanh số công ty')).toBeTruthy()
         expect(screen.queryByText(huge)).toBeNull()
+        expect(screen.queryByText(/Doanh số thuần|Hàng trả lại/)).toBeNull()
         // Compact KPI values keep the exact amount for assistive technology.
         expect(kpis.textContent).toContain(`(${formatVND(huge)})`)
       }
       if (kind === 'debt') {
         expect(within(kpis).getByText('Nợ cuối kỳ')).toBeTruthy()
+        expect(within(kpis).getByText('Đã thu')).toBeTruthy()
         expect(screen.getByText('Biến động công nợ trong kỳ')).toBeTruthy()
+        // A prepaid (negative) opening debt keeps its sign.
+        expect(
+          within(region).getAllByRole('cell', { name: '-5 ₫' }).length,
+        ).toBeGreaterThan(0)
+        expect(screen.queryByText(/Dư có|Cấn trừ/)).toBeNull()
       }
       if (kind === 'inventory') {
         expect(screen.getByText('0,001').className).toContain('cell-number')
         expect(screen.getByText('-0,001')).toBeTruthy()
         expect(within(kpis).getByText('Hết tồn cuối kỳ')).toBeTruthy()
+        expect(within(kpis).getByText('Có xuất bán')).toBeTruthy()
+        expect(screen.queryByText(/Điều chỉnh|Trả lại/)).toBeNull()
         // Every closing stock is zero: the ranked chart explains the blank.
         expect(
           screen.getByText('Không có giá trị khác 0 để vẽ biểu đồ.'),
@@ -223,13 +227,18 @@ describe('authoritative reports', { timeout: 20000 }, () => {
         expect(
           screen.getByText('Mặt hàng bán nhiều nhất (số lượng)'),
         ).toBeTruthy()
-        expect(
-          screen.getByText('Mặt hàng doanh số thuần cao nhất'),
-        ).toBeTruthy()
+        expect(screen.getByText('Mặt hàng doanh số cao nhất')).toBeTruthy()
+        expect(screen.getByText('Mặt hàng dẫn đầu doanh số')).toBeTruthy()
       }
-      if (kind === 'cash-and-credit') {
-        expect(within(kpis).getByText('Tiền đã thu')).toBeTruthy()
-        expect(screen.getByText('Biến động dư có trong kỳ')).toBeTruthy()
+      if (kind === 'collections') {
+        expect(within(kpis).getByText('Tổng thu')).toBeTruthy()
+        expect(within(kpis).getByText('3 phiếu thu')).toBeTruthy()
+        expect(within(kpis).getByText('Trực tuyến')).toBeTruthy()
+        expect(screen.getByText('Tiền thu theo ngày')).toBeTruthy()
+        expect(screen.getByText('Cơ cấu hình thức thu')).toBeTruthy()
+        expect(
+          within(region).getByRole('columnheader', { name: 'Số phiếu thu' }),
+        ).toBeTruthy()
       }
     },
   )
@@ -242,14 +251,14 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     const header = screen.getByRole('rowheader', {
       name: 'DL-101 — Đại lý nguồn',
     })
-    expect(header.closest('tr')!.textContent).toContain('-1 ₫')
+    expect(header.closest('tr')!.textContent).toContain(formatVND(huge))
   })
 
   it('re-sorts on the server from a column header and restarts at page one', async () => {
     render(<ReportsPage />)
     apply()
     await sourceRow()
-    const header = screen.getByRole('columnheader', { name: 'Doanh số thuần' })
+    const header = screen.getByRole('columnheader', { name: 'Doanh số' })
     expect(header.getAttribute('aria-sort')).toBe('none')
     // Identity/rate columns are not in the sort enum and stay plain headers.
     expect(
@@ -259,31 +268,31 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     ).toBeNull()
     fireEvent.click(within(header).getByRole('button'))
     await waitFor(() => expect(reportCalls()).toHaveLength(2))
-    expect(reportCalls()[1]![0]).toContain('sort=-netSalesAmount')
+    expect(reportCalls()[1]![0]).toContain('sort=-salesAmount')
     expect(reportCalls()[1]![0]).not.toContain('cursor=')
     await sourceRow()
     expect(
       screen
-        .getByRole('columnheader', { name: 'Doanh số thuần' })
+        .getByRole('columnheader', { name: 'Doanh số' })
         .getAttribute('aria-sort'),
     ).toBe('descending')
     // The filter bar follows, so the applied query is not marked dirty.
     expect((screen.getByLabelText('Sắp xếp') as HTMLSelectElement).value).toBe(
-      '-netSalesAmount',
+      '-salesAmount',
     )
     expect(exportTrigger().disabled).toBe(false)
     fireEvent.click(
-      within(
-        screen.getByRole('columnheader', { name: 'Doanh số thuần' }),
-      ).getByRole('button'),
+      within(screen.getByRole('columnheader', { name: 'Doanh số' })).getByRole(
+        'button',
+      ),
     )
     await waitFor(() => expect(reportCalls()).toHaveLength(3))
-    expect(reportCalls()[2]![0]).toContain('sort=netSalesAmount')
+    expect(reportCalls()[2]![0]).toContain('sort=salesAmount')
     await sourceRow()
     fireEvent.click(
-      within(
-        screen.getByRole('columnheader', { name: 'Doanh số thuần' }),
-      ).getByRole('button'),
+      within(screen.getByRole('columnheader', { name: 'Doanh số' })).getByRole(
+        'button',
+      ),
     )
     // Third click returns to the report's default contract sort.
     await waitFor(() => expect(reportCalls()).toHaveLength(4))
@@ -382,10 +391,10 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     expect(labels).toEqual([
       'Đại lý: cũ trước',
       'Đại lý: mới thêm trước',
-      'Doanh số gộp: thấp đến cao',
-      'Doanh số gộp: cao đến thấp',
-      'Doanh số thuần: thấp đến cao',
-      'Doanh số thuần: cao đến thấp',
+      'Doanh số: thấp đến cao',
+      'Doanh số: cao đến thấp',
+      'Số phiếu xuất: thấp đến cao',
+      'Số phiếu xuất: cao đến thấp',
     ])
     expect(Array.from(sort.options).map((o) => o.value)).toEqual(
       reports.sales.sorts,
@@ -395,11 +404,11 @@ describe('authoritative reports', { timeout: 20000 }, () => {
       'Số dòng mỗi trang',
     ) as HTMLSelectElement
     expect(limit.value).toBe('25')
-    fireEvent.change(sort, { target: { value: '-netSalesAmount' } })
+    fireEvent.change(sort, { target: { value: '-numberOfIssues' } })
     fireEvent.change(limit, { target: { value: '100' } })
     apply()
     await sourceRow()
-    expect(reportCalls()[0]![0]).toContain('sort=-netSalesAmount')
+    expect(reportCalls()[0]![0]).toContain('sort=-numberOfIssues')
     expect(reportCalls()[0]![0]).toContain('limit=100')
   })
 
@@ -424,9 +433,9 @@ describe('authoritative reports', { timeout: 20000 }, () => {
   it.each(
     [
       ['sales.read'],
-      ['reports.read'],
+      ['sales.read', 'debt.read'],
       [],
-      ['product.manage', 'reports.read'],
+      ['product.manage', 'agency.read'],
     ].map((grants) => ({ grants })),
   )('does not request with missing allOf grants $grants', ({ grants }) => {
     auth.allowedFunctions = grants
@@ -437,15 +446,58 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     expect(api.apiFetch).not.toHaveBeenCalled()
   })
 
-  it('uses inventory defaults for an inventory-only reader', async () => {
-    auth.allowedFunctions = ['reports.read', 'inventory.read']
+  it('uses inventory defaults for a reader with only reports.read', async () => {
+    auth.allowedFunctions = ['reports.read']
     render(<ReportsPage />)
-    expect(screen.getAllByRole('tab')).toHaveLength(1)
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Xuất nhập tồn',
+    ])
     apply()
     await screen.findByRole('region', { name: 'Xuất nhập tồn' })
     expect(vi.mocked(api.apiFetch).mock.calls[0]![0]).toContain(
       'sort=productId',
     )
+  })
+
+  it('offers sales.read and debt.read readers the tabs their grants allow', () => {
+    auth.allowedFunctions = ['reports.read', 'debt.read']
+    render(<ReportsPage />)
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Công nợ',
+      'Xuất nhập tồn',
+      'Thu tiền',
+    ])
+  })
+
+  it('filters collections by a receipt type choice and by agency', async () => {
+    render(<ReportsPage />)
+    openTab('collections')
+    const type = screen.getByLabelText('Hình thức thu') as HTMLSelectElement
+    expect(Array.from(type.options).map((o) => o.value)).toEqual([
+      '',
+      'CASH',
+      'BANK_TRANSFER',
+      'ONLINE',
+    ])
+    expect((screen.getByLabelText('Sắp xếp') as HTMLSelectElement).value).toBe(
+      'businessDate',
+    )
+    fireEvent.change(type, { target: { value: 'ONLINE' } })
+    await choose('Đại lý', '4')
+    apply()
+    await screen.findByRole('region', { name: reports.collections.label })
+    const path = reportCalls()[0]![0]
+    expect(path).toContain('/reports/collections?')
+    expect(path).toContain('receiptType=ONLINE')
+    expect(path).toContain('agencyId=4')
+    expect(path).toContain('sort=businessDate')
+    // Back to "all" omits the parameter entirely.
+    fireEvent.change(screen.getByLabelText('Hình thức thu'), {
+      target: { value: '' },
+    })
+    apply()
+    await waitFor(() => expect(reportCalls()).toHaveLength(2))
+    expect(reportCalls()[1]![0]).not.toContain('receiptType')
   })
 
   it('shows loading skeletons until the report arrives', async () => {
@@ -566,7 +618,7 @@ describe('authoritative reports', { timeout: 20000 }, () => {
     const view = render(<ReportsPage />)
     apply()
     await sourceRow()
-    auth.allowedFunctions = ['reports.read', 'inventory.read']
+    auth.allowedFunctions = ['reports.read']
     view.rerender(<ReportsPage />)
     expect(screen.queryByText('Đại lý nguồn')).toBeNull()
     expect(vi.mocked(api.apiFetch).mock.calls[0]![1]!.signal!.aborted).toBe(
@@ -632,13 +684,16 @@ describe('authoritative reports', { timeout: 20000 }, () => {
 describe('report display helpers', () => {
   it('formats exact strings by column kind without numeric coercion', () => {
     expect(displayValue('salesAmount', huge)).toBe(formatVND(huge))
-    expect(displayValue('netSalesAmount', '-1500000')).toBe('-1.500.000 ₫')
+    expect(displayValue('closingDebt', '-1500000')).toBe('-1.500.000 ₫')
+    expect(displayValue('businessDate', '2026-10-05')).toBe('05/10/2026')
+    expect(displayValue('receiptCount', 1200)).toBe('1.200')
     expect(displayValue('closingStock', '1234.500')).toBe('1.234,5')
     expect(displayValue('numberOfIssues', 1200)).toBe('1.200')
     expect(displayValue('salesRate', '12.5')).toBe('12,5 %')
     expect(displayValue('agencyCode', 'DL-1')).toBe('DL-1')
     expect(displayValue('agencyName', '')).toBe('—')
-    expect(isNumeric('cashReceived')).toBe(true)
+    expect(isNumeric('cashAmount')).toBe(true)
+    expect(isNumeric('businessDate')).toBe(false)
     expect(isNumeric('productName')).toBe(false)
   })
 
@@ -658,18 +713,21 @@ describe('report display helpers', () => {
 
   it('offers header sorting only for visible columns in the sort enum', () => {
     expect([...sortableColumns('sales')]).toEqual([
+      'numberOfIssues',
       'salesAmount',
-      'netSalesAmount',
     ])
-    expect([...sortableColumns('debt')]).toEqual(['closingDebt'])
+    expect([...sortableColumns('debt')]).toEqual([
+      'debtIncrease',
+      'closingDebt',
+    ])
     expect([...sortableColumns('inventory')]).toEqual(['closingStock'])
     expect([...sortableColumns('product-sales')]).toEqual([
-      'salesAmount',
       'soldQuantity',
+      'salesAmount',
     ])
-    expect([...sortableColumns('cash-and-credit')]).toEqual([
-      'cashReceived',
-      'closingCredit',
+    expect([...sortableColumns('collections')]).toEqual([
+      'businessDate',
+      'totalAmount',
     ])
     for (const kind of Object.keys(reports) as ReportKind[]) {
       expect(sortableColumns(kind).has('agencyId')).toBe(false)

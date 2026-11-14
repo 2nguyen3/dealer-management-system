@@ -42,14 +42,12 @@ export function isPermitted(path: string, hasPermission: HasPermission) {
 const DEFAULT_RULES: readonly (readonly [FunctionCode, string])[] = [
   ['cash.receipt.prepare', '/payment-receipts'],
   ['cash.receipt.post', '/payment-receipts'],
-  ['cash.upfront.verify', '/upfront-payments'],
+  ['debt.read', '/payment-receipts'],
   ['stock.receipt.prepare', '/stock-receipts'],
   ['stock.issue.prepare', '/stock-issues'],
   ['stock.issue.post', '/stock-issues'],
-  ['stock.count', '/stock-counts'],
   ['agency.manage', '/agencies'],
-  ['debt.read', '/receivables'],
-  ['inventory.read', '/inventory'],
+  ['product.manage', '/products'],
   ['users.manage', '/users'],
   ['permissions.manage', '/permissions'],
   ['audit.read', '/audit-logs'],
@@ -76,7 +74,10 @@ export function defaultFavorites(hasPermission: HasPermission): string[] {
 
 /**
  * Reads a stored deck: a JSON array of favouritable paths, kept in order and
- * de-duplicated. Anything else (missing, malformed, wrong type) is `null`.
+ * de-duplicated. Paths that are no longer functions (removed pages) are
+ * dropped; a non-empty deck left with none of them counts as never saved, so
+ * the role defaults apply. Anything else (missing, malformed, wrong type) is
+ * `null`.
  */
 export function parseFavorites(raw: string | null): string[] | null {
   if (raw === null) return null
@@ -95,7 +96,7 @@ export function parseFavorites(raw: string | null): string[] | null {
       !paths.includes(entry)
     )
       paths.push(entry)
-  return paths
+  return paths.length === 0 && value.length > 0 ? null : paths
 }
 
 export function favoritesKey(userId: string): string {
@@ -159,11 +160,15 @@ export function reorderVisible(
   return [...visible, ...list.filter((path) => !visible.includes(path))]
 }
 
-/** Splits a saved deck into the permitted entries and the hidden count. */
+/**
+ * Splits a saved deck into the permitted entries and the hidden count.
+ * Functions that no longer exist are dropped silently, not counted as hidden.
+ */
 export function resolveDeck(
   list: readonly string[],
   hasPermission: HasPermission,
 ): { visible: string[]; hidden: number } {
-  const visible = list.filter((path) => isPermitted(path, hasPermission))
-  return { visible, hidden: list.length - visible.length }
+  const known = list.filter(isFavoritable)
+  const visible = known.filter((path) => isPermitted(path, hasPermission))
+  return { visible, hidden: known.length - visible.length }
 }

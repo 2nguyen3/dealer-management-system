@@ -20,7 +20,7 @@ describe('HomePage', () => {
   })
 
   it('shows a task directory with only permitted work links', () => {
-    access.granted = ['inventory.read']
+    access.granted = ['stock.receipt.prepare']
     render(
       <MemoryRouter>
         <HomePage />
@@ -33,7 +33,11 @@ describe('HomePage', () => {
     expect(
       screen.getByRole('link', { name: /Danh mục mặt hàng/ }),
     ).toBeDefined()
+    expect(screen.getByRole('link', { name: /Phiếu nhập hàng/ })).toBeDefined()
     expect(screen.queryByRole('link', { name: /Phiếu thu tiền/ })).toBeNull()
+    // Pages removed by the simplification never appear in the directory.
+    for (const name of [/Tồn kho/, /Công nợ đại lý/, /Kiểm kê/, /Hoàn tiền/])
+      expect(screen.queryByRole('link', { name }), String(name)).toBeNull()
     expect(screen.getByRole('link', { name: /Xem tổng quan/ })).toBeDefined()
     expect(screen.queryByRole('link', { name: /Mở báo cáo/ })).toBeNull()
   })
