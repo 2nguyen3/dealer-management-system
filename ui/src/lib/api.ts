@@ -1,3 +1,5 @@
+import { describeError, ERROR_TEXTS, type ErrorText } from './errors'
+import { t } from './i18n/core'
 import {
   getAccessToken,
   getSessionGeneration,
@@ -15,6 +17,10 @@ export class ApiError extends Error {
   readonly requestId?: string
   readonly fieldErrors?: Record<string, string>
   readonly retryAfter?: string
+  /** Translated guidance for a known code (see `src/lib/errors.ts`). */
+  readonly hint?: string
+  /** Page that resolves a known code, if any. */
+  readonly action?: ErrorText['action']
 
   constructor(
     status: number,
@@ -31,17 +37,32 @@ export class ApiError extends Error {
     this.requestId = requestId
     this.fieldErrors = fieldErrors
     this.retryAfter = retryAfter
+    const known = describeError(code)
+    if (known?.hint) this.hint = known.hint
+    if (known?.action) this.action = known.action
   }
 }
 
 /**
- * Vietnamese messages for business error codes whose server text is not
- * meant for end users. Other codes keep the server's own message.
+ * User-facing text for a known error code: the message followed by its hint.
+ * Unknown codes keep the server's own message (see `apiFetch`).
  */
-export const ERROR_CODE_MESSAGES: Readonly<Record<string, string>> = {
-  WARD_CAPACITY_EXCEEDED:
-    'Phường/xã đã đủ số đại lý tối đa theo quy định. Hãy chọn phường/xã khác hoặc điều chỉnh quy định.',
+export function errorCodeMessage(code: string): string | null {
+  const known = describeError(code)
+  if (!known) return null
+  return known.hint ? `${known.message} ${known.hint}` : known.message
 }
+
+/** Vietnamese source texts per code, kept for callers that build an ApiError. */
+export const ERROR_CODE_MESSAGES: Readonly<Record<string, string>> =
+  Object.fromEntries(
+    Object.entries(ERROR_TEXTS as Record<string, ErrorText>).map(
+      ([code, text]) => [
+        code,
+        text.hint ? `${text.message} ${text.hint}` : text.message,
+      ],
+    ),
+  )
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
@@ -161,7 +182,11 @@ export async function apiFetch<T = unknown>(
       assertCurrent()
       if (error instanceof DOMException && error.name === 'AbortError')
         throw error
-      throw new ApiError(0, 'NETWORK_ERROR', 'Không thể kết nối đến máy chủ.')
+      throw new ApiError(
+        0,
+        'NETWORK_ERROR',
+        t('Không thể kết nối đến máy chủ.'),
+      )
     }
   }
 
@@ -215,7 +240,7 @@ export async function apiFetch<T = unknown>(
           ? errorPayload.code
           : `HTTP_${response.status}`
       const message =
-        ERROR_CODE_MESSAGES[code] ||
+        (response.status < 500 ? errorCodeMessage(code) : null) ||
         (response.status < 500 &&
         typeof errorPayload.message === 'string' &&
         errorPayload.message.length <= 1000 &&
@@ -223,16 +248,20 @@ export async function apiFetch<T = unknown>(
           ? errorPayload.message
           : null) ||
         (response.status === 403
-          ? 'Bạn không có quyền thực hiện thao tác này.'
+          ? t('Bạn không có quyền thực hiện thao tác này.')
           : response.status === 404
-            ? 'Không tìm thấy dữ liệu yêu cầu.'
+            ? t('Không tìm thấy dữ liệu yêu cầu.')
             : response.status === 412
-              ? 'Dữ liệu đã bị thay đổi bởi người dùng khác. Vui lòng tải lại.'
+              ? t(
+                  'Dữ liệu đã bị thay đổi bởi người dùng khác. Vui lòng tải lại.',
+                )
               : response.status === 429
-                ? 'Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.'
+                ? t('Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.')
                 : response.status >= 500
-                  ? 'Máy chủ gặp sự cố xử lý.'
-                  : `Yêu cầu thất bại (HTTP ${response.status})`)
+                  ? t('Máy chủ gặp sự cố xử lý.')
+                  : t('Yêu cầu thất bại (HTTP {status})', {
+                      status: response.status,
+                    }))
 
       const fields: Record<string, string> = Object.create(null) as Record<
         string,
@@ -273,7 +302,7 @@ export async function apiFetch<T = unknown>(
       throw new ApiError(
         response.status,
         'INVALID_RESPONSE',
-        'Phản hồi máy chủ không hợp lệ.',
+        t('Phản hồi máy chủ không hợp lệ.'),
       )
     }
     assertCurrent()
@@ -281,7 +310,7 @@ export async function apiFetch<T = unknown>(
       throw new ApiError(
         response.status,
         'INVALID_RESPONSE',
-        'Phản hồi máy chủ không hợp lệ.',
+        t('Phản hồi máy chủ không hợp lệ.'),
       )
     }
     return {
@@ -310,7 +339,7 @@ export async function apiDownload(
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ].includes(accept)
   ) {
-    throw new ApiError(0, 'INVALID_ACCEPT', 'Cần chọn định dạng tải xuống.')
+    throw new ApiError(0, 'INVALID_ACCEPT', t('Cần chọn định dạng tải xuống.'))
   }
   const response = await apiFetch<Blob>(path, {
     ...options,
@@ -323,7 +352,7 @@ export async function apiDownload(
     throw new ApiError(
       response.status,
       'INVALID_RESPONSE',
-      'Định dạng tải xuống không hợp lệ.',
+      t('Định dạng tải xuống không hợp lệ.'),
     )
   }
   return response
