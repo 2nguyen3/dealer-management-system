@@ -2,8 +2,21 @@ import type { FlowState, FlowStep } from '../payment_receipts/flow'
 import { t } from '@/lib/i18n/core'
 import { formatVND } from '@/lib/formatters'
 import { paymentLimit } from '../stock_receipts/lineEstimates'
+import {
+  decimal,
+  id,
+  record,
+  text,
+  type Row,
+} from '../payment_receipts/contracts'
 
 const AMOUNT = /^[1-9][0-9]{0,17}$/
+export const PAYMENT_STATUSES = [
+  'PENDING',
+  'SUCCESS',
+  'FAILED',
+  'EXPIRED',
+] as const
 
 export const PAYMENT_FLOW_LABELS = [
   ['create', t('Tạo giao dịch')],
@@ -75,4 +88,38 @@ export function onlineAmountError(amount: string, debt: string | null) {
       debt: formatVND(limit.toString()),
     })
   return null
+}
+
+/** Validated online payment (GET/POST /online-payments) row. */
+export function payment(value: unknown): Row {
+  const data = record(value)
+  id(data.id)
+  id(data.agencyId)
+  decimal(data.amount)
+  text(data.provider)
+  text(data.merchantReference)
+  if (!(PAYMENT_STATUSES as readonly string[]).includes(text(data.status)))
+    throw new Error('Invalid payment status')
+  if (!AMOUNT.test(String(data.amount)))
+    throw new Error('Invalid payment amount')
+  if (data.status === 'SUCCESS') {
+    id(data.receiptDocumentId)
+    text(data.paymentTime)
+    text(data.providerTransactionId)
+  } else if (data.receiptDocumentId !== null)
+    throw new Error('Unverified payment cannot have a receipt')
+  return data
+}
+
+/** The checkout URL when it is a credential-free https link, else null. */
+export function checkoutUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
 }

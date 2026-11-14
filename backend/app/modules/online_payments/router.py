@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.common.catalogue_http import responses
@@ -11,6 +11,7 @@ from app.common.transport import BusinessRoute
 from app.modules.auth.dependencies import require_permissions
 from app.modules.auth.service import Principal
 from app.modules.online_payments.dependencies import get_online_payment_service
+from app.modules.online_payments.printing import print_payment
 from app.modules.online_payments.schemas import (
     OnlinePayment,
     OnlinePaymentCreate,
@@ -110,6 +111,28 @@ def get_online_payment(paymentId: Id, principal: Reader, service: Service, respo
     item = service.get(int(paymentId))
     response.headers["ETag"] = etag(item)
     return item
+
+
+PRINT_RESPONSES = responses(200, 401, 403, 404, 406, 422, 429, 500)
+PRINT_RESPONSES[200]["content"] = {
+    "text/html": {"schema": {"type": "string"}},
+    "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+}
+
+
+@router.get(
+    "/{paymentId}/print",
+    operation_id="printOnlinePayment",
+    responses=PRINT_RESPONSES,
+    response_class=Response,
+    openapi_extra=READ_PERMISSIONS,
+)
+def print_online_payment(paymentId: Id, principal: Reader, service: Service, request: Request):
+    """Payment request with the VNPAY QR while PENDING; not a receipt."""
+    payment = service.get(int(paymentId)).model_dump(mode="json")
+    service.session.rollback()  # The renderer only consumes the detached projection.
+    content, media, headers = print_payment(payment, request.headers.get("accept"))
+    return Response(content, media_type=media, headers=headers)
 
 
 @router.get(

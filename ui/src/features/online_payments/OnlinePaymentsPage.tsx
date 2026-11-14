@@ -5,9 +5,7 @@ import {
   CircleCheck,
   CircleX,
   Clock3,
-  Copy,
   CreditCard,
-  ExternalLink,
   Globe,
   Hourglass,
   QrCode,
@@ -26,7 +24,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
-import QRCode from 'react-qr-code'
+import { CheckoutActions, CheckoutLink, CheckoutQr } from './CheckoutParts'
 import { useSearchParams } from 'react-router'
 import { DateField } from '@/components/blocks/DateField'
 import { PageHeader } from '@/components/blocks/PageHeader'
@@ -61,7 +59,6 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '../authentication/useAuth'
 import {
   dateRangeParams,
-  decimal,
   id,
   Intent,
   message,
@@ -72,6 +69,7 @@ import {
   type Row,
 } from '../payment_receipts/contracts'
 import { DetailList } from '../payment_receipts/DetailList'
+import { PdfButton } from '../payment_receipts/PdfButton'
 import {
   ActionBar,
   FilterBar,
@@ -84,14 +82,19 @@ import { groupTotals, type FlowStep } from '../payment_receipts/flow'
 import { FlowSteps } from '../payment_receipts/FlowSteps'
 import { PageSummary } from '../payment_receipts/PageSummary'
 import { useSourcePage } from '../payment_receipts/useSourcePage'
-import { onlineAmountError, paymentFlowSteps } from './paymentFlow'
+import {
+  checkoutUrl,
+  onlineAmountError,
+  payment,
+  paymentFlowSteps,
+  PAYMENT_STATUSES,
+} from './paymentFlow'
 import { DebtPanel } from '../document_history/DebtPanel'
 import { documentLink } from '../document_history/documentContracts'
 import { useAgencyBalance } from '../document_history/useRecords'
 import { SafeLink } from '@/components/guide/SafeLink'
 import { usePathAllowed } from '../guide/usePathAllowed'
 
-const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'EXPIRED'] as const
 const AMOUNT = /^[1-9][0-9]{0,17}$/
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'var(--warning)',
@@ -108,44 +111,12 @@ function optionalDateTime(value: unknown, fallback: string): string {
   return typeof value === 'string' && value ? formatDateTime(value) : fallback
 }
 
-function payment(value: unknown): Row {
-  const data = record(value)
-  id(data.id)
-  id(data.agencyId)
-  decimal(data.amount)
-  text(data.provider)
-  text(data.merchantReference)
-  if (!(PAYMENT_STATUSES as readonly string[]).includes(text(data.status)))
-    throw new Error('Invalid payment status')
-  if (!AMOUNT.test(String(data.amount)))
-    throw new Error('Invalid payment amount')
-  if (data.status === 'SUCCESS') {
-    id(data.receiptDocumentId)
-    text(data.paymentTime)
-    text(data.providerTransactionId)
-  } else if (data.receiptDocumentId !== null)
-    throw new Error('Unverified payment cannot have a receipt')
-  return data
-}
-
 function eventSummary(value: unknown): Row {
   const data = record(value)
   id(data.id)
   text(data.providerStatus)
   record(data.verifiedData)
   return data
-}
-
-function checkoutUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' && !url.username && !url.password
-      ? url.href
-      : null
-  } catch {
-    return null
-  }
 }
 
 export function OnlinePaymentsPage() {
@@ -796,6 +767,12 @@ export function OnlinePaymentsPage() {
                 >
                   {t('Kiểm tra trạng thái')}
                 </Button>
+                <PdfButton
+                  path={`/online-payments/${String(detail.id)}/print`}
+                  filename={`phieu-bao-thanh-toan-${String(detail.id)}.pdf`}
+                >
+                  {t('Tải PDF phiếu báo thanh toán')}
+                </PdfButton>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -901,6 +878,21 @@ export function OnlinePaymentsPage() {
                 </Popover>
               )}
               {payable && <CheckoutLink url={url} />}
+              <PdfButton
+                path={`/online-payments/${String(detail.id)}/print`}
+                filename={`phieu-bao-thanh-toan-${String(detail.id)}.pdf`}
+              >
+                {t('PDF phiếu báo')}
+              </PdfButton>
+              {typeof detail.receiptDocumentId === 'string' &&
+                detail.receiptDocumentId && (
+                  <PdfButton
+                    path={`/documents/${detail.receiptDocumentId}/print`}
+                    filename={`${typeof detail.receiptCode === 'string' && detail.receiptCode ? detail.receiptCode : `PT-${detail.receiptDocumentId}`}.pdf`}
+                  >
+                    {t('PDF phiếu thu')}
+                  </PdfButton>
+                )}
             </ActionBar>
             {canManage && (
               <SectionCard
@@ -1087,57 +1079,6 @@ function MiniFlow({ steps }: { steps: FlowStep[] | null }) {
         />
       ))}
     </span>
-  )
-}
-
-/** QR of the validated https checkout URL; kept on white so it scans in dark mode. */
-function CheckoutQr({ url, size }: { url: string; size: number }) {
-  return (
-    <figure className="w-fit space-y-1.5">
-      <div className="rounded-xl border bg-white p-3 shadow-xs">
-        <QRCode
-          value={url}
-          size={size}
-          level="M"
-          title={t('Mã QR trang thanh toán VNPAY')}
-        />
-      </div>
-      <figcaption className="text-center text-[0.7rem] text-muted-foreground">
-        {t('Quét để mở VNPAY')}
-      </figcaption>
-    </figure>
-  )
-}
-
-function CheckoutLink({ url }: { url: string }) {
-  return (
-    <ShadcnButton asChild>
-      <a href={url} target="_blank" rel="noreferrer">
-        <ExternalLink className="size-4" aria-hidden="true" />
-        {t('Mở trang thanh toán')}
-      </a>
-    </ShadcnButton>
-  )
-}
-
-function CheckoutActions({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
-  }
-  return (
-    <div className="flex flex-wrap gap-2">
-      <CheckoutLink url={url} />
-      <ShadcnButton type="button" variant="outline" onClick={() => void copy()}>
-        <Copy className="size-4" aria-hidden="true" />
-        {copied ? t('Đã sao chép') : t('Sao chép liên kết')}
-      </ShadcnButton>
-    </div>
   )
 }
 

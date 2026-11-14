@@ -168,8 +168,9 @@ def test_transaction_error_translation():
 
 def test_shared_harness_and_contract(monkeypatch):
     matrix = transport_matrix()
-    # 0011 simplification: 90 runtime operations (three document kinds, VNPAY, reads).
-    assert len(matrix) == 90 and len({item["operationId"] for item in matrix}) == 90
+    # 0011 simplification: 90 runtime operations (three document kinds, VNPAY, reads),
+    # plus printOnlinePayment (payment request with QR).
+    assert len(matrix) == 91 and len({item["operationId"] for item in matrix}) == 91
     for item in matrix:
         assert item["responses"] and item["method"] in ("GET", "POST", "PATCH", "PUT", "DELETE")
     assert any(item["bodyRequired"] for item in matrix)

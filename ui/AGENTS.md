@@ -17,7 +17,9 @@ REASON_REQUIRED, AGENCY_HAS_DEBT, PAYMENT_EXCEEDS_DEBT, DEBT_LIMIT_EXCEEDED,
 INSUFFICIENT_STOCK, PRODUCT_NOT_PRICED, WARD_CAPACITY_EXCEEDED…). Switching the
 interface language reloads behind the `index.html` boot splash (`showLoadingSplash`
 in `src/lib/i18n/runtime.ts`) instead of a blank page. Contract:
-`../openwiki/backend-design/API/openapi.json` (90 operations). Evidence:
+`../openwiki/backend-design/API/openapi.json` (91 operations). Payment receipts: every
+receipt exports a PDF (`PdfButton`); a new receipt by "Chuyển khoản (VNPAY)" creates a pending
+online payment with QR + payment request PDF (`TransferHandoff`) instead of a document. Evidence:
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page
 description below is historical.
 
