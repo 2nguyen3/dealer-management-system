@@ -1,6 +1,6 @@
 const { chromium } = require('playwright-core')
 
-// Seed v2 manager account and first agency (root README account table).
+// Seed v2 manager account and first agency (openwiki/cred/account/account.md).
 const BASE_URL = (process.env.E2E_BASE_URL || 'http://localhost:8080').replace(
   /\/$/,
   '',

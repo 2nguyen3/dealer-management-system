@@ -479,8 +479,9 @@ four months of trading history (June–September 2026). It covers multi-line rec
 issues, current/historical price snapshots, FIFO cash/bank/online collections,
 upfront evidence, returns, credit lots/application, cash/online refunds and pending
 reservations, stock counts, drafts, cancellations, correction revisions, reversals
-and automatic audit logs. Full counts and all 8 demo account credentials are in
-the [root README](../README.md#tài-khoản-đăng-nhập-mẫu).
+and automatic audit logs. Current seed v2 counts are in
+[database design](../openwiki/database-design/README.md) and the account credentials in
+[openwiki/cred/account/account.md](../openwiki/cred/account/account.md).
 
 Passwords are hashed with Argon2id. Seeded tokens are random digests, all revoked;
 raw tokens are discarded. Provider evidence uses `DEMO_SANDBOX` and explicitly

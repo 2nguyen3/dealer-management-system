@@ -201,8 +201,22 @@ Dùng khoảng nửa mở `[đầu tháng, đầu tháng sau)` để giữ index
   20 phường (có phường đủ 4/4, cặp trùng tên khác phường, 2 TERMINATED, đại lý mới chưa giao
   dịch, nợ sát hạn mức, nợ 0, 1 nợ âm do VNPAY về muộn), phiếu nhập/xuất/thu có hủy và sửa
   có lý do, nháp cả 3 loại, 15–25 giao dịch VNPAY SUCCESS/FAILED/EXPIRED (không PENDING).
-- Bảng tài khoản, mật khẩu và số lượng thật từng bảng nằm ở [README root](../../README.md);
+- Tài khoản và mật khẩu nằm ở [openwiki/cred/account/account.md](../cred/account/account.md);
   tài liệu thiết kế không ghi mật khẩu.
+
+Số liệu seed v2 (seed ngày 14/11/2026, kiểm tra trên PostgreSQL 18):
+
+| Nội dung | Số lượng |
+|---|---|
+| Nhóm / chức năng / phân quyền | 4 nhóm, 22 chức năng, 88 dòng phân quyền |
+| Tài khoản | 11 (10 hoạt động, 1 bị khóa) |
+| Quy định / danh mục | Tối đa 4 đại lý/phường, tỷ lệ giá bán 1,02; 2 loại đại lý (hạn mức 50.000.000đ và 20.000.000đ); 168 phường/xã; 8 đơn vị tính |
+| Đại lý | 34 (3 đã chấm dứt hợp tác); có một phường đã đủ 4 đại lý |
+| Mặt hàng | 30 (2 ngừng bán, 1 chưa từng nhập nên chưa có giá) |
+| Chứng từ | 468: phiếu nhập 90, phiếu xuất 255, phiếu thu 123 (nháp 8, đã hủy 13, sửa thay thế 5); 1.270 dòng hàng |
+| Phiếu thu | Tiền mặt 65, chuyển khoản 47, VNPAY 11 |
+| Thanh toán VNPAY | 19 giao dịch: 11 thành công, 5 thất bại, 3 hết hạn; một đại lý có nợ âm do tiền VNPAY về muộn |
+| Nhật ký | 4.020 bản ghi, không chứa mật khẩu/token |
 
 ## 7. Chạy và kiểm chứng
 
