@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../features/home/HomePage'
@@ -10,6 +10,9 @@ vi.mock('../features/authentication/useAuth', () => ({
     hasPermission: (code: string) => access.granted.includes(code),
   }),
 }))
+
+const openCatalogue = () =>
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /Chức năng nghiệp vụ/ }))
 
 describe('HomePage', () => {
   beforeEach(() => {
@@ -24,7 +27,8 @@ describe('HomePage', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Bàn làm việc' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Cổng quản lý' })).toBeDefined()
+    openCatalogue()
     expect(screen.getByRole('heading', { name: 'Nghiệp vụ' })).toBeDefined()
     expect(
       screen.getByRole('link', { name: /Danh mục mặt hàng/ }),
@@ -40,6 +44,7 @@ describe('HomePage', () => {
         <HomePage />
       </MemoryRouter>,
     )
+    openCatalogue()
 
     expect(
       screen.getByRole('heading', {

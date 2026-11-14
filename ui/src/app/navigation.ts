@@ -112,7 +112,7 @@ export const navigationGroups: {
     key: 'overview',
     title: t('Tổng quan'),
     items: [
-      { path: '/', label: t('Bàn làm việc') },
+      { path: '/', label: t('Cổng quản lý') },
       { path: '/dashboard', label: t('Bảng điều khiển') },
       { path: '/reports', label: t('Báo cáo kinh doanh') },
     ],

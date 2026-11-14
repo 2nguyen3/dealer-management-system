@@ -54,6 +54,7 @@ import { ModeToggle } from '@/components/theme/ModeToggle'
 import { initials } from '../features/profile/profileModel'
 import { ChangePasswordModal } from '../features/authentication/ChangePasswordModal'
 import { GuideButton } from '../features/guide/GuideButton'
+import { FavoriteButton } from '../features/portal/FavoriteButton'
 import { useAuth } from '../features/authentication/useAuth'
 import {
   allowsNavigation,
@@ -107,7 +108,7 @@ function WorkspaceSidebar({
       <SidebarHeader className="gap-3 px-2 pt-4">
         <NavLink
           to="/"
-          aria-label={t('Agentra - Bàn làm việc')}
+          aria-label={t('Agentra - Cổng quản lý')}
           data-testid="sidebar-brand"
           className="flex min-w-0 items-center gap-2 rounded-md py-1 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
@@ -386,11 +387,14 @@ export function ShellLayout() {
             <PageIconContext.Provider value={pageIcon}>
               <PageToolsContext.Provider
                 value={
-                  <GuideButton
-                    key={guidePath}
-                    path={guidePath}
-                    title={pageLabel}
-                  />
+                  <>
+                    <GuideButton
+                      key={guidePath}
+                      path={guidePath}
+                      title={pageLabel}
+                    />
+                    <FavoriteButton path={guidePath} title={pageLabel} />
+                  </>
                 }
               >
                 <PageTransition key={location.pathname}>

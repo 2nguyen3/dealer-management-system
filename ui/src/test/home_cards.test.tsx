@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '../features/home/HomePage'
@@ -27,6 +27,10 @@ describe('HomePage quick-action cards', () => {
   it('groups permitted modules into described cards across all work areas', () => {
     access.granted = ['users.manage', 'audit.read', 'agency.read']
     renderHome()
+    // The catalogue is the second Portal tab (favourites open first).
+    fireEvent.mouseDown(
+      screen.getByRole('tab', { name: /Chức năng nghiệp vụ/ }),
+    )
     expect(screen.getByText('Người dùng')).toBeTruthy()
     const users = screen.getByRole('link', { name: /Tài khoản người dùng/ })
     expect(users.getAttribute('href')).toBe('/users')
