@@ -6,6 +6,7 @@ MCP tool, which calls the public API with the user's own token (same RBAC as the
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Callable
 
@@ -16,7 +17,7 @@ from app.core.exceptions import ApiError
 from app.modules.auth.service import AuthService, utc_now
 from app.modules.auth.tokens import decode_access_token
 from app.modules.chatbot import mcp_client
-from app.modules.chatbot.llm import LLMClient, LLMUnavailable
+from app.modules.chatbot.llm import LLMClient, LLMRateLimited, LLMUnavailable
 from app.modules.chatbot.orchestrator import Orchestrator
 from app.modules.chatbot.schemas import ChatbotMessageRequest, ChatbotReply
 
@@ -76,6 +77,14 @@ class ChatbotService:
         turns = [turn.model_dump() for turn in request.messages]
         try:
             reply = asyncio.run(self._run(token, turns, today, request.locale))
+        except LLMRateLimited as error:
+            logger.warning("chatbot provider rate limited for user %s", user_id)
+            raise ApiError(
+                429,
+                "RATE_LIMIT_EXCEEDED",
+                "The assistant is busy, try again shortly",
+                headers={"Retry-After": str(max(1, math.ceil(error.retry_after)))},
+            ) from None
         except (LLMUnavailable, mcp_client.McpUnavailable) as error:
             logger.warning("chatbot unavailable for user %s: %r", user_id, error)
             raise unavailable() from None

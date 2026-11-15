@@ -9,6 +9,34 @@ from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.exceptions import ToolError
 
+# JSON Schema keys that cost model tokens without helping it choose arguments; the
+# backend still validates every argument against the full contract.
+DROPPED_SCHEMA_KEYS = frozenset({"title", "pattern", "minLength", "maxLength"})
+
+
+def compact_schema(node: Any) -> Any:
+    """A smaller schema with the same meaning for the model: `anyOf [X, null]` -> X, no
+    titles or regex patterns, whole-number floats as integers."""
+    if isinstance(node, list):
+        return [compact_schema(item) for item in node]
+    if isinstance(node, float) and node.is_integer():
+        return int(node)
+    if not isinstance(node, dict):
+        return node
+    options = node.get("anyOf")
+    if isinstance(options, list):
+        concrete = [option for option in options if option != {"type": "null"}]
+        if len(concrete) == 1 and isinstance(concrete[0], dict):
+            rest = {key: value for key, value in node.items() if key != "anyOf"}
+            return compact_schema(concrete[0] | rest)
+    result = {}
+    for key, value in node.items():
+        if key == "properties" and isinstance(value, dict):
+            result[key] = {name: compact_schema(item) for name, item in value.items()}
+        elif key not in DROPPED_SCHEMA_KEYS:
+            result[key] = compact_schema(value)
+    return result
+
 
 class McpUnavailable(Exception):
     """The MCP server cannot be reached or rejected the session."""
@@ -28,7 +56,7 @@ class McpTools:
         """`tools/list` converted to OpenAI function-calling definitions."""
         result = []
         for tool in await self.client.list_tools():
-            schema = tool.input_schema or {"type": "object", "properties": {}}
+            schema = compact_schema(tool.input_schema or {"type": "object", "properties": {}})
             result.append(
                 {
                     "type": "function",

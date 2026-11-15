@@ -107,7 +107,9 @@ phone numbers, addresses or e-mails.
 ## HTTP errors
 
 `400/422 VALIDATION_FAILED` (schema, more than 20 turns, last turn not from the user),
-`401`, `415`, `429 RATE_LIMIT_EXCEEDED` (per-user `chatbot` bucket, `Retry-After`),
+`401`, `415`, `429 RATE_LIMIT_EXCEEDED` (per-user `chatbot` bucket, or every model answered
+429 and the provider's `Retry-After` exceeds 20 s / the deadline; shorter waits are waited
+out once inside the message),
 `503 CHATBOT_UNAVAILABLE` (disabled or unconfigured, MCP server unreachable, every model
 failed, loop exhausted without data). A forbidden tool call inside a request is not an
 HTTP error: the tool error goes back to the LLM, which tells the user they lack access.
@@ -116,6 +118,8 @@ HTTP error: the tool error goes back to the LLM, which tells the user they lack 
 
 - Figures shown in tables come from tool results; a number in `answer` that appears in
   neither the tool results nor the user's turns is replaced by `…`.
+- Tool definitions are sent compacted (no titles/regex patterns, `anyOf [X, null]` → X) and
+  tool results without null fields, to save provider tokens; the backend still validates.
 - Tool results are sent to the provider (each truncated at 12 000 characters).
   `list_agencies` includes contact data, so phone/address reach the provider; this
   extends the user decision of 13/11/2026 that query results may be sent.
@@ -158,12 +162,16 @@ MCP server (`mcp-server/.env.example`): `AGENTRA_API_URL`, `MCP_HOST`, `MCP_PORT
 | `backend/.../chatbot/service.py`, `router.py`, `schemas.py`, `dependencies.py` | Admission, rate limit, HTTP operation. |
 
 Tests: `mcp-server/tests/test_server.py` (13, offline, real contract, in-memory MCP calls)
-and `backend/tests/chatbot/test_chatbot.py` (29, offline).
+and `backend/tests/chatbot/test_chatbot.py` (33, offline).
 
-Runtime (15/11/2026): Docker Compose service `mcp` (`127.0.0.1:8100`); local LLM is a
-temporary OpenAI-compatible router on the host (`host.docker.internal:20128/v1`, models
-`ag/gemini-3-flash`, `cx/gpt-6-luna`). Vercel has neither the MCP server nor `CHATBOT_*`,
-so production answers 503 and the UI shows "unavailable".
+Runtime (15/11/2026): Docker Compose service `mcp` (`127.0.0.1:8100`). Provider: z.ai
+free Flash models (`CHATBOT_LLM_BASE_URL=https://api.z.ai/api/paas/v4`, models
+`glm-4.5-flash,glm-4.7-flash`, timeout 30 s, deadline 55 s; `glm-5.3-flash*` need a paid
+balance). Measured: 15–40 s per answer, one 30 s timeout recovered by the fallback model.
+Groq free (`openai/gpt-oss-120b/20b`) was faster (~1 s per round) but its 8K tokens/minute
+per model allowed about one question per minute; a third quick question returned 429.
+Vercel has neither the MCP server nor `CHATBOT_*`, so production answers 503 and the UI
+shows "unavailable".
 
 ## Next
 

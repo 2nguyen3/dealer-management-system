@@ -2,12 +2,13 @@
 only chooses tools and arguments, tables are copied from tool results, and figures in the
 answer that no tool returned are removed."""
 
+import asyncio
 import json
 import logging
 import re
 import time
 
-from app.modules.chatbot.llm import LLMClient, LLMUnavailable
+from app.modules.chatbot.llm import LLMClient, LLMRateLimited, LLMUnavailable
 from app.modules.chatbot.mcp_client import McpTools
 from app.modules.chatbot.tables import build_table
 
@@ -15,6 +16,8 @@ logger = logging.getLogger("app.chatbot")
 
 MAX_TABLES = 3
 MAX_TOOL_PAYLOAD = 12000
+# Longest provider rate-limit wait absorbed inside one message before answering 429.
+MAX_RATE_WAIT_SECONDS = 20
 LANGUAGES = {
     "vi": "Vietnamese",
     "en": "English",
@@ -49,6 +52,15 @@ NUMBER = re.compile(
     r"(?<![\w/-])\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?(?![\w/-])"  # 1.250.000 / 1,250.5
     r"|(?<![\w/.,-])\d{4,}(?![\w/-])"  # 1250000
 )
+
+
+def without_nulls(value):
+    """Tool data for the model without null fields (fewer tokens, same facts)."""
+    if isinstance(value, dict):
+        return {key: without_nulls(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [without_nulls(item) for item in value]
+    return value
 
 
 def fallback(locale: str) -> str:
@@ -96,8 +108,8 @@ def system_prompt(today: str, locale: str) -> str:
     return (
         "You are the read-only lookup assistant of Agentra, a dealer management system for "
         f"a goods distributor in Vietnam. Today is {today} (Asia/Ho_Chi_Minh). Always answer "
-        f"in {language}, in one to three short plain sentences without markdown tables; the "
-        "result table is shown to the user separately.\n"
+        f"in {language}, in one to three short plain-text sentences: no Markdown (no **, #, "
+        "bullets or tables); the result table is shown to the user separately.\n"
         "Rules:\n"
         "- Use the tools for every figure; never invent, estimate or compute numbers.\n"
         "- To find an agency or product by name, call list_agencies / list_products with "
@@ -132,7 +144,7 @@ class Orchestrator:
             if time.monotonic() - started > self.deadline_seconds:
                 break
             try:
-                reply = await self.client.chat(messages, definitions)
+                reply = await self._chat(messages, definitions, started)
             except LLMUnavailable:
                 if tables:
                     break
@@ -159,7 +171,12 @@ class Orchestrator:
                     table = build_table(name, outcome.data, locale)
                     if table is not None and len(tables) < MAX_TABLES:
                         tables.append(table)
-                    content = json.dumps(outcome.data, ensure_ascii=False, default=str)
+                    content = json.dumps(
+                        without_nulls(outcome.data),
+                        ensure_ascii=False,
+                        default=str,
+                        separators=(",", ":"),
+                    )
                 else:
                     content = json.dumps({"error": outcome.data}, ensure_ascii=False)
                 messages.append(
@@ -172,6 +189,17 @@ class Orchestrator:
         if tables:
             return self._reply(fallback(locale), tables, called, model, allowed)
         raise LLMUnavailable("tool loop exhausted")
+
+    async def _chat(self, messages: list[dict], definitions: list[dict], started: float):
+        """One model round; a short provider rate limit is waited out once."""
+        try:
+            return await self.client.chat(messages, definitions)
+        except LLMRateLimited as error:
+            remaining = self.deadline_seconds - (time.monotonic() - started)
+            if error.retry_after > min(MAX_RATE_WAIT_SECONDS, remaining - 5):
+                raise
+            await asyncio.sleep(error.retry_after)
+            return await self.client.chat(messages, definitions)
 
     @staticmethod
     def _arguments(raw) -> dict:

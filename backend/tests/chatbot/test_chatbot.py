@@ -19,8 +19,14 @@ from app.main import create_app
 from app.modules.chatbot import dependencies as chatbot_dependencies
 from app.modules.chatbot import mcp_client
 from app.modules.chatbot import orchestrator as orch
-from app.modules.chatbot.llm import LLMClient, LLMReply, LLMUnavailable
-from app.modules.chatbot.mcp_client import McpTools, McpUnavailable, ToolOutcome
+from app.modules.chatbot.llm import (
+    LLMClient,
+    LLMRateLimited,
+    LLMReply,
+    LLMUnavailable,
+    retry_after,
+)
+from app.modules.chatbot.mcp_client import McpTools, McpUnavailable, ToolOutcome, compact_schema
 from app.modules.chatbot.schemas import ChatbotMessageRequest
 from app.modules.chatbot.service import ChatbotService
 from app.modules.chatbot.tables import TABLES, build_table, cell
@@ -224,6 +230,38 @@ class FakeFastMcpClient:
         return result
 
 
+def test_compact_schema_keeps_meaning_and_drops_noise():
+    schema = {
+        "type": "object",
+        "title": "Params",
+        "properties": {
+            "title": {"type": "string", "title": "Title"},
+            "limit": {"type": "integer", "maximum": 100.0, "minimum": 1.0, "default": 25},
+            "q": {
+                "anyOf": [{"type": "string", "minLength": 1, "pattern": "\S"}, {"type": "null"}],
+                "title": "Q",
+                "description": "Name or code",
+            },
+            "either": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            "status": {"anyOf": [{"type": "string", "enum": ["ACTIVE"]}, {"type": "null"}]},
+            "ratio": {"type": "number", "maximum": 0.5},
+        },
+        "required": [],
+    }
+    assert compact_schema(schema) == {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "limit": {"type": "integer", "maximum": 100, "minimum": 1, "default": 25},
+            "q": {"type": "string", "description": "Name or code"},
+            "either": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            "status": {"type": "string", "enum": ["ACTIVE"]},
+            "ratio": {"type": "number", "maximum": 0.5},
+        },
+        "required": [],
+    }
+
+
 def test_mcp_tools_convert_definitions_and_results():
     tools = [
         SimpleNamespace(name="list_agencies", description="List", input_schema={"type": "object"}),
@@ -358,7 +396,9 @@ def test_orchestrator_answers_with_tables_from_tool_results():
 def test_orchestrator_feeds_errors_back_and_answers_without_table():
     fake = FakeTools(
         {
-            "get_business_rules": ToolOutcome(True, {"maxAgenciesPerWard": 4}),
+            "get_business_rules": ToolOutcome(
+                True, {"maxAgenciesPerWard": 4, "note": None, "rate": [1, {"x": None}]}
+            ),
             "get_debt_report": ToolOutcome(False, "HTTP error 403: Forbidden"),
         }
     )
@@ -372,7 +412,7 @@ def test_orchestrator_feeds_errors_back_and_answers_without_table():
     reply, _ = loop(client, fake)
     assert reply["tables"] == [] and reply["tools"] == ["get_business_rules", "get_debt_report"]
     messages = client.calls[1]
-    assert json.loads(messages[-2]["content"]) == {"maxAgenciesPerWard": 4}
+    assert messages[-2]["content"] == '{"maxAgenciesPerWard":4,"rate":[1,{}]}'
     assert json.loads(messages[-1]["content"])["error"].startswith("HTTP error 403")
     assert messages[-1]["tool_call_id"] == "get_debt_report"
 
@@ -578,3 +618,50 @@ def test_dependency_factory_builds_service():
         SimpleNamespace(app=SimpleNamespace(state=state))
     )
     assert isinstance(built, ChatbotService) and built.limiter is not None
+
+
+# -- provider rate limits -------------------------------------------------------------
+def test_llm_client_reports_rate_limit_only_when_every_model_is_limited():
+    headers = {"a": {"retry-after": "7"}, "b": {"retry-after": "x"}}
+
+    def handler(request):
+        model = json.loads(request.content)["model"]
+        if model == "c":
+            return httpx.Response(500)
+        return httpx.Response(429, headers=headers[model])
+
+    transport = httpx.MockTransport(handler)
+    with pytest.raises(LLMRateLimited) as error:
+        run(LLMClient("http://router.test/v1", "", ["a", "b"], 5, transport).chat([], []))
+    assert error.value.retry_after == 7
+    with pytest.raises(LLMUnavailable) as error:
+        run(LLMClient("http://router.test/v1", "", ["a", "c"], 5, transport).chat([], []))
+    assert not isinstance(error.value, LLMRateLimited)
+    limited = httpx.Response(429, headers={"retry-after": "x"})
+    assert retry_after(limited) == 60 and retry_after(httpx.Response(429)) == 60
+
+
+def test_orchestrator_waits_out_a_short_rate_limit_once(monkeypatch):
+    slept = []
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(orch.asyncio, "sleep", fake_sleep)
+    reply, _ = loop(ScriptedClient(LLMRateLimited(3), say("Xong.")))
+    assert reply["answer"] == "Xong." and slept == [3]
+    with pytest.raises(LLMRateLimited):
+        loop(ScriptedClient(LLMRateLimited(3), LLMRateLimited(3)))
+    with pytest.raises(LLMRateLimited):
+        loop(ScriptedClient(LLMRateLimited(orch.MAX_RATE_WAIT_SECONDS + 1)))
+    with pytest.raises(LLMRateLimited):
+        loop(ScriptedClient(LLMRateLimited(3)), deadline=6)
+    assert slept == [3, 3]
+
+
+def test_service_maps_provider_rate_limit_to_429():
+    chatbot = service(ScriptedClient(LLMRateLimited(59.2), LLMRateLimited(59.2)))
+    with pytest.raises(ApiError) as error:
+        chatbot.send("t", request())
+    assert (error.value.status, error.value.code) == (429, "RATE_LIMIT_EXCEEDED")
+    assert error.value.headers == {"Retry-After": "60"}

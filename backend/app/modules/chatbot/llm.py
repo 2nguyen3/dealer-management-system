@@ -16,6 +16,21 @@ class LLMUnavailable(Exception):
     """Every configured model failed or timed out."""
 
 
+class LLMRateLimited(LLMUnavailable):
+    """Every configured model answered 429; `retry_after` is the shortest wait (s)."""
+
+    def __init__(self, retry_after: float):
+        super().__init__(f"rate limited, retry after {retry_after:g}s")
+        self.retry_after = retry_after
+
+
+def retry_after(response: httpx.Response) -> float:
+    try:
+        return max(0.0, float(response.headers.get("retry-after", "")))
+    except ValueError:
+        return 60.0
+
+
 @dataclass(frozen=True)
 class LLMReply:
     model: str
@@ -42,6 +57,7 @@ class LLMClient:
 
     async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
         last = "no model configured"
+        waits: list[float] = []
         async with httpx.AsyncClient(timeout=self.timeout, transport=self.transport) as client:
             for model in self.models:
                 body = {
@@ -58,6 +74,8 @@ class LLMClient:
                     last = f"{model}: {type(error).__name__}"
                     logger.warning("chatbot model transport failure: %s", last)
                     continue
+                if response.status_code == 429:
+                    waits.append(retry_after(response))
                 if response.status_code != 200:
                     last = f"{model}: HTTP {response.status_code}"
                     logger.warning("chatbot model rejected request: %s", last)
@@ -67,6 +85,8 @@ class LLMClient:
                     return reply
                 last = f"{model}: malformed response"
                 logger.warning("chatbot model returned malformed JSON: %s", model)
+        if waits and len(waits) == len(self.models):
+            raise LLMRateLimited(min(waits))
         raise LLMUnavailable(last)
 
     @staticmethod
