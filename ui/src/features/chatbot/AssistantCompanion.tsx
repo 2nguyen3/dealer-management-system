@@ -29,9 +29,6 @@ const SLEEP_AFTER_MS = 120_000
 
 const outcomeMood: Record<ChatOutcome, PetMood> = {
   ANSWERED: 'happy',
-  NEEDS_SELECTION: 'puzzled',
-  NEEDS_INFO: 'puzzled',
-  REFUSED: 'sad',
   ERROR: 'sad',
   UNAVAILABLE: 'sad',
 }
@@ -318,7 +315,6 @@ function Companion({
               firstName={firstName}
               hasPermission={hasPermission}
               onSend={chat.send}
-              onChoose={chat.choose}
               onReset={chat.reset}
               onHide={() => {
                 setOpen(false)

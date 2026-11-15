@@ -23,7 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/shadcn/dropdown-menu'
-import { describeError } from '@/lib/errors'
 import {
   formatDate,
   formatDateTime,
@@ -31,6 +30,7 @@ import {
   formatVND,
 } from '@/lib/formatters'
 import { t } from '@/lib/i18n/core'
+import { kindLabel, statusLabel } from '@/lib/labels'
 import type { FunctionCode } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { allowsNavigation, routePermissions } from '../../app/navigation'
@@ -39,36 +39,26 @@ import {
   INVENTORY_PERMISSIONS,
   MAX_TURN_LENGTH,
   SOURCE_ROUTES,
-  type ChatbotCandidate,
   type ChatbotCell,
   type ChatbotColumnType,
-  type ChatbotMissing,
-  type ChatbotRefusal,
   type ChatbotTable,
 } from './contract'
 import { PetMascot } from './PetMascot'
 import type { ChatItem } from './useAssistantChat'
 
-/** Labels of contract columns that the reports page does not show. */
+/** Labels of table columns that the reports page does not show. */
 const extraLabels: Record<string, string> = {
   wardName: t('Phường/xã'),
+  typeName: t('Loại đại lý'),
   debt: t('Dư nợ hiện tại'),
+  maxDebt: t('Nợ tối đa'),
   stock: t('Tồn kho hiện tại'),
-}
-
-const missingLabels: Record<ChatbotMissing, string> = {
-  metric: t('Loại tra cứu'),
-  period: t('Khoảng thời gian'),
-  agency: t('Đại lý'),
-  product: t('Mặt hàng'),
-}
-
-function refusalText(reason: ChatbotRefusal): string {
-  if (reason === 'UNSUPPORTED_QUERY')
-    return describeError('UNSUPPORTED_QUERY')?.hint ?? reason
-  if (reason === 'FORBIDDEN_METRIC')
-    return t('Bạn chưa được cấp quyền xem loại số liệu này.')
-  return t('Không tìm thấy đại lý hoặc mặt hàng phù hợp.')
+  lastPurchasePrice: t('Giá nhập gần nhất'),
+  sellingPrice: t('Giá bán'),
+  documentCode: t('Số chứng từ'),
+  kind: t('Loại chứng từ'),
+  status: t('Trạng thái'),
+  documentAmount: t('Tổng tiền'),
 }
 
 function formatCell(type: ChatbotColumnType, value: ChatbotCell): string {
@@ -82,16 +72,15 @@ function formatCell(type: ChatbotColumnType, value: ChatbotCell): string {
       return formatQuantity(raw)
     case 'rate':
       return `${formatQuantity(raw)} %`
+    case 'date':
+      return formatDate(raw)
+    case 'status':
+      return statusLabel(raw)
+    case 'kind':
+      return kindLabel(raw)
     default:
       return raw
   }
-}
-
-/** Last day of a half-open [fromDate, toDate) period. */
-function inclusiveEnd(toDate: string): string {
-  const date = new Date(`${toDate}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() - 1)
-  return date.toISOString().slice(0, 10)
 }
 
 function ResultTable({
@@ -101,18 +90,14 @@ function ResultTable({
   table: ChatbotTable
   hasPermission: (code: FunctionCode) => boolean
 }) {
-  const period = table.understood.period
-  const route = SOURCE_ROUTES[table.source.operationId]
-  const canOpen = allowsNavigation(hasPermission, routePermissions[route])
+  const route = SOURCE_ROUTES[table.tool]
+  const canOpen =
+    route !== undefined &&
+    allowsNavigation(hasPermission, routePermissions[route])
   return (
     <figure className="mt-2 overflow-hidden rounded-lg border bg-background">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-2 border-b bg-muted/40 px-3 py-1.5 text-xs">
         <span className="font-medium text-foreground">{table.title}</span>
-        <span className="text-muted-foreground">
-          {period
-            ? `${formatDate(period.fromDate)} – ${formatDate(inclusiveEnd(period.toDate))}`
-            : t('Số dư hiện tại')}
-        </span>
       </figcaption>
       <div className="max-h-64 overflow-auto">
         <table className="w-full text-xs tabular-nums">
@@ -177,7 +162,7 @@ function ResultTable({
             time: formatDateTime(table.asOf),
           })}
         </span>
-        {canOpen && (
+        {canOpen && route && (
           <Link
             to={route}
             className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
@@ -188,50 +173,6 @@ function ResultTable({
         )}
       </div>
     </figure>
-  )
-}
-
-function Candidates({
-  candidates,
-  chosen,
-  disabled,
-  onChoose,
-}: {
-  candidates: ChatbotCandidate[]
-  chosen?: string
-  disabled: boolean
-  onChoose: (candidate: ChatbotCandidate) => void
-}) {
-  return (
-    <ul className="mt-2 grid gap-1.5" aria-label={t('Chọn đúng mã')}>
-      {candidates.map((candidate) => (
-        <li key={candidate.code}>
-          <button
-            type="button"
-            disabled={disabled || chosen !== undefined}
-            aria-pressed={chosen === candidate.code}
-            onClick={() => onChoose(candidate)}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-start text-xs transition-colors',
-              'hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-              chosen === candidate.code &&
-                'border-primary bg-primary/10 opacity-100 disabled:opacity-100',
-            )}
-          >
-            <span className="font-mono text-[11px] font-semibold text-primary">
-              {candidate.code}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{candidate.name}</span>
-            {candidate.detail && (
-              <span className="shrink-0 text-muted-foreground">
-                {candidate.detail}
-              </span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -297,7 +238,6 @@ export interface AssistantPanelProps {
   firstName: string
   hasPermission: (code: FunctionCode) => boolean
   onSend: (text: string) => void
-  onChoose: (itemId: number, candidate: ChatbotCandidate) => void
   onReset: () => void
   onHide: () => void
   onClose: () => void
@@ -313,7 +253,6 @@ export function AssistantPanel({
   firstName,
   hasPermission,
   onSend,
-  onChoose,
   onReset,
   onHide,
   onClose,
@@ -462,56 +401,15 @@ export function AssistantPanel({
             )
           const { reply } = item
           return (
-            <Bubble
-              key={item.id}
-              from="assistant"
-              tone={reply.status === 'REFUSED' ? 'warning' : 'default'}
-            >
+            <Bubble key={item.id} from="assistant">
               <p className="whitespace-pre-wrap">{reply.answer}</p>
-              {reply.status === 'ANSWERED' &&
-                reply.tables.map((table, index) => (
-                  <ResultTable
-                    key={index}
-                    table={table}
-                    hasPermission={hasPermission}
-                  />
-                ))}
-              {reply.status === 'NEEDS_SELECTION' && (
-                <>
-                  <Candidates
-                    candidates={reply.candidates}
-                    chosen={item.chosen}
-                    disabled={pending}
-                    onChoose={(candidate) => onChoose(item.id, candidate)}
-                  />
-                  {reply.totalMatches > reply.candidates.length && (
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      {t(
-                        'Có {total} kết quả; nêu thêm mã hoặc phường/xã để thu hẹp.',
-                        { total: reply.totalMatches },
-                      )}
-                    </p>
-                  )}
-                </>
-              )}
-              {reply.status === 'NEEDS_INFO' && (
-                <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                  {t('Cần thêm:')}
-                  {reply.missing.map((key) => (
-                    <span
-                      key={key}
-                      className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
-                    >
-                      {missingLabels[key]}
-                    </span>
-                  ))}
-                </p>
-              )}
-              {reply.status === 'REFUSED' && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {refusalText(reply.reason)}
-                </p>
-              )}
+              {reply.tables.map((table, index) => (
+                <ResultTable
+                  key={index}
+                  table={table}
+                  hasPermission={hasPermission}
+                />
+              ))}
             </Bubble>
           )
         })}

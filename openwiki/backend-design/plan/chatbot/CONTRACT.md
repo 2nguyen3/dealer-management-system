@@ -1,15 +1,15 @@
 # M32 Chatbot Contract
 
-Revised: 2026-11-15, after the 14/11/2026 simplification. Status: phase 1 implemented
-15/11/2026 (`backend/app/modules/chatbot/`, operation `sendChatbotMessage`); the web UI
-(floating assistant, `ui/src/features/chatbot/`) calls it. Phase 2 (public MCP + OAuth)
-is not started. See [Implementation (phase 1)](#implementation-phase-1).
+Revised: 2026-11-15. Status: implemented. The web assistant (`POST /chatbot/messages`,
+`backend/app/modules/chatbot/`) runs an LLM tool loop whose tools come from the Agentra
+MCP server (`mcp-server/`, FastMCP). The semantic model and its engine (first phase-1
+build, same day) were removed on request: the MCP server wraps the existing read APIs
+instead. OAuth for external MCP clients is not started.
 
 This revision supersedes the fixed-slot `POST /chatbot/queries` (`queryChatbot`),
-decision [D10](../full_backend/DECISIONS.md) (candidate paging through `/agencies`) and
-the F32 page plans under `openwiki/frontend-design/plan/chatbot/`. The architecture
-draft of 13/11 (`tmp/kien-truc-chatbot.html`) remains the rationale; the corrections
-below take precedence over it.
+decision [D10](../full_backend/DECISIONS.md) (candidate paging through `/agencies`), the
+F32 page plans under `openwiki/frontend-design/plan/chatbot/` and the 13/11 draft with a
+semantic model. The current architecture page is `tmp/kien-truc-chatbot.html` (local).
 
 ## Files
 
@@ -17,166 +17,156 @@ below take precedence over it.
 | --- | --- |
 | [chatbot.openapi.yaml](chatbot.openapi.yaml) | Design-first HTTP contract of `sendChatbotMessage` (`POST /chatbot/messages`). |
 | `API/openapi.json` | Generated from the runtime app: 92 operations including `sendChatbotMessage`. |
-| this file | Semantic model, permissions, MCP tools, settings and decisions. |
+| this file | Architecture, MCP tools, permissions, settings and decisions. |
 
-## Architecture (unchanged direction)
+## Architecture
 
 ```text
-Web assistant (React, floating) ──HTTPS + session JWT──▶ POST /chatbot/messages
-                                                         │ orchestrator: LLM tool loop ≤ 4 steps
-Claude / Cursor / agents ──MCP + OAuth (phase 2)──▶ /mcp │
-                                                         ▼
-                         SemanticQueryEngine (pure Python: semantic model, validator,
-                         per-metric RBAC, QĐ16 policy, entity resolver)
-                                                         ▼
-                         agency.debt / product.stock / ReportService SQL (reports/queries.py)
+Web assistant (React, floating) ──HTTPS + Bearer──▶ backend POST /chatbot/messages
+                                                     │ orchestrator: LLM tool loop
+                                                     │ (OpenAI-compatible provider)
+                                                     ▼ fastmcp.Client, same Bearer
+Claude / Cursor / agents ──MCP + Bearer──▶ mcp-server  /mcp  (FastMCP, Streamable HTTP)
+                                                     │ from_openapi: 19 read tools
+                                                     │ verifier GET /auth/me, tool filter
+                                                     ▼ httpx, same Bearer
+                                           backend REST /api/v1 (RBAC x-permissions)
+                                                     ▼
+                                           Neon PostgreSQL (backend only)
 ```
 
-The web assistant is an in-process MCP client: the orchestrator lists and calls the
-same four tools the MCP server exposes, so both paths share validation and RBAC.
+- The MCP server has no database access and no credentials of its own. It loads the
+  backend's runtime `/api/openapi.json` at startup and keeps the GET operations listed
+  in `mcp-server/agentra_mcp/tools.py`; `FastMCP.from_openapi` turns them into tools.
+- Every call carries the caller's own Agentra access token. The MCP server accepts a
+  token when `GET /api/v1/auth/me` accepts it (cached 30 s by SHA-256), hides tools whose
+  `x-permissions` the user lacks, and forwards the token to the backend, which checks the
+  permission again (403). Figures and permissions therefore match the web UI exactly.
+- The web orchestrator is an ordinary MCP client of that server.
 
-## Corrections to the 13/11 draft
+## MCP tools
 
-| # | Draft | Now |
+Names are the snake_case operation ids. Descriptions are the backend summary plus a
+business hint for the LLM; every tool has `readOnlyHint: true`, `destructiveHint: false`.
+
+| Tool | Operation | Permission (from the backend) |
 | --- | --- | --- |
-| C1 | INVENTORY needs `inventory.read` | That code was retired. Current stock follows the product list policy (anyOf below). |
-| C2 | Reuse the report routes' permissions | `/reports/*` require `reports.read` **and** `debt.read`/`sales.read`; SALES and WAREHOUSE groups lack `reports.read`. The engine calls the report SQL directly with its own per-metric policy so sales staff can ask. |
-| C3 | DEBT lineage `receivable_entry`, "after returns and offsets" | Removed tables. Debt = POSTED stock issues − POSTED payment receipts; the current balance is `agency.debt`. |
-| C4 | OAuth tables in migration 0011 | 0011 is the simplified schema; OAuth tables go to **0012** (phase 2). |
-| C5 | Two reply statuses | Four: `ANSWERED`, `NEEDS_SELECTION`, `NEEDS_INFO`, `REFUSED`, plus `resume` so picking a candidate costs no LLM call. |
-| C6 | Columns carry labels | Columns carry `key` + `type`; the UI translates labels (24 locales). `answer`/`title` follow `locale`. |
-| C7 | Table links to UI paths | `source` names the read operation (`operationId` + query) that shows the same figures. |
+| `get_current_user` | `GET /auth/me` | authenticated |
+| `get_dashboard` | `GET /dashboard` | any business read permission |
+| `list_agencies`, `get_agency` | `GET /agencies`, `/agencies/{agencyId}` | `agency.read` or `agency.manage` |
+| `list_agency_types` | `GET /agency-types` | `agency_type.manage`, `agency.read` or `agency.manage` |
+| `list_wards` | `GET /wards` | `agency.read` or `agency.manage` |
+| `list_products`, `get_product` | `GET /products`, `/products/{productId}` | product readers¹ |
+| `get_business_rules` | `GET /business-rules` | `rules.manage`, `agency.manage`, `stock.issue.prepare/post` |
+| `search_documents`, `get_document` | `GET /documents`, `/documents/{documentId}` | per document kind |
+| `list_stock_issues` | `GET /stock-issues` | `sales.read`, `debt.read`, `reports.read`, issue/correction codes |
+| `list_stock_receipts` | `GET /stock-receipts` | `product.manage`, `reports.read`, receipt/correction codes |
+| `list_payment_receipts` | `GET /payment-receipts` | `debt.read`, `payments.online`, `reports.read`, cash/correction codes |
+| `get_sales_report`, `get_product_sales_report` | `GET /reports/sales`, `/reports/product-sales` | `reports.read` **and** `sales.read` |
+| `get_debt_report`, `get_collections_report` | `GET /reports/debt`, `/reports/collections` | `reports.read` **and** `debt.read` |
+| `get_inventory_report` | `GET /reports/inventory` | `reports.read` |
 
-## Semantic model (D3)
+¹ anyOf `product.manage`, `stock.receipt.prepare`, `stock.receipt.post`,
+`stock.issue.prepare`, `stock.issue.post`, `sales.read`, `reports.read`.
 
-Periods are half-open `[fromDate, toDate)`, as in the reports. Money, quantity and rate
-are exact decimal strings. `limit` is 1–50 (default 20); `filters` ≤ 5.
-
-| Metric | Period | Grain | Reader | Permission | Filter fields (op) | Sorts | Columns |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| DEBT | omitted | agency | `agency.debt` | `debt.read` | agency, ward, agencyType (eq); debt (gt/gte/lt/lte) | debt, agencyCode | agencyCode, agencyName, wardName, debt |
-| DEBT | given | agency | report `debt` | `debt.read` | agency, ward, agencyType (eq); closingDebt (cmp) | closingDebt, debtIncrease, agencyCode | agencyCode, agencyName, openingDebt, debtIncrease, paidAmount, closingDebt |
-| INVENTORY | omitted | product | `product.stock` | product readers¹ | product (eq); stock (cmp) | stock, productCode | productCode, productName, unitName, stock |
-| INVENTORY | given | product | report `inventory` | `reports.read` | product (eq); closingStock (cmp) | closingStock, productCode | productCode, productName, unitName, openingStock, receiptQuantity, issueQuantity, closingStock |
-| SALES (`groupBy=agency`) | **required** | agency | report `sales` | `sales.read` | agency, agencyType (eq); salesAmount (cmp) | salesAmount, numberOfIssues, agencyCode | agencyCode, agencyName, numberOfIssues, salesAmount, salesRate |
-| SALES (`groupBy=product`) | **required** | product | report `product-sales` | `sales.read` | agency, product (eq); salesAmount (cmp) | salesAmount, soldQuantity, productCode | productCode, productName, unitName, numberOfIssues, soldQuantity, salesAmount |
-
-¹ Product readers = anyOf `product.manage`, `stock.receipt.prepare`, `stock.receipt.post`,
-`stock.issue.prepare`, `stock.issue.post`, `sales.read`, `reports.read` (same as `listProducts`).
-The endpoint's anyOf in the YAML is the union of all metric permissions.
-
-Source mapping: DEBT current → `listAgencies`, DEBT period → `getDebtReport`, INVENTORY
-current → `listProducts`, INVENTORY period → `getInventoryReport`, SALES →
-`getSalesReport` / `getProductSalesReport`.
-
-Entity resolution: `agency` and `product` match an exact code first, then names that
-contain every word of the query (accent- and case-insensitive, `đ` = `d`); one exact
-product name wins over longer ones, duplicate agency names always ask. One match → run; several → `NEEDS_SELECTION` with ≤ 10 candidates
-`{code, name, detail}` (ward / unit), no balances; none → `REFUSED` `NO_MATCH`.
+Consequence: sales staff without `reports.read` (groups SALES/WAREHOUSE) cannot use the
+report tools; they still read current debt (`list_agencies`) and stock (`list_products`).
+Adding a tool = adding an existing GET `operationId` to `TOOLS`; the server refuses to
+start if an operation is missing from the backend.
 
 ## QĐ16 mapping
 
 | Step | Where |
 | --- | --- |
 | B1 receive question | `POST /chatbot/messages` (web) or the client's own LLM (MCP). |
-| B3 read the semantic model | `semantic_model.py` (frozen dataclasses); `describe_semantic_model` filtered by the caller's permissions. |
-| B4 interpret | LLM chooses `query_metric` arguments. |
-| B5 scope, permission, completeness | Engine: whitelist → `REFUSED UNSUPPORTED_QUERY`; RBAC → `REFUSED FORBIDDEN_METRIC`; missing slot → `NEEDS_INFO`. |
-| B6 query; duplicate names → list | Resolver → `NEEDS_SELECTION`; the answer is accepted again only by code (`resume.select`). |
-| B7 return result | `ANSWERED` with tables copied from the engine. |
+| B2 connect to the database | Backend only: each tool is a REST request with its own session. |
+| B3 read the data description (D3) | Tool schemas generated from the OpenAPI contract + hints in `tools.py`, sent by `tools/list`. |
+| B4 interpret | The LLM chooses tools and arguments. |
+| B5 scope, permission, completeness | Only read tools exist; hidden tools + backend 403; 422 for bad arguments; the prompt asks when the period or entity is missing. |
+| B6 query; duplicate names → list | `list_agencies`/`list_products` with `q`; several matches → the LLM lists them by code and asks which one. |
+| B7 return result | Tables built from tool results (`tables.py`), short answer from the LLM. |
 
-## MCP tools (same engine)
+## Reply and tables
 
-| Tool | Input | Output | Permission |
-| --- | --- | --- | --- |
-| `describe_semantic_model` (+ resource `dms://semantic-model`) | — | metrics/fields/ops the caller may use | authenticated |
-| `find_agencies` | `query` | ≤ 10 `{code, name, ward}`, `totalMatches` | `debt.read` or `sales.read` |
-| `find_products` | `query` | ≤ 10 `{code, name, unit}` | product readers |
-| `query_metric` | `SemanticQuery` | `ChatbotTable` or structured error | per metric |
+`ChatbotReply = {answer, tables[≤3], tools[], model?}`. A table is built only from a
+tool result, never from model text, with fixed columns per tool (`tables.py`):
 
-Structured tool errors: `MISSING_FIELD`, `AMBIGUOUS_ENTITY` (with candidates),
-`FORBIDDEN_METRIC`, `UNSUPPORTED_FIELD`, `INVALID_OPERATOR`, `UNSUPPORTED_QUERY`,
-`NO_MATCH`. All tools carry `readOnlyHint`; none writes business data.
+| Tool | Columns |
+| --- | --- |
+| `list_agencies` | agencyCode, agencyName, wardName, typeName, debt, maxDebt |
+| `list_products` | productCode, productName, unitName, stock, lastPurchasePrice, sellingPrice |
+| `search_documents`, `list_stock_issues/receipts`, `list_payment_receipts` | documentCode, kind, businessDate, agencyName, status, documentAmount |
+| sales/product-sales/debt/inventory reports | code, name and the report amounts |
+| `get_collections_report` | businessDate, receiptCount, cash/bank transfer/online/total amounts |
 
-The web orchestrator adds two loop-only tools that never reach MCP: `ask_user`
-(`question`, `missing[]` → `NEEDS_INFO`) and `report_unsupported` (→ `REFUSED
-UNSUPPORTED_QUERY`).
+Rows ≤ 50 (`truncated` when the tool returned more or has a next page), `totalRows`,
+`asOf` = the tool's `generatedAt` or now. Column types: code, text, money, quantity,
+integer, rate, date, status, kind; the UI owns labels (24 locales). Tables never carry
+phone numbers, addresses or e-mails.
 
 ## HTTP errors
 
-`400/422 VALIDATION_FAILED` (schema, reversed period, `limit` > 50, last turn not from the
-user without `resume`, a `resume` query that no longer validates), `401`, `415`, `403 FORBIDDEN`
-(no metric permission at all), `429 RATE_LIMIT_EXCEEDED` (per-user `chatbot` bucket,
-`Retry-After`), `503 CHATBOT_UNAVAILABLE` (disabled, all models failed, loop timeout).
-A forbidden or unsupported question inside an allowed request is a `200 REFUSED`, not an
-HTTP error, so the conversation continues.
+`400/422 VALIDATION_FAILED` (schema, more than 20 turns, last turn not from the user),
+`401`, `415`, `429 RATE_LIMIT_EXCEEDED` (per-user `chatbot` bucket, `Retry-After`),
+`503 CHATBOT_UNAVAILABLE` (disabled or unconfigured, MCP server unreachable, every model
+failed, loop exhausted without data). A forbidden tool call inside a request is not an
+HTTP error: the tool error goes back to the LLM, which tells the user they lack access.
 
 ## Safety rules
 
-- Figures shown to the user come from `tables`, never from model text; numbers in
-  `answer` that are absent from tool results are stripped.
-- At most 50 rows per table and no contact data reach the provider. The provider sees
-  query results; this is an accepted change to the earlier "no financial data to the
-  provider" assumption (user decision 13/11/2026).
-- Phase 1 logs (logger `app.chatbot`) the user id, tool names with error codes, reply
-  status, model and duration; never the question, the answer or results. A durable
-  `audit_log` entry is deferred to phase 2 because the endpoint writes nothing.
-- No database connection is held while the model thinks: authentication runs in one
-  short read-only transaction and every tool call opens its own read-only
-  REPEATABLE READ snapshot.
-- Provider key only in backend settings; never logged.
+- Figures shown in tables come from tool results; a number in `answer` that appears in
+  neither the tool results nor the user's turns is replaced by `…`.
+- Tool results are sent to the provider (each truncated at 12 000 characters).
+  `list_agencies` includes contact data, so phone/address reach the provider; this
+  extends the user decision of 13/11/2026 that query results may be sent.
+- No write tool exists; permissions belong to the token, not to the prompt.
+- The backend logs (logger `app.chatbot`) user id, tool names, model and duration; never
+  the question, the answer or results.
+- Provider key only in backend settings; the MCP server holds no secrets.
 
-## Settings (backend `.env`, Vercel secrets)
+## Settings
 
-Provider-neutral names (any OpenAI-compatible `/chat/completions` endpoint with tool
-calling, e.g. OpenRouter `https://openrouter.ai/api/v1` or a local router):
+Backend (`backend/.env`, Vercel secrets):
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CHATBOT_ENABLED` | `false` | Off → `503 CHATBOT_UNAVAILABLE`. |
-| `CHATBOT_LLM_BASE_URL` | empty | Base URL ending in `/v1`; empty → unavailable. |
+| `CHATBOT_LLM_BASE_URL` | empty | OpenAI-compatible base URL ending in `/v1`. |
 | `CHATBOT_LLM_API_KEY` | empty | Bearer key (SecretStr, never logged); empty for local routers. |
 | `CHATBOT_LLM_MODELS` | empty | Comma-separated fallback list, tried in order per step. |
-| `CHATBOT_LLM_TIMEOUT_SECONDS` | 20 | Per model request. |
+| `CHATBOT_MCP_URL` | empty | Agentra MCP endpoint, e.g. `http://mcp:8100/mcp` in Compose. |
+| `CHATBOT_LLM_TIMEOUT_SECONDS` | 20 | Per model request (also the MCP client timeout). |
 | `CHATBOT_MAX_TOOL_STEPS` | 4 | LLM rounds per message (1–8). |
 | `CHATBOT_DEADLINE_SECONDS` | 45 | Whole tool loop. |
 | `CHATBOT_RATE_LIMIT` / `CHATBOT_RATE_WINDOW_SECONDS` | 20 / 60 | Per-user `chatbot` bucket. |
 
-Phase 2 adds `MCP_RESOURCE_URL` and `OAUTH_ACCESS_TOKEN_TTL_SECONDS`.
+MCP server (`mcp-server/.env.example`): `AGENTRA_API_URL`, `MCP_HOST`, `MCP_PORT` (8100),
+`MCP_PATH` (`/mcp`), `MCP_PUBLIC_URL`, `MCP_TOKEN_CACHE_SECONDS` (30),
+`MCP_REQUEST_TIMEOUT_SECONDS` (20), `MCP_STARTUP_RETRIES` (10).
 
-## Phases
+## Implementation
 
-1. Engine + in-process MCP tools + `POST /chatbot/messages` + orchestrator (this contract).
-2. OAuth 2.1 (PKCE, DCR, migration 0012) and the public `/mcp` endpoint for Claude,
-   Cursor and other agents, after a Vercel serverless spike.
-
-## Web UI behaviour (implemented 15/11/2026)
-
-- The assistant is a floating companion in the shell, not a sidebar route; `/chatbot`
-  was removed. It is shown to users with at least one metric permission and can be
-  hidden from its menu or **Hồ sơ → Giao diện**.
-- Unknown routes (`404`) and `503 CHATBOT_UNAVAILABLE` render "not deployed / unavailable"
-  without fabricating an answer. `resume` is sent when the user clicks a candidate.
-
-## Implementation (phase 1)
-
-Module `backend/app/modules/chatbot/`:
-
-| File | Role |
+| Path | Role |
 | --- | --- |
-| `semantic_model.py` | Variants of the table above, `ADMISSION`, `PRODUCT_READERS`. |
-| `engine.py` | `SemanticQueryEngine` (`describe`, `find`, `query`), `ToolError`, entity matching. |
-| `repository.py` | Read-only lookups and `ReportQueries` (the same SQL as the reports). |
-| `llm.py` | `LLMClient`: OpenAI-compatible chat completions, `stream: false`, model fallback. |
-| `orchestrator.py` | System prompt, tools, loop, status mapping, number scrub, `pendingQuery`. |
-| `service.py`, `dependencies.py`, `router.py`, `schemas.py` | HTTP operation, admission, rate limit. |
+| `mcp-server/agentra_mcp/tools.py` | Wrapped operations, hints, `tool_name`, `select_operations`, permission rules. |
+| `mcp-server/agentra_mcp/auth.py` | `AgentraTokenVerifier` (`/auth/me`, scopes = `allowedFunctions`). |
+| `mcp-server/agentra_mcp/server.py` | `build_server` (`from_openapi`), `forward_token`, `PermissionFilter`, `/healthz`. |
+| `backend/.../chatbot/mcp_client.py` | `connect` (fastmcp `Client`, Bearer), `McpTools` (OpenAI tool list, calls). |
+| `backend/.../chatbot/llm.py` | `LLMClient`: async chat completions, `stream: false`, model fallback. |
+| `backend/.../chatbot/orchestrator.py` | System prompt, loop, number scrub. |
+| `backend/.../chatbot/tables.py` | Fixed table columns per tool. |
+| `backend/.../chatbot/service.py`, `router.py`, `schemas.py`, `dependencies.py` | Admission, rate limit, HTTP operation. |
 
-Tests: `backend/tests/chatbot/test_chatbot.py` (offline, exact 100% statements/branches of
-the module). No PostgreSQL integration suite yet; the engine reuses report SQL already
-covered by the reports suites.
+Tests: `mcp-server/tests/test_server.py` (13, offline, real contract, in-memory MCP calls)
+and `backend/tests/chatbot/test_chatbot.py` (29, offline).
 
-Runtime (15/11/2026): local Docker uses a temporary local OpenAI-compatible router on the
-host (`CHATBOT_LLM_BASE_URL=http://host.docker.internal:20128/v1`, Compose maps
-`host.docker.internal` via `extra_hosts`; models `ag/gemini-3-flash`, `cx/gpt-6-luna`).
-Vercel production cannot reach that router, so `CHATBOT_ENABLED` stays unset there and
-the UI shows "unavailable" until a hosted provider key (e.g. OpenRouter) is configured.
+Runtime (15/11/2026): Docker Compose service `mcp` (`127.0.0.1:8100`); local LLM is a
+temporary OpenAI-compatible router on the host (`host.docker.internal:20128/v1`, models
+`ag/gemini-3-flash`, `cx/gpt-6-luna`). Vercel has neither the MCP server nor `CHATBOT_*`,
+so production answers 503 and the UI shows "unavailable".
+
+## Next
+
+1. Host the MCP server publicly and configure a hosted provider to enable production.
+2. OAuth 2.1 for external clients (metadata, DCR, PKCE, consent; OAuth tables in a new
+   migration). Only the MCP `TokenVerifier` changes; tools and backend stay as they are.

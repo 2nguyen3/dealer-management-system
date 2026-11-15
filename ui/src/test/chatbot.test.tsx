@@ -10,7 +10,6 @@ import { AssistantCompanion } from '../features/chatbot/AssistantCompanion'
 import {
   parseChatbotReply,
   type ChatbotReply,
-  type SemanticQuery,
 } from '../features/chatbot/contract'
 import {
   ASSISTANT_KEY,
@@ -22,16 +21,14 @@ import { conversationTurns } from '../features/chatbot/useAssistantChat'
 import * as api from '../lib/api'
 import type { FunctionCode } from '../lib/types'
 
-const query: SemanticQuery = { metric: 'DEBT', filters: [], limit: 20 }
-
 const answered: ChatbotReply = {
-  status: 'ANSWERED',
   answer: 'Đại lý Minh Phát đang nợ nhiều nhất.',
   model: 'test/model',
+  tools: ['list_agencies'],
   tables: [
     {
-      title: 'Dư nợ đại lý',
-      understood: { ...query, sort: '-debt', limit: 5 },
+      title: 'Đại lý',
+      tool: 'list_agencies',
       columns: [
         { key: 'agencyCode', type: 'code' },
         { key: 'agencyName', type: 'text' },
@@ -43,21 +40,38 @@ const answered: ChatbotReply = {
       totalRows: 30,
       truncated: true,
       asOf: '2026-11-15T02:00:00Z',
-      source: { operationId: 'listAgencies', query: { sort: '-debt' } },
     },
   ],
 }
 
-const selection: ChatbotReply = {
-  status: 'NEEDS_SELECTION',
-  answer: 'Có 2 đại lý tên Minh Phát.',
-  entity: 'agency',
-  candidates: [
-    { code: 'DL-101', name: 'Minh Phát', detail: 'Phường Sài Gòn' },
-    { code: 'DL-102', name: 'Minh Phát', detail: 'Phường Bàn Cờ' },
+const documents: ChatbotReply = {
+  answer: 'Có 2 phiếu xuất của DL-8 trong tháng 10.',
+  tools: ['list_agencies', 'list_stock_issues'],
+  tables: [
+    {
+      title: 'Phiếu xuất hàng',
+      tool: 'list_stock_issues',
+      columns: [
+        { key: 'documentCode', type: 'code' },
+        { key: 'kind', type: 'kind' },
+        { key: 'businessDate', type: 'date' },
+        { key: 'status', type: 'status' },
+        { key: 'documentAmount', type: 'money' },
+      ],
+      rows: [
+        {
+          documentCode: 'PX-12',
+          kind: 'STOCK_ISSUE',
+          businessDate: '2026-10-03',
+          status: 'POSTED',
+          documentAmount: '2500000',
+        },
+      ],
+      totalRows: 1,
+      truncated: false,
+      asOf: '2026-11-15T02:00:00Z',
+    },
   ],
-  totalMatches: 2,
-  pendingQuery: query,
 }
 
 function auth(codes: FunctionCode[]): AuthContextValue {
@@ -120,29 +134,24 @@ afterEach(() => {
 })
 
 describe('chatbot contract', () => {
-  it('accepts every reply status of the contract', () => {
+  it('accepts answers with and without tables', () => {
     expect(parseChatbotReply(answered)).toEqual(answered)
-    expect(parseChatbotReply(selection)).toEqual(selection)
-    expect(
-      parseChatbotReply({
-        status: 'NEEDS_INFO',
-        answer: 'Khoảng thời gian nào?',
-        missing: ['period'],
-      }),
-    ).not.toBeNull()
-    expect(
-      parseChatbotReply({
-        status: 'REFUSED',
-        answer: 'Không hỗ trợ.',
-        reason: 'UNSUPPORTED_QUERY',
-      }),
-    ).not.toBeNull()
+    expect(parseChatbotReply(documents)).toEqual(documents)
+    const plain = { answer: 'Bạn muốn xem kỳ nào?', tables: [], tools: [] }
+    expect(parseChatbotReply(plain)).toEqual(plain)
   })
 
   it('rejects malformed or out-of-contract bodies', () => {
     expect(parseChatbotReply(null)).toBeNull()
-    expect(parseChatbotReply({ status: 'ANSWERED', answer: '' })).toBeNull()
-    expect(parseChatbotReply({ ...answered, tables: [] })).toBeNull()
+    expect(parseChatbotReply({ ...answered, answer: '' })).toBeNull()
+    expect(parseChatbotReply({ ...answered, tools: undefined })).toBeNull()
+    expect(parseChatbotReply({ ...answered, model: 5 })).toBeNull()
+    expect(
+      parseChatbotReply({
+        ...answered,
+        tables: Array.from({ length: 4 }, () => answered.tables[0]),
+      }),
+    ).toBeNull()
     expect(
       parseChatbotReply({
         ...answered,
@@ -151,20 +160,18 @@ describe('chatbot contract', () => {
     ).toBeNull()
     expect(
       parseChatbotReply({
-        ...selection,
-        candidates: [selection.candidates[0]],
+        ...answered,
+        tables: [{ ...answered.tables[0], tool: 'List Agencies' }],
       }),
     ).toBeNull()
     expect(
       parseChatbotReply({
-        ...selection,
-        pendingQuery: { ...query, limit: 51 },
+        ...answered,
+        tables: [
+          { ...answered.tables[0], columns: [{ key: 'x', type: 'blob' }] },
+        ],
       }),
     ).toBeNull()
-    expect(
-      parseChatbotReply({ status: 'REFUSED', answer: 'x', reason: 'NOPE' }),
-    ).toBeNull()
-    expect(parseChatbotReply({ status: 'OTHER', answer: 'x' })).toBeNull()
   })
 
   it('treats a missing route or disabled service as unavailable', () => {
@@ -283,32 +290,27 @@ describe('AssistantCompanion', () => {
     expect(screen.queryByRole('link', { name: /Mở dữ liệu nguồn/ })).toBeNull()
   })
 
-  it('resumes the pending query by code without a new question', async () => {
-    const fetch = vi
-      .spyOn(api, 'apiFetch')
-      .mockResolvedValueOnce({ data: selection, status: 200, etag: null })
-      .mockResolvedValueOnce({ data: answered, status: 200, etag: null })
-    renderCompanion()
+  it('formats document dates, kinds and statuses from the tool result', async () => {
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({
+      data: documents,
+      status: 200,
+      etag: null,
+    })
+    renderCompanion(['debt.read', 'stock.issue.prepare'])
     openPanel()
-    ask('Minh Phát nợ bao nhiêu?')
-    fireEvent.click(await screen.findByRole('button', { name: /DL-102/ }))
-    await screen.findByText(answered.answer)
-    expect(fetch).toHaveBeenLastCalledWith(
-      '/chatbot/messages',
-      expect.objectContaining({
-        body: {
-          messages: [
-            { role: 'user', content: 'Minh Phát nợ bao nhiêu?' },
-            { role: 'assistant', content: selection.answer },
-          ],
-          locale: 'vi',
-          resume: { query, select: { entity: 'agency', code: 'DL-102' } },
-        },
-      }),
-    )
+    ask('Phiếu xuất của DL-8 tháng 10?')
+    await screen.findByText(documents.answer)
+    expect(screen.getByText('Số chứng từ')).toBeDefined()
     expect(
-      screen.getByRole('button', { name: /DL-101/ }).hasAttribute('disabled'),
-    ).toBe(true)
+      screen.getByText('Phiếu xuất hàng', { selector: 'td' }),
+    ).toBeDefined()
+    expect(screen.getByText('03/10/2026')).toBeDefined()
+    expect(screen.getByText('Đã ghi sổ')).toBeDefined()
+    expect(
+      screen
+        .getByRole('link', { name: /Mở dữ liệu nguồn/ })
+        .getAttribute('href'),
+    ).toBe('/stock-issues')
   })
 
   it('reports an undeployed backend instead of inventing an answer', async () => {
@@ -323,32 +325,17 @@ describe('AssistantCompanion', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('shows missing fields and refusals from the contract', async () => {
-    vi.spyOn(api, 'apiFetch')
-      .mockResolvedValueOnce({
-        data: {
-          status: 'NEEDS_INFO',
-          answer: 'Bạn muốn xem kỳ nào?',
-          missing: ['period'],
-        },
-        status: 200,
-        etag: null,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          status: 'REFUSED',
-          answer: 'Mình không xóa phiếu được.',
-          reason: 'FORBIDDEN_METRIC',
-        },
-        status: 200,
-        etag: null,
-      })
+  it('shows a plain answer without a table', async () => {
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({
+      data: { answer: 'Bạn muốn xem kỳ nào?', tables: [], tools: [] },
+      status: 200,
+      etag: null,
+    })
     renderCompanion()
     openPanel()
     ask('Doanh số?')
-    await screen.findByText('Khoảng thời gian')
-    ask('Xóa phiếu')
-    await screen.findByText('Bạn chưa được cấp quyền xem loại số liệu này.')
+    await screen.findByText('Bạn muốn xem kỳ nào?')
+    expect(screen.queryByRole('table')).toBeNull()
   })
 
   it('marks an answer that arrives while closed as unread', async () => {

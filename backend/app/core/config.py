@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     chatbot_llm_base_url: str = ""
     chatbot_llm_api_key: SecretStr = SecretStr("")
     chatbot_llm_models: str = ""
+    chatbot_mcp_url: str = ""
     chatbot_llm_timeout_seconds: float = Field(default=20, gt=0, le=120)
     chatbot_max_tool_steps: int = Field(default=4, ge=1, le=8)
     chatbot_deadline_seconds: float = Field(default=45, gt=0, le=300)
@@ -81,7 +82,12 @@ class Settings(BaseSettings):
         return [model.strip() for model in self.chatbot_llm_models.split(",") if model.strip()]
 
     def chatbot_ready(self) -> bool:
-        return bool(self.chatbot_enabled and self.chatbot_llm_base_url and self.chatbot_models())
+        return bool(
+            self.chatbot_enabled
+            and self.chatbot_llm_base_url
+            and self.chatbot_mcp_url
+            and self.chatbot_models()
+        )
 
     @field_validator("vnpay_ipn_url", "vnpay_return_url")
     @classmethod

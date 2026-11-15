@@ -4,19 +4,17 @@ import { isAssistantUnavailable, sendChatbotMessage } from './api'
 import {
   MAX_TURN_LENGTH,
   MAX_TURNS,
-  type ChatbotCandidate,
-  type ChatbotMessageRequest,
   type ChatbotReply,
   type ChatTurn,
 } from './contract'
 
 export type ChatItem =
   | { id: number; kind: 'user'; text: string }
-  | { id: number; kind: 'reply'; reply: ChatbotReply; chosen?: string }
+  | { id: number; kind: 'reply'; reply: ChatbotReply }
   | { id: number; kind: 'error'; unavailable: boolean; message: string }
 
 /** What the last request ended with, for the companion's expression. */
-export type ChatOutcome = ChatbotReply['status'] | 'ERROR' | 'UNAVAILABLE'
+export type ChatOutcome = 'ANSWERED' | 'ERROR' | 'UNAVAILABLE'
 
 /** Conversation turns for the request: user text and assistant answers only. */
 export function conversationTurns(items: readonly ChatItem[]): ChatTurn[] {
@@ -60,7 +58,7 @@ export function useAssistantChat(onSettled?: (outcome: ChatOutcome) => void) {
   }, [])
 
   const run = useCallback(
-    async (userText: string, resume?: ChatbotMessageRequest['resume']) => {
+    async (userText: string) => {
       if (controller.current) return
       const userItem: ChatItem = {
         id: nextId.current++,
@@ -72,24 +70,16 @@ export function useAssistantChat(onSettled?: (outcome: ChatOutcome) => void) {
       const abort = new AbortController()
       controller.current = abort
       setPending(true)
-      // A resume request repeats the conversation up to the selection reply.
-      const turns = conversationTurns(
-        resume ? itemsRef.current.slice(0, -1) : history,
-      )
       try {
         const reply = await sendChatbotMessage(
-          {
-            messages: turns.length ? turns : conversationTurns(history),
-            locale: getLocale(),
-            ...(resume ? { resume } : {}),
-          },
+          { messages: conversationTurns(history), locale: getLocale() },
           abort.signal,
         )
         update([
           ...itemsRef.current,
           { id: nextId.current++, kind: 'reply', reply },
         ])
-        settled.current?.(reply.status)
+        settled.current?.('ANSWERED')
       } catch (error) {
         if (abort.signal.aborted) return
         const unavailable = isAssistantUnavailable(error)
@@ -127,31 +117,6 @@ export function useAssistantChat(onSettled?: (outcome: ChatOutcome) => void) {
     [run],
   )
 
-  /** Picks a NEEDS_SELECTION candidate: resumes the pending query by code. */
-  const choose = useCallback(
-    (itemId: number, candidate: ChatbotCandidate) => {
-      if (controller.current) return
-      const index = itemsRef.current.findIndex((item) => item.id === itemId)
-      const item = itemsRef.current[index]
-      if (
-        !item ||
-        item.kind !== 'reply' ||
-        item.chosen ||
-        item.reply.status !== 'NEEDS_SELECTION'
-      )
-        return
-      const { pendingQuery, entity } = item.reply
-      const marked = [...itemsRef.current]
-      marked[index] = { ...item, chosen: candidate.code }
-      update(marked)
-      void run(`${candidate.code} – ${candidate.name}`, {
-        query: pendingQuery,
-        select: { entity, code: candidate.code },
-      })
-    },
-    [run, update],
-  )
-
   const reset = useCallback(() => {
     controller.current?.abort()
     controller.current = null
@@ -159,5 +124,5 @@ export function useAssistantChat(onSettled?: (outcome: ChatOutcome) => void) {
     update([])
   }, [update])
 
-  return { items, pending, send, choose, reset }
+  return { items, pending, send, reset }
 }

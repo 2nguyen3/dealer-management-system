@@ -1,1 +1,1 @@
-"""M32 read-only assistant: semantic query engine, LLM tool loop and HTTP route."""
+"""M32 read-only assistant: LLM tool loop over the Agentra MCP server and HTTP route."""

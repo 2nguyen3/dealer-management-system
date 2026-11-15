@@ -1,4 +1,4 @@
-"""Minimal OpenAI-compatible chat-completions client with a model fallback list.
+"""Minimal async OpenAI-compatible chat-completions client with a model fallback list.
 
 Works with OpenRouter, a local 9router, or any `/v1/chat/completions` endpoint that
 supports `tools`. The API key is optional (local routers) and never logged.
@@ -30,7 +30,7 @@ class LLMClient:
         api_key: str,
         models: list[str],
         timeout: float,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ):
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.models = list(models)
@@ -40,20 +40,20 @@ class LLMClient:
         self.timeout = timeout
         self.transport = transport
 
-    def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
+    async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
         last = "no model configured"
-        with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, transport=self.transport) as client:
             for model in self.models:
                 body = {
                     "model": model,
                     "messages": messages,
-                    "tools": tools,
-                    "tool_choice": "auto",
                     "stream": False,
                     "temperature": 0.1,
                 }
+                if tools:
+                    body |= {"tools": tools, "tool_choice": "auto"}
                 try:
-                    response = client.post(self.url, json=body, headers=self.headers)
+                    response = await client.post(self.url, json=body, headers=self.headers)
                 except httpx.HTTPError as error:
                     last = f"{model}: {type(error).__name__}"
                     logger.warning("chatbot model transport failure: %s", last)

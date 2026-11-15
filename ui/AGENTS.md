@@ -8,7 +8,8 @@ stock_receipts, stock_issues, payment_receipts, online_payments, document_histor
 users, user_groups, permissions, audit_logs, chatbot. The chatbot is a floating companion
 (`AssistantCompanion`, mounted lazily in `ShellLayout`), not a route: it opens a chat panel
 against `POST /chatbot/messages` (contract: `../openwiki/backend-design/plan/chatbot/`),
-is shown to users with a metric permission, can be dragged and hidden (Hồ sơ → Giao diện,
+is shown to users with a business read permission (tools come from the MCP server and
+are filtered by the same permissions; tables link to their source page), can be dragged and hidden (Hồ sơ → Giao diện,
 key `agentra-assistant`) and reports "not ready" when the route answers 404/405/501/503
 (e.g. `CHATBOT_ENABLED` off). The menu
 has 13 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;

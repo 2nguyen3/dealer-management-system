@@ -16,6 +16,7 @@ dependencies = [
     "httpx>=0.28,<1",
     "reportlab>=4.4,<5",
     "xlsxwriter>=3.2,<4",
+    "fastmcp>=4.2.0",
 ]
 
 [dependency-groups]

@@ -9,7 +9,6 @@ from app.core.exceptions import AuthError
 from app.modules.auth.dependencies import bearer
 from app.modules.chatbot.dependencies import get_chatbot_service
 from app.modules.chatbot.schemas import ChatbotMessageRequest, ChatbotReply
-from app.modules.chatbot.semantic_model import ADMISSION
 from app.modules.chatbot.service import ChatbotService
 
 router = APIRouter(tags=["Chatbot"], route_class=BusinessRoute)
@@ -18,11 +17,17 @@ router = APIRouter(tags=["Chatbot"], route_class=BusinessRoute)
 @router.post(
     "/chatbot/messages",
     operation_id="sendChatbotMessage",
-    summary="Ask the read-only assistant about debt, inventory or sales",
+    summary="Ask the read-only assistant about agencies, products, documents and reports",
     response_model=ChatbotReply,
     response_model_exclude_none=True,
-    responses=responses(200, 400, 401, 403, 415, 422, 429, 500, 503),
-    openapi_extra={"x-permissions": {"anyOf": list(ADMISSION)}},
+    responses=responses(200, 400, 401, 415, 422, 429, 500, 503),
+    openapi_extra={
+        "x-permissions": {
+            "conditional": (
+                "Authenticated; each MCP tool applies the permissions of the operation it wraps"
+            )
+        }
+    },
 )
 def send_chatbot_message(
     body: ChatbotMessageRequest,

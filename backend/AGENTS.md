@@ -6,9 +6,9 @@ Head 0011 rebuilds schema `dms` (16 tables, 22 function codes). Modules now: aut
 users, user_groups, permissions, audit_logs, business_rules, wards, agency_types,
 units, products, agencies, document_core (shared DocumentService + router factory),
 stock_receipts, stock_issues, payment_receipts, online_payments (VNPAY sandbox),
-document_history, reports, dashboard, chatbot (M32 web assistant, 15/11/2026: semantic
-engine + OpenAI-compatible tool loop, `CHATBOT_*` settings, offline tests in
-`tests/chatbot/`), health — 92 operations (incl. printOnlinePayment:
+document_history, reports, dashboard, chatbot (M32 web assistant, 15/11/2026:
+OpenAI-compatible tool loop over the `../mcp-server/` MCP tools with the caller's token,
+`CHATBOT_*` settings incl. `CHATBOT_MCP_URL`, offline tests in `tests/chatbot/`), health — 92 operations (incl. printOnlinePayment:
 payment request PDF/HTML with the VNPAY QR; receipt PDFs add amount in words + signatures). Removed (Bỏ theo yêu cầu
 14/11/2026): agency_credit, credit_applications, document_corrections, inventory,
 receivables, refunds, sales_returns, settlement_core, stock_adjustments, stock_counts,
