@@ -38,7 +38,7 @@ Current application (after the 14/11/2026 simplification, owning plan
   backend API (see `mcp-server/README.md`). No database access.
 - `compose.yaml`: backend, MCP server (`127.0.0.1:8100`), Nginx frontend and an explicit
   `migrate` job (`tools` profile).
-- `vercel.json`: Vercel services for the frontend and FastAPI backend.
+- `vercel.json`: Vercel services for the frontend, FastAPI backend and MCP server (`/mcp`).
 - `openwiki/BA/`: business analysis.
 - `openwiki/database-design/`: PostgreSQL/DBML design, psql entry points, seed counts.
 - `openwiki/backend-design/`, `openwiki/frontend-design/`: design documents and plans.
@@ -105,4 +105,5 @@ anything left unverified.
   run explicitly, never on API startup. See `.agents/workflows/docker.md`.
 - Vercel: project `agentra-dms`, alias https://agentra-dms.vercel.app, functions pinned
   to `sin1`. Deploy with `npx --yes vercel@65.12.1 deploy --prod` from the repo root;
-  upload env with `backend/deploy_vercel_env.py`.
+  upload env with `backend/deploy_vercel_env.py` (`--chatbot` for CHATBOT_* and the MCP
+  service settings; provider z.ai `glm-4.5-flash`, key only in `backend/.env`).

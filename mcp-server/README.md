@@ -33,12 +33,17 @@ uv run python -m agentra_mcp          # http://127.0.0.1:8100/mcp
 Docker Compose (repository root) runs it as service `mcp` on `127.0.0.1:8100`, after the
 backend is healthy; the backend reaches it at `http://mcp:8100/mcp` (`CHATBOT_MCP_URL`).
 
+Vercel: service `mcp` in the root `vercel.json` (root `mcp-server/`, entrypoint
+`index:app`, which calls `asgi_app()`), served at https://agentra-dms.vercel.app/mcp. Its
+settings come from the project environment (`backend/deploy_vercel_env.py --chatbot`).
+
 Settings (`.env.example`): `AGENTRA_API_URL`, `MCP_HOST`, `MCP_PORT`, `MCP_PATH`,
 `MCP_PUBLIC_URL`, `MCP_TOKEN_CACHE_SECONDS`, `MCP_REQUEST_TIMEOUT_SECONDS`,
 `MCP_STARTUP_RETRIES`.
 
 ## Connect a client
 
+Use `https://agentra-dms.vercel.app/mcp` (production) or `http://localhost:8100/mcp`.
 Get an access token with `POST /api/v1/auth/login` (it expires after about 15 minutes;
 OAuth is a later phase), then:
 

@@ -121,6 +121,13 @@ def build_server(
     return server
 
 
+def asgi_app(settings: Settings | None = None):
+    """Stateless Streamable HTTP app with JSON responses, for hosted runtimes (Vercel)."""
+    settings = settings or get_settings()
+    server = build_server(settings, load_spec(settings))
+    return server.http_app(path=settings.mcp_path, stateless_http=True, json_response=True)
+
+
 def main() -> None:  # pragma: no cover - process entry point
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()

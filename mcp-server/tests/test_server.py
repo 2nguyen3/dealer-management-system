@@ -246,3 +246,21 @@ def test_server_health_route_and_default_verifier():
     with TestClient(mcp.http_app(path="/mcp", stateless_http=True)) as http:
         assert http.get("/healthz").json() == {"status": "ok", "tools": len(TOOLS)}
         assert http.post("/mcp", json={}).status_code == 401
+
+
+def test_asgi_app_and_vercel_entrypoint(monkeypatch):
+    import runpy
+
+    from starlette.testclient import TestClient
+
+    loaded = []
+    monkeypatch.setattr(server_module, "load_spec", lambda current: loaded.append(current) or SPEC)
+    app = server_module.asgi_app(settings())
+    with TestClient(app) as http:
+        assert http.get("/healthz").json()["tools"] == len(TOOLS)
+        assert http.post("/mcp", json={}).status_code == 401
+    monkeypatch.setenv("AGENTRA_API_URL", "https://agentra.test")
+    entry = runpy.run_path(str(Path(__file__).resolve().parents[1] / "index.py"))["app"]
+    assert loaded[-1].agentra_api_url == "https://agentra.test" and entry is not None
+    monkeypatch.setattr(server_module, "get_settings", lambda: settings())
+    assert server_module.asgi_app() is not None

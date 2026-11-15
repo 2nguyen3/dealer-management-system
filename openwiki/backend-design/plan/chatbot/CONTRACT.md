@@ -162,7 +162,7 @@ MCP server (`mcp-server/.env.example`): `AGENTRA_API_URL`, `MCP_HOST`, `MCP_PORT
 | `backend/.../chatbot/service.py`, `router.py`, `schemas.py`, `dependencies.py` | Admission, rate limit, HTTP operation. |
 
 Tests: `mcp-server/tests/test_server.py` (13, offline, real contract, in-memory MCP calls)
-and `backend/tests/chatbot/test_chatbot.py` (33, offline).
+and `backend/tests/chatbot/test_chatbot.py` (33, offline); `mcp-server` has 14 tests.
 
 Runtime (15/11/2026): Docker Compose service `mcp` (`127.0.0.1:8100`). Provider: z.ai
 free Flash models (`CHATBOT_LLM_BASE_URL=https://api.z.ai/api/paas/v4`, models
@@ -170,11 +170,18 @@ free Flash models (`CHATBOT_LLM_BASE_URL=https://api.z.ai/api/paas/v4`, models
 balance). Measured: 15–40 s per answer, one 30 s timeout recovered by the fallback model.
 Groq free (`openai/gpt-oss-120b/20b`) was faster (~1 s per round) but its 8K tokens/minute
 per model allowed about one question per minute; a third quick question returned 429.
-Vercel has neither the MCP server nor `CHATBOT_*`, so production answers 503 and the UI
-shows "unavailable".
+Production (15/11/2026): Vercel service `mcp` (root `mcp-server/`, entrypoint
+`index:app` = `asgi_app()`, rewrites `/mcp`, `/mcp/*`,
+`/.well-known/oauth-protected-resource*`) at https://agentra-dms.vercel.app/mcp; the
+backend calls it at that URL. Environment uploaded with
+`uv run python deploy_vercel_env.py --chatbot --environment production` (CHATBOT_*,
+`CHATBOT_MCP_URL`, and `AGENTRA_API_URL`/`MCP_PUBLIC_URL`/`MCP_STARTUP_RETRIES` for the
+mcp service; Vercel variables are project-wide). Verified: `/mcp` without a token → 401;
+19 tools and `list_agencies` with a real token; two web questions answered in 12–15 s;
+browser check of the assistant passes.
 
 ## Next
 
-1. Host the MCP server publicly and configure a hosted provider to enable production.
-2. OAuth 2.1 for external clients (metadata, DCR, PKCE, consent; OAuth tables in a new
+1. OAuth 2.1 for external clients (metadata, DCR, PKCE, consent; OAuth tables in a new
    migration). Only the MCP `TokenVerifier` changes; tools and backend stay as they are.
+2. A faster or paid provider if 15–40 s answers are too slow.

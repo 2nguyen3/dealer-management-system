@@ -26,6 +26,10 @@ BACKEND = Path(__file__).resolve().parents[1]
         ("/api/v1/health", "backend"),
         ("/api/docs", "backend"),
         ("/api/v1/not-found", "backend"),
+        ("/mcp", "mcp"),
+        ("/mcp/", "mcp"),
+        ("/.well-known/oauth-protected-resource/mcp", "mcp"),
+        ("/mcpx", "frontend"),
     ],
 )
 def test_service_routes_preserve_api_prefix_and_explicit_spa_root(path, service):
@@ -183,3 +187,47 @@ def test_env_check_does_not_upload_or_print_values(monkeypatch, capsys):
     assert deploy_vercel_env.main() == 0
     runner.assert_not_called()
     assert "synthetic" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("key", ["synthetic-llm-key", ""])
+def test_chatbot_upload_points_services_at_the_public_origin(monkeypatch, capsys, key):
+    settings = deployment_settings(
+        chatbot_enabled=False,
+        chatbot_llm_base_url="https://llm.example/v1",
+        chatbot_llm_api_key=key,
+        chatbot_llm_models="model-a, model-b",
+        chatbot_mcp_url="http://mcp:8100/mcp",
+    )
+    monkeypatch.setattr(
+        "sys.argv", ["deploy_vercel_env.py", "--chatbot", "--environment", "production"]
+    )
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=settings))
+    runner = Mock(return_value=Mock(returncode=0))
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 0
+    supplied = {call.args[0][5]: call.kwargs["input"] for call in runner.call_args_list}
+    assert supplied["CHATBOT_ENABLED"] == "true"
+    assert supplied["CHATBOT_LLM_MODELS"] == "model-a,model-b"
+    assert supplied["CHATBOT_MCP_URL"] == "https://agentra-dms.vercel.app/mcp"
+    assert (
+        supplied["AGENTRA_API_URL"]
+        == supplied["MCP_PUBLIC_URL"]
+        == "https://agentra-dms.vercel.app"
+    )
+    assert supplied["CHATBOT_LLM_TIMEOUT_SECONDS"] == "20"
+    assert ("CHATBOT_LLM_API_KEY" in supplied) == bool(key)
+    assert not any(name.startswith(("DB_", "AUTH_", "VNPAY_")) for name in supplied)
+    if key:
+        assert supplied["CHATBOT_LLM_API_KEY"] == key
+        assert key not in capsys.readouterr().out
+
+
+def test_chatbot_upload_requires_a_provider(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["deploy_vercel_env.py", "--chatbot"])
+    monkeypatch.setattr(deploy_vercel_env.shutil, "which", lambda _: "npx")
+    monkeypatch.setattr(deploy_vercel_env, "Settings", Mock(return_value=deployment_settings()))
+    runner = Mock()
+    monkeypatch.setattr(deploy_vercel_env.subprocess, "run", runner)
+    assert deploy_vercel_env.main() == 1
+    runner.assert_not_called()
