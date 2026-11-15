@@ -9,7 +9,8 @@ users, user_groups, permissions, audit_logs, chatbot. The chatbot is a floating 
 (`AssistantCompanion`, mounted lazily in `ShellLayout`), not a route: it opens a chat panel
 against `POST /chatbot/messages` (contract: `../openwiki/backend-design/plan/chatbot/`),
 is shown to users with a metric permission, can be dragged and hidden (Hồ sơ → Giao diện,
-key `agentra-assistant`) and reports "not ready" while the backend route is absent. The menu
+key `agentra-assistant`) and reports "not ready" when the route answers 404/405/501/503
+(e.g. `CHATBOT_ENABLED` off). The menu
 has 13 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
 Catalogue (agency types/units/rules) and Users & Permissions (users/groups/permissions)
 are one entry each with route-backed sub-tabs (`navigationSections`, `SectionTabs.tsx`).
@@ -21,7 +22,7 @@ REASON_REQUIRED, AGENCY_HAS_DEBT, PAYMENT_EXCEEDS_DEBT, DEBT_LIMIT_EXCEEDED,
 INSUFFICIENT_STOCK, PRODUCT_NOT_PRICED, WARD_CAPACITY_EXCEEDED…). Switching the
 interface language reloads behind the `index.html` boot splash (`showLoadingSplash`
 in `src/lib/i18n/runtime.ts`) instead of a blank page. Contract:
-`../openwiki/backend-design/API/openapi.json` (91 operations). Payment receipts: every
+`../openwiki/backend-design/API/openapi.json` (92 operations). Payment receipts: every
 receipt exports a PDF (`PdfButton`); a new receipt by "Chuyển khoản (VNPAY)" creates a pending
 online payment with QR + payment request PDF (`TransferHandoff`) instead of a document. Evidence:
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page

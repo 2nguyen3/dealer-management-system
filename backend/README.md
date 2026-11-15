@@ -259,6 +259,23 @@ URLs with both credentials blank are allowed. Once either credential is supplied
 both credentials and both callback URLs are required. The current preparation is
 sandbox-only and does not accept arbitrary or production provider endpoints.
 
+### Web assistant (M32)
+
+`POST /api/v1/chatbot/messages` answers read-only debt, inventory and sales questions
+through any OpenAI-compatible `/chat/completions` endpoint with tool calling. It is off
+unless enabled; disabled or unconfigured returns `503 CHATBOT_UNAVAILABLE`.
+
+| Variable | Meaning |
+| --- | --- |
+| `CHATBOT_ENABLED` | `true` to enable (default `false`). |
+| `CHATBOT_LLM_BASE_URL` | Provider base URL ending in `/v1`, e.g. `https://openrouter.ai/api/v1`. In Docker, a router on the host is `http://host.docker.internal:<port>/v1`. |
+| `CHATBOT_LLM_API_KEY` | Provider key (`SecretStr`, never logged); blank for local routers. |
+| `CHATBOT_LLM_MODELS` | Comma-separated fallback list of tool-calling models. |
+| `CHATBOT_LLM_TIMEOUT_SECONDS`, `CHATBOT_MAX_TOOL_STEPS`, `CHATBOT_DEADLINE_SECONDS` | 20 s per request, 4 LLM rounds, 45 s per message. |
+| `CHATBOT_RATE_LIMIT`, `CHATBOT_RATE_WINDOW_SECONDS` | Per-user bucket, 20 per 60 s. |
+
+Design and semantic model: `../openwiki/backend-design/plan/chatbot/CONTRACT.md`.
+
 After filling both credentials, rebuild/refresh the backend from the repository root:
 
 ```powershell

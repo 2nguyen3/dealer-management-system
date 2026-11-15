@@ -5,6 +5,7 @@ from app.modules.agency_types.router import router as agency_types_router
 from app.modules.audit_logs.router import router as audit_logs_router
 from app.modules.auth.router import router as auth_router
 from app.modules.business_rules.router import router as business_rules_router
+from app.modules.chatbot.router import router as chatbot_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.document_history.router import router as document_history_router
 from app.modules.health.router import router as health_router
@@ -42,3 +43,4 @@ router.include_router(online_payments_router)
 router.include_router(document_history_router)
 router.include_router(reports_router)
 router.include_router(dashboard_router)
+router.include_router(chatbot_router)

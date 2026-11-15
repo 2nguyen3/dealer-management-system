@@ -1,8 +1,9 @@
 # M32 Chatbot Contract
 
-Revised: 2026-11-15, after the 14/11/2026 simplification. Status: contract agreed,
-backend not implemented. The web UI (floating assistant, `ui/src/features/chatbot/`)
-is built against this contract and shows "not deployed" until the route exists.
+Revised: 2026-11-15, after the 14/11/2026 simplification. Status: phase 1 implemented
+15/11/2026 (`backend/app/modules/chatbot/`, operation `sendChatbotMessage`); the web UI
+(floating assistant, `ui/src/features/chatbot/`) calls it. Phase 2 (public MCP + OAuth)
+is not started. See [Implementation (phase 1)](#implementation-phase-1).
 
 This revision supersedes the fixed-slot `POST /chatbot/queries` (`queryChatbot`),
 decision [D10](../full_backend/DECISIONS.md) (candidate paging through `/agencies`) and
@@ -15,17 +16,17 @@ below take precedence over it.
 | File | Role |
 | --- | --- |
 | [chatbot.openapi.yaml](chatbot.openapi.yaml) | Design-first HTTP contract of `sendChatbotMessage` (`POST /chatbot/messages`). |
-| `API/openapi.json` | Unchanged (91 operations) until the router exists; `gen_openapi.py` then adds it (92). |
+| `API/openapi.json` | Generated from the runtime app: 92 operations including `sendChatbotMessage`. |
 | this file | Semantic model, permissions, MCP tools, settings and decisions. |
 
 ## Architecture (unchanged direction)
 
 ```text
 Web assistant (React, floating) ──HTTPS + session JWT──▶ POST /chatbot/messages
-                                                         │ orchestrator: OpenRouter tool loop ≤ 4 steps
+                                                         │ orchestrator: LLM tool loop ≤ 4 steps
 Claude / Cursor / agents ──MCP + OAuth (phase 2)──▶ /mcp │
                                                          ▼
-                         SemanticQueryEngine (pure Python: YAML model, validator,
+                         SemanticQueryEngine (pure Python: semantic model, validator,
                          per-metric RBAC, QĐ16 policy, entity resolver)
                                                          ▼
                          agency.debt / product.stock / ReportService SQL (reports/queries.py)
@@ -68,8 +69,9 @@ Source mapping: DEBT current → `listAgencies`, DEBT period → `getDebtReport`
 current → `listProducts`, INVENTORY period → `getInventoryReport`, SALES →
 `getSalesReport` / `getProductSalesReport`.
 
-Entity resolution: `agency` matches code or name (pg_trgm), `product` matches code or
-name. One match → run; several → `NEEDS_SELECTION` with ≤ 10 candidates
+Entity resolution: `agency` and `product` match an exact code first, then names that
+contain every word of the query (accent- and case-insensitive, `đ` = `d`); one exact
+product name wins over longer ones, duplicate agency names always ask. One match → run; several → `NEEDS_SELECTION` with ≤ 10 candidates
 `{code, name, detail}` (ward / unit), no balances; none → `REFUSED` `NO_MATCH`.
 
 ## QĐ16 mapping
@@ -77,7 +79,7 @@ name. One match → run; several → `NEEDS_SELECTION` with ≤ 10 candidates
 | Step | Where |
 | --- | --- |
 | B1 receive question | `POST /chatbot/messages` (web) or the client's own LLM (MCP). |
-| B3 read the semantic model | YAML validated at startup; `describe_semantic_model` filtered by the caller's permissions. |
+| B3 read the semantic model | `semantic_model.py` (frozen dataclasses); `describe_semantic_model` filtered by the caller's permissions. |
 | B4 interpret | LLM chooses `query_metric` arguments. |
 | B5 scope, permission, completeness | Engine: whitelist → `REFUSED UNSUPPORTED_QUERY`; RBAC → `REFUSED FORBIDDEN_METRIC`; missing slot → `NEEDS_INFO`. |
 | B6 query; duplicate names → list | Resolver → `NEEDS_SELECTION`; the answer is accepted again only by code (`resume.select`). |
@@ -96,9 +98,14 @@ Structured tool errors: `MISSING_FIELD`, `AMBIGUOUS_ENTITY` (with candidates),
 `FORBIDDEN_METRIC`, `UNSUPPORTED_FIELD`, `INVALID_OPERATOR`, `UNSUPPORTED_QUERY`,
 `NO_MATCH`. All tools carry `readOnlyHint`; none writes business data.
 
+The web orchestrator adds two loop-only tools that never reach MCP: `ask_user`
+(`question`, `missing[]` → `NEEDS_INFO`) and `report_unsupported` (→ `REFUSED
+UNSUPPORTED_QUERY`).
+
 ## HTTP errors
 
-`400/422 VALIDATION_FAILED` (schema, reversed period, `limit` > 50), `401`, `403 FORBIDDEN`
+`400/422 VALIDATION_FAILED` (schema, reversed period, `limit` > 50, last turn not from the
+user without `resume`, a `resume` query that no longer validates), `401`, `415`, `403 FORBIDDEN`
 (no metric permission at all), `429 RATE_LIMIT_EXCEEDED` (per-user `chatbot` bucket,
 `Retry-After`), `503 CHATBOT_UNAVAILABLE` (disabled, all models failed, loop timeout).
 A forbidden or unsupported question inside an allowed request is a `200 REFUSED`, not an
@@ -111,14 +118,30 @@ HTTP error, so the conversation continues.
 - At most 50 rows per table and no contact data reach the provider. The provider sees
   query results; this is an accepted change to the earlier "no financial data to the
   provider" assumption (user decision 13/11/2026).
-- `audit_log` records user, tool, metric and filters; never the question or results.
+- Phase 1 logs (logger `app.chatbot`) the user id, tool names with error codes, reply
+  status, model and duration; never the question, the answer or results. A durable
+  `audit_log` entry is deferred to phase 2 because the endpoint writes nothing.
+- No database connection is held while the model thinks: authentication runs in one
+  short read-only transaction and every tool call opens its own read-only
+  REPEATABLE READ snapshot.
 - Provider key only in backend settings; never logged.
 
 ## Settings (backend `.env`, Vercel secrets)
 
-`CHATBOT_ENABLED`, `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`, `OPENROUTER_MODELS`
-(comma-separated fallback list; free models change often, recheck when implementing),
-`CHATBOT_LLM_TIMEOUT_SECONDS`, `CHATBOT_MAX_TOOL_STEPS` (4), `CHATBOT_RATE_LIMIT`.
+Provider-neutral names (any OpenAI-compatible `/chat/completions` endpoint with tool
+calling, e.g. OpenRouter `https://openrouter.ai/api/v1` or a local router):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CHATBOT_ENABLED` | `false` | Off → `503 CHATBOT_UNAVAILABLE`. |
+| `CHATBOT_LLM_BASE_URL` | empty | Base URL ending in `/v1`; empty → unavailable. |
+| `CHATBOT_LLM_API_KEY` | empty | Bearer key (SecretStr, never logged); empty for local routers. |
+| `CHATBOT_LLM_MODELS` | empty | Comma-separated fallback list, tried in order per step. |
+| `CHATBOT_LLM_TIMEOUT_SECONDS` | 20 | Per model request. |
+| `CHATBOT_MAX_TOOL_STEPS` | 4 | LLM rounds per message (1–8). |
+| `CHATBOT_DEADLINE_SECONDS` | 45 | Whole tool loop. |
+| `CHATBOT_RATE_LIMIT` / `CHATBOT_RATE_WINDOW_SECONDS` | 20 / 60 | Per-user `chatbot` bucket. |
+
 Phase 2 adds `MCP_RESOURCE_URL` and `OAUTH_ACCESS_TOKEN_TTL_SECONDS`.
 
 ## Phases
@@ -134,3 +157,26 @@ Phase 2 adds `MCP_RESOURCE_URL` and `OAUTH_ACCESS_TOKEN_TTL_SECONDS`.
   hidden from its menu or **Hồ sơ → Giao diện**.
 - Unknown routes (`404`) and `503 CHATBOT_UNAVAILABLE` render "not deployed / unavailable"
   without fabricating an answer. `resume` is sent when the user clicks a candidate.
+
+## Implementation (phase 1)
+
+Module `backend/app/modules/chatbot/`:
+
+| File | Role |
+| --- | --- |
+| `semantic_model.py` | Variants of the table above, `ADMISSION`, `PRODUCT_READERS`. |
+| `engine.py` | `SemanticQueryEngine` (`describe`, `find`, `query`), `ToolError`, entity matching. |
+| `repository.py` | Read-only lookups and `ReportQueries` (the same SQL as the reports). |
+| `llm.py` | `LLMClient`: OpenAI-compatible chat completions, `stream: false`, model fallback. |
+| `orchestrator.py` | System prompt, tools, loop, status mapping, number scrub, `pendingQuery`. |
+| `service.py`, `dependencies.py`, `router.py`, `schemas.py` | HTTP operation, admission, rate limit. |
+
+Tests: `backend/tests/chatbot/test_chatbot.py` (offline, exact 100% statements/branches of
+the module). No PostgreSQL integration suite yet; the engine reuses report SQL already
+covered by the reports suites.
+
+Runtime (15/11/2026): local Docker uses a temporary local OpenAI-compatible router on the
+host (`CHATBOT_LLM_BASE_URL=http://host.docker.internal:20128/v1`, Compose maps
+`host.docker.internal` via `extra_hosts`; models `ag/gemini-3-flash`, `cx/gpt-6-luna`).
+Vercel production cannot reach that router, so `CHATBOT_ENABLED` stays unset there and
+the UI shows "unavailable" until a hosted provider key (e.g. OpenRouter) is configured.
