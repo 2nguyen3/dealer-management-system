@@ -226,6 +226,10 @@ Whole R6/frontend/browser acceptance remains separate.
 
 ## D10 — Chatbot candidate pagination has no safe continuation
 
+**Superseded 2026-11-15** by the [M32 chatbot contract](../chatbot/CONTRACT.md): the
+assistant returns at most 10 code/name/ward candidates and asks for a code or ward
+instead of paging, so no `/agencies` continuation is needed. Kept as history.
+
 **Observed:** ChatbotSelection describes paging >25 matches through GET /agencies.
 Chatbot accepts debt.read/sales.read by query type, while /agencies requires
 agency.read/manage and its response includes contact/balance fields. The chatbot

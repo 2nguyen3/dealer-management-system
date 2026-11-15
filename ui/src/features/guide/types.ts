@@ -13,7 +13,7 @@ export interface GuideStep {
 }
 
 export interface GuideContent {
-  /** Route path, exactly as in `routePermissions` (or '/', '/profile', '/chatbot'). */
+  /** Route path, exactly as in `routePermissions` (or '/', '/profile'). */
   path: string
   /** "Trang này để làm gì" — one or two sentences. */
   purpose: string

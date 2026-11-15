@@ -160,7 +160,6 @@ export const navigationGroups: {
       { path: '/permissions', label: t('Phân quyền chức năng') },
       { path: '/audit-logs', label: t('Nhật ký hệ thống') },
       { path: '/document-history', label: t('Lịch sử chứng từ') },
-      { path: '/chatbot', label: t('Trợ lý AI'), unavailable: true },
     ],
   },
 ]

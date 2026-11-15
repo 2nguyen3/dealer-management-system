@@ -1,5 +1,4 @@
 import {
-  Bot,
   ChartColumn,
   Globe,
   History,
@@ -42,7 +41,6 @@ export const navigationIcons: Record<string, LucideIcon> = {
   '/permissions': ShieldCheck,
   '/audit-logs': ScrollText,
   '/document-history': History,
-  '/chatbot': Bot,
 }
 
 /** Sidebar icon of each merged entry (its pages keep their own icons). */

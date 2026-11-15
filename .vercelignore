@@ -1,6 +1,7 @@
 # Only application sources and deployment configuration belong in the upload.
 /*
 !backend
+!mcp-server
 !ui
 !vercel.json
 !.vercelignore

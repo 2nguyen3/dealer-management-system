@@ -71,8 +71,9 @@ Giao diện ở http://localhost:8080, API docs ở http://localhost:8080/api/do
 
 ### Vercel
 
-Dự án đã liên kết với Vercel (`vercel.json` dựng cả frontend và backend). Từ `backend/`
-tải biến môi trường bằng `uv run python deploy_vercel_env.py --environment production`,
+Dự án đã liên kết với Vercel (`vercel.json` dựng frontend, backend và MCP server tại `/mcp`).
+Từ `backend/` tải biến môi trường bằng `uv run python deploy_vercel_env.py --environment production`
+(thêm `--chatbot` cho trợ lý ảo và MCP),
 rồi từ thư mục gốc chạy `npx vercel deploy --prod`.
 
 Chi tiết cấu hình: [backend/README.md](backend/README.md), [ui/README.md](ui/README.md).

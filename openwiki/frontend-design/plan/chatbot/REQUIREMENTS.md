@@ -1,5 +1,10 @@
 # F32 — chatbot: Requirements
 
+> **Superseded 2026-11-15.** The chatbot is now a floating assistant in the shell, not the
+> `/chatbot` page, and `POST /chatbot/queries` was replaced by `POST /chatbot/messages`.
+> Current contract: [backend plan/chatbot/CONTRACT.md](../../../backend-design/plan/chatbot/CONTRACT.md).
+> The content below is history.
+
 **Status:** detailed design and paired wireframes prepared; application implementation and live integration open.
 **Source:** [single target OpenAPI](../../../backend-design/API/openapi.json); [frontend roadmap](../../GENERAL_PLAN.md); [full frontend program](../full_frontend/PLAN.md).
 

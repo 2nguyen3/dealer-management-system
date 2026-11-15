@@ -13,6 +13,10 @@
         }
       }
     },
+    "mcp": {
+      "root": "mcp-server",
+      "entrypoint": "index:app"
+    },
     "frontend": {
       "root": "ui",
       "framework": "vite",
@@ -28,6 +32,9 @@
   "rewrites": [
     { "source": "/api", "destination": { "service": "backend" } },
     { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/mcp", "destination": { "service": "mcp" } },
+    { "source": "/mcp/(.*)", "destination": { "service": "mcp" } },
+    { "source": "/\\.well-known/oauth-protected-resource(.*)", "destination": { "service": "mcp" } },
     { "source": "/", "destination": { "service": "frontend" } },
     { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]

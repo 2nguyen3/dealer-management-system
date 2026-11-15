@@ -5,8 +5,14 @@
 Features in `src/features/`: authentication, home, portal, guide, profile, dashboard,
 reports, agencies, products, agency_types, units, wards, business_rules, master_data,
 stock_receipts, stock_issues, payment_receipts, online_payments, document_history,
-users, user_groups, permissions, audit_logs, chatbot (placeholder, not built). The menu
-has 14 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
+users, user_groups, permissions, audit_logs, chatbot. The chatbot is a floating companion
+(`AssistantCompanion`, mounted lazily in `ShellLayout`), not a route: it opens a chat panel
+against `POST /chatbot/messages` (contract: `../openwiki/backend-design/plan/chatbot/`),
+is shown to users with a business read permission (tools come from the MCP server and
+are filtered by the same permissions; tables link to their source page), can be dragged and hidden (Hồ sơ → Giao diện,
+key `agentra-assistant`) and reports "not ready" when the route answers 404/405/501/503
+(e.g. `CHATBOT_ENABLED` off). The menu
+has 13 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
 Catalogue (agency types/units/rules) and Users & Permissions (users/groups/permissions)
 are one entry each with route-backed sub-tabs (`navigationSections`, `SectionTabs.tsx`).
 Removed (Bỏ theo yêu cầu 14/11/2026): receivables, stock_counts, upfront_payments,
@@ -17,7 +23,7 @@ REASON_REQUIRED, AGENCY_HAS_DEBT, PAYMENT_EXCEEDS_DEBT, DEBT_LIMIT_EXCEEDED,
 INSUFFICIENT_STOCK, PRODUCT_NOT_PRICED, WARD_CAPACITY_EXCEEDED…). Switching the
 interface language reloads behind the `index.html` boot splash (`showLoadingSplash`
 in `src/lib/i18n/runtime.ts`) instead of a blank page. Contract:
-`../openwiki/backend-design/API/openapi.json` (91 operations). Payment receipts: every
+`../openwiki/backend-design/API/openapi.json` (92 operations). Payment receipts: every
 receipt exports a PDF (`PdfButton`); a new receipt by "Chuyển khoản (VNPAY)" creates a pending
 online payment with QR + payment request PDF (`TransferHandoff`) instead of a document. Evidence:
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page

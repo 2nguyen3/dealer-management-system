@@ -24,11 +24,6 @@ const ReportsPage = lazy(() =>
     default: m.ReportsPage,
   })),
 )
-const ChatbotPage = lazy(() =>
-  import('../features/chatbot/ChatbotPage').then((m) => ({
-    default: m.ChatbotPage,
-  })),
-)
 const AgenciesPage = lazy(() =>
   import('../features/agencies/AgenciesPage').then((m) => ({
     default: m.AgenciesPage,
@@ -199,7 +194,6 @@ export function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/chatbot" element={<ChatbotPage />} />
                   <Route path="/agencies" element={<AgenciesPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/agency-types" element={<AgencyTypesPage />} />

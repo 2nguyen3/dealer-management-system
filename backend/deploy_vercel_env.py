@@ -1,4 +1,4 @@
-"""Upload core or native VNPAY Sandbox settings without exposing their values."""
+"""Upload core, native VNPAY Sandbox or chatbot/MCP settings without exposing values."""
 
 import argparse
 import shutil
@@ -17,6 +17,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--environment", choices=("preview", "production"), default="preview")
     parser.add_argument("--vnpay", action="store_true", help="Upload only native sandbox settings")
+    parser.add_argument(
+        "--chatbot",
+        action="store_true",
+        help="Upload only the assistant settings (CHATBOT_*) and the MCP service settings",
+    )
     parser.add_argument(
         "--update-existing", action="store_true", help="Allow replacing selected keys"
     )
@@ -69,6 +74,26 @@ def main() -> int:
             "VNPAY_PAYMENT_URL": settings.vnpay_payment_url,
             "VNPAY_API_URL": settings.vnpay_api_url,
         }
+    if args.chatbot:
+        if not settings.chatbot_llm_base_url or not settings.chatbot_models():
+            print("CHATBOT_LLM_BASE_URL and CHATBOT_LLM_MODELS are missing from local settings.")
+            return 1
+        values = {
+            "CHATBOT_ENABLED": "true",
+            "CHATBOT_LLM_BASE_URL": settings.chatbot_llm_base_url,
+            "CHATBOT_LLM_API_KEY": settings.chatbot_llm_api_key.get_secret_value(),
+            "CHATBOT_LLM_MODELS": ",".join(settings.chatbot_models()),
+            "CHATBOT_LLM_TIMEOUT_SECONDS": f"{settings.chatbot_llm_timeout_seconds:g}",
+            "CHATBOT_MAX_TOOL_STEPS": str(settings.chatbot_max_tool_steps),
+            "CHATBOT_DEADLINE_SECONDS": f"{settings.chatbot_deadline_seconds:g}",
+            # The local value points at the Compose service; Vercel serves MCP at /mcp.
+            "CHATBOT_MCP_URL": PUBLIC_ORIGIN + "/mcp",
+            # Read by the mcp service (mcp-server/), which shares the project environment.
+            "AGENTRA_API_URL": PUBLIC_ORIGIN,
+            "MCP_PUBLIC_URL": PUBLIC_ORIGIN,
+            "MCP_STARTUP_RETRIES": "3",
+        }
+        values = {name: value for name, value in values.items() if value}
     if args.check:
         print(f"Valid local configuration for {len(values)} selected keys (values hidden).")
         print(

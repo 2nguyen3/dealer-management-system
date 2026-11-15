@@ -95,18 +95,16 @@ async function runSmoke() {
     throw new Error(`Unexpected error alert found: ${errorText}`)
   }
 
-  // 10. Check chatbot page shows proper unavailable status
-  await page.click('a[href="/chatbot"]')
-  await page.waitForURL(`${BASE_URL}/chatbot`, { timeout: 5000 })
-  await page.waitForSelector('main h1:has-text("Trợ lý tra cứu")', {
-    timeout: 10000,
-  })
-  const chatbotTitle = await page.textContent('main h1')
-  const chatbotAlert = await page.textContent('#chatbot-unavailable')
-  if (!chatbotAlert?.includes('Chưa khả dụng'))
-    throw new Error(`Chatbot should be unavailable, saw: ${chatbotAlert}`)
-  console.log('Chatbot page title:', chatbotTitle)
-  console.log('Chatbot page notice:', chatbotAlert)
+  // 10. The floating assistant opens; without a deployed backend route it
+  // reports the service as not ready instead of inventing an answer.
+  await page.click('button[aria-label="Mở trợ lý Agentra"]')
+  await page.fill('[role="dialog"] textarea', 'Đại lý nào đang nợ nhiều nhất?')
+  await page.click('button[aria-label="Gửi câu hỏi"]')
+  const assistantReply = await page.waitForSelector(
+    '[role="dialog"] [role="log"] li:last-child',
+    { timeout: 20000 },
+  )
+  console.log('Assistant reply:', await assistantReply.textContent())
 
   await browser.close()
 

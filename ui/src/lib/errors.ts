@@ -334,17 +334,9 @@ export const ERROR_TEXTS = {
     message: msg('Câu hỏi chưa được hỗ trợ.'),
     hint: msg('Đặt câu hỏi cụ thể hơn về tồn kho, công nợ hoặc doanh số.'),
   },
-  READ_ONLY_QUERY_REQUIRED: {
-    message: msg('Trợ lý chỉ trả lời câu hỏi tra cứu.'),
-    hint: msg('Thực hiện thay đổi dữ liệu trên màn hình nghiệp vụ.'),
-  },
-  NEEDS_AGENCY_SELECTION: {
-    message: msg('Cần chọn một đại lý cụ thể.'),
-    hint: msg('Nêu tên hoặc mã đại lý trong câu hỏi.'),
-  },
-  NEEDS_CLARIFICATION: {
-    message: msg('Câu hỏi cần làm rõ thêm.'),
-    hint: msg('Bổ sung khoảng thời gian, đại lý hoặc mặt hàng.'),
+  CHATBOT_UNAVAILABLE: {
+    message: msg('Trợ lý tạm thời không trả lời được.'),
+    hint: msg('Thử lại sau ít phút hoặc tra cứu trên Báo cáo kinh doanh.'),
   },
 } as const satisfies Record<string, ErrorText>
 
