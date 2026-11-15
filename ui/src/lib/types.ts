@@ -210,12 +210,3 @@ export interface AuditLog {
   createdAt: string
   requestId?: string
 }
-
-export interface ChatbotMessage {
-  id: string
-  sender: 'user' | 'assistant'
-  text: string
-  timestamp: string
-  data?: unknown
-  suggestions?: string[]
-}

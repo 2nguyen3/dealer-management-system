@@ -295,7 +295,6 @@ describe('route guides', () => {
     ...Object.keys(routePermissions),
     '/',
     '/profile',
-    '/chatbot',
     '/document-history',
   ]
   beforeEach(() => {

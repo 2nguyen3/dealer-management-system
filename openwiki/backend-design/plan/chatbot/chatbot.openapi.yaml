@@ -1,0 +1,377 @@
+# Design-first contract for the M32 web assistant (revised 15/11/2026 after the
+# 14/11/2026 simplification). It is NOT part of API/openapi.json yet: that file is
+# generated from the runtime app by backend/scripts/gen_openapi.py, so this operation
+# joins it (92 operations) only when backend/app/modules/chatbot/ is implemented.
+# Paths are relative to the /api/v1 server, like API/openapi.json.
+# Supersedes POST /chatbot/queries (queryChatbot) and decision D10.
+openapi: 3.1.0
+info:
+  title: Agentra DMS - web assistant (design-first)
+  version: 2026-11-15
+  description: >-
+    One read-only endpoint for the floating web assistant. The server runs a short
+    LLM tool loop (OpenRouter) over the same semantic query engine that the MCP server
+    exposes; every figure comes from that engine, never from the model. Stateless: the
+    client resends the recent conversation. Shared error bodies, X-Request-Id and the
+    BearerAuth scheme are those of API/openapi.json.
+servers:
+  - url: /api/v1
+tags:
+  - name: Chatbot
+paths:
+  /chatbot/messages:
+    post:
+      tags: [Chatbot]
+      operationId: sendChatbotMessage
+      summary: Ask the read-only assistant about debt, inventory or sales
+      description: >-
+        Interprets the latest user turn (or resumes a pending query after the user
+        picked a candidate) and returns exactly one reply status. Never writes business
+        data. Permissions are checked per metric inside the engine; the endpoint itself
+        only requires at least one metric permission. A `resume` request does not call
+        the LLM: the server re-validates `query` from scratch and runs it.
+      security:
+        - BearerAuth: []
+      x-permissions:
+        anyOf:
+          - debt.read
+          - sales.read
+          - reports.read
+          - product.manage
+          - stock.receipt.prepare
+          - stock.receipt.post
+          - stock.issue.prepare
+          - stock.issue.post
+      x-rate-limit: per user bucket `chatbot`, separate from the HTTP bucket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatbotMessageRequest'
+            examples:
+              ask:
+                value:
+                  locale: vi
+                  messages:
+                    - role: user
+                      content: Top 5 đại lý doanh số cao nhất tháng 10
+              resume:
+                value:
+                  locale: vi
+                  messages:
+                    - role: user
+                      content: Minh Phát còn nợ bao nhiêu?
+                    - role: assistant
+                      content: Có 2 đại lý tên Minh Phát. Bạn chọn mã đại lý cần tra cứu.
+                  resume:
+                    query: { metric: DEBT, filters: [], limit: 20 }
+                    select: { entity: agency, code: DL-102 }
+      responses:
+        '200':
+          description: One assistant reply.
+          headers:
+            X-Request-Id: { schema: { type: string } }
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatbotReply'
+              examples:
+                answered:
+                  value:
+                    status: ANSWERED
+                    answer: Đây là 5 đại lý có doanh số cao nhất từ 01/10 đến 31/10/2026.
+                    model: google/gemma-4-31b-it:free
+                    tables:
+                      - title: Doanh số theo đại lý
+                        understood:
+                          metric: SALES
+                          groupBy: agency
+                          period: { fromDate: '2026-10-01', toDate: '2026-11-01' }
+                          filters: []
+                          sort: -salesAmount
+                          limit: 5
+                        columns:
+                          - { key: agencyCode, type: code }
+                          - { key: agencyName, type: text }
+                          - { key: numberOfIssues, type: integer }
+                          - { key: salesAmount, type: money }
+                        rows:
+                          - { agencyCode: DL-007, agencyName: Đại lý Hòa Bình, numberOfIssues: 12, salesAmount: '184500000' }
+                        totalRows: 30
+                        truncated: true
+                        asOf: '2026-11-15T02:12:00Z'
+                        source:
+                          operationId: getSalesReport
+                          query: { fromDate: '2026-10-01', toDate: '2026-11-01', sort: -salesAmount }
+                selection:
+                  value:
+                    status: NEEDS_SELECTION
+                    answer: Có 2 đại lý tên Minh Phát. Bạn chọn mã đại lý cần tra cứu.
+                    entity: agency
+                    candidates:
+                      - { code: DL-101, name: Đại lý Minh Phát, detail: Phường Sài Gòn }
+                      - { code: DL-102, name: Đại lý Minh Phát, detail: Phường Bàn Cờ }
+                    totalMatches: 2
+                    pendingQuery: { metric: DEBT, filters: [], limit: 20 }
+                needsInfo:
+                  value:
+                    status: NEEDS_INFO
+                    answer: Bạn muốn xem doanh số trong khoảng thời gian nào?
+                    missing: [period]
+                refused:
+                  value:
+                    status: REFUSED
+                    answer: Trợ lý chỉ tra cứu công nợ, tồn kho và doanh số; không xóa được phiếu.
+                    reason: UNSUPPORTED_QUERY
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '415': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          description: >-
+            CHATBOT_UNAVAILABLE - the assistant is disabled (CHATBOT_ENABLED=false), every
+            configured model failed, or the tool loop timed out. The server never invents
+            an answer in this case.
+          $ref: '#/components/responses/Problem'
+components:
+  responses:
+    Problem:
+      description: Shared error body of API/openapi.json (code, message, requestId, fieldErrors?).
+      headers:
+        X-Request-Id: { schema: { type: string } }
+        Retry-After: { schema: { type: string }, description: Only on 429. }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, message, requestId]
+            properties:
+              code: { type: string }
+              message: { type: string }
+              requestId: { type: string }
+              fieldErrors:
+                type: array
+                items:
+                  type: object
+                  required: [field, code, message]
+                  properties:
+                    field: { type: string }
+                    code: { type: string }
+                    message: { type: string }
+  schemas:
+    ChatbotMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [messages]
+      properties:
+        messages:
+          description: >-
+            Recent conversation, oldest first. The server keeps no history. Without
+            `resume` the last turn must have role `user`.
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ChatTurn' }
+        resume: { $ref: '#/components/schemas/ChatbotResume' }
+        locale:
+          description: Interface language for `answer` (one of the 24 UI locales). Data is never translated.
+          type: string
+          pattern: '^[a-z]{2,3}(-[A-Z]{2})?$'
+          default: vi
+    ChatTurn:
+      type: object
+      additionalProperties: false
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string, minLength: 1, maxLength: 2000 }
+    ChatbotResume:
+      description: Continue a NEEDS_SELECTION reply. No LLM call; `query` is re-validated.
+      type: object
+      additionalProperties: false
+      required: [query, select]
+      properties:
+        query: { $ref: '#/components/schemas/SemanticQuery' }
+        select:
+          type: object
+          additionalProperties: false
+          required: [entity, code]
+          properties:
+            entity: { $ref: '#/components/schemas/ChatbotEntity' }
+            code: { type: string, minLength: 1, maxLength: 32 }
+    ChatbotEntity:
+      type: string
+      enum: [agency, product]
+    ChatbotMetric:
+      description: See CONTRACT.md -> Semantic model. Only these three query kinds exist (QĐ16).
+      type: string
+      enum: [DEBT, INVENTORY, SALES]
+    SemanticQuery:
+      description: >-
+        The engine's normalized query, shared with the MCP tool `query_metric`. Field
+        names, operators and sorts are whitelisted per metric in the semantic model.
+      type: object
+      additionalProperties: false
+      required: [metric, filters, limit]
+      properties:
+        metric: { $ref: '#/components/schemas/ChatbotMetric' }
+        groupBy:
+          description: SALES only; `product` reads the product sales report. Defaults to the metric grain.
+          type: string
+          enum: [agency, product]
+        period:
+          description: >-
+            Half-open business-date interval [fromDate, toDate), exactly as the reports.
+            Omitted for DEBT/INVENTORY = current balance; required for SALES.
+          type: object
+          additionalProperties: false
+          required: [fromDate, toDate]
+          properties:
+            fromDate: { type: string, format: date }
+            toDate: { type: string, format: date }
+        filters:
+          type: array
+          maxItems: 5
+          items: { $ref: '#/components/schemas/SemanticFilter' }
+        sort:
+          description: A whitelisted field, `-` prefix for descending.
+          type: string
+          pattern: '^-?[A-Za-z]+$'
+        limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
+    SemanticFilter:
+      type: object
+      additionalProperties: false
+      required: [field, op, value]
+      properties:
+        field: { type: string, pattern: '^[A-Za-z]+$' }
+        op: { type: string, enum: [eq, gt, gte, lt, lte] }
+        value:
+          description: Entity code/name for entity fields; decimal string for money/quantity.
+          type: string
+          minLength: 1
+          maxLength: 120
+    ChatbotReply:
+      oneOf:
+        - $ref: '#/components/schemas/ChatbotAnswered'
+        - $ref: '#/components/schemas/ChatbotNeedsSelection'
+        - $ref: '#/components/schemas/ChatbotNeedsInfo'
+        - $ref: '#/components/schemas/ChatbotRefused'
+      discriminator:
+        propertyName: status
+        mapping:
+          ANSWERED: '#/components/schemas/ChatbotAnswered'
+          NEEDS_SELECTION: '#/components/schemas/ChatbotNeedsSelection'
+          NEEDS_INFO: '#/components/schemas/ChatbotNeedsInfo'
+          REFUSED: '#/components/schemas/ChatbotRefused'
+    ChatbotAnswerText:
+      description: >-
+        Short plain-text reply in `locale`. Post-checked: a number that is not in the
+        tool results is removed. Tables carry the exact figures.
+      type: string
+      minLength: 1
+      maxLength: 2000
+    ChatbotAnswered:
+      type: object
+      additionalProperties: false
+      required: [status, answer, tables]
+      properties:
+        status: { type: string, const: ANSWERED }
+        answer: { $ref: '#/components/schemas/ChatbotAnswerText' }
+        tables:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ChatbotTable' }
+        model: { type: [string, 'null'], description: OpenRouter model that answered; null for resume. }
+    ChatbotNeedsSelection:
+      description: Several entities match. Candidates carry no balance or contact data.
+      type: object
+      additionalProperties: false
+      required: [status, answer, entity, candidates, totalMatches, pendingQuery]
+      properties:
+        status: { type: string, const: NEEDS_SELECTION }
+        answer: { $ref: '#/components/schemas/ChatbotAnswerText' }
+        entity: { $ref: '#/components/schemas/ChatbotEntity' }
+        candidates:
+          description: At most 10; when totalMatches > 10 the answer asks for a code or ward.
+          type: array
+          minItems: 2
+          maxItems: 10
+          items:
+            type: object
+            additionalProperties: false
+            required: [code, name, detail]
+            properties:
+              code: { type: string }
+              name: { type: string }
+              detail: { type: [string, 'null'], description: Ward name (agency) or unit name (product). }
+        totalMatches: { type: integer, minimum: 2 }
+        pendingQuery: { $ref: '#/components/schemas/SemanticQuery' }
+    ChatbotNeedsInfo:
+      type: object
+      additionalProperties: false
+      required: [status, answer, missing]
+      properties:
+        status: { type: string, const: NEEDS_INFO }
+        answer: { $ref: '#/components/schemas/ChatbotAnswerText' }
+        missing:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [metric, period, agency, product] }
+    ChatbotRefused:
+      type: object
+      additionalProperties: false
+      required: [status, answer, reason]
+      properties:
+        status: { type: string, const: REFUSED }
+        answer: { $ref: '#/components/schemas/ChatbotAnswerText' }
+        reason: { type: string, enum: [UNSUPPORTED_QUERY, FORBIDDEN_METRIC, NO_MATCH] }
+    ChatbotTable:
+      type: object
+      additionalProperties: false
+      required: [title, understood, columns, rows, totalRows, truncated, asOf, source]
+      properties:
+        title: { type: string, description: Short caption in `locale`. }
+        understood: { $ref: '#/components/schemas/SemanticQuery' }
+        columns:
+          description: Keys and value types only; the UI owns translated labels.
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, type]
+            properties:
+              key: { type: string, pattern: '^[A-Za-z]+$' }
+              type: { type: string, enum: [code, text, money, quantity, integer, rate] }
+        rows:
+          description: >-
+            Values copied from the engine. money/quantity/rate are exact decimal
+            strings, integer is a JSON integer, code/text are strings; null allowed.
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties:
+              type: [string, integer, 'null']
+        totalRows: { type: integer, minimum: 0 }
+        truncated: { type: boolean }
+        asOf: { type: string, format: date-time }
+        source:
+          description: The read operation that shows the same figures, for "open source data".
+          type: object
+          additionalProperties: false
+          required: [operationId, query]
+          properties:
+            operationId:
+              type: string
+              enum: [listAgencies, listProducts, getDebtReport, getInventoryReport, getSalesReport, getProductSalesReport]
+            query:
+              type: object
+              additionalProperties: { type: string }

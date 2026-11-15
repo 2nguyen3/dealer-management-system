@@ -63,6 +63,11 @@ import {
   useHintsEnabled,
 } from '@/components/guide/preferences'
 import { Switch } from '@/components/shadcn/switch'
+import { ASSISTANT_PERMISSIONS } from '../chatbot/contract'
+import {
+  setAssistantPlacement,
+  useAssistantPlacement,
+} from '../chatbot/preferences'
 import { LanguagePicker } from '@/components/i18n/LanguagePicker'
 import { useAuth } from '../authentication/useAuth'
 import {
@@ -81,6 +86,7 @@ export function ProfilePage() {
   const [palette, setPalette] = usePalette()
   const tools = useContext(PageToolsContext)
   const hints = useHintsEnabled()
+  const assistant = useAssistantPlacement()
   const swatch =
     PALETTES.find((option) => option.value === palette)?.swatch ?? '#1857d1'
   if (!user) return null
@@ -529,6 +535,28 @@ export function ProfilePage() {
                   onCheckedChange={(checked) => setHintsEnabled(checked)}
                 />
               </div>
+              {hasPermission(ASSISTANT_PERMISSIONS) && (
+                <div className="mt-4 flex items-start justify-between gap-4 border-t pt-4">
+                  <Label
+                    htmlFor="assistant-companion"
+                    className="grid cursor-pointer gap-1 leading-snug"
+                  >
+                    <span>{t('Hiện trợ lý ảo')}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {t(
+                        'Trợ lý nằm ở góc màn hình, kéo để đổi chỗ và bấm vào để hỏi về công nợ, tồn kho, doanh số.',
+                      )}
+                    </span>
+                  </Label>
+                  <Switch
+                    id="assistant-companion"
+                    checked={!assistant.hidden}
+                    onCheckedChange={(checked) =>
+                      setAssistantPlacement({ hidden: !checked })
+                    }
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

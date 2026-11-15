@@ -44,6 +44,9 @@ export const overviewGuides: readonly GuideContent[] = [
       msg(
         'Nháp chưa làm thay đổi tồn kho hay nợ. Chỉ Ghi sổ mới có hiệu lực; chứng từ đã ghi sổ chỉ Hủy hoặc Sửa có lý do.',
       ),
+      msg(
+        'Trợ lý ảo ở góc màn hình trả lời câu hỏi tra cứu công nợ, tồn kho, doanh số theo đúng quyền của bạn; nó không sửa dữ liệu. Kéo để đổi chỗ, bấm vào để hỏi.',
+      ),
     ],
     related: ['/dashboard', '/reports', '/profile'],
   },
@@ -172,36 +175,10 @@ export const overviewGuides: readonly GuideContent[] = [
       msg(
         'Thẻ Giao diện còn có mục Ngôn ngữ giao diện (24 ngôn ngữ). Chỉ chữ của phần mềm đổi; tên hàng, tên đại lý, phường/xã, ghi chú và mã chứng từ giữ nguyên.',
       ),
+      msg(
+        'Đã ẩn trợ lý ảo? Bật lại bằng công tắc Hiện trợ lý ảo trong thẻ Giao diện.',
+      ),
     ],
     related: ['/', '/permissions'],
-  },
-  {
-    path: '/chatbot',
-    purpose: msg(
-      'Trợ lý AI sẽ trả lời câu hỏi tra cứu về tồn kho, công nợ, doanh số theo đúng quyền của bạn. Tính năng này đang ở trạng thái Sắp có.',
-    ),
-    roles: [
-      msg(
-        'Mọi người dùng; trợ lý không cấp thêm quyền truy cập dữ liệu ngoài quyền bạn đang có.',
-      ),
-    ],
-    steps: [
-      msg('Hiện dịch vụ chưa được triển khai nên ô hỏi đáp đang tắt.'),
-      msg(
-        'Trong lúc chờ, dùng Bảng điều khiển, Báo cáo kinh doanh, Hồ sơ đại lý hoặc Danh mục mặt hàng để tra cứu.',
-      ),
-    ],
-    rules: [
-      msg(
-        'Trợ lý chỉ trả lời câu hỏi tra cứu; mọi thay đổi dữ liệu phải làm trên màn hình nghiệp vụ.',
-      ),
-    ],
-    errors: [
-      'READ_ONLY_QUERY_REQUIRED',
-      'UNSUPPORTED_QUERY',
-      'NEEDS_AGENCY_SELECTION',
-      'NEEDS_CLARIFICATION',
-    ],
-    related: ['/dashboard', '/reports', '/agencies', '/products'],
   },
 ]

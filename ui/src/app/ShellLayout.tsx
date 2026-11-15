@@ -5,7 +5,7 @@ import {
   Search,
   UserRound,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import {
   PageIconContext,
@@ -67,6 +67,12 @@ import { SectionTabs } from './SectionTabs'
 import { sidebarGroups } from './sidebarEntries'
 import { getLocale, t } from '@/lib/i18n/core'
 import { localeDirection } from '@/lib/i18n/locales'
+
+const AssistantCompanion = lazy(() =>
+  import('../features/chatbot/AssistantCompanion').then((module) => ({
+    default: module.AssistantCompanion,
+  })),
+)
 
 function isRouteActive(pathname: string, path: string): boolean {
   return path === '/'
@@ -403,6 +409,9 @@ export function ShellLayout() {
           isOpen={isPasswordModalOpen}
           onClose={() => setIsPasswordModalOpen(false)}
         />
+        <Suspense fallback={null}>
+          <AssistantCompanion />
+        </Suspense>
       </SidebarProvider>
     </TooltipProvider>
   )

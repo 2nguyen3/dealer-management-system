@@ -5,8 +5,12 @@
 Features in `src/features/`: authentication, home, portal, guide, profile, dashboard,
 reports, agencies, products, agency_types, units, wards, business_rules, master_data,
 stock_receipts, stock_issues, payment_receipts, online_payments, document_history,
-users, user_groups, permissions, audit_logs, chatbot (placeholder, not built). The menu
-has 14 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
+users, user_groups, permissions, audit_logs, chatbot. The chatbot is a floating companion
+(`AssistantCompanion`, mounted lazily in `ShellLayout`), not a route: it opens a chat panel
+against `POST /chatbot/messages` (contract: `../openwiki/backend-design/plan/chatbot/`),
+is shown to users with a metric permission, can be dragged and hidden (Hồ sơ → Giao diện,
+key `agentra-assistant`) and reports "not ready" while the backend route is absent. The menu
+has 13 sidebar entries (`src/app/navigation.ts`) gated by the 22 backend function codes;
 Catalogue (agency types/units/rules) and Users & Permissions (users/groups/permissions)
 are one entry each with route-backed sub-tabs (`navigationSections`, `SectionTabs.tsx`).
 Removed (Bỏ theo yêu cầu 14/11/2026): receivables, stock_counts, upfront_payments,

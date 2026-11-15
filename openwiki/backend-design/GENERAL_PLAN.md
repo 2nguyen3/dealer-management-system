@@ -34,7 +34,8 @@ marked **Bỏ theo yêu cầu 14/11/2026**. Owning plan and evidence:
   M10–M12 rules/products/agencies fields.
 - **Runtime contract:** [API/openapi.json](API/openapi.json) regenerated, 90 operations.
 - **Data:** production reseeded with seed v2 (01/06/2026 → day before seed). M32 chatbot
-  remains unbuilt and must target the new schema.
+  remains unbuilt and must target the new schema; its revised contract (15/11/2026) is
+  [plan/chatbot/CONTRACT.md](plan/chatbot/CONTRACT.md).
 
 The checkpoints below are historical; operation counts such as 154 target operations no
 longer describe the runtime.
