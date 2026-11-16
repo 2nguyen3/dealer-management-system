@@ -593,7 +593,6 @@ export function DashboardPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        className="mb-0"
         eyebrow={t('Tổng quan điều hành')}
         title={t('Bảng điều khiển')}
         description={t('Nhấn một đại lý hoặc mặt hàng để lọc chéo.')}

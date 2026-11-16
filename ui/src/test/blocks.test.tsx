@@ -156,7 +156,7 @@ describe('IllustratedFigure', () => {
     )
     const frame = screen.getByTitle('Xe nâng')
     expect(frame.getAttribute('src')).toMatch(
-      /^\/figures\/forklift\.html\?theme=light&shadow=%23[0-9a-f]{6}$/,
+      /^\/figures\/forklift\.html\?theme=light&shadow=%23[0-9a-f]{6}&motion=hover$/,
     )
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts')
     expect(frame.getAttribute('loading')).toBe('lazy')

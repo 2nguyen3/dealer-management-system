@@ -129,7 +129,6 @@ export function BusinessRulesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title={t('Thay đổi quy định')}
         actions={
           <InfoHint label={t('Giới thiệu quy định')}>

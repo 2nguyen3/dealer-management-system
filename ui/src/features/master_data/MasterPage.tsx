@@ -513,7 +513,6 @@ export function MasterPage({ config }: { config: MasterConfig }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title={config.title}
         actions={
           <>

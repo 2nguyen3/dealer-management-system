@@ -1,5 +1,10 @@
 <!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>/* Agentra host shim: with ?motion=hover the figure renders one still frame
+   (its reduced-motion path) and loops only while the pointer moves over it
+   (the host posts "agentra:pause" once the pointer is back on its page), so
+   an idle page does not spend a CPU core redrawing the scene every frame. */
+(function(){try{if(new URLSearchParams(location.search).get('motion')!=='hover'||!window.matchMedia)return;var real=window.matchMedia.bind(window),sys=real('(prefers-reduced-motion: reduce)'),still={media:'(prefers-reduced-motion: reduce)',matches:true,onchange:null,addEventListener:function(){},removeEventListener:function(){},addListener:function(){},removeListener:function(){},dispatchEvent:function(){return false}},idle=0,seen=0;window.matchMedia=function(q){return /prefers-reduced-motion/.test(q)?still:real(q)};function pause(){clearTimeout(idle);still.matches=true}function play(){var now=Date.now();if(now-seen<400&&!still.matches)return;seen=now;clearTimeout(idle);idle=setTimeout(pause,6000);if(still.matches&&!sys.matches){still.matches=false;document.dispatchEvent(new Event('visibilitychange'));parent.postMessage('agentra:figure-playing','*')}}document.addEventListener('pointermove',play);document.addEventListener('pointerout',function(e){if(!e.relatedTarget)pause()});addEventListener('message',function(e){if(e.source===parent&&e.data==='agentra:pause')pause()})}catch(e){}})();</script>
 <title>Chuỗi phân phối</title>
 <style>
   /* the figure alone, on a transparent page: it sits on the host's own panel */

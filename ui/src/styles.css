@@ -430,6 +430,17 @@
   ::selection {
     background: color-mix(in oklab, var(--primary) 22%, transparent);
   }
+
+  /* Thin, theme-tinted scrollbars (tables, panels, the page itself). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 35%,
+        transparent
+      )
+      transparent;
+  }
 }
 
 @layer components {
@@ -455,6 +466,20 @@
       transparent 1px
     );
     background-size: 14px 14px;
+  }
+
+  /* Dot grid for surfaces painted with the (always dark) sidebar tokens. */
+  .bg-dots-sidebar {
+    background-image: radial-gradient(
+      color-mix(in oklab, var(--sidebar-foreground) 22%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  /* Static film grain; pair with a low opacity and mix-blend-overlay. */
+  .bg-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   .page-container {
@@ -571,6 +596,99 @@
   }
   to {
     background-position: 200% 0;
+  }
+}
+
+/* Assistant mascot (PetMascot). Bob and shadow animate transforms of HTML
+   wrappers so the compositor runs them; the rest plays only on events. */
+.pet-bob {
+  animation: pet-bob 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+.pet-shadow {
+  translate: -50% 0;
+  animation: pet-shadow 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+.pet[data-mood='sleep'] .pet-bob {
+  animation-name: pet-doze;
+  animation-duration: 4s;
+}
+.pet[data-mood='sleep'] .pet-shadow {
+  animation-duration: 4s;
+}
+.pet-z {
+  animation: pet-z 2.6s ease-out infinite;
+  will-change: transform, opacity;
+}
+.pet-pulse {
+  animation: pet-pulse 0.7s ease-in-out infinite;
+}
+.pet-wave {
+  animation: pet-wave 1.6s ease-in-out 1;
+}
+
+@keyframes pet-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4%);
+  }
+}
+
+@keyframes pet-doze {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1.5%);
+  }
+}
+
+@keyframes pet-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.85);
+  }
+}
+
+@keyframes pet-z {
+  0% {
+    opacity: 0;
+    transform: translateY(40%);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-110%);
+  }
+}
+
+@keyframes pet-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes pet-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25%,
+  75% {
+    transform: rotate(-150deg);
+  }
+  50% {
+    transform: rotate(-110deg);
   }
 }
 

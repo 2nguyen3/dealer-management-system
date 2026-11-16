@@ -98,7 +98,7 @@ export function HomePage() {
                 <Sparkles className="size-3.5" aria-hidden="true" />
                 {date}
               </p>
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                   {t('Cổng quản lý')}
                 </h1>

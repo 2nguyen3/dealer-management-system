@@ -25,12 +25,11 @@ describe('Authentication Components', () => {
         </BrowserRouter>,
       )
 
-      // Desktop intro and mobile header each carry the light and dark
-      // wordmark; the theme class shows exactly one of each pair.
+      // The always-dark brand panel carries the white wordmark; the mobile
+      // header carries both variants and the theme class shows one.
       const logos = screen.getAllByAltText('Agentra')
-      expect(logos).toHaveLength(4)
+      expect(logos).toHaveLength(3)
       expect(logos.map((logo) => logo.getAttribute('src'))).toEqual([
-        '/assets/brand/agentra-dark.png',
         '/assets/brand/agentra-white.png',
         '/assets/brand/agentra-dark.png',
         '/assets/brand/agentra-white.png',

@@ -408,7 +408,6 @@ export function OnlinePaymentsPage() {
         description={t(
           'Tạo giao dịch → đại lý trả trên VNPAY → cổng xác nhận (IPN) → phiếu thu tự động.',
         )}
-        className="mb-0"
         actions={
           canManage && (
             <Button

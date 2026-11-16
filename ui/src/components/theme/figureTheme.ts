@@ -30,19 +30,29 @@ export function figureShadow(palette: Palette, dark: boolean): string {
 }
 
 /**
+ * How a figure moves: `loop` plays its animation continuously (it redraws the
+ * whole scene every frame, about one CPU core); `hover` renders a still frame
+ * and plays only while the host posts `agentra:play` (see the shim in each
+ * figure document).
+ */
+export type FigureMotion = 'loop' | 'hover'
+
+/**
  * URL of a static figure under `public/figures/` with the theme tokens it
- * reads (`theme`, `shadow`). Changing theme or palette changes the URL, so the
- * sandboxed frame reloads with matching colours.
+ * reads (`theme`, `shadow`, optional `motion`). Changing theme or palette
+ * changes the URL, so the sandboxed frame reloads with matching colours.
  */
 export function figureSrc(
   name: string,
   palette: Palette,
   dark: boolean,
   base: string = import.meta.env.BASE_URL,
+  motion: FigureMotion = 'loop',
 ): string {
   const query = new URLSearchParams({
     theme: dark ? 'dark' : 'light',
     shadow: figureShadow(palette, dark),
   })
+  if (motion === 'hover') query.set('motion', 'hover')
   return `${base}figures/${name}?${query.toString()}`
 }
