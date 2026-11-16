@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useEffect, useState, type CSSProperties } from 'react'
 
 export type PetMood =
   'idle' | 'wave' | 'happy' | 'think' | 'puzzled' | 'sad' | 'sleep'
@@ -16,8 +16,40 @@ const centered = {
   transformOrigin: 'center',
 } as const
 
-function Eyes({ mood, look }: { mood: PetMood; look: PetLook }) {
-  const reduce = useReducedMotion()
+/** Moods whose eyes are open pupils that blink and follow the pointer. */
+const OPEN_EYES: ReadonlySet<PetMood> = new Set(['idle', 'think', 'puzzled'])
+
+/**
+ * Blinks every few seconds with a timer (a 150 ms state flip), so an idle
+ * pet costs nothing between blinks instead of animating every frame.
+ */
+function useBlink(enabled: boolean): boolean {
+  const [blink, setBlink] = useState(false)
+  useEffect(() => {
+    if (!enabled) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (reduce?.matches) return
+    let timer = 0
+    const schedule = () => {
+      timer = window.setTimeout(
+        () => {
+          setBlink(true)
+          timer = window.setTimeout(() => {
+            setBlink(false)
+            schedule()
+          }, 150)
+        },
+        3200 + Math.random() * 2400,
+      )
+    }
+    schedule()
+    return () => window.clearTimeout(timer)
+  }, [enabled])
+  return enabled && blink
+}
+
+function Eyes({ mood }: { mood: PetMood }) {
+  const blink = useBlink(OPEN_EYES.has(mood))
   if (mood === 'happy' || mood === 'wave')
     return (
       <g
@@ -49,24 +81,23 @@ function Eyes({ mood, look }: { mood: PetMood; look: PetLook }) {
         </g>
       </g>
     )
-  // idle / think / puzzled: pupils that blink and follow the pointer.
-  const offset =
-    mood === 'think' ? { x: 2.2, y: -2 } : { x: look.x * 2.6, y: look.y * 2 }
+  // idle / think / puzzled: pupils that blink and follow the pointer. The
+  // offset comes from CSS variables set by the host (no React re-render).
   const small = mood === 'puzzled'
+  const follow: CSSProperties = {
+    transform:
+      mood === 'think'
+        ? 'translate(2.2px, -2px)'
+        : 'translate(calc(var(--pet-look-x, 0) * 2.6px), calc(var(--pet-look-y, 0) * 2px))',
+    transition: 'transform 180ms ease-out',
+  }
   return (
-    <motion.g
-      data-eyes={mood}
-      animate={{ x: offset.x, y: offset.y }}
-      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-    >
-      <motion.g
-        style={centered}
-        animate={reduce ? undefined : { scaleY: [1, 1, 0.1, 1] }}
-        transition={{
-          duration: 4.2,
-          times: [0, 0.93, 0.965, 1],
-          repeat: Infinity,
-          ease: 'easeInOut',
+    <g data-eyes={mood} style={follow}>
+      <g
+        style={{
+          ...centered,
+          transform: blink ? 'scaleY(0.1)' : 'none',
+          transition: 'transform 70ms ease-in-out',
         }}
       >
         <rect x="22.5" y="25" width="5" height="7.5" rx="2.5" fill={EYE} />
@@ -78,8 +109,8 @@ function Eyes({ mood, look }: { mood: PetMood; look: PetLook }) {
           rx="2.2"
           fill={EYE}
         />
-      </motion.g>
-    </motion.g>
+      </g>
+    </g>
   )
 }
 
@@ -111,157 +142,120 @@ function Mouth({ mood }: { mood: PetMood }) {
  * The assistant's companion: a small screen-faced robot that bobs, blinks,
  * follows the pointer with its eyes and changes expression with its mood.
  * Purely decorative (aria-hidden); the surrounding button carries the name.
+ *
+ * Performance: the idle bob and shadow are CSS transform animations on HTML
+ * wrappers (`.pet-bob`, `.pet-shadow` in styles.css), which the compositor
+ * runs without main-thread work; SVG-internal motion only happens on events
+ * (blink, wave, thinking bulb). Pointer tracking reads `--pet-look-x/y`.
  */
 export function PetMascot({
   mood,
-  look = { x: 0, y: 0 },
+  look,
   size = 64,
 }: {
   mood: PetMood
+  /** Optional fixed gaze; otherwise inherited `--pet-look-x/y` variables. */
   look?: PetLook
   size?: number
 }) {
-  const reduce = useReducedMotion()
   const sleeping = mood === 'sleep'
-  const bob = reduce ? undefined : { y: sleeping ? [0, 1, 0] : [0, -2.5, 0] }
   const bulb =
     mood === 'think' ? '#fbbf24' : mood === 'sad' ? '#f87171' : '#5eead4'
+  const gaze = look
+    ? ({ '--pet-look-x': look.x, '--pet-look-y': look.y } as CSSProperties)
+    : undefined
   return (
-    <svg
-      viewBox="0 0 64 64"
-      width={size}
-      height={size}
+    <span
       aria-hidden="true"
-      focusable="false"
       data-mood={mood}
-      className="overflow-visible"
+      className="pet relative inline-block shrink-0"
+      style={{ width: size, height: size, fontSize: size * 0.22, ...gaze }}
     >
-      <motion.ellipse
-        cx="32"
-        cy="59"
-        rx="15"
-        ry="2.6"
-        className="fill-foreground/15"
-        style={centered}
-        animate={reduce ? undefined : { scaleX: [1, 0.85, 1] }}
-        transition={{ duration: sleeping ? 4 : 2.8, repeat: Infinity }}
-      />
-      <motion.g
-        animate={bob}
-        transition={{
-          duration: sleeping ? 4 : 2.8,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        {/* Antenna */}
-        <line
-          x1="32"
-          y1="11"
-          x2="32"
-          y2="5.5"
-          stroke="var(--primary)"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <motion.circle
-          cx="32"
-          cy="4.5"
-          r="2.8"
-          fill={bulb}
-          animate={
-            reduce
-              ? undefined
-              : { opacity: mood === 'think' ? [1, 0.3, 1] : [1, 0.7, 1] }
-          }
-          transition={{
-            duration: mood === 'think' ? 0.7 : 2.4,
-            repeat: Infinity,
-          }}
-        />
-        {/* Arms */}
-        <rect
-          x="5.5"
-          y="31"
-          width="7"
-          height="11"
-          rx="3.5"
-          fill="var(--primary)"
-        />
-        <motion.rect
-          x="51.5"
-          y="31"
-          width="7"
-          height="11"
-          rx="3.5"
-          fill="var(--primary)"
-          style={{ transformBox: 'fill-box', transformOrigin: '50% 15%' }}
-          animate={
-            mood === 'wave' && !reduce
-              ? { rotate: [0, -150, -110, -150, -110, 0] }
-              : { rotate: 0 }
-          }
-          transition={{ duration: 1.6, ease: 'easeInOut' }}
-        />
-        {/* Body */}
-        <rect
-          x="10"
-          y="11"
-          width="44"
-          height="40"
-          rx="16"
-          fill="var(--primary)"
-        />
-        <path
-          d="M17 17 Q22 13.5 30 13.5"
-          stroke="white"
-          strokeOpacity="0.35"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {/* Face screen */}
-        <rect x="15.5" y="19" width="33" height="23" rx="9" fill={SCREEN} />
-        <Eyes mood={mood} look={look} />
-        <Mouth mood={mood} />
-        {(mood === 'happy' || mood === 'wave') && (
-          <g fill="#fb7185" opacity="0.55">
-            <circle cx="19.5" cy="35" r="2" />
-            <circle cx="44.5" cy="35" r="2" />
-          </g>
-        )}
-      </motion.g>
-      <AnimatePresence>
-        {sleeping && (
-          <motion.text
-            key="z"
-            x="50"
-            y="12"
-            className="fill-muted-foreground text-[9px] font-semibold"
-            initial={{ opacity: 0, y: 4 }}
-            animate={
-              reduce ? { opacity: 1 } : { opacity: [0, 1, 0], y: [4, -4, -10] }
-            }
-            exit={{ opacity: 0 }}
-            transition={{ duration: 2.6, repeat: Infinity }}
-          >
-            z
-          </motion.text>
-        )}
-        {mood === 'puzzled' && (
-          <motion.text
-            key="q"
-            x="52"
-            y="12"
-            className="fill-amber-500 text-[11px] font-bold"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            ?
-          </motion.text>
-        )}
-      </AnimatePresence>
-    </svg>
+      <span className="pet-shadow absolute bottom-[2.5%] left-1/2 h-[8%] w-[47%] rounded-[50%] bg-foreground/15" />
+      <span className="pet-bob absolute inset-0">
+        <svg
+          viewBox="0 0 64 64"
+          width={size}
+          height={size}
+          focusable="false"
+          className="overflow-visible"
+        >
+          {/* Antenna */}
+          <line
+            x1="32"
+            y1="11"
+            x2="32"
+            y2="5.5"
+            stroke="var(--primary)"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <circle
+            cx="32"
+            cy="4.5"
+            r="2.8"
+            fill={bulb}
+            className={mood === 'think' ? 'pet-pulse' : undefined}
+          />
+          {/* Arms */}
+          <rect
+            x="5.5"
+            y="31"
+            width="7"
+            height="11"
+            rx="3.5"
+            fill="var(--primary)"
+          />
+          <rect
+            key={mood === 'wave' ? 'wave' : 'rest'}
+            x="51.5"
+            y="31"
+            width="7"
+            height="11"
+            rx="3.5"
+            fill="var(--primary)"
+            className={mood === 'wave' ? 'pet-wave' : undefined}
+            style={{ transformBox: 'fill-box', transformOrigin: '50% 15%' }}
+          />
+          {/* Body */}
+          <rect
+            x="10"
+            y="11"
+            width="44"
+            height="40"
+            rx="16"
+            fill="var(--primary)"
+          />
+          <path
+            d="M17 17 Q22 13.5 30 13.5"
+            stroke="white"
+            strokeOpacity="0.35"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            fill="none"
+          />
+          {/* Face screen */}
+          <rect x="15.5" y="19" width="33" height="23" rx="9" fill={SCREEN} />
+          <Eyes mood={mood} />
+          <Mouth mood={mood} />
+          {(mood === 'happy' || mood === 'wave') && (
+            <g fill="#fb7185" opacity="0.55">
+              <circle cx="19.5" cy="35" r="2" />
+              <circle cx="44.5" cy="35" r="2" />
+            </g>
+          )}
+        </svg>
+      </span>
+      {sleeping && (
+        <span className="pet-z absolute end-[6%] top-0 text-[0.6em] leading-none font-semibold text-muted-foreground">
+          z
+        </span>
+      )}
+      {mood === 'puzzled' && (
+        <span className="absolute end-[2%] top-0 animate-in text-[0.7em] leading-none font-bold text-amber-500 duration-200 zoom-in-50 fade-in-0">
+          ?
+        </span>
+      )}
+    </span>
   )
 }

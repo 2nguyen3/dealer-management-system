@@ -5,7 +5,7 @@ import {
   Search,
   UserRound,
 } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useDeferredValue, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import {
   PageIconContext,
@@ -93,7 +93,8 @@ function WorkspaceSidebar({
   const { isMobile, setOpenMobile } = useSidebar()
   const { pathname } = useLocation()
   const [query, setQuery] = useState('')
-  const search = query.trim().toLocaleLowerCase('vi')
+  // Typing stays responsive; the menu filters on the deferred value.
+  const search = useDeferredValue(query).trim().toLocaleLowerCase('vi')
   const groups = sidebarGroups(hasPermission, search)
 
   return (
@@ -161,7 +162,7 @@ function WorkspaceSidebar({
                             isRouteActive(pathname, path),
                           )}
                           tooltip={item.label}
-                          className="data-[active=true]:bg-sidebar-primary data-[active=true]:font-medium data-[active=true]:text-sidebar-primary-foreground"
+                          className="relative transition-colors duration-150 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--sidebar-primary)_22%,transparent)] data-[active=true]:before:absolute data-[active=true]:before:inset-y-1.5 data-[active=true]:before:start-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-sidebar-primary data-[active=true]:[&>svg]:text-sidebar-primary"
                         >
                           <NavLink
                             to={item.path}
@@ -208,7 +209,7 @@ function WorkspaceSidebar({
                     className="data-[state=open]:bg-sidebar-accent"
                   >
                     <Avatar className="size-8 rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-gradient-to-br from-[#5fd4ff] via-sidebar-primary to-[#1f4fd8] text-xs font-bold text-white">
+                      <AvatarFallback className="rounded-lg bg-gradient-to-br from-sidebar-primary to-primary text-xs font-bold text-white">
                         {initials(user.fullName)}
                       </AvatarFallback>
                     </Avatar>
@@ -344,7 +345,9 @@ export function ShellLayout() {
           isLoggingOut={isLoggingOut}
         />
         <SidebarInset className="min-w-0 bg-background">
-          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-6">
+          {/* Solid (not blurred) bar: a backdrop blur would be recomputed on
+              every scroll frame over long tables and charts. */}
+          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 md:px-6">
             <SidebarTrigger
               className="-ms-1"
               aria-label={t('Mở hoặc thu gọn menu')}

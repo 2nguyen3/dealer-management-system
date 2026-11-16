@@ -192,6 +192,10 @@ script in `index.html`), each with light and dark tokens; light/dark comes from
 `ModeToggle` and the `/profile` appearance tab switch both. Type is Be Vietnam Pro;
 the brand stays the original `/assets/brand/agentra-*.png` logo (`BrandLogo` swaps the
 dark/white wordmark via `.dark`; figures get `?theme=&shadow=` tokens from `figureTheme.ts`).
+Performance: `IllustratedFigure` defaults to `motion=hover` (a still frame that loops only
+while the pointer moves over it; a looping figure redraws its whole scene and costs a full
+CPU core), and the assistant mascot idles with compositor-only CSS (`.pet-*` in
+`styles.css`). Avoid infinite JS/SVG animation loops and `backdrop-blur` on sticky bars.
 Icons are central: `Button`/`Modal` infer a lucide icon from the Vietnamese label/title
 (`components/ui/actionIcons.ts`, `action`/`icon={false}` to override), `PageHeader` shows
 the route's sidebar icon (`PageIconContext`), and status badges/filters use `statusIcons.ts`. Motion helpers

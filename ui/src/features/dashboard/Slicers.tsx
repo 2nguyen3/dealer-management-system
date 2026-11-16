@@ -58,7 +58,7 @@ export function Slicers({
   return (
     <section
       aria-label={t('Bộ lọc bảng điều khiển')}
-      className="z-10 rounded-xl border bg-card/95 p-3 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:sticky lg:top-14"
+      className="z-10 rounded-xl border bg-card p-3 shadow-xs lg:sticky lg:top-14"
     >
       <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] [&_.form-field]:mb-0">
         <Select

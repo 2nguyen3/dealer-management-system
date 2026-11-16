@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '../authentication/useAuth'
 import { AssistantPanel } from './AssistantPanel'
 import { ASSISTANT_PERMISSIONS } from './contract'
-import { PetMascot, type PetLook, type PetMood } from './PetMascot'
+import { PetMascot, type PetMood } from './PetMascot'
 import {
   setAssistantPlacement,
   useAssistantPlacement,
@@ -85,7 +85,6 @@ function Companion({
   const [bubble, setBubble] = useState<string | null>(null)
   const [transient, setTransient] = useState<PetMood | null>(null)
   const [sleeping, setSleeping] = useState(false)
-  const [look, setLook] = useState<PetLook>({ x: 0, y: 0 })
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null)
   const [viewport, setViewport] = useState(() => ({
     width: window.innerWidth,
@@ -171,21 +170,29 @@ function Companion({
     }
   }, [])
 
-  // Eyes follow the pointer (one update per frame).
+  // Eyes follow the pointer: at most one update per frame, written as CSS
+  // variables on the button so the companion does not re-render on every move.
   useEffect(() => {
     if (reduce) return
     let frame = 0
+    let last = ''
     const onMove = (event: PointerEvent) => {
       if (frame) return
       frame = window.requestAnimationFrame(() => {
         frame = 0
-        const rect = button.current?.getBoundingClientRect()
-        if (!rect) return
+        const element = button.current
+        if (!element) return
+        const rect = element.getBoundingClientRect()
         const dx = event.clientX - (rect.left + rect.width / 2)
         const dy = event.clientY - (rect.top + rect.height / 2)
         const distance = Math.max(1, Math.hypot(dx, dy))
         const reach = Math.min(1, distance / 240)
-        setLook({ x: (dx / distance) * reach, y: (dy / distance) * reach })
+        const x = ((dx / distance) * reach).toFixed(2)
+        const y = ((dy / distance) * reach).toFixed(2)
+        if (`${x},${y}` === last) return
+        last = `${x},${y}`
+        element.style.setProperty('--pet-look-x', x)
+        element.style.setProperty('--pet-look-y', y)
       })
     }
     window.addEventListener('pointermove', onMove)
@@ -384,7 +391,7 @@ function Companion({
           )}
           style={{ width: PET, height: PET }}
         >
-          <PetMascot mood={mood} look={look} size={PET} />
+          <PetMascot mood={mood} size={PET} />
           {unread && !open && (
             <span className="absolute top-1 end-1 flex size-3.5 items-center justify-center">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-rose-400 opacity-75 motion-reduce:animate-none" />

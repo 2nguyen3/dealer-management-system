@@ -217,7 +217,6 @@ export function PermissionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title={t('Phân quyền chức năng')}
         actions={
           <InfoHint label={t('Cách phân quyền')}>

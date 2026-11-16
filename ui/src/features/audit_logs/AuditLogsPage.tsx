@@ -165,7 +165,6 @@ export function AuditLogsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title={t('Nhật ký hệ thống')}
         actions={
           <InfoHint label={t('Giới thiệu nhật ký')}>

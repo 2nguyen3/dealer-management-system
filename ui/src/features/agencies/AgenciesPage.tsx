@@ -587,7 +587,6 @@ export function AgenciesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title={t('Hồ sơ đại lý')}
         actions={
           <>

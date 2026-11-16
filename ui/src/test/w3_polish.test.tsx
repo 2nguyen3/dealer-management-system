@@ -96,7 +96,7 @@ describe('IllustratedFigure theming', () => {
     render(<IllustratedFigure name="forklift.html" title="Xe nâng" />)
     const frame = screen.getByTitle('Xe nâng') as HTMLIFrameElement
     expect(frame.getAttribute('src')).toBe(
-      figureSrc('forklift.html', 'thuy', false),
+      figureSrc('forklift.html', 'thuy', false, '/', 'hover'),
     )
     expect(frame.style.colorScheme).toBe('light')
     expect(frame.className).toContain('dark:brightness-[.86]')
@@ -115,7 +115,37 @@ describe('IllustratedFigure theming', () => {
     )
     const src = screen.getByTitle('Chuỗi').getAttribute('src') ?? ''
     expect(src).toContain('theme=dark')
-    expect(src).toBe(figureSrc('supplychain.html', 'thuy', true))
+    expect(src).toBe(figureSrc('supplychain.html', 'thuy', true, '/', 'hover'))
+  })
+
+  it('adds the hover flag only for still-until-hovered figures', () => {
+    expect(figureSrc('forklift.html', 'thuy', false, '/', 'loop')).toBe(
+      '/figures/forklift.html?theme=light&shadow=%23365ba5',
+    )
+    expect(figureSrc('forklift.html', 'thuy', false, '/', 'hover')).toBe(
+      '/figures/forklift.html?theme=light&shadow=%23365ba5&motion=hover',
+    )
+  })
+
+  it('can force the figure tone for an always-dark panel', () => {
+    render(
+      <IllustratedFigure name="supplychain.html" title="Chuỗi" tone="dark" />,
+    )
+    const frame = screen.getByTitle('Chuỗi')
+    expect(frame.getAttribute('src')).toBe(
+      figureSrc('supplychain.html', 'thuy', true, '/', 'hover'),
+    )
+    // No extra dimming: the forced tone already matches the panel.
+    expect(frame.className).not.toContain('dark:brightness-[.86]')
+  })
+
+  it('omits the hover flag for a looping figure', () => {
+    render(
+      <IllustratedFigure name="forklift.html" title="Xe nâng" motion="loop" />,
+    )
+    expect(screen.getByTitle('Xe nâng').getAttribute('src')).toBe(
+      figureSrc('forklift.html', 'thuy', false),
+    )
   })
 
   it('reloads the frame (skeleton again) when the palette changes', () => {
@@ -127,7 +157,7 @@ describe('IllustratedFigure theming', () => {
     act(() => setPalette('hoa'))
     const frame = screen.getByTitle('Xe nâng')
     expect(frame.getAttribute('src')).toBe(
-      figureSrc('forklift.html', 'hoa', false),
+      figureSrc('forklift.html', 'hoa', false, '/', 'hover'),
     )
     expect(frame.className).toContain('opacity-0')
     expect(container.querySelector('[data-slot="skeleton"]')).toBeTruthy()
@@ -163,7 +193,8 @@ describe('BrandLogo and the authentication frame', () => {
     )
     const intro = screen.getByTestId('auth-intro')
     expect(intro.className).not.toMatch(/#[0-9a-f]{3,6}/i)
-    expect(intro.className).toContain('from-primary/12')
+    // The brand panel is painted with the palette's sidebar tokens.
+    expect(intro.className).toContain('bg-sidebar')
     expect(
       screen.getByRole('button', { name: 'Đổi giao diện và màu chủ đạo' }),
     ).toBeDefined()
@@ -171,8 +202,8 @@ describe('BrandLogo and the authentication frame', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Đăng nhập' }),
     ).toBeDefined()
-    // Desktop intro + mobile header each carry both theme variants.
-    expect(screen.getAllByAltText('Agentra')).toHaveLength(4)
+    // Dark panel: the white wordmark; mobile header: both theme variants.
+    expect(screen.getAllByAltText('Agentra')).toHaveLength(3)
   })
 
   it('omits the title icon tile when no icon is given', () => {
@@ -183,8 +214,12 @@ describe('BrandLogo and the authentication frame', () => {
         </AuthLayout>
       </MemoryRouter>,
     )
-    const header = container.querySelector('[data-slot="card-header"]')
-    expect(header?.querySelector('svg')).toBeNull()
+    expect(
+      container.querySelector('[data-testid="auth-title-icon"]'),
+    ).toBeNull()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Quên mật khẩu' }),
+    ).toBeDefined()
   })
 })
 

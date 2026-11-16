@@ -582,7 +582,6 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
         eyebrow={eyebrows[kind]}
         title={config.title}
         description={descriptions[kind]}
-        className="mb-0"
         actions={
           canPrepare && (
             <Button

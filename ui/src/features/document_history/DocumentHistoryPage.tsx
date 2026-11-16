@@ -50,7 +50,6 @@ function HistoryScreen() {
         description={t(
           'Chuỗi thay thế, bản in và PDF của phiếu nhập, phiếu xuất và phiếu thu.',
         )}
-        className="mb-0"
       />
       <DocumentList
         onRowClick={(row) => setSelected(row)}
