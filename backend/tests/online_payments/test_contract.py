@@ -164,6 +164,56 @@ def test_reconcile_rejects_a_query_for_another_reference():
         instance.reconcile(7)
 
 
+# ----------------------------------------------------------- payer return ----
+
+
+def test_payer_outcome_unknown_reference_is_none():
+    instance = service(by_reference=Mock(return_value=None))
+    assert instance.payer_outcome("VNPmissing", reconcile=True) is None
+    instance.session.rollback.assert_called_once()
+    instance.repo.get.assert_not_called()
+
+
+def test_payer_outcome_returns_recorded_state_and_debt_without_querying():
+    adapter = Mock()
+    instance = service(
+        adapter=adapter,
+        by_reference=Mock(return_value=7),
+        get=Mock(return_value=row(status="SUCCESS")),
+        agency=Mock(return_value={"debt": Decimal(1000)}),
+    )
+    view = instance.payer_outcome("VNPx", reconcile=True)
+    assert view["status"] == "SUCCESS" and view["agencyDebt"] == Decimal(1000)
+    adapter.bind.assert_not_called()
+    instance.repo.agency.assert_called_once_with(3)
+
+
+def test_payer_outcome_reconciles_pending_only_when_asked():
+    instance = service(
+        by_reference=Mock(return_value=7),
+        get=Mock(side_effect=[row(), row(status="SUCCESS")]),
+        agency=Mock(return_value=None),
+    )
+    instance.reconcile = Mock()
+    view = instance.payer_outcome("VNPx", reconcile=True)
+    instance.reconcile.assert_called_once_with(7)
+    assert view["status"] == "SUCCESS" and view["agencyDebt"] is None
+    instance.reconcile.reset_mock()
+    instance.repo.get = Mock(return_value=row())
+    assert instance.payer_outcome("VNPx")["status"] == "PENDING"
+    instance.reconcile.assert_not_called()
+
+
+def test_payer_outcome_keeps_pending_when_reconcile_fails():
+    instance = service(
+        by_reference=Mock(return_value=7),
+        get=Mock(return_value=row()),
+        agency=Mock(return_value={"debt": Decimal(5)}),
+    )
+    instance.reconcile = Mock(side_effect=ApiError(503, "PROVIDER_UNAVAILABLE", "down"))
+    assert instance.payer_outcome("VNPx", reconcile=True)["status"] == "PENDING"
+
+
 def test_missing_payment_is_not_found():
     with pytest.raises(ApiError) as error:
         service(get=Mock(return_value=None)).get(99)

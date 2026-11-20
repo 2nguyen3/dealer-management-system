@@ -9,7 +9,9 @@ stock_receipts, stock_issues, payment_receipts, online_payments (VNPAY sandbox),
 document_history, reports, dashboard, chatbot (M32 web assistant, 15/11/2026:
 OpenAI-compatible tool loop over the `../mcp-server/` MCP tools with the caller's token,
 `CHATBOT_*` settings incl. `CHATBOT_MCP_URL`, offline tests in `tests/chatbot/`), health — 92 operations (incl. printOnlinePayment:
-payment request PDF/HTML with the VNPAY QR; receipt PDFs add amount in words + signatures). Removed (Bỏ theo yêu cầu
+payment request PDF/HTML with the VNPAY QR; receipt PDFs add amount in words + signatures). The native VNPAY
+Return renders the agency's payment receipt page (`online_payments/return_page.py`, success
+only after IPN/querydr recorded it). Removed (Bỏ theo yêu cầu
 14/11/2026): agency_credit, credit_applications, document_corrections, inventory,
 receivables, refunds, sales_returns, settlement_core, stock_adjustments, stock_counts,
 upfront_payments, durable commands/idempotency. Seed v2 (`app/db/seed.py` +

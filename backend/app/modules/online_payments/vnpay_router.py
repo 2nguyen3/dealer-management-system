@@ -1,9 +1,7 @@
 """Native provider transports; not additional canonical business operations."""
 
 import logging
-from html import escape
 from typing import Annotated
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -11,6 +9,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from app.common.rate_limit import check_business_limit
 from app.core.exceptions import ApiError
 from app.modules.online_payments.dependencies import get_webhook_service
+from app.modules.online_payments.return_page import (
+    PAGE_HEADERS,
+    provider_paid,
+    render_invalid,
+    render_return,
+)
 from app.modules.online_payments.service import OnlinePaymentService
 from app.modules.online_payments.vnpay import VnpayAdapter
 
@@ -54,26 +58,29 @@ def vnpay_ipn(
 
 
 @router.get("/return")
-def vnpay_return(request: Request):
+def vnpay_return(
+    request: Request,
+    service: Annotated[OnlinePaymentService, Depends(get_webhook_service)],
+):
+    """Payer-facing receipt page; success only after the server recorded the payment."""
     try:
         adapter = native_adapter(request)
         fields = adapter.verify_callback(request.query_params.multi_items())
-        reference = fields.get("vnp_TxnRef", "")
     except ApiError as error:
         return HTMLResponse(
-            "<html lang='vi'><meta charset='utf-8'>"
-            "<h1>Không xác minh được kết quả VNPAY</h1></html>",
+            render_invalid(),
             status_code=503 if error.status == 503 else 400,
-            headers=HEADERS,
+            headers=PAGE_HEADERS,
         )
-    workbench = "/online-payments?" + urlencode({"merchantReference": reference})
-    return HTMLResponse(
-        "<!doctype html><html lang='vi'><head><meta charset='utf-8'>"
-        "<title>Kết quả VNPAY</title></head><body><h1>Đã trở về từ VNPAY</h1>"
-        f"<p>Mã tham chiếu: {escape(reference)}</p>"
-        "<p>Vui lòng kiểm tra trạng thái thanh toán trong Agentra. "
-        "Kết quả được ghi nhận qua IPN hoặc đối soát từ máy chủ.</p>"
-        f'<p><a href="{escape(workbench, quote=True)}">Agentra: thanh toán / payment status</a></p>'
-        "</body></html>",
-        headers=HEADERS,
-    )
+    view = None
+    try:
+        try:
+            check_business_limit(request, None)
+            may_query = provider_paid(fields)
+        except ApiError:  # rate limited: show the recorded state without querying VNPAY
+            may_query = False
+        view = service.payer_outcome(fields.get("vnp_TxnRef", ""), reconcile=may_query)
+    except Exception:  # the page still renders from the verified return parameters
+        logger.exception("VNPAY return lookup failed")
+    reload_url = request.url.path + ("?" + request.url.query if request.url.query else "")
+    return HTMLResponse(render_return(fields, view, reload_url), headers=PAGE_HEADERS)
