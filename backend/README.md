@@ -252,7 +252,7 @@ VNPAY_RETURN_URL=https://YOUR-NGROK-DOMAIN/api/v1/integrations/vnpay/return
 | `VNPAY_PAYMENT_URL` | Literal official sandbox checkout endpoint above. |
 | `VNPAY_API_URL` | Literal official sandbox query/refund endpoint above. |
 | `VNPAY_IPN_URL` | Proposed HTTPS server-to-server IPN endpoint; distinct from Return. |
-| `VNPAY_RETURN_URL` | Proposed HTTPS browser return handler; not money-posting evidence. |
+| `VNPAY_RETURN_URL` | HTTPS browser return handler: the agency's receipt page; not money-posting evidence. |
 
 URLs cannot contain credentials, whitespace, query strings or fragments. Prepared
 URLs with both credentials blank are allowed. Once either credential is supplied,
@@ -295,6 +295,14 @@ Setting `PAYMENT_PROVIDER=VNPAY` does not select the native adapter;
 the existing `PAYMENT_*` JSON/HMAC settings must not be populated with VNPAY values.
 native composition uses the separate `VNPAY_*` credentials when no controlled provider
 is selected. Settings validation itself makes no VNPAY call.
+
+The Return handler renders the agency's payment receipt page ("Biên lai thanh toán",
+`app/modules/online_payments/return_page.py`, mobile layout, print/save as PDF). It verifies
+the signature, reads the payment by `vnp_TxnRef` and shows success only once the server
+recorded it (IPN, or a `querydr` reconciliation it triggers when the signed return reports
+paid and the payment is still PENDING, under the business rate limit). A still-PENDING
+payment shows "Đang xác nhận" and reloads every 5 s; failures show the VNPAY reason.
+Return parameters never change payment state.
 
 Nginx preserves the backend Referrer-Policy for API responses, so native Return keeps
 one `no-referrer` policy through the proxy. Other API responses retain the default

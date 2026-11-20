@@ -323,6 +323,28 @@ class OnlinePaymentService:
         )
         return self.project(self.payment(identifier)), duplicate
 
+    def payer_outcome(self, reference, *, reconcile=False):
+        """Server-recorded payment for the payer's VNPAY return page, or None if unknown.
+
+        Return parameters never change payment state: when the provider reported the
+        payment paid (``reconcile``) and it is still PENDING here, it is confirmed with a
+        server-to-server ``querydr`` exactly like ``POST /reconcile`` (system actor).
+        """
+        identifier = self.repo.by_reference(PROVIDER, reference)
+        if identifier is None:
+            self.session.rollback()
+            return None
+        row = self.payment(identifier)
+        if reconcile and row["status"] == "PENDING":
+            try:
+                self.reconcile(identifier)
+            except ApiError:
+                pass  # IPN or a later reload/reconcile records the outcome
+            row = self.payment(identifier)
+        agency = self.repo.agency(row["agencyId"])
+        self.session.rollback()
+        return {**row, "agencyDebt": None if agency is None else agency["debt"]}
+
     def reconcile(self, identifier) -> OnlinePayment:
         """Query the provider for a PENDING payment and apply its verified outcome."""
         self.authorize(WRITE)
