@@ -8,7 +8,7 @@ units, products, agencies, document_core (shared DocumentService + router factor
 stock_receipts, stock_issues, payment_receipts, online_payments (VNPAY sandbox),
 document_history, reports, dashboard, chatbot (M32 web assistant, 15/11/2026:
 OpenAI-compatible tool loop over the `../mcp-server/` MCP tools with the caller's token,
-`CHATBOT_*` settings incl. `CHATBOT_MCP_URL`, offline tests in `tests/chatbot/`), health — 92 operations (incl. printOnlinePayment:
+`CHATBOT_*` settings incl. `CHATBOT_MCP_URL`, offline tests in `tests/chatbot/`), health — 93 operations (incl. printOnlinePayment:
 payment request PDF/HTML with the VNPAY QR; receipt PDFs add amount in words + signatures). The native VNPAY
 Return renders the agency's payment receipt page (`online_payments/return_page.py`, success
 only after IPN/querydr recorded it). Removed (Bỏ theo yêu cầu
