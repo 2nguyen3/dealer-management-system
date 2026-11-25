@@ -74,9 +74,6 @@ export const overviewGuides: readonly GuideContent[] = [
         'Chỉ tính chứng từ đã ghi sổ. Nháp và chứng từ đã hủy không được tính.',
       ),
       msg('Số liệu tính theo ngày nghiệp vụ của chứng từ.'),
-      msg(
-        'Tổng nợ là tổng nợ hiện tại của các đại lý; đại lý trả trước có nợ âm.',
-      ),
     ],
     errors: ['FORBIDDEN', 'NETWORK_ERROR', 'SERVICE_UNAVAILABLE'],
     tips: [
