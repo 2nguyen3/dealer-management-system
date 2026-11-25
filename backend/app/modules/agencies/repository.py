@@ -56,6 +56,49 @@ class AgencyRepository(SqlCatalogueRepository):
             raise ApiError(409, "INACTIVE_MASTER", "Agency master is inactive")
         return kind.maxDebt
 
+    def debt_history(self, identifier, after, limit):
+        # Compute the window before the page boundary; keep the agency row even if
+        # there are no movements. The current debt and rows share one DB snapshot.
+        return (
+            self.session.execute(
+                text("""
+                WITH movements AS (
+                    SELECT d.id, d.code, d.kind, old.code AS "replacesCode",
+                           e.at, e.stage,
+                           CASE WHEN d.kind = 'STOCK_ISSUE' THEN d."totalAmount"
+                                ELSE -d."totalAmount" END * e.sign AS change
+                    FROM dms.document d
+                    LEFT JOIN dms.document old ON old.id = d."replacesDocumentId"
+                    CROSS JOIN LATERAL (VALUES (d."postedAt", 0, 1),
+                                               (d."cancelledAt", 1, -1)) e(at, stage, sign)
+                    WHERE d."agencyId" = :id AND d.kind IN ('STOCK_ISSUE', 'PAYMENT_RECEIPT')
+                      AND e.at IS NOT NULL
+                ), ledger AS (
+                    SELECT *, sum(change) OVER (ORDER BY at, id, stage
+                                                ROWS UNBOUNDED PRECEDING) AS "balanceAfter"
+                    FROM movements
+                )
+                SELECT a.debt, l.at AS "occurredAt", CAST(l.id AS text) AS "documentId",
+                       l.code AS "documentCode", l.kind, l."replacesCode", l.change,
+                       l."balanceAfter", CASE l.stage WHEN 0 THEN 'POSTED'
+                                                    WHEN 1 THEN 'REVERSED' END AS event
+                FROM dms.agency a
+                LEFT JOIN ledger l ON CAST(:at AS timestamptz) IS NULL
+                    OR (l.at, l.id, l.stage) > (:at, :doc_id, :stage)
+                WHERE a.id = :id ORDER BY l.at, l.id, l.stage LIMIT :size
+            """),
+                {
+                    "id": identifier,
+                    "at": after[0],
+                    "doc_id": after[1],
+                    "stage": after[2],
+                    "size": limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
+
     def lock(self, identifier: int):
         self.session.execute(text("SELECT id FROM dms.business_rule WHERE id FOR UPDATE"))
         current = (
