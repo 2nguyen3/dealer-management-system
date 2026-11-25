@@ -285,6 +285,12 @@ export const ERROR_TEXTS = {
   },
 
   // Money
+  PAYMENT_IN_PROGRESS: {
+    message: msg(
+      'Đại lý đang có phiếu thu hoặc giao dịch thanh toán chưa hoàn tất.',
+    ),
+    hint: msg('Hoàn tất phiếu thu hoặc giao dịch trước khi lập phiếu mới.'),
+  },
   PAYMENT_EXCEEDS_DEBT: {
     message: msg('Số tiền thu vượt nợ hiện tại của đại lý.'),
     hint: msg('Nhập số tiền lớn hơn 0 và không lớn hơn nợ hiện tại.'),
