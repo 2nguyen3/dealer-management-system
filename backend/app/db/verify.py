@@ -1,7 +1,8 @@
 """Live PostgreSQL integrity checks of the simplified 0011 schema (handoff 4/6.6).
 
-``--seeded`` adds the seed v2 checks: account hashes, volumes and situations,
-chronological replay (stock never negative, QĐ3 at posting time), report closing debt,
+Without ``--seeded``, verify reconciled live/legacy data without imposing the new seed
+contract on pre-existing history. ``--seeded`` adds checks for a fresh seed: account
+hashes, volumes, serialized payments, nonnegative debt and stock, QĐ3, report closing debt,
 the forbidden-word scan and business-hour windows. ``--regression`` runs the SQL
 regression in an isolated, always rolled-back schema built from the 0011 snapshot.
 """
@@ -294,7 +295,7 @@ def check_situations(connection, data) -> None:
         "(SELECT 1 FROM dms.document d WHERE d.\"agencyId\" = a.id AND d.status = 'POSTED')"
     )
     require(zero >= 2, f"agencies with history and zero debt, got {zero}")
-    require(count("SELECT count(*) FROM dms.agency WHERE debt < 0") >= 1, "a negative-debt agency")
+    require(count("SELECT count(*) FROM dms.agency WHERE debt < 0") == 0, "no negative agency debt")
     require(
         count(
             "SELECT count(*) FROM (SELECT \"wardId\" FROM dms.agency WHERE status='ACTIVE' GROUP "
@@ -379,7 +380,7 @@ def check_situations(connection, data) -> None:
 
 
 def replay(connection) -> None:
-    """Replay postings/cancellations in time order: stock >= 0 and QĐ3 at each issue post."""
+    """Check payment starts against the debt and unfinished work at that point in history."""
     limits = dict(
         connection.execute(
             text(
@@ -404,6 +405,19 @@ def replay(connection) -> None:
     ):
         lines[row.documentId].append((row.productId, Decimal(row.quantity), Decimal(row.unitPrice)))
     events = []
+    # Each manual receipt opens at creation and closes at posting, even if later
+    # cancelled. ONLINE receipts settle their originating checkout; do not count twice.
+    requests = connection.execute(
+        text("""
+        SELECT id, "agencyId", "totalAmount" AS amount, "createdAt", "postedAt" AS finished
+        FROM dms.document WHERE "receiptType" IN ('CASH', 'BANK_TRANSFER')
+        UNION ALL
+        SELECT id, "agencyId", amount, "createdAt",
+            CASE WHEN status <> 'PENDING' THEN "updatedAt" END FROM dms.online_payment
+    """)
+    )
+    for request in requests:
+        events.append((request.createdAt, 3, request.id, "start", request))
     for document in documents:
         # Same instant (a correction): receipts add the new stock first, issues and
         # payments release the old effect first, exactly like DocumentService.correct.
@@ -414,8 +428,19 @@ def replay(connection) -> None:
     events.sort(key=lambda event: event[:3])
     stock = defaultdict(Decimal)
     debt = defaultdict(Decimal)
+    finished = {}
     receipts = defaultdict(list)  # product -> posted receipt prices in posting order
-    for _, _, _, action, document in events:
+    for moment, _, _, action, document in events:
+        if action == "start":
+            agency = document.agencyId
+            require(
+                agency not in finished
+                or (finished[agency] is not None and finished[agency] <= moment),
+                f"overlapping unfinished payments for agency {agency} at {moment}",
+            )
+            require(0 < document.amount <= debt[agency], f"payment exceeds debt at start: {agency}")
+            finished[agency] = document.finished
+            continue
         sign = 1 if action == "post" else -1
         if document.kind == "STOCK_RECEIPT":
             for product, _quantity, price in lines[document.id]:
@@ -434,6 +459,7 @@ def replay(connection) -> None:
                 require(price == expected, f"QĐ2 selling price of document {document.id}")
         if document.kind == "PAYMENT_RECEIPT":
             debt[document.agencyId] -= sign * Decimal(document.totalAmount)
+            require(debt[document.agencyId] >= 0, f"payment {document.id} exceeds debt at posting")
             continue
         direction = 1 if document.kind == "STOCK_RECEIPT" else -1
         for product, quantity, _price in lines[document.id]:
