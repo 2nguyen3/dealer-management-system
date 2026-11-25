@@ -5,7 +5,6 @@ catalogue does. Streets were chosen to lie inside the named 2025 ward/commune.
 """
 
 from datetime import date
-from decimal import Decimal
 
 # email, full name, group, password, status, account created (local date)
 USERS = [
@@ -146,7 +145,7 @@ STREETS = {
 }
 
 # Profiles: N normal, H near the debt limit at the end, Z settled to zero in November,
-# X small negative debt (VNPAY success after a cash payment), U has never paid,
+# X settles in two steps (VNPAY success, then the remaining debt in cash), U has never paid,
 # T terminated after settling, W accepted recently and without transactions.
 # name, ward code, type, street, accepted, profile, account manager, email
 AGENCIES = [
@@ -297,8 +296,7 @@ TERMINATIONS = {
     "Đại lý Vĩnh Hưng": (date(2026, 9, 29), "Chủ cửa hàng chuyển nhượng mặt bằng"),
     "Tạp hóa Mỹ Châu": (date(2026, 9, 30), "Ngừng kinh doanh từ 01/10/2026"),
 }
-NEGATIVE_DAY = date(2026, 11, 10)
-NEGATIVE_ONLINE_AMOUNT = Decimal(1_500_000)
+SPLIT_PAYMENT_DAY = date(2026, 11, 10)
 
 # Planned issue counts per month (seasonal peaks: Mid-Autumn in September, November).
 MONTHLY_ISSUES = {6: 39, 7: 37, 8: 40, 9: 48, 10: 41, 11: 33}
@@ -329,7 +327,7 @@ SPECIALS = [
     (date(2026, 11, 11), "cancel_issue", "Đại lý báo tạm đóng cửa sửa chữa, chưa nhận hàng"),
 ]
 
-# VNPAY checkouts: date, outcome (the negative-debt case is scripted separately)
+# VNPAY checkouts: date, outcome (the split settlement is scripted separately)
 ONLINE_PLAN = [
     (date(2026, 7, 9), "SUCCESS"),
     (date(2026, 7, 21), "FAILED"),
