@@ -20,6 +20,7 @@ from app.common.pagination import build_page
 from app.core.exceptions import ApiError, AuthError
 from app.core.request_context import set_audit_context
 from app.core.transactions import translate_database_error
+from app.modules.document_core.payment_guard import check_no_open_payment, check_payment_amount
 from app.modules.document_core.service import DocumentService
 from app.modules.online_payments.repository import (
     EVENT_SELECT,
@@ -237,21 +238,17 @@ class OnlinePaymentService:
 
         def work():
             self.authorize(WRITE)
+            agency = self.repo.agency(agency_id, lock=True)
+            # Replay after the lock: a concurrent same-key creator may have just committed.
             existing = self.repo.by_key(key)
             if existing is not None:
                 return replay(existing)
-            agency = self.repo.agency(agency_id, lock=True)
             if agency is None:
                 raise ApiError(404, "NOT_FOUND", "Agency not found")
             if agency["status"] != "ACTIVE":
                 raise ApiError(409, "AGENCY_TERMINATED", "Agency is terminated")
-            if body.amount > agency["debt"]:
-                raise ApiError(
-                    409,
-                    "PAYMENT_EXCEEDS_DEBT",
-                    "Amount exceeds current debt",
-                    details={"debt": str(agency["debt"]), "amount": str(body.amount)},
-                )
+            check_payment_amount(body.amount, agency["debt"])
+            check_no_open_payment(self.session, agency_id)
             identifier = self.repo.create(
                 agency_id,
                 PROVIDER,
@@ -295,8 +292,8 @@ class OnlinePaymentService:
                 return identifier, True
             self.repo.append_event(identifier, evidence)
             if evidence.status == "SUCCESS":
-                # Verified money is always recorded, also after local FAILED/EXPIRED and
-                # when the debt is already settled (debt may go negative, handoff 3.3).
+                # A late success still needs sufficient locked debt. On conflict the
+                # transaction rolls back and IPN does not acknowledge a successful posting.
                 documents = DocumentService(
                     self.session,
                     self.codec,
