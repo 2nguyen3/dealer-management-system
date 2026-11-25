@@ -89,7 +89,7 @@ người dùng được phép dùng.
 | Cổng quản lý | Trang chủ (Portal): ghim các chức năng hay dùng. |
 | Bảng điều khiển | Dashboard doanh thu, công nợ, tồn kho. |
 | Báo cáo kinh doanh | 5 báo cáo: doanh số, công nợ, tồn kho, doanh số theo mặt hàng, thu tiền; xuất Excel/PDF. |
-| Hồ sơ đại lý | Tiếp nhận, sửa, ngừng hợp tác đại lý; xem công nợ hiện tại. |
+| Hồ sơ đại lý | Tiếp nhận, sửa, ngừng hợp tác đại lý; xem nợ hiện tại và lịch sử tăng, giảm nợ theo từng chứng từ. |
 | Danh mục mặt hàng | Mặt hàng, tồn kho và giá nhập gần nhất. |
 | Phiếu nhập hàng (PN) | Nhập hàng vào kho; ghi sổ làm tăng tồn kho. |
 | Phiếu xuất hàng (PX) | Xuất hàng cho đại lý; ghi sổ làm giảm tồn kho và tăng công nợ. |
@@ -101,5 +101,5 @@ người dùng được phép dùng.
 | Lịch sử chứng từ | Tìm, xem, in chứng từ; hủy hoặc sửa chứng từ trong tháng hiện tại (bắt buộc ghi lý do). |
 
 Quy trình chứng từ: **Nháp → Ghi sổ → Hủy**. Chỉ phiếu đã ghi sổ mới ảnh hưởng tồn kho
-và công nợ. Mỗi trang có nút **GUIDE** giải thích cách dùng. Giao diện hỗ trợ 24 ngôn ngữ và
+và công nợ. Mỗi đại lý chỉ được có một phiếu thu nháp hoặc một thanh toán đang chờ tại một thời điểm. Số tiền thu không được vượt dư nợ lúc lập phiếu và lúc ghi sổ. Mỗi trang có nút **GUIDE** giải thích cách dùng. Giao diện hỗ trợ 24 ngôn ngữ và
 nhiều bảng màu sáng/tối, đổi trong trang Hồ sơ.
