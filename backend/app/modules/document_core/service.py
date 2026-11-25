@@ -24,6 +24,7 @@ from app.common.values import rounded_amount, validate_fraction
 from app.core.exceptions import ApiError
 from app.core.request_context import set_audit_context
 from app.core.transactions import translate_database_error
+from app.modules.document_core.payment_guard import check_no_open_payment, check_payment_amount
 from app.modules.document_core.repository import DocumentRepository
 from app.modules.document_core.schemas import (
     Document,
@@ -330,16 +331,22 @@ class DocumentService(CatalogueService):
             )
         return lines
 
-    def content(self, body, *, today, agency_id=None) -> tuple[dict, list[dict]]:
+    def content(self, body, *, today, draft_id=None, replacing=None) -> tuple[dict, list[dict]]:
         """Validated document header values and lines of a draft or a correction."""
         business_date = self.business_date(body.businessDate, today=today)
         values = {"businessDate": business_date, "note": body.note}
         lines: list[dict] = []
         if self.kind != "STOCK_RECEIPT":
-            agency = int(agency_id if agency_id is not None else body.agencyId)
-            self.usable_agency(agency, business_date)
-            values["agencyId"] = agency
+            agency_id = int(replacing["agencyId"] if replacing is not None else body.agencyId)
+            agency = self.usable_agency(
+                agency_id, business_date, lock=self.kind == "PAYMENT_RECEIPT"
+            )
+            values["agencyId"] = agency_id
         if self.kind == "PAYMENT_RECEIPT":
+            # Correction releases the old posting in this transaction before reposting.
+            available = agency["debt"] + (replacing["totalAmount"] if replacing is not None else 0)
+            check_payment_amount(body.amount, available)
+            check_no_open_payment(self.session, agency_id, draft_id=draft_id)
             values["receiptType"] = body.receiptType
             values["totalAmount"] = body.amount
         else:
@@ -366,7 +373,7 @@ class DocumentService(CatalogueService):
     def replace(self, identifier: int, body, preconditions: Preconditions) -> Document:
         def work():
             self.locked(identifier, preconditions, status="DRAFT")
-            values, lines = self.content(body, today=self.repo.today())
+            values, lines = self.content(body, today=self.repo.today(), draft_id=identifier)
             self.repo.update_document(identifier, values)
             self.repo.replace_lines(identifier, lines)
             return identifier
@@ -384,29 +391,16 @@ class DocumentService(CatalogueService):
 
     # ---------------------------------------------------------- effects ----
 
-    def apply_post(self, document, *, online: bool = False) -> None:
+    def apply_post(self, document, *, replaced_issue_amount=None) -> None:
         """Check QĐ2–QĐ6 against current balances and apply the posting effects."""
         identifier = document["id"]
         today = self.repo.today()
         if document["businessDate"] > today:
             raise invalid("businessDate", "Business date cannot be in the future")
         if self.kind == "PAYMENT_RECEIPT":
-            agency = self.usable_agency(
-                document["agencyId"], None, lock=True, allow_terminated=online
-            )
+            agency = self.usable_agency(document["agencyId"], None, lock=True)
             amount = Decimal(document["totalAmount"])
-            if amount <= 0:
-                raise invalid("amount", "Amount must be positive")
-            # QĐ4; a verified online payment is real money and is always recorded (3.3).
-            if not online and amount > agency["debt"]:
-                raise ApiError(
-                    409,
-                    "PAYMENT_EXCEEDS_DEBT",
-                    "Payment exceeds the current debt",
-                    details={"debt": str(agency["debt"]), "amount": str(amount)},
-                )
-            self.repo.change_debt(agency["id"], -amount)
-            self.repo.mark_posted(identifier, self.actor_id, amount)
+            self.settle_receipt(identifier, agency, amount)
             return
 
         agency = None
@@ -449,6 +443,8 @@ class DocumentService(CatalogueService):
                 self.repo.set_line_price(line["id"], price)
             total += rounded_amount(Decimal(line["quantity"]), price)
         debt_after = Decimal(agency["debt"]) + total
+        if replaced_issue_amount is not None:
+            self.check_issue_reversal(agency["debt"] + replaced_issue_amount, debt_after)
         if debt_after > agency["maxDebt"]:
             raise ApiError(
                 409,
@@ -465,7 +461,12 @@ class DocumentService(CatalogueService):
         self.repo.change_debt(agency["id"], total)
         self.repo.mark_posted(identifier, self.actor_id, total, rate)
 
-    def apply_cancel(self, document, reason: str) -> None:
+    def check_issue_reversal(self, before, after) -> None:
+        # Legacy negative balances may improve, but never deepen.
+        if after < min(before, 0):
+            raise ApiError(409, "STATE_CONFLICT", "Reversing this issue would overpay the agency")
+
+    def apply_cancel(self, document, reason: str, *, replacing=False) -> None:
         identifier = document["id"]
         if self.kind == "PAYMENT_RECEIPT":
             self.repo.agency(document["agencyId"], lock=True)
@@ -474,7 +475,9 @@ class DocumentService(CatalogueService):
             self.repo.change_debt(document["agencyId"], Decimal(document["totalAmount"]))
             return
         if self.kind == "STOCK_ISSUE":
-            self.repo.agency(document["agencyId"], lock=True)
+            agency = self.repo.agency(document["agencyId"], lock=True)
+            if not replacing:
+                self.check_issue_reversal(agency["debt"], agency["debt"] - document["totalAmount"])
         lines = self.repo.raw_lines(identifier)
         products = self.repo.products([line["productId"] for line in lines], lock=True)
         if self.kind == "STOCK_RECEIPT":
@@ -548,7 +551,7 @@ class DocumentService(CatalogueService):
             old = self.locked(identifier, preconditions, status="POSTED")
             today = self.repo.today()
             self.cancellable(old, today)
-            values, lines = self.content(body, today=today, agency_id=old["agencyId"])
+            values, lines = self.content(body, today=today, replacing=old)
             if body.businessDate is None:
                 values["businessDate"] = old["businessDate"]
             self.check_period(values["businessDate"], today)
@@ -568,8 +571,8 @@ class DocumentService(CatalogueService):
                 self.apply_post(draft)
                 self.apply_cancel(old, reason)
             else:
-                self.apply_cancel(old, reason)
-                self.apply_post(draft)
+                self.apply_cancel(old, reason, replacing=True)
+                self.apply_post(draft, replaced_issue_amount=old["totalAmount"])
             return replacement
 
         replacement = self.transaction(
@@ -578,6 +581,13 @@ class DocumentService(CatalogueService):
         return self.result(replacement)
 
     # ------------------------------------------------- online payments ----
+
+    def settle_receipt(self, identifier, agency, amount: Decimal) -> None:
+        if amount <= 0:
+            raise invalid("amount", "Amount must be positive")
+        check_payment_amount(amount, agency["debt"])
+        self.repo.change_debt(agency["id"], -amount)
+        self.repo.mark_posted(identifier, self.actor_id, amount)
 
     def record_online_receipt(
         self,
@@ -596,6 +606,7 @@ class DocumentService(CatalogueService):
             self.session, self.actor_id, self.request_id, function_code="payments.online"
         )
         business_date = business_date or self.repo.today()
+        agency = self.usable_agency(agency_id, business_date, lock=True, allow_terminated=True)
         identifier = self.repo.insert_document(
             {
                 "kind": "PAYMENT_RECEIPT",
@@ -607,5 +618,5 @@ class DocumentService(CatalogueService):
                 "createdBy": created_by,
             }
         )
-        self.apply_post(self.repo.lock_document(identifier), online=True)
+        self.settle_receipt(identifier, agency, amount)
         return identifier
