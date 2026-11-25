@@ -130,9 +130,6 @@ export const goodsGuides: readonly GuideContent[] = [
       msg(
         'Ghi sổ bị từ chối vì vượt hạn mức: lập phiếu thu để giảm nợ trước, hoặc giảm số lượng.',
       ),
-      msg(
-        'Nợ có thể âm khi đại lý trả trước qua thanh toán trực tuyến; phiếu xuất sau tự trừ vào số trả trước đó.',
-      ),
     ],
     related: ['/payment-receipts', '/agencies', '/products', '/business-rules'],
   },
