@@ -61,6 +61,7 @@ import {
   dateRangeParams,
   id,
   Intent,
+  isPaymentRuleConflict,
   message,
   page,
   positiveMoney,
@@ -263,6 +264,7 @@ export function OnlinePaymentsPage() {
   /** Opens the create flow; an accepted (202) setup resumes at confirmation. */
   const openCreate = () => {
     setError('')
+    setBalanceVersion((value) => value + 1)
     if (!pendingSetupId) setNotice('')
     setCreateStep(pendingSetupId ? 'confirm' : 'form')
     setOpen(true)
@@ -344,7 +346,7 @@ export function OnlinePaymentsPage() {
       list.reload()
     } catch (failure) {
       setError(message(failure))
-      // PAYMENT_EXCEEDS_DEBT and similar: show the server's current debt.
+      if (isPaymentRuleConflict(failure)) setCreateStep('form')
       setBalanceVersion((value) => value + 1)
     } finally {
       setBusy(false)
