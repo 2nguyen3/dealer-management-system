@@ -148,9 +148,11 @@ def test_debt_previous_month_counts_last_day_as_increase(reports, ledger, world,
     assert by_id(current, "agencyId")[str(world.agency)].openingDebt == mine.closingDebt
 
 
-def test_debt_report_negative_debt_from_late_online_payment(reports, ledger, world, dates, stocked):
+def test_debt_report_keeps_legacy_negative_debt(reports, ledger, world, dates, stocked):
     ledger.post("STOCK_ISSUE", issue(world.agency, (world.noodles, 1)))
-    ledger.online(world.agency, 150000)
+    with pytest.raises(ApiError, match="PAYMENT_EXCEEDS_DEBT"):
+        ledger.online(world.agency, 150000)
+    ledger.legacy_online(world.agency, 150000)
     result = reports.read("debt", dates["start"], dates["end"])
     mine = by_id(result, "agencyId")[str(world.agency)]
     assert mine.paidAmount == 150000 and mine.closingDebt == Decimal(-48000)
