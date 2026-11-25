@@ -1,10 +1,17 @@
 from datetime import UTC, datetime
 
 from app.common.catalogue import CatalogueService
+from app.common.pagination import build_page
 from app.common.preconditions import Preconditions
 from app.core.exceptions import ApiError
 from app.modules.agencies.repository import AgencyRepository
-from app.modules.agencies.schemas import AgencyListResponse, AgencyResponse, Reason
+from app.modules.agencies.schemas import (
+    AgencyDebtHistory,
+    AgencyListResponse,
+    AgencyResponse,
+    DebtMovement,
+    Reason,
+)
 
 
 class AgencyService(CatalogueService):
@@ -43,6 +50,26 @@ class AgencyService(CatalogueService):
             return lambda: self.get(identifier)
 
         return self.write(work)
+
+    def debt_history(self, identifier: int, *, limit: int, cursor: str | None):
+        scope = {"operation": "getAgencyDebtHistory", "agencyId": identifier}
+        after = self.codec.decode(cursor, scope, [datetime, int, int]) if cursor else (None,) * 3
+        rows = self.repo.debt_history(identifier, after, limit + 1)
+        if not rows:
+            raise ApiError(404, "NOT_FOUND", "Agency not found")
+        movements = [
+            DebtMovement.model_validate({k: v for k, v in row.items() if k != "debt"})
+            for row in rows
+            if row["documentId"] is not None
+        ]
+        items, pagination = build_page(
+            movements,
+            limit,
+            self.codec,
+            scope,
+            lambda m: (m.occurredAt, int(m.documentId), int(m.event == "REVERSED")),
+        )
+        return AgencyDebtHistory(currentDebt=rows[0]["debt"], items=items, pagination=pagination)
 
     def validate_update(self, row, values):
         super().validate_update(row, values)
