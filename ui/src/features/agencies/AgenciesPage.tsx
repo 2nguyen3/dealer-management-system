@@ -54,6 +54,7 @@ import { cn } from '../../lib/utils'
 import { useAuth } from '../authentication/useAuth'
 import { WardPicker } from '../wards/WardPicker'
 import { listAllWards } from '../wards/wardsApi'
+import { AgencyProfileTabs } from './AgencyProfileTabs'
 import {
   DetailGrid,
   FilterReset,
@@ -1057,63 +1058,65 @@ export function AgenciesPage() {
         title={t('Chi tiết đại lý: {value}', {
           value: detailAgency?.name || '',
         })}
-        maxWidth="lg"
+        maxWidth="xl"
       >
         {detailAgency && (
-          <DetailGrid
-            entries={[
-              [
-                t('Mã đại lý'),
-                <span key="code" className="font-mono">
-                  {detailAgency.code}
-                </span>,
-              ],
-              [
-                t('Tên đại lý'),
-                <span key="name" className="font-semibold">
-                  {detailAgency.name}
-                </span>,
-              ],
-              [t('Điện thoại'), detailAgency.phone || '—'],
-              ['Email', detailAgency.email || '—'],
-              [t('Địa chỉ'), detailAgency.address || '—', true],
-              [t('Phường/xã'), wardLabel(detailAgency)],
-              [t('Loại đại lý'), typeLabel(detailAgency)],
-              [t('Ngày tiếp nhận'), formatDate(detailAgency.acceptedDate)],
-              [t('Trạng thái'), statusBadge(detailAgency.status)],
-              [
-                t('Nợ hiện tại'),
-                <span
-                  key="debt"
-                  className={cn(
-                    'font-semibold tabular-nums',
-                    num(detailAgency.debt) < 0
-                      ? 'text-success'
-                      : 'text-destructive',
-                  )}
-                >
-                  {formatVND(detailAgency.debt)}
-                  {num(detailAgency.debt) < 0 && ` (${t('trả trước')})`}
-                </span>,
-              ],
-              [t('Nợ tối đa'), formatVND(detailAgency.maxDebt)],
-              [
-                t('Còn được nợ'),
-                <span key="remaining" className="tabular-nums">
-                  {formatVND(detailAgency.remainingCreditLimit)}
-                </span>,
-              ],
-              ...(detailAgency.terminationReason
-                ? ([
-                    [
-                      t('Lý do ngừng hợp tác'),
-                      detailAgency.terminationReason,
-                      true,
-                    ],
-                  ] as DetailEntry[])
-                : []),
-            ]}
-          />
+          <AgencyProfileTabs key={detailAgency.id} agencyId={detailAgency.id}>
+            <DetailGrid
+              entries={[
+                [
+                  t('Mã đại lý'),
+                  <span key="code" className="font-mono">
+                    {detailAgency.code}
+                  </span>,
+                ],
+                [
+                  t('Tên đại lý'),
+                  <span key="name" className="font-semibold">
+                    {detailAgency.name}
+                  </span>,
+                ],
+                [t('Điện thoại'), detailAgency.phone || '—'],
+                ['Email', detailAgency.email || '—'],
+                [t('Địa chỉ'), detailAgency.address || '—', true],
+                [t('Phường/xã'), wardLabel(detailAgency)],
+                [t('Loại đại lý'), typeLabel(detailAgency)],
+                [t('Ngày tiếp nhận'), formatDate(detailAgency.acceptedDate)],
+                [t('Trạng thái'), statusBadge(detailAgency.status)],
+                [
+                  t('Nợ hiện tại'),
+                  <span
+                    key="debt"
+                    className={cn(
+                      'font-semibold tabular-nums',
+                      num(detailAgency.debt) < 0
+                        ? 'text-success'
+                        : 'text-destructive',
+                    )}
+                  >
+                    {formatVND(detailAgency.debt)}
+                    {num(detailAgency.debt) < 0 && ` (${t('trả trước')})`}
+                  </span>,
+                ],
+                [t('Nợ tối đa'), formatVND(detailAgency.maxDebt)],
+                [
+                  t('Còn được nợ'),
+                  <span key="remaining" className="tabular-nums">
+                    {formatVND(detailAgency.remainingCreditLimit)}
+                  </span>,
+                ],
+                ...(detailAgency.terminationReason
+                  ? ([
+                      [
+                        t('Lý do ngừng hợp tác'),
+                        detailAgency.terminationReason,
+                        true,
+                      ],
+                    ] as DetailEntry[])
+                  : []),
+              ]}
+            />
+          </AgencyProfileTabs>
         )}
       </Modal>
     </div>
