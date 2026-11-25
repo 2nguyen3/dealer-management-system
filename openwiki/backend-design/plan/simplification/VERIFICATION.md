@@ -202,3 +202,31 @@ tra "hình dạng seed", không phải lỗi toàn vẹn.
 | Cách seed production | Seed chạy trên PostgreSQL 18 local rồi chép schema `dms` lên Neon bằng `pg_dump`/`pg_restore` trong một transaction, thay cho chạy `app.db.seed` trực tiếp trên Neon; verify `--seeded --regression` + `alembic check` chạy trực tiếp trên Neon | Seed qua mạng ~70 phút (site không dùng được suốt thời gian đó); cách này ~40 giây. Người dùng chọn 14/11/2026. Cùng code seed, cùng ngày, cùng 0011; chỉ khác chuỗi băm Argon2 (muối ngẫu nhiên) |
 | Quyền đọc đơn vị tính | Mở rộng bằng tập đọc mặt hàng | 403 ở trang Mặt hàng cho Kinh doanh/Kế toán, phát hiện khi kiểm tra theo vai trò sau deploy |
 | `verify --seeded` sau deploy | Kiểm tra số lượng hình dạng seed không còn khớp | Kiểm tra sau deploy ghi chứng từ thật (mục 5); toàn vẹn + quét từ cấm vẫn PASS |
+
+## 7. Feedback 25/11/2026 — mục 2 (phiếu thu ≤ dư nợ) và mục 4 (lịch sử công nợ)
+
+Phạm vi: chỉ mục 2 và 4 của "FEEDBACK CHỈNH SỬA WEBSITE AGENTRA" (mục 1, 3, 6 do thành
+viên khác làm, mục 5 thảo luận sau).
+
+- QĐ4 mới: mỗi đại lý chỉ có **một** PT nháp hoặc một giao dịch VNPAY `PENDING` chưa hết hạn
+  (`PAYMENT_IN_PROGRESS`, `document_core/payment_guard.py`, kiểm tra sau khóa dòng đại lý).
+  Số tiền ≤ nợ hiện tại khi lập, sửa, ghi sổ và cả khi VNPAY báo thành công muộn
+  (`PAYMENT_EXCEEDS_DEBT`; IPN rollback, giao dịch vẫn `PENDING`). Hủy/sửa PX không được làm
+  nợ âm sâu hơn (`STATE_CONFLICT`). Giao dịch VNPAY quá `expiresAt` không còn chặn (không có
+  tiến trình ghi `EXPIRED`).
+- Mới: `GET /agencies/{agencyId}/debt-history` (`getAgencyDebtHistory`, cần `debt.read` +
+  đọc đại lý): ghi sổ/hủy PX, PT theo thời gian với dư nợ sau giao dịch; UI tab
+  "Lịch sử công nợ & thanh toán" trong chi tiết đại lý. Hợp đồng 93 operation.
+- Seed v2: kịch bản "nợ âm" thay bằng thanh toán hai bước (VNPAY rồi tiền mặt phần còn lại);
+  `verify --seeded` yêu cầu không có nợ âm và không có hai thanh toán chồng nhau.
+
+Kiểm tra (25/11/2026): backend ruff/format sạch, `pytest` 645 passed; PG local
+(`postgres:18`, `BUSINESS_TEST_DATABASE_URL`/`AUTH_TEST_DATABASE_URL`)
+`pytest tests/integration -m integration` 376 passed (gồm seed v2 + `verify --seeded`);
+mcp-server 14 passed; UI lint/typecheck/format/build sạch, vitest 858 passed; hợp đồng sinh
+lại khớp; `python -m app.db.verify` trên Neon PASS.
+
+Dữ liệu production cũ giữ nguyên (không sửa số dư trực tiếp): DL-1 −12.687.558 (3 PT VNPAY
+20/11) và DL-24 −1.500.000 (kịch bản seed cũ). Quy tắc mới chặn mọi phiếu thu khi nợ ≤ 0;
+phiếu xuất sau đó cấn trừ dần. Dashboard/báo cáo vẫn hiển thị số dư âm cũ (test
+`legacy_online`).
