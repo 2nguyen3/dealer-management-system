@@ -170,7 +170,7 @@ def test_shared_harness_and_contract(monkeypatch):
     matrix = transport_matrix()
     # 0011 simplification: 90 runtime operations (three document kinds, VNPAY, reads),
     # plus printOnlinePayment (payment request with QR) and sendChatbotMessage (M32).
-    assert len(matrix) == 92 and len({item["operationId"] for item in matrix}) == 92
+    assert len(matrix) == 93 and len({item["operationId"] for item in matrix}) == 93
     for item in matrix:
         assert item["responses"] and item["method"] in ("GET", "POST", "PATCH", "PUT", "DELETE")
     assert any(item["bodyRequired"] for item in matrix)
