@@ -17,6 +17,7 @@ from app.common.transport import BusinessRoute
 from app.modules.agencies.dependencies import get_agency_service
 from app.modules.agencies.schemas import (
     AgencyCreate,
+    AgencyDebtHistory,
     AgencyListResponse,
     AgencyResponse,
     AgencyUpdate,
@@ -29,6 +30,10 @@ from app.modules.auth.service import Principal
 router = APIRouter(prefix="/agencies", tags=["Agencies"], route_class=BusinessRoute)
 READ = {"anyOf": ["agency.read", "agency.manage"]}
 WRITE = {"allOf": ["agency.manage"]}
+HISTORY_READ = {**READ, "allOf": ["debt.read"]}
+HistoryReader = Annotated[
+    Principal, Depends(require_permissions(all_of=("debt.read",), any_of=tuple(READ["anyOf"])))
+]
 Reader = Annotated[Principal, Depends(require_permissions(any_of=tuple(READ["anyOf"])))]
 Writer = Annotated[Principal, Depends(require_permissions(all_of=("agency.manage",)))]
 Service = Annotated[AgencyService, Depends(get_agency_service)]
@@ -88,6 +93,24 @@ def get_agency(agencyId: Id, principal: Reader, service: Service, response: Resp
     item = service.get(int(agencyId))
     response.headers["ETag"] = service.etag(item)
     return item
+
+
+@router.get(
+    "/{agencyId}/debt-history",
+    operation_id="getAgencyDebtHistory",
+    response_model=AgencyDebtHistory,
+    responses=responses(200, 400, 401, 403, 404, 422, 429, 500),
+    openapi_extra={"x-permissions": HISTORY_READ},
+)
+def get_agency_debt_history(
+    agencyId: Id,
+    principal: HistoryReader,
+    service: Service,
+    limit: Limit = 25,
+    cursor: Cursor | None = None,
+):
+    """Issue and payment postings and their reversals, oldest event first, with running debt."""
+    return service.debt_history(int(agencyId), limit=limit, cursor=cursor)
 
 
 @router.post(
