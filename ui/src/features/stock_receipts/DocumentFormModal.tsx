@@ -14,6 +14,7 @@ import { ErrorNotice } from '../../components/guide/ErrorNotice'
 import { formatVND } from '../../lib/formatters'
 import { methodLabel } from '../../lib/labels'
 import { DebtPanel } from '../document_history/DebtPanel'
+import { useAuth } from '../authentication/useAuth'
 import {
   documentKinds,
   exact,
@@ -52,6 +53,7 @@ export function DocumentFormModal({
   busy,
   error,
   failure,
+  balanceVersion = 0,
   canPostNow,
   canTransfer = false,
   onSubmit,
@@ -66,6 +68,7 @@ export function DocumentFormModal({
   busy: boolean
   error: string | null
   failure?: unknown
+  balanceVersion?: number
   /** Offer "Lưu & ghi sổ" (create/edit only). */
   canPostNow: boolean
   onSubmit: (form: DocumentForm, post: boolean) => void
@@ -88,7 +91,13 @@ export function DocumentFormModal({
   const [transfer, setTransfer] = useState(false)
   const viaVnpay = newReceipt && transfer && canTransfer && !!onTransfer
   const agencyId = form.agencyId
-  const agency = useAgencyBalance(kind === 'STOCK_RECEIPT' ? '' : agencyId)
+  const { hasPermission } = useAuth()
+  const canReadBalance = hasPermission(['agency.read', 'agency.manage'])
+  const [retry, setRetry] = useState(0)
+  const agency = useAgencyBalance(
+    kind === 'STOCK_RECEIPT' || (payment && !canReadBalance) ? '' : agencyId,
+    balanceVersion + retry,
+  )
   const quotes = useProductQuotes(
     kind === 'STOCK_ISSUE' ? form.lines.map((line) => line.productId) : [],
   )
@@ -106,12 +115,16 @@ export function DocumentFormModal({
       ? summary.subtotal - reversed
       : null
   const limit = payment ? paymentLimit(agency.balance?.debt, reversed) : null
+  const balanceUnavailable = payment && (agency.loading || !!agency.error)
   const set = (patch: Partial<DocumentForm>) => {
     setLocalError(null)
     setForm((current) => ({ ...current, ...patch }))
   }
   function submit(post: boolean) {
     if (busy) return
+    // A receipt-only role cannot read /agencies/{id}; the mutation still
+    // enforces both rules under the agency lock. Never use a failed lookup.
+    if (balanceUnavailable) return
     if (payment && limit !== null && amountValid) {
       if (limit <= 0n) {
         setLocalError(t('Đại lý không còn nợ để thu.'))
@@ -307,9 +320,22 @@ export function DocumentFormModal({
                 </div>
               )}
             </fieldset>
+            {payment && agency.loading && (
+              <p role="status">{t('Đang đọc công nợ đại lý...')}</p>
+            )}
             {kind !== 'STOCK_RECEIPT' && agency.error && (
               <p role="alert" className="mt-3 text-xs text-destructive">
                 {agency.error}
+                {payment && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRetry((value) => value + 1)}
+                  >
+                    {t('Tải lại')}
+                  </Button>
+                )}
               </p>
             )}
             {agency.balance && (
@@ -344,6 +370,7 @@ export function DocumentFormModal({
                 <Button
                   type="submit"
                   isLoading={busy}
+                  disabled={balanceUnavailable}
                   icon={<QrCode className="size-4" />}
                 >
                   {t('Tạo thanh toán & mã QR')}
@@ -361,6 +388,7 @@ export function DocumentFormModal({
               <FormButtons
                 mode={mode}
                 busy={busy}
+                submitDisabled={balanceUnavailable}
                 canPostNow={canPostNow}
                 onPost={() => submit(true)}
                 onClose={onClose}
@@ -424,6 +452,7 @@ export function DocumentFormModal({
 function FormButtons({
   mode,
   busy,
+  submitDisabled = false,
   canPostNow,
   onPost,
   onClose,
@@ -431,6 +460,7 @@ function FormButtons({
 }: {
   mode: FormMode
   busy: boolean
+  submitDisabled?: boolean
   canPostNow: boolean
   onPost: () => void
   onClose: () => void
@@ -448,6 +478,7 @@ function FormButtons({
         <Button
           type="submit"
           isLoading={busy}
+          disabled={submitDisabled}
           icon={<Undo2 className="size-4" />}
         >
           {t('Hủy phiếu cũ & ghi sổ phiếu mới')}
@@ -458,6 +489,7 @@ function FormButtons({
             type="submit"
             variant={canPostNow ? 'outline' : 'primary'}
             isLoading={busy}
+            disabled={submitDisabled}
             icon={<Save className="size-4" />}
           >
             {t('Lưu nháp')}
@@ -465,7 +497,7 @@ function FormButtons({
           {canPostNow && (
             <Button
               type="button"
-              disabled={busy}
+              disabled={busy || submitDisabled}
               icon={<BookCheck className="size-4" />}
               onClick={onPost}
             >
