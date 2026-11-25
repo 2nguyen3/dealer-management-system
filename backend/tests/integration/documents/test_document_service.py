@@ -407,22 +407,25 @@ def test_correct_payment(documents, world, engine, indebted):
     assert code(error) == "PAYMENT_EXCEEDS_DEBT"
 
 
-def test_online_receipt_may_make_debt_negative(documents, world, engine, indebted):
+def test_online_receipt_cannot_exceed_debt(documents, world, engine, indebted):
     service = documents("PAYMENT_RECEIPT")
-    post_new(service, payment_body(world.agency, 1_020_000))
+    with pytest.raises(ApiError) as error:
+        service.record_online_receipt(world.agency, Decimal(1_020_001), note="VNPAY 14501233")
+    assert code(error) == "PAYMENT_EXCEEDS_DEBT"
+    service.session.rollback()
     receipt_id = service.record_online_receipt(
         world.agency, Decimal(200_000), note="VNPAY 14501234"
     )
     service.session.commit()
     online = service.get(receipt_id)
     assert online.receiptType == "ONLINE" and online.status == "POSTED"
-    assert balances(engine, world)[1][world.agency] == Decimal(-200_000)
+    assert balances(engine, world)[1][world.agency] == Decimal(820_000)
     with pytest.raises(ApiError) as error:
         service.cancel(receipt_id, "Không hợp lệ", match(service, online))
     assert code(error) == "STATE_CONFLICT"
-    # The next issue is netted against the prepayment.
-    issue = post_new(documents("STOCK_ISSUE"), issue_body(world.agency, (world.noodles, 1)))
-    assert issue.agencyDebt == Decimal(-98_000)
+    with pytest.raises(ApiError) as error:
+        post_new(service, payment_body(world.agency, 820_001))
+    assert code(error) == "PAYMENT_EXCEEDS_DEBT"
 
 
 def test_manual_payment_cannot_be_online(world):
