@@ -34,6 +34,7 @@ def test_seed_v2_then_rerun_only_verifies(database_factory, settings, capsys):
             with engine.connect() as connection:
                 first = check_database(connection, seeded=True)
                 before = connection.execute(FINGERPRINT).one()
+                assert connection.scalar(text("SELECT min(debt) FROM dms.agency")) == 0
                 emails = set(connection.execute(text("SELECT email FROM dms.app_user")).scalars())
                 assert connection.scalar(text("SELECT count(*) FROM dms.auth_token")) == 0
             assert first["app_user"] == len(seed_data.USERS) == 11
