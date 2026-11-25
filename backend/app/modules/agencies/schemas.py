@@ -77,3 +77,20 @@ class AgencyResponse(ApiModel):
 class AgencyListResponse(ApiModel):
     items: list[AgencyResponse]
     pagination: Pagination
+
+
+class DebtMovement(ApiModel):
+    occurredAt: Instant
+    documentId: Id
+    documentCode: str
+    kind: Literal["STOCK_ISSUE", "PAYMENT_RECEIPT"]
+    event: Literal["POSTED", "REVERSED"]
+    replacesCode: str | None
+    change: SignedMoney
+    balanceAfter: SignedMoney
+
+
+class AgencyDebtHistory(ApiModel):
+    currentDebt: SignedMoney
+    items: list[DebtMovement]
+    pagination: Pagination
