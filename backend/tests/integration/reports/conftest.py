@@ -9,6 +9,7 @@ mounts the real auth, reports and dashboard routers with the production handlers
 from collections.abc import Callable
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -143,7 +144,7 @@ class Ledger:
         return service.cancel(int(document.id), reason, match(service, document))
 
     def online(self, agency, amount, business_date=None):
-        """Verified VNPAY receipt (the only path that may push debt below zero)."""
+        """Verified VNPAY receipt; like every payment it cannot exceed the debt."""
         with Session(self.engine) as session:
             service = DocumentService(
                 session, None, None, "ipn-test", lambda _: None, kind="PAYMENT_RECEIPT"
@@ -153,6 +154,14 @@ class Ledger:
             )
             session.commit()
         return identifier
+
+    def legacy_online(self, agency, amount):
+        """A late VNPAY receipt recorded before 25/11/2026, when it could overpay.
+
+        Production still holds such negative balances; reads must keep showing them.
+        """
+        with patch("app.modules.document_core.service.check_payment_amount"):
+            return self.online(agency, amount)
 
     def current(self):
         with self.engine.connect() as connection:
