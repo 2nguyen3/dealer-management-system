@@ -124,7 +124,7 @@ def test_over_limit_and_prepaid_agencies(login, ledger, world, dates, stocked):
     # QĐ7: cancelling a payment may push the agency over its limit.
     ledger.cancel("PAYMENT_RECEIPT", voided)
     ledger.post("STOCK_ISSUE", issue(world.second_agency, (world.noodles, 1)))
-    ledger.online(world.second_agency, 150000)
+    ledger.legacy_online(world.second_agency, 150000)  # prepaid before 25/11/2026
 
     _, debt = ledger.current()
     assert debt[str(world.agency)] == Decimal(10200000)
