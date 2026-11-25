@@ -59,6 +59,7 @@ import { payment as onlinePayment } from '../online_payments/paymentFlow'
 import {
   id,
   Intent,
+  isPaymentRuleConflict,
   positiveMoney,
   type Row,
 } from '../payment_receipts/contracts'
@@ -165,6 +166,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
     doc: DocumentDetail | null
   } | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [balanceVersion, setBalanceVersion] = useState(0)
   const [formFailure, setFormFailure] = useState<unknown>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -266,6 +268,13 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
     setForm({ mode, initial: formFromDocument(detail.doc), doc: detail.doc })
   }
 
+  function reportFormFailure(message: string, failure: unknown) {
+    setFormError(message)
+    setFormFailure(failure)
+    if (kind === 'PAYMENT_RECEIPT' && isPaymentRuleConflict(failure))
+      setBalanceVersion((value) => value + 1)
+  }
+
   async function post(id: string, etag: string, code: string) {
     const result = await mutation.run(`${config.path}/${id}/post`, {
       ifMatch: etag,
@@ -361,10 +370,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
         setDetailFailure(postFailure)
       }
     } catch (error) {
-      failed(error, (message, failure) => {
-        setFormError(message)
-        setFormFailure(failure)
-      })
+      failed(error, reportFormFailure)
     }
   }
 
@@ -395,15 +401,14 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
         ),
       })
     } catch (error) {
-      setFormError(errorMessage(error))
-      setFormFailure(error)
+      reportFormFailure(errorMessage(error), error)
     } finally {
       setTransferBusy(false)
     }
   }
 
   async function runPost(then: 'stay' | 'collect') {
-    if (!detail?.etag || mutation.busy || !canPost) return
+    if (!detail?.etag || mutation.busy || !canPost || exceedsDebt) return
     setDetailError(null)
     try {
       const posted = await post(detail.doc.id, detail.etag, detail.doc.code)
@@ -413,6 +418,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
       else setNotice(t('Đã ghi sổ {code}.', { code: posted.doc.code }))
     } catch (error) {
       setConfirm(null)
+      if (kind === 'PAYMENT_RECEIPT' && isPaymentRuleConflict(error)) refresh()
       failed(error, (message, failure) => {
         setDetailError(message)
         setDetailFailure(failure)
@@ -470,6 +476,11 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
   }
 
   const doc = detail?.doc ?? null
+  const exceedsDebt =
+    kind === 'PAYMENT_RECEIPT' &&
+    doc &&
+    doc.agencyDebt !== null &&
+    BigInt(doc.totalAmount) > BigInt(doc.agencyDebt)
   const grants = { prepare: canPrepare, post: canPost, collect: canCollect }
   const flow = doc ? documentSteps(doc, grants) : null
   const next = doc ? documentNext(doc, grants) : null
@@ -666,6 +677,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
                 )
               }
               isLoading={mutation.busy}
+              disabled={!!exceedsDebt}
               onClick={() =>
                 void runPost(confirm === 'collect' ? 'collect' : 'stay')
               }
@@ -762,6 +774,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
           busy={mutation.busy || transferBusy}
           error={formError}
           failure={formFailure}
+          balanceVersion={balanceVersion}
           canPostNow={form.mode !== 'correct' && canPost}
           canTransfer={canTransfer}
           onTransfer={(values) => void transfer(values)}
