@@ -139,6 +139,14 @@ export function message(error: unknown): string {
   return error instanceof Error ? error.message : t('Yêu cầu thất bại.')
 }
 
+export function isPaymentRuleConflict(error: unknown) {
+  return (
+    error instanceof ApiError &&
+    (error.code === 'PAYMENT_EXCEEDS_DEBT' ||
+      error.code === 'PAYMENT_IN_PROGRESS')
+  )
+}
+
 // Retain a key until a confirmed response. An uncertain retry must use identical bytes.
 export class Intent {
   private pending = new Map<string, { fingerprint: string; key: string }>()
