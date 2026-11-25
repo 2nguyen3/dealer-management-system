@@ -59,7 +59,7 @@ function serve(doc: DocumentDetail, write?: Handler, agencyData = agency()) {
   vi.mocked(api.apiFetch).mockImplementation(async (path, options = {}) => {
     const method = options.method ?? 'GET'
     if (method === 'GET') {
-      if (path.startsWith('/agencies/')) return response(agencyData)
+      if (path.startsWith('/agencies/')) return response({ ...agencyData })
       if (path.startsWith('/agencies?')) return response(page([agencyData]))
       if (path.startsWith('/products/')) return response(product())
       if (path.startsWith('/products?')) return response(page([product()]))
@@ -282,6 +282,105 @@ describe('document workbench: drafts', () => {
     fireEvent.click(button('Lưu nháp'))
     await waitFor(() => expect(writes()).toHaveLength(1))
     expect(writes()[0]![1]?.body).toMatchObject({ amount: '500000' })
+  })
+
+  it('does not save or post a receipt while its balance read is pending or failed', async () => {
+    const doc = detail('PAYMENT_RECEIPT')
+    let fail!: () => void
+    const pending = new Promise<never>((_, reject) => {
+      fail = () => reject(new Error('Balance unavailable'))
+    })
+    vi.mocked(api.apiFetch).mockImplementation(async (path) =>
+      path === '/agencies/401' ? pending : response(doc),
+    )
+    render(
+      PaymentReceiptsPage,
+      doc,
+      allGoodsGrants,
+      '/payment-receipts?new=1&agencyId=401&amount=1',
+    )
+    const form = await screen.findByRole('dialog', {
+      name: 'Tạo phiếu thu tiền',
+    })
+    fireEvent.click(within(form).getByRole('button', { name: 'Lưu nháp' }))
+    expect(writes()).toHaveLength(0)
+    fail()
+    await within(form).findByText('Balance unavailable')
+    fireEvent.click(within(form).getByRole('button', { name: 'Lưu & ghi sổ' }))
+    expect(writes()).toHaveLength(0)
+    serve(doc)
+    fireEvent.click(within(form).getByRole('button', { name: 'Tải lại' }))
+    await within(form).findByText('Thu toàn bộ nợ 500.000 ₫')
+    fireEvent.click(within(form).getByRole('button', { name: 'Lưu nháp' }))
+    await screen.findByText('Đã lưu nháp PT-1.')
+    expect(writes()).toHaveLength(1)
+  })
+
+  it('shows the unfinished-payment conflict even for a receipt-only operator', async () => {
+    const doc = detail('PAYMENT_RECEIPT')
+    const error = api.errorCodeMessage('PAYMENT_IN_PROGRESS')!
+    serve(doc, () => new ApiError(409, 'PAYMENT_IN_PROGRESS', error))
+    render(
+      PaymentReceiptsPage,
+      doc,
+      ['cash.receipt.prepare'],
+      '/payment-receipts?new=1&agencyId=401&amount=1',
+    )
+    const form = await screen.findByRole('dialog', {
+      name: 'Tạo phiếu thu tiền',
+    })
+    fireEvent.click(within(form).getByRole('button', { name: 'Lưu nháp' }))
+    await within(form).findByText(error)
+    expect(writes()).toHaveLength(1)
+    expect(screen.queryByText('Đã lưu nháp PT-1.')).toBeNull()
+  })
+
+  it('keeps the amount and refreshes debt after another payment wins the race', async () => {
+    const doc = detail('PAYMENT_RECEIPT')
+    const current = agency()
+    serve(
+      doc,
+      () => {
+        current.debt = '100000'
+        return new ApiError(409, 'PAYMENT_EXCEEDS_DEBT', 'Vượt công nợ')
+      },
+      current,
+    )
+    render(
+      PaymentReceiptsPage,
+      doc,
+      allGoodsGrants,
+      '/payment-receipts?new=1&agencyId=401&amount=200000',
+    )
+    await screen.findByText('Thu toàn bộ nợ 500.000 ₫')
+    fireEvent.click(button('Lưu nháp'))
+    await screen.findByText('Thu toàn bộ nợ 100.000 ₫')
+    fireEvent.click(button('Lưu nháp'))
+    await screen.findByText(
+      'Số tiền thu không được vượt nợ hiện tại (100.000 ₫).',
+    )
+    expect(writes()).toHaveLength(1)
+  })
+
+  it('cannot confirm posting a draft that exceeds the agency debt in its detail', async () => {
+    const doc = detail('PAYMENT_RECEIPT', {
+      totalAmount: '100001',
+      agencyDebt: '100000',
+    })
+    serve(doc)
+    render(PaymentReceiptsPage, doc, ['cash.receipt.post'])
+    await openDetail(doc.code)
+    fireEvent.click(button('Ghi sổ'))
+    const confirm = await screen.findByRole('dialog', {
+      name: 'Xác nhận ghi sổ',
+    })
+    await within(confirm).findByText('Số tiền thu vượt nợ hiện tại.')
+    const submit = within(confirm).getByRole('button', {
+      name: 'Xác nhận ghi sổ',
+    })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(submit)
+    expect(writes()).toHaveLength(0)
   })
 
   it('refuses a payment when the agency owes nothing', async () => {
