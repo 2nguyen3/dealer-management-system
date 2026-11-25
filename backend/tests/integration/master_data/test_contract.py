@@ -174,7 +174,7 @@ def test_all_new_operations_exact_runtime_contract(client):
                     SOURCE,
                     runtime,
                 )
-    assert count == 20
+    assert count == 21
 
 
 def test_termination_state_precondition_and_rollback(client, engine, actor, masters):
