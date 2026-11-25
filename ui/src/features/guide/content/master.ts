@@ -45,7 +45,7 @@ export const masterGuides: readonly GuideContent[] = [
         'Loại đại lý quyết định nợ tối đa. Không đổi được sang loại có nợ tối đa thấp hơn nợ hiện tại.',
       ),
       msg(
-        'Nợ hiện tại tăng khi ghi sổ phiếu xuất và giảm khi ghi sổ phiếu thu. Nợ âm nghĩa là đại lý đã trả trước.',
+        'Ghi sổ làm nợ của đại lý giảm đúng số tiền thu; nợ chỉ là một con số, không phân bổ theo từng phiếu xuất.',
       ),
       msg(
         'Chỉ ngừng hợp tác được khi nợ hiện tại bằng 0. Ngừng hợp tác không mở lại được và đại lý không dùng được cho chứng từ mới.',
