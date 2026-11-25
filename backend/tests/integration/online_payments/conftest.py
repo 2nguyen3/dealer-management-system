@@ -140,6 +140,18 @@ def counts(engine) -> dict[str, int]:
         }
 
 
+def lapse(engine, identifier) -> None:
+    """Let a checkout expire unpaid (the earliest expiry its check constraint allows)."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                'UPDATE dms.online_payment SET "expiresAt" = "createdAt"'
+                " + interval '1 microsecond' WHERE id = :id"
+            ),
+            {"id": int(identifier)},
+        )
+
+
 def payment_row(engine, identifier: int) -> dict:
     with engine.connect() as connection:
         return dict(
