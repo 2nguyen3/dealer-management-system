@@ -55,6 +55,7 @@ export const moneyGuides: readonly GuideContent[] = [
     ],
     errors: [
       'PAYMENT_EXCEEDS_DEBT',
+      'PAYMENT_IN_PROGRESS',
       'WHOLE_VND_REQUIRED',
       'AGENCY_TERMINATED',
       'PERIOD_CLOSED',
@@ -117,12 +118,11 @@ export const moneyGuides: readonly GuideContent[] = [
       msg(
         'Thành công là trạng thái cuối. Phiếu thu trực tuyến không sửa hay hủy được.',
       ),
-      msg(
-        'Nếu tiền về khi nợ đã giảm vì phiếu thu khác, tiền vẫn được ghi nhận và nợ có thể âm (đại lý trả trước).',
-      ),
+      msg('Hoàn tất phiếu thu hoặc giao dịch trước khi lập phiếu mới.'),
     ],
     errors: [
       'PAYMENT_EXCEEDS_DEBT',
+      'PAYMENT_IN_PROGRESS',
       'VNPAY_AMOUNT_INVALID',
       'PROVIDER_UNAVAILABLE',
       'UNSUPPORTED_PROVIDER',
