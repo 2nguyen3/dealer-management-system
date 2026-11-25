@@ -472,6 +472,42 @@ describe('OnlinePaymentsPage Component', () => {
     )
   }, 20_000)
 
+  it.each(['PAYMENT_IN_PROGRESS', 'PAYMENT_EXCEEDS_DEBT'])(
+    'returns to the form with the latest debt after %s and does not claim success',
+    async (code) => {
+      const error = apiModule.errorCodeMessage(code)!
+      const create = vi.fn(async () => {
+        agency102 = () => ({ ...agencies[1], debt: '100000' })
+        throw new apiModule.ApiError(409, code, error)
+      })
+      mockServer(undefined, create)
+      renderPage()
+      await fillCreate()
+      const dialog = screen.getByRole('dialog')
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Khởi tạo thanh toán' }),
+      )
+      await within(dialog).findByText(error)
+      const panel = await debtPanel(dialog)
+      expect(within(panel).getByText('100.000 ₫')).toBeDefined()
+      expect(
+        (
+          within(dialog).getByLabelText(
+            /Số tiền thanh toán/,
+          ) as HTMLInputElement
+        ).value,
+      ).toBe('300000')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Tiếp tục' }))
+      await within(dialog).findByText(
+        'Số tiền vượt công nợ hiện tại (100.000 ₫).',
+      )
+      expect(create).toHaveBeenCalledTimes(1)
+      expect(
+        within(dialog).queryByRole('link', { name: 'Mở trang thanh toán' }),
+      ).toBeNull()
+    },
+  )
+
   it.each(['button', 'focus'])(
     'synchronizes authoritative detail and list on %s refresh',
     async (refresh) => {
