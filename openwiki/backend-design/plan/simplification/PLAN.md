@@ -27,7 +27,8 @@ hoạch của chúng vẫn giữ trong các thư mục plan cũ.
 | Giá bán | `round(lastPurchasePrice × sellingPriceRate)`; chưa có giá nhập → `PRODUCT_NOT_PRICED` |
 | QĐ1 | Tối đa `maxAgenciesPerWard` đại lý đang hoạt động / phường → `WARD_CAPACITY_EXCEEDED` |
 | QĐ2–QĐ3 | Xuất không vượt tồn (`INSUFFICIENT_STOCK`), nợ sau xuất không vượt hạn mức loại đại lý (`DEBT_LIMIT_EXCEEDED`) |
-| QĐ4 | Thu tiền không vượt nợ hiện tại (`PAYMENT_EXCEEDS_DEBT`); nợ âm chỉ có thể do VNPAY về muộn |
+| QĐ4 (cập nhật 25/11) | Mỗi đại lý chỉ có một PT nháp hoặc giao dịch VNPAY đang chờ. Khi lập và khi ghi sổ, số tiền thu không được vượt nợ hiện tại (`PAYMENT_EXCEEDS_DEBT`), kể cả khi VNPAY báo muộn. Chứng từ đã ghi sổ và số dư lịch sử không được sửa hồi tố. |
+| Hồ sơ đại lý | Lịch sử công nợ hiển thị tác động của từng lần ghi sổ, hủy và thay thế PX/PT cùng dư nợ sau giao dịch, không phân bổ theo hóa đơn. |
 | Chấm dứt đại lý | Thêm guard `AGENCY_HAS_DEBT` (409) khi còn nợ (lệch so với đặc tả gốc, ghi ở VERIFICATION) |
 | VNPAY | Sandbox; IPN thành công tạo phiếu thu `ONLINE` đã ghi sổ; TxnRef lạ → `RspCode 01`; không hoàn tiền |
 | Báo cáo | Doanh số (BM5.1), công nợ (BM5.2), xuất nhập tồn, doanh số mặt hàng, tiền thu; tính Σ trực tiếp trên chứng từ POSTED |
