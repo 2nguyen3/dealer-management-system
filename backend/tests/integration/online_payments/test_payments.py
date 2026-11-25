@@ -19,7 +19,7 @@ from app.modules.document_core.schemas import PaymentReceiptInput
 from app.modules.document_core.service import DocumentService
 from app.modules.online_payments.schemas import OnlinePaymentCreate
 from app.modules.online_payments.vnpay import RESPONSE, VnpayAdapter, checksum
-from tests.integration.online_payments.conftest import DEBT, counts, debt, payment_row
+from tests.integration.online_payments.conftest import DEBT, counts, debt, lapse, payment_row
 from tests.online_payments.harness import SECRET, config, ipn_fields
 from tests.support.database import race_timeout
 
@@ -131,6 +131,8 @@ def test_repeated_idempotency_key_returns_the_same_payment(payments, world, engi
 
 def test_missing_idempotency_key_creates_distinct_payments(payments, world, engine):
     first = payments(world.accountant).create(body(world.agency, 1000))
+    # One unfinished payment per agency: the first must finish before the next.
+    payments().complete("VNPAY", evidence(first))
     second = payments(world.accountant).create(body(world.agency, 1000))
     assert first.id != second.id
     assert first.merchantReference != second.merchantReference
@@ -246,8 +248,10 @@ def test_concurrent_duplicate_ipn_creates_exactly_one_receipt(payments, world, e
     assert debt(engine, world.agency) == DEBT - 400_000
 
 
-def test_ipn_success_after_debt_reached_zero_makes_debt_negative(payments, world, engine):
+def test_late_ipn_success_cannot_push_debt_below_zero(payments, world, engine):
     created = payments(world.accountant).create(body(world.agency, 500_000))
+    # The checkout lapsed unpaid, so the counter may collect the whole debt.
+    lapse(engine, created.id)
     cash = DocumentService(
         payments().session,
         CursorCodec(b"p" * 32),
@@ -261,9 +265,14 @@ def test_ipn_success_after_debt_reached_zero_makes_debt_negative(payments, world
     )
     cash.post(int(draft.id), Preconditions(cash.etag(draft)))
     assert debt(engine, world.agency) == 0
-    result, duplicate = payments().complete("VNPAY", evidence(created))
-    assert duplicate is False and result.status == "SUCCESS"
-    assert debt(engine, world.agency) == -500_000
+    with pytest.raises(ApiError) as error:
+        payments().complete("VNPAY", evidence(created))
+    assert (error.value.status, error.value.code) == (409, "PAYMENT_EXCEEDS_DEBT")
+    # Rolled back: no event, no online receipt, the checkout is still pending, debt stays zero.
+    assert debt(engine, world.agency) == 0
+    assert payment_row(engine, int(created.id))["status"] == "PENDING"
+    assert [row["receiptType"] for row in receipts(engine, world.agency)] == ["CASH"]
+    assert counts(engine)["payment_event"] == 0
 
 
 def test_failed_ipn_records_evidence_without_receipt(payments, world, engine):
@@ -344,8 +353,8 @@ def test_unknown_reference_is_not_found(payments, world, engine):
 
 def test_provider_transaction_cannot_be_reused_by_another_payment(payments, world, engine):
     first = payments(world.accountant).create(body(world.agency, 1000))
-    second = payments(world.accountant).create(body(world.agency, 2000))
     payments().complete("VNPAY", evidence(first, transaction="777"))
+    second = payments(world.accountant).create(body(world.agency, 2000))
     with pytest.raises(ApiError) as error:
         payments().complete("VNPAY", evidence(second, transaction="777"))
     assert (error.value.status, error.value.code) == (409, "PAYMENT_CONFLICT")
@@ -435,8 +444,8 @@ def test_reconcile_unknown_payment_is_not_found(payments, world):
 
 def test_list_get_and_events_project_the_persisted_state(payments, world, engine):
     first = payments(world.accountant).create(body(world.agency, 1000))
-    second = payments(world.accountant).create(body(world.agency, 2000))
     payments().complete("VNPAY", evidence(first))
+    second = payments(world.accountant).create(body(world.agency, 2000))
     reader = payments(world.manager)
     page = reader.list(limit=1)
     assert [item.id for item in page.items] == [second.id] and page.pagination.hasMore
