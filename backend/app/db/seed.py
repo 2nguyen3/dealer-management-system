@@ -87,7 +87,7 @@ class Seeder:
         self.types: dict[str, tuple[int, Decimal]] = {}
         self.agencies: dict[int, dict] = {}  # agency id -> profile record
         self.reserved_debt: defaultdict = defaultdict(Decimal)
-        self.reserved_pay: defaultdict = defaultdict(Decimal)
+        self.unfinished_payment: set[int] = set()
         self.reserved_stock: defaultdict = defaultdict(Decimal)
         self.pending_receipt: defaultdict = defaultdict(Decimal)
         self.pending: dict[int, tuple] = {}
@@ -370,7 +370,7 @@ class Seeder:
             record.update(close_issues=settle - timedelta(days=3), settle=settle)
             record["close_payments"] = settle + timedelta(days=1)
         elif profile == "X":
-            settle = min(data.NEGATIVE_DAY, self.end)
+            settle = min(data.SPLIT_PAYMENT_DAY, self.end)
             record.update(
                 close_issues=settle - timedelta(days=2),
                 close_payments=settle - timedelta(days=2),
@@ -556,7 +556,7 @@ class Seeder:
             for product, quantity in quantities.items():
                 self.pending_receipt[product] -= quantity
         else:
-            self.reserved_pay[agency] -= amount
+            self.unfinished_payment.remove(agency)
 
     def post(self, moment: datetime, kind: str, identifier: int) -> None:
         actor = self.accountant() if kind == "PAYMENT_RECEIPT" else self.warehouse()
@@ -704,11 +704,10 @@ class Seeder:
     # ---------------------------------------------------------- payments ----
 
     def payable(self, identifier: int) -> Decimal:
+        if identifier in self.unfinished_payment:
+            return Decimal(0)
         debt, _, _ = self.agency_state(identifier)
-        return Decimal(debt) - self.reserved_pay[identifier] - self.reserved_debt_cancel(identifier)
-
-    def reserved_debt_cancel(self, identifier: int) -> Decimal:
-        return Decimal(0)
+        return Decimal(debt)
 
     def create_payment(self, moment: datetime, agency_id: int, amount=None, kind=None, note=None):
         available = self.payable(agency_id)
@@ -739,7 +738,7 @@ class Seeder:
                 note=note,
             )
         )
-        self.reserved_pay[agency_id] += amount
+        self.unfinished_payment.add(agency_id)
         self.pending[identifier] = ("PAYMENT_RECEIPT", agency_id, amount, {})
         return identifier
 
@@ -781,16 +780,16 @@ class Seeder:
         key = "vnpay:" + hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
         return VerifiedPayment(eventKey=key, **payload)
 
-    def start_online(
-        self, moment: datetime, agency_id: int, amount: Decimal, outcome: str, delay=None
-    ) -> None:
+    def start_online(self, moment: datetime, agency_id: int, amount: Decimal, outcome: str) -> None:
+        if not 0 < amount <= self.payable(agency_id):
+            raise SeedError(f"Checkout for agency {agency_id} has no payable balance for {amount}")
         actor = self.accountant()
         self.context(actor, "payments.online")
         repository = OnlinePaymentRepository(self.s)
         key = uuid.UUID(int=self.rng.getrandbits(128), version=4)
         identifier = repository.create(agency_id, "VNPAY", amount, actor, key, 900)
+        self.unfinished_payment.add(agency_id)
         if outcome == "SUCCESS":
-            self.reserved_pay[agency_id] += amount
             finish = moment + timedelta(
                 minutes=self.rng.randint(2, 9), seconds=self.rng.randrange(60)
             )
@@ -801,10 +800,6 @@ class Seeder:
         else:
             finish = moment + timedelta(
                 minutes=self.rng.randint(24, 70), seconds=self.rng.randrange(60)
-            )
-        if delay is not None:
-            finish = moment + timedelta(
-                minutes=self.rng.randint(*delay), seconds=self.rng.randrange(60)
             )
         self.stats[f"online:{outcome}"] += 1
         self.schedule(finish, self.finish_online, identifier, agency_id, amount, outcome, actor)
@@ -817,7 +812,6 @@ class Seeder:
         ).scalar_one()
         savepoint = self.s.begin_nested()
         if outcome == "SUCCESS":
-            self.reserved_pay[agency_id] -= amount
             self.txn_no += self.rng.randint(40, 900)
             transaction = str(self.txn_no)
             paid = (moment - timedelta(seconds=self.rng.randint(4, 40))).replace(microsecond=0)
@@ -843,6 +837,7 @@ class Seeder:
         self.s.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
         self.s.execute(text("SET CONSTRAINTS ALL DEFERRED"))
         savepoint.commit()
+        self.unfinished_payment.remove(agency_id)
 
     def planned_online(self, moment: datetime, outcome: str) -> None:
         day = moment.date()
@@ -895,6 +890,8 @@ class Seeder:
             document = self.document(identifier)
             if document["agencyId"] is not None:
                 record = self.agencies[document["agencyId"]]
+                if kind == "STOCK_ISSUE" and self.payable(record["id"]) < document["totalAmount"]:
+                    continue
                 if record["profile"] in ("Z", "X", "T") and day >= date(2026, 9, 1):
                     continue
             result.append(identifier)
@@ -1166,12 +1163,12 @@ class Seeder:
 
     # ------------------------------------------------- scripted endings ----
 
-    def settle(self, moment: datetime, agency_id: int, *, close: bool = True) -> None:
-        """Full payment of the remaining debt (Z/T profiles)."""
+    def settle(self, moment: datetime, agency_id: int, kind=None) -> None:
+        """Full payment of the remaining debt."""
         available = self.payable(agency_id)
         if available > 0:
             self.payment_then_post(
-                moment, agency_id, available, self.rng.choice(["CASH", "BANK_TRANSFER"])
+                moment, agency_id, available, kind or self.rng.choice(["CASH", "BANK_TRANSFER"])
             )
 
     def terminate(self, moment: datetime, agency_id: int, reason: str) -> None:
@@ -1188,12 +1185,11 @@ class Seeder:
         )
         self.agencies[agency_id]["terminated"] = True
 
-    def negative_start(self, moment: datetime, agency_id: int) -> None:
-        if self.payable(agency_id) < data.NEGATIVE_ONLINE_AMOUNT:
-            raise SeedError("Negative-debt agency has too little debt for its scripted payments")
-        # The checkout is opened first; the owner then pays everything in cash at the
-        # counter and the VNPAY success arrives afterwards (handoff 3.3).
-        self.start_online(moment, agency_id, data.NEGATIVE_ONLINE_AMOUNT, "SUCCESS", delay=(33, 38))
+    def split_settlement(self, moment: datetime, agency_id: int) -> None:
+        # Collect part online, then price the cash receipt from the updated balance.
+        amount = self.payable(agency_id) // 2
+        self.start_online(moment, agency_id, amount, "SUCCESS")
+        self.schedule(moment + timedelta(hours=1), self.settle, agency_id, "CASH")
 
     def deactivate(self, moment: datetime, key: str) -> None:
         self.context(self.user("giaphuc"), "product.manage")
@@ -1442,8 +1438,7 @@ class Seeder:
                 self.payments_closed_from.setdefault(identifier, day)
             if day == record.get("settle"):
                 if profile == "X":
-                    self.schedule(at(day, 9, 5, 12), self.negative_start, identifier)
-                    self.schedule(at(day, 9, 20, 40), self.negative_cash, identifier)
+                    self.schedule(at(day, 9, 5, 12), self.split_settlement, identifier)
                 else:
                     self.schedule(at(day, 14, 10, self.rng.randrange(60)), self.settle, identifier)
             if profile == "T" and day == data.TERMINATIONS[record["name"]][0]:
@@ -1478,21 +1473,6 @@ class Seeder:
             share = [k for i, k in enumerate(kinds) if i % len(draft_days) == index]
             for kind in share:
                 self.schedule(self.random_time(day, (15, 50), (16, 50)), self.draft, kind)
-
-    def negative_cash(self, moment: datetime, agency_id: int) -> None:
-        debt, _, _ = self.agency_state(agency_id)
-        # The pending checkout reserved part of the debt; the counter payment settles the
-        # whole recorded debt, which QĐ4 allows.
-        self.reserved_pay[agency_id] -= data.NEGATIVE_ONLINE_AMOUNT
-        identifier = self.create_payment(
-            moment, agency_id, Decimal(debt), "CASH", "Chủ cửa hàng trả hết nợ bằng tiền mặt"
-        )
-        self.reserved_pay[agency_id] += data.NEGATIVE_ONLINE_AMOUNT
-        if identifier is None:
-            raise SeedError("Negative-debt cash payment could not be prepared")
-        self.schedule(
-            moment + timedelta(minutes=4, seconds=20), self.post, "PAYMENT_RECEIPT", identifier
-        )
 
 
 def seeded(connection) -> bool:
