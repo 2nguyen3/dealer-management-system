@@ -346,7 +346,7 @@ export function compositionOf(
       return donut(
         t('Mặt hàng dẫn đầu doanh số'),
         t('Tổng doanh số'),
-        totals?.salesAmount,
+        totals?.allProductsSalesAmount,
         [
           ...top.map((row, index) => ({
             key: String(row.productId),
@@ -359,7 +359,7 @@ export function compositionOf(
             label: t('Mặt hàng khác'),
             color: 'var(--chart-8)',
             raw: totals
-              ? remainder(totals.salesAmount, shown.toString())
+              ? remainder(totals.allProductsSalesAmount, shown.toString())
               : undefined,
           },
         ],
