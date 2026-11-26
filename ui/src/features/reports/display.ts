@@ -23,6 +23,7 @@ export const columnLabels: Record<string, string> = {
   salesAmount: t('Doanh số'),
   salesRate: t('Tỷ lệ doanh số'),
   companySalesAmount: t('Doanh số toàn công ty'),
+  allProductsSalesAmount: t('Tổng doanh số'),
   openingDebt: t('Nợ đầu kỳ'),
   debtIncrease: t('Phát sinh nợ'),
   paidAmount: t('Đã thu'),
@@ -74,6 +75,7 @@ const moneyKeys = new Set([
   ...Object.keys(collectionAmounts).filter((key) => key !== 'receiptCount'),
   'salesAmount',
   'companySalesAmount',
+  'allProductsSalesAmount',
 ])
 const quantityKeys = new Set(
   Object.keys(rowRules.inventory)
