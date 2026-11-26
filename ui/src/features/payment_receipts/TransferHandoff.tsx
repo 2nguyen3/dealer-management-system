@@ -44,7 +44,7 @@ export function TransferHandoff({
             <ShadcnButton asChild variant="ghost" className="me-auto">
               <SafeLink to={detailLink}>
                 <ExternalLink className="size-4" aria-hidden="true" />
-                {t('Xem trong Thanh toán trực tuyến')}
+                {t('Xem chi tiết')} VNPAY
               </SafeLink>
             </ShadcnButton>
           )}
