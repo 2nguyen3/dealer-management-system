@@ -66,10 +66,11 @@ class AgencyResponse(ApiModel):
     updatedBy: Id | None
     debt: SignedMoney = Field(
         json_schema_extra={"readOnly": True},
-        description="Current debt; negative only after a late verified online payment.",
+        description="Current agency debt; collections cannot make it negative.",
     )
     maxDebt: Money
     remainingCreditLimit: SignedMoney
+    canDelete: bool = Field(json_schema_extra={"readOnly": True})
     createdAt: Instant = Field(json_schema_extra={"readOnly": True})
     updatedAt: Instant = Field(json_schema_extra={"readOnly": True})
 
