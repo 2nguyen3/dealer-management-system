@@ -90,22 +90,24 @@ FROM (SELECT 1) moment LEFT JOIN filtered f ON true
 """
 
 PRODUCT_SALES = """
-WITH amounts AS (
+WITH amounts AS MATERIALIZED (
   SELECT l."productId", count(DISTINCT d.id) AS "numberOfIssues",
     sum(l.quantity) AS "soldQuantity", sum(l."lineAmount") AS "salesAmount"
   FROM dms.document d JOIN dms.document_line l ON l."documentId"=d.id
   WHERE d.kind='STOCK_ISSUE' AND d.status='POSTED'
     AND d."businessDate">=CAST(:fromDate AS date) AND d."businessDate"<CAST(:toDate AS date)
     AND (CAST(:agencyId AS bigint) IS NULL OR d."agencyId"=:agencyId)
-    AND (CAST(:productId AS bigint) IS NULL OR l."productId"=:productId)
   GROUP BY l."productId"
+), scope AS (
+  SELECT coalesce(sum("salesAmount"),0) AS gross FROM amounts
 ), filtered AS (
   SELECT a."productId", p.code AS "productCode", p.name AS "productName", p."unitId",
     u.name AS "unitName", a."numberOfIssues", a."soldQuantity", a."salesAmount"
   FROM amounts a JOIN dms.product p ON p.id=a."productId" JOIN dms.unit u ON u.id=p."unitId"
+  WHERE (CAST(:productId AS bigint) IS NULL OR a."productId"=:productId)
 )
-SELECT statement_timestamp() AS "__generatedAt", f.*
-FROM (SELECT 1) moment LEFT JOIN filtered f ON true
+SELECT statement_timestamp() AS "__generatedAt", scope.gross AS "__allProductsSalesAmount", f.*
+FROM scope LEFT JOIN filtered f ON true
 """
 
 COLLECTIONS = """
