@@ -38,4 +38,6 @@ class ReportQueries:
         detached = {"generatedAt": records[0]["__generatedAt"], "rows": rows}
         if kind == "sales":
             detached["companySalesAmount"] = records[0]["__companySalesAmount"]
+        if kind == "product-sales":
+            detached["allProductsSalesAmount"] = records[0]["__allProductsSalesAmount"]
         return detached
