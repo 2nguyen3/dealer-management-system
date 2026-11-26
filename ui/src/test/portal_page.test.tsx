@@ -134,7 +134,7 @@ describe('Portal', () => {
     renderPortal()
     fireEvent.click(screen.getByTestId('favorites-add'))
     const options = screen.getAllByRole('option').map((o) => o.textContent)
-    expect(options).toContain('Thanh toán trực tuyến')
+    expect(options).not.toContain('Thanh toán trực tuyến')
     expect(options).toContain('Lịch sử chứng từ')
     expect(options).not.toContain('Phiếu thu tiền')
     expect(options).not.toContain('Tài khoản người dùng')
@@ -146,9 +146,9 @@ describe('Portal', () => {
     fireEvent.click(
       screen
         .getAllByRole('option')
-        .find((o) => o.textContent === 'Thanh toán trực tuyến')!,
+        .find((o) => o.textContent === 'Lịch sử chứng từ')!,
     )
-    expect(rowNames().at(-1)).toMatch(/^Thanh toán trực tuyến/)
+    expect(rowNames().at(-1)).toMatch(/^Lịch sử chứng từ/)
   })
 
   it('hides favourites whose permission was removed and says how many', () => {
@@ -176,21 +176,21 @@ describe('Portal', () => {
     )
     expect(localStorage.getItem(PORTAL_TAB_KEY_PREFIX + 'u1')).toBe('functions')
     const star = screen.getByRole('button', {
-      name: 'Thêm Thanh toán trực tuyến vào yêu thích',
+      name: 'Thêm Danh mục mặt hàng vào yêu thích',
     })
     expect(star.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(star)
     expect(
       screen
         .getByRole('button', {
-          name: 'Bỏ Thanh toán trực tuyến khỏi yêu thích',
+          name: 'Bỏ Danh mục mặt hàng khỏi yêu thích',
         })
         .getAttribute('aria-pressed'),
     ).toBe('true')
     // The star sits beside the card link, never inside it.
     expect(
       screen
-        .getByRole('link', { name: /Thanh toán trực tuyến/ })
+        .getByRole('link', { name: /Danh mục mặt hàng/ })
         .querySelector('button'),
     ).toBeNull()
     view.unmount()
