@@ -1,5 +1,6 @@
 import {
   BookCheck,
+  Globe,
   HandCoins,
   PencilLine,
   Plus,
@@ -12,10 +13,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { PageHeader } from '../../components/blocks/PageHeader'
 import { Skeleton } from '../../components/shadcn/skeleton'
+import { Button as ShadcnButton } from '../../components/shadcn/button'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { ErrorNotice } from '../../components/guide/ErrorNotice'
+import { SafeLink } from '../../components/guide/SafeLink'
 import { LockedButton } from '../../components/guide/LockedButton'
 import { NextActionCallout } from '../../components/guide/NextActionCallout'
 import { notifyNextStep } from '../../components/guide/notifyNextStep'
@@ -383,6 +386,7 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
     try {
       const result = await transferIntent.send<unknown>('/online-payments', {
         method: 'POST',
+        retainAccepted: true,
         body: {
           agencyId: id(values.agencyId),
           provider: 'VNPAY',
@@ -390,6 +394,14 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
         },
       })
       const created = onlinePayment(result.data)
+      if (result.status === 202) {
+        setFormError(
+          t(
+            'Đang khởi tạo trang thanh toán. Giữ nguyên nội dung và bấm tiếp tục để hoàn tất cùng giao dịch này, không tạo giao dịch mới.',
+          ),
+        )
+        return
+      }
       setForm(null)
       setHandoff(created)
       for (const prefix of ['/online-payments', '/agencies'])
@@ -594,14 +606,24 @@ function WorkbenchScreen({ kind }: { kind: DocumentKind }) {
         title={config.title}
         description={descriptions[kind]}
         actions={
-          canPrepare && (
-            <Button
-              icon={<Plus className="size-4" />}
-              onClick={() => openForm('create')}
-            >
-              {t('Tạo phiếu')}
-            </Button>
-          )
+          <>
+            {kind === 'PAYMENT_RECEIPT' && pathAllowed('/online-payments') && (
+              <ShadcnButton asChild variant="outline">
+                <SafeLink to="/online-payments">
+                  <Globe className="size-4" aria-hidden="true" />
+                  {t('Giao dịch trực tuyến')}
+                </SafeLink>
+              </ShadcnButton>
+            )}
+            {canPrepare && (
+              <Button
+                icon={<Plus className="size-4" />}
+                onClick={() => openForm('create')}
+              >
+                {t('Tạo phiếu')}
+              </Button>
+            )}
+          </>
         }
       />
       {notice && <Alert type="success">{notice}</Alert>}
