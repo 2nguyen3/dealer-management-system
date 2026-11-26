@@ -226,7 +226,12 @@ Kiểm tra (25/11/2026): backend ruff/format sạch, `pytest` 645 passed; PG loc
 mcp-server 14 passed; UI lint/typecheck/format/build sạch, vitest 858 passed; hợp đồng sinh
 lại khớp; `python -m app.db.verify` trên Neon PASS.
 
-Dữ liệu production cũ giữ nguyên (không sửa số dư trực tiếp): DL-1 −12.687.558 (3 PT VNPAY
-20/11) và DL-24 −1.500.000 (kịch bản seed cũ). Quy tắc mới chặn mọi phiếu thu khi nợ ≤ 0;
-phiếu xuất sau đó cấn trừ dần. Dashboard/báo cáo vẫn hiển thị số dư âm cũ (test
-`legacy_online`).
+Dọn dữ liệu production (26/11/2026, theo yêu cầu người dùng "xóa đi"): hai PT VNPAY thu vượt
+dư nợ bị xóa hẳn cùng giao dịch online và sự kiện VNPAY của chúng — PT-493 (DL-1, 20.000.000,
+giao dịch #24) và PT-440 (DL-24, 1.500.000, giao dịch #18, kịch bản seed cũ). Một transaction:
+sao lưu dòng (ngoài repo), tạm tắt `a_append_only`/`a_guard` của `payment_event`,
+`online_payment`, `document` (trigger audit vẫn bật), xóa, cộng lại `debt` trong ngữ cảnh
+`cash.receipt.post`, bật lại trigger, kiểm tra dư nợ = Σ chứng từ POSTED rồi commit (đã chạy
+thử rollback trước). Kết quả: DL-1 7.312.442, DL-24 0; không còn đại lý nợ âm, không trigger
+nào bị tắt, `python -m app.db.verify` PASS. PT nháp PT-468 (DL-5, nợ 0) xóa qua
+`DocumentService.delete`. Test `legacy_online` vẫn giữ cho dữ liệu nợ âm có sẵn.
