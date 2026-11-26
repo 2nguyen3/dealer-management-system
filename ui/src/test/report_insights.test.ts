@@ -310,7 +310,11 @@ describe('report insights', () => {
     const items = ['10', '50', '20', '40', '30'].map((amount, i) =>
       product(String(i + 1), amount),
     )
-    const mix = compositionOf('product-sales', { salesAmount: '200' }, items)
+    const mix = compositionOf(
+      'product-sales',
+      { salesAmount: '200', allProductsSalesAmount: '200' },
+      items,
+    )
     expect(mix.parts.map((part) => part.label)).toEqual([
       'MH 2',
       'MH 4',
@@ -320,6 +324,13 @@ describe('report insights', () => {
     ])
     expect(mix.parts.at(-1)!.value).toBe(60)
     expect(mix.centerValue).toBe(formatCompactVND(200))
+    const selected = compositionOf(
+      'product-sales',
+      { salesAmount: '20', allProductsSalesAmount: '100' },
+      [product('1', '20')],
+    )
+    expect(selected.parts.map((part) => part.value)).toEqual([20, 80])
+    expect(selected.parts[0]!.ratio).toBeCloseTo(0.2)
     const none = compositionOf('product-sales', undefined, [])
     expect(none.parts).toHaveLength(1)
     expect(none.parts[0]!.display).toBe('—')
