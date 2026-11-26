@@ -20,6 +20,14 @@ the contract with `uv run python -m scripts.gen_openapi`. Gates and numbers:
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. Everything below is
 historical pre-0011 context unless it describes tooling still present.
 
+2026-11-26 feedback: Agency responses now expose read-only `canDelete`, true only when
+debt is zero and no document or online payment references the agency. DELETE still
+rechecks references under lock and physically removes eligible records; otherwise
+termination requires zero debt and preserves history. Product-sales totals expose
+`allProductsSalesAmount`, summing all products in the requested period and agency
+scope even when `productId` filters the displayed product rows. The existing
+payment admission/posted-debt and VNPAY confirmation guards remain authoritative.
+
 ## Source review checkpoint - 2026-10-30
 
 1088offline pass; reports/dashboard/API/responses717stmt140branches exact100%.
