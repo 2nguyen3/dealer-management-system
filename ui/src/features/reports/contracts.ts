@@ -86,7 +86,7 @@ export const productIdentity = {
   unitId: catalogId,
   unitName: text,
 }
-/** Debt flow of an agency; opening/closing may be negative (prepaid). */
+/** Debt flow of an agency; legacy historical balances may be signed. */
 export const debtAmounts = {
   openingDebt: signedMoney,
   debtIncrease: money,
@@ -133,7 +133,7 @@ const totalRules: Partial<Record<ReportKind, Record<string, Rule>>> = {
     companySalesAmount: money,
   },
   debt: debtAmounts,
-  'product-sales': { salesAmount: money },
+  'product-sales': { salesAmount: money, allProductsSalesAmount: money },
   collections: collectionAmounts,
 }
 
@@ -251,6 +251,7 @@ export const labels: Record<string, string> = {
   salesAmount: t('Doanh số (VND)'),
   salesRate: t('Tỷ lệ (%)'),
   companySalesAmount: t('Doanh số toàn doanh nghiệp (VND)'),
+  allProductsSalesAmount: t('Tổng doanh số'),
   openingDebt: t('Nợ đầu kỳ (VND)'),
   debtIncrease: t('Phát sinh nợ (VND)'),
   paidAmount: t('Đã thu (VND)'),
