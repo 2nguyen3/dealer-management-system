@@ -29,6 +29,13 @@ online payment with QR + payment request PDF (`TransferHandoff`) instead of a do
 `../openwiki/backend-design/plan/simplification/VERIFICATION.md`. The starter-page
 description below is historical.
 
+2026-11-26 feedback: the separate online-payment sidebar/Portal entry is removed;
+the receipt workbench provides a contextual link to its VNPAY transactions and
+retains an accepted (202) checkout request for safe retry. The agency row menu uses
+server `canDelete` to offer physical deletion only for unused agencies, otherwise
+termination; the server rechecks at deletion time. Product-sales shares use the
+all-product total within the same period and agency scope as denominator.
+
 This guide applies to work inside `ui/`. It describes the current frontend, its
 place in the full application, and conventions for extending it. Commands run
 from `ui/` unless stated otherwise.
