@@ -139,7 +139,15 @@ function rowsFor(kind: string, params: URLSearchParams) {
           salesAmount: '700',
         },
       ].filter((row) => !productId || row.productId === productId)
-      return { items: rows, totals: { salesAmount: '2000' } }
+      return {
+        items: rows,
+        totals: {
+          salesAmount: String(
+            rows.reduce((sum, row) => sum + Number(row.salesAmount), 0),
+          ),
+          allProductsSalesAmount: '2000',
+        },
+      }
     }
     case 'collections': {
       const amounts =
