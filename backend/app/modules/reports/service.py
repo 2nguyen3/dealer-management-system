@@ -178,7 +178,7 @@ class ReportService:
             values = {
                 name: sum(int(getattr(row, name)) for row in rows)
                 for name in spec.totals.model_fields
-                if name != "companySalesAmount"
+                if name not in {"companySalesAmount", "allProductsSalesAmount"}
             }
             values = {
                 name: value if name in COUNT_FIELDS else Decimal(value)
@@ -186,6 +186,8 @@ class ReportService:
             }
             if kind == "sales":
                 values["companySalesAmount"] = detached["companySalesAmount"]
+            if kind == "product-sales":
+                values["allProductsSalesAmount"] = detached["allProductsSalesAmount"]
             totals = spec.totals.model_validate(values)
         if export:
             rows.sort(key=lambda row: identity_key(kind, row))
