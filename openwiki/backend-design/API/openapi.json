@@ -59125,7 +59125,7 @@
             "type": "string",
             "pattern": "^-?(0|[1-9][0-9]{0,17})$",
             "title": "Debt",
-            "description": "Current debt; negative only after a late verified online payment.",
+            "description": "Current agency debt; collections cannot make it negative.",
             "readOnly": true
           },
           "maxDebt": {
@@ -59137,6 +59137,11 @@
             "type": "string",
             "pattern": "^-?(0|[1-9][0-9]{0,17})$",
             "title": "Remainingcreditlimit"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "title": "Candelete",
+            "readOnly": true
           },
           "createdAt": {
             "type": "string",
@@ -59173,6 +59178,7 @@
           "debt",
           "maxDebt",
           "remainingCreditLimit",
+          "canDelete",
           "createdAt",
           "updatedAt"
         ],
@@ -61014,12 +61020,18 @@
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)$",
             "title": "Salesamount"
+          },
+          "allProductsSalesAmount": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$",
+            "title": "Allproductssalesamount"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "salesAmount"
+          "salesAmount",
+          "allProductsSalesAmount"
         ],
         "title": "ProductSalesTotals"
       },
