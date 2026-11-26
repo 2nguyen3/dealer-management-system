@@ -31,6 +31,9 @@ export const moneyGuides: readonly GuideContent[] = [
       msg(
         'Chuyển khoản (VNPAY): bấm Tạo thanh toán & mã QR, gửi mã QR hoặc PDF phiếu báo cho đại lý. Phiếu thu tự lập và ghi sổ khi VNPAY xác nhận tiền về.',
       ),
+      msg('Giao dịch trực tuyến') +
+        ': ' +
+        msg('Bấm Kiểm tra trạng thái để xem kết quả mới nhất.'),
       msg(
         'Xuất PDF cho khách: mở Chi tiết phiếu thu và bấm Xuất PDF phiếu thu (có số tiền bằng chữ và chỗ ký).',
       ),
