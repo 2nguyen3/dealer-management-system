@@ -33,6 +33,11 @@ export const masterGuides: readonly GuideContent[] = [
         'Xem cột Nợ hiện tại, Nợ tối đa và thanh mức sử dụng để biết đại lý nào sắp chạm hạn mức.',
       ),
       msg('Bấm Sửa hồ sơ, chỉnh thông tin rồi bấm Lưu thay đổi.'),
+      msg('Xóa') +
+        ' ' +
+        msg('Đại lý') +
+        ': ' +
+        msg('Dữ liệu đang được sử dụng nên không thể xóa.'),
       msg(
         'Bấm Ngừng hợp tác, nhập Lý do ngừng hợp tác rồi bấm Xác nhận ngừng hợp tác.',
       ),
@@ -51,12 +56,14 @@ export const masterGuides: readonly GuideContent[] = [
         'Chỉ ngừng hợp tác được khi nợ hiện tại bằng 0. Ngừng hợp tác không mở lại được và đại lý không dùng được cho chứng từ mới.',
       ),
       msg('Ngày chứng từ của đại lý không được trước ngày tiếp nhận.'),
+      msg('Dữ liệu đang được sử dụng nên không thể xóa.'),
     ],
     errors: [
       'WARD_CAPACITY_EXCEEDED',
       'LIMIT_CONFLICT',
       'AGENCY_HAS_DEBT',
       'AGENCY_CONFLICT',
+      'RESOURCE_IN_USE',
       'STATE_CONFLICT',
       'PRECONDITION_FAILED',
     ],
