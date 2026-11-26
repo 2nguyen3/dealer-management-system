@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Store,
   Tags,
+  Trash2,
 } from 'lucide-react'
 import { notifyNextStep } from '../../components/guide/notifyNextStep'
 import { t } from '../../lib/i18n/core'
@@ -127,6 +128,10 @@ export function AgenciesPage() {
     etag: string | null
   } | null>(null)
   const [terminateAgency, setTerminateAgency] = useState<{
+    agency: Agency
+    etag: string | null
+  } | null>(null)
+  const [deleteAgency, setDeleteAgency] = useState<{
     agency: Agency
     etag: string | null
   } | null>(null)
@@ -514,6 +519,52 @@ export function AgenciesPage() {
     }
   }
 
+  const openDeleteModal = async (agencyItem: Agency) => {
+    setFormError(null)
+    setDeleteAgency({ agency: agencyItem, etag: null })
+    try {
+      const res = await apiFetch<Agency>(`/agencies/${agencyItem.id}`)
+      if (!isMountedRef.current) return
+      setDeleteAgency({ agency: res.data, etag: res.etag })
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : t('Không thể tải danh sách đại lý.'),
+      )
+    }
+  }
+
+  const handleDeleteSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!deleteAgency?.etag || !deleteAgency.agency.canDelete || isSubmitting)
+      return
+    setIsSubmitting(true)
+    setFormError(null)
+    try {
+      await apiFetch(`/agencies/${deleteAgency.agency.id}`, {
+        method: 'DELETE',
+        ifMatch: deleteAgency.etag,
+      })
+      setDeleteAgency(null)
+      setSuccessNotice(
+        `${t('Đại lý')} ${deleteAgency.agency.code}: ${t('Xóa')}.`,
+      )
+      invalidateCache('/agencies')
+      void loadAgencies()
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : t('Dữ liệu đang được sử dụng nên không thể xóa.'),
+      )
+      invalidateCache('/agencies')
+      void loadAgencies()
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const typeLabel = agencyTypeLabel
   const statusBadge = (status: string) =>
     status === 'ACTIVE' ? (
@@ -847,11 +898,6 @@ export function AgenciesPage() {
                   <td className="whitespace-nowrap">{typeLabel(agency)}</td>
                   <td className="cell-number text-end font-semibold whitespace-nowrap tabular-nums">
                     {formatVND(agency.debt)}
-                    {num(agency.debt) < 0 && (
-                      <div className="text-xs font-normal text-success">
-                        {t('Trả trước')}
-                      </div>
-                    )}
                     <DebtUsage
                       debt={num(agency.debt)}
                       limit={limitOf(agency)}
@@ -899,6 +945,18 @@ export function AgenciesPage() {
                               {t('Sửa hồ sơ')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                          </>
+                        )}
+                        {canManage &&
+                          (agency.canDelete ? (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => void openDeleteModal(agency)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {t('Xóa')} {t('Đại lý')}
+                            </DropdownMenuItem>
+                          ) : agency.status === 'ACTIVE' ? (
                             <DropdownMenuItem
                               variant="destructive"
                               onSelect={() => void openTerminateModal(agency)}
@@ -906,8 +964,7 @@ export function AgenciesPage() {
                               <Ban aria-hidden="true" />
                               {t('Ngừng hợp tác')}
                             </DropdownMenuItem>
-                          </>
-                        )}
+                          ) : null)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -1002,6 +1059,40 @@ export function AgenciesPage() {
         </form>
       </Modal>
 
+      <Modal
+        isOpen={!!deleteAgency}
+        onClose={() => setDeleteAgency(null)}
+        title={`${t('Xóa')} ${t('Đại lý')}: ${deleteAgency?.agency.code || ''}`}
+        maxWidth="md"
+      >
+        <form onSubmit={handleDeleteSubmit} className="space-y-4">
+          {formError && <Alert type="error">{formError}</Alert>}
+          <Alert type="warning">
+            {deleteAgency?.agency.canDelete
+              ? `${deleteAgency.agency.name} (${deleteAgency.agency.code})`
+              : t('Dữ liệu đang được sử dụng nên không thể xóa.')}
+          </Alert>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteAgency(null)}
+              disabled={isSubmitting}
+            >
+              {t('Hủy')}
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              isLoading={isSubmitting}
+              disabled={!deleteAgency?.etag || !deleteAgency.agency.canDelete}
+            >
+              {t('Xác nhận')} {t('Xóa')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Terminate Modal */}
       <Modal
         isOpen={!!terminateAgency}
@@ -1087,15 +1178,9 @@ export function AgenciesPage() {
                   t('Nợ hiện tại'),
                   <span
                     key="debt"
-                    className={cn(
-                      'font-semibold tabular-nums',
-                      num(detailAgency.debt) < 0
-                        ? 'text-success'
-                        : 'text-destructive',
-                    )}
+                    className="font-semibold tabular-nums text-destructive"
                   >
                     {formatVND(detailAgency.debt)}
-                    {num(detailAgency.debt) < 0 && ` (${t('trả trước')})`}
                   </span>,
                 ],
                 [t('Nợ tối đa'), formatVND(detailAgency.maxDebt)],
