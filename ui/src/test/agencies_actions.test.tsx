@@ -46,6 +46,7 @@ const agencies: Agency[] = [
     debt: '15000000',
     maxDebt: '50000000',
     remainingCreditLimit: '35000000',
+    canDelete: false,
     status: 'ACTIVE',
   } as Agency,
   {
@@ -60,7 +61,23 @@ const agencies: Agency[] = [
     debt: '0',
     maxDebt: '50000000',
     remainingCreditLimit: '50000000',
+    canDelete: false,
     status: 'TERMINATED',
+  } as Agency,
+  {
+    id: '104',
+    code: 'DL-104',
+    name: 'Đại lý Chưa Giao Dịch',
+    phone: '0934567890',
+    wardId: 2,
+    wardName: 'Phường Sài Gòn',
+    typeId: 1,
+    typeName: 'Đại lý cấp 1',
+    debt: '0',
+    maxDebt: '50000000',
+    remainingCreditLimit: '50000000',
+    canDelete: true,
+    status: 'ACTIVE',
   } as Agency,
   {
     id: '103',
@@ -74,6 +91,7 @@ const agencies: Agency[] = [
     debt: '-200000',
     maxDebt: '50000000',
     remainingCreditLimit: '50200000',
+    canDelete: false,
     status: 'ACTIVE',
   } as Agency,
 ]
@@ -82,6 +100,7 @@ let types: unknown[]
 let wardRows: unknown[]
 let posted: { path: string; body: unknown }[]
 let failCreate: unknown = null
+let agencyRows: Agency[]
 
 function renderPage(granted = ['agency.read', 'agency.manage']) {
   return render(
@@ -124,6 +143,7 @@ describe('AgenciesPage row actions and overview', () => {
     ]
     posted = []
     failCreate = null
+    agencyRows = [...agencies]
     vi.spyOn(cacheModule, 'getCachedData').mockReturnValue(null)
     vi.spyOn(cacheModule, 'cachedApiFetch').mockImplementation(
       async (path: string) => ({
@@ -133,6 +153,14 @@ describe('AgenciesPage row actions and overview', () => {
       }),
     )
     vi.spyOn(apiModule, 'apiFetch').mockImplementation(async (path, opts) => {
+      if (opts?.method === 'DELETE') {
+        posted.push({ path, body: opts.ifMatch })
+        if (failCreate) throw failCreate
+        agencyRows = agencyRows.filter(
+          (agency) => `/agencies/${agency.id}` !== path,
+        )
+        return { data: null, status: 204, etag: null }
+      }
       if (opts?.method === 'POST' || opts?.method === 'PATCH') {
         posted.push({ path, body: opts.body })
         if (failCreate) throw failCreate
@@ -153,10 +181,45 @@ describe('AgenciesPage row actions and overview', () => {
           status: 200,
           etag: null,
         }
-      if (path === '/agencies/101')
-        return { data: agencies[0], status: 200, etag: '"a1"' }
+      if (path === '/agencies/101/debt-history')
+        return {
+          data: {
+            currentDebt: '15000000',
+            items: [
+              {
+                documentId: '501',
+                documentCode: 'PX-501',
+                occurredAt: '2026-11-01T09:00:00+07:00',
+                event: 'POSTED',
+                kind: 'STOCK_ISSUE',
+                replacesCode: null,
+                change: '20000000',
+                balanceAfter: '20000000',
+              },
+              {
+                documentId: '502',
+                documentCode: 'PT-502',
+                occurredAt: '2026-11-03T09:00:00+07:00',
+                event: 'POSTED',
+                kind: 'PAYMENT_RECEIPT',
+                replacesCode: null,
+                change: '-5000000',
+                balanceAfter: '15000000',
+              },
+            ],
+            pagination: { limit: 25, hasMore: false, nextCursor: null },
+          },
+          status: 200,
+          etag: null,
+        }
+      if (path.startsWith('/agencies/'))
+        return {
+          data: agencyRows.find((agency) => `/agencies/${agency.id}` === path),
+          status: 200,
+          etag: '"a1"',
+        }
       return {
-        data: { items: agencies, pagination: { nextCursor: null } },
+        data: { items: agencyRows, pagination: { nextCursor: null } },
         status: 200,
         etag: null,
       }
@@ -178,7 +241,67 @@ describe('AgenciesPage row actions and overview', () => {
     expect(apiModule.apiFetch).toHaveBeenCalledWith('/agencies/101')
   })
 
-  it('shows current debt, maximum debt and a prepaid balance', async () => {
+  it('offers physical deletion only for an unused agency and removes its row', async () => {
+    renderPage()
+    await screen.findByText('Đại lý Chưa Giao Dịch')
+    openMenu('DL-104')
+    const menu = await screen.findAllByRole('menuitem')
+    expect(menu.map((item) => item.textContent)).toEqual([
+      'Xem chi tiết',
+      'Sửa hồ sơ',
+      'Xóa Đại lý',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Xóa Đại lý' }))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() =>
+      expect(
+        within(dialog)
+          .getByRole('button', { name: 'Xác nhận Xóa' })
+          .hasAttribute('disabled'),
+      ).toBe(false),
+    )
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Xác nhận Xóa' }),
+    )
+    await waitFor(() =>
+      expect(posted.at(-1)).toEqual({ path: '/agencies/104', body: '"a1"' }),
+    )
+    await waitFor(() =>
+      expect(screen.queryByText('Đại lý Chưa Giao Dịch')).toBeNull(),
+    )
+  })
+
+  it('does not offer deletion for a referenced agency even with zero debt', async () => {
+    renderPage()
+    await screen.findByText('Đại lý Minh Phát')
+    openMenu('DL-101')
+    expect(screen.queryByRole('menuitem', { name: 'Xóa Đại lý' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Ngừng hợp tác' })).toBeTruthy()
+  })
+
+  it('shows the agency debt ledger alongside its profile when authorized', async () => {
+    renderPage(['agency.read', 'agency.manage', 'debt.read'])
+    await screen.findByText('Đại lý Minh Phát')
+    openMenu('DL-101')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Xem chi tiết' }))
+    const dialog = await screen.findByRole('dialog')
+    const historyTab = within(dialog).getByRole('tab', {
+      name: 'Lịch sử công nợ & thanh toán',
+    })
+    fireEvent.mouseDown(historyTab, { button: 0, ctrlKey: false })
+    expect(historyTab.getAttribute('aria-selected')).toBe('true')
+    expect(apiModule.apiFetch).toHaveBeenCalledWith(
+      '/agencies/101/debt-history',
+      expect.anything(),
+    )
+    expect(await within(dialog).findByText('PX-501')).toBeTruthy()
+    expect(within(dialog).getByText('PT-502')).toBeTruthy()
+    expect(within(dialog).getByText('+20.000.000 ₫')).toBeTruthy()
+    expect(within(dialog).getByText('-5.000.000 ₫')).toBeTruthy()
+    expect(within(dialog).getAllByText('15.000.000 ₫')).toHaveLength(2)
+  })
+
+  it('shows current debt and maximum debt without treating negative legacy data as prepayment', async () => {
     renderPage()
     await screen.findByText('Đại lý Minh Phát')
     expect(
@@ -189,7 +312,7 @@ describe('AgenciesPage row actions and overview', () => {
       screen.queryByRole('columnheader', { name: /Dư nợ|Dư có/ }),
     ).toBeNull()
     const prepaid = screen.getByText('Đại lý Trả Trước').closest('tr')!
-    expect(prepaid.textContent).toContain('Trả trước')
+    expect(prepaid.textContent).not.toContain('Trả trước')
     openMenu('DL-101')
     fireEvent.click(
       await screen.findByRole('menuitem', { name: 'Xem chi tiết' }),
