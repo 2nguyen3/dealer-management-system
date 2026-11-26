@@ -139,7 +139,6 @@ export const navigationGroups: {
       { path: '/stock-receipts', label: t('Phiếu nhập hàng') },
       { path: '/stock-issues', label: t('Phiếu xuất hàng') },
       { path: '/payment-receipts', label: t('Phiếu thu tiền') },
-      { path: '/online-payments', label: t('Thanh toán trực tuyến') },
     ],
   },
   {
