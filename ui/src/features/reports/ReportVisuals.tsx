@@ -128,15 +128,7 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
         moneyKpi(t('Nợ đầu kỳ'), totals, 'openingDebt', <Scale />),
         moneyKpi(t('Phát sinh nợ'), totals, 'debtIncrease', <ArrowUpRight />),
         moneyKpi(t('Đã thu'), totals, 'paidAmount', <ArrowDownLeft />),
-        moneyKpi(
-          t('Nợ cuối kỳ'),
-          totals,
-          'closingDebt',
-          <Wallet />,
-          String(totals?.closingDebt ?? '').startsWith('-')
-            ? t('Âm: các đại lý đang trả trước')
-            : FILTERED,
-        ),
+        moneyKpi(t('Nợ cuối kỳ'), totals, 'closingDebt', <Wallet />, FILTERED),
       ]
     case 'inventory': {
       const counts = inventoryCounts(page.items)
@@ -148,9 +140,24 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
         countKpi(t('Hết tồn cuối kỳ'), counts.outOfStock, <CircleOff />, hint),
       ]
     }
-    case 'product-sales':
+    case 'product-sales': {
+      const allProducts = toNumber(totals?.allProductsSalesAmount)
+      const share =
+        allProducts > 0 ? toNumber(totals?.salesAmount) / allProducts : null
       return [
         moneyKpi(t('Doanh số'), totals, 'salesAmount', <TrendingUp />),
+        moneyKpi(
+          t('Tổng doanh số'),
+          totals,
+          'allProductsSalesAmount',
+          <Banknote />,
+        ),
+        {
+          label: t('Tỷ trọng'),
+          value: share === null ? '—' : formatPercent(share),
+          hint: `${t('Mặt hàng')} / ${t('Tổng doanh số')}`,
+          icon: <PieChart />,
+        },
         countKpi(
           t('Mặt hàng có giao dịch'),
           page.items.length,
@@ -167,6 +174,7 @@ function kpisOf(kind: ReportKind, page: ReportPage): Kpi[] {
           t('Cộng số phiếu theo mặt hàng · trang này'),
         ),
       ]
+    }
     case 'collections':
       return [
         moneyKpi(
