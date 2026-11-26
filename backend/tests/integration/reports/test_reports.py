@@ -239,6 +239,17 @@ def test_product_sales_quantity_value_and_agency_filter(reports, ledger, world, 
     )
     assert [row.productId for row in result.items] == [str(world.noodles), str(world.rice)]
     assert result.totals.salesAmount == 336600
+    assert result.totals.allProductsSalesAmount == 336600
+
+    selected = reports.read(
+        "product-sales",
+        dates["start"],
+        dates["end"],
+        filters={"agencyId": str(world.agency), "productId": str(world.noodles)},
+    )
+    assert len(selected.items) == 1
+    assert selected.totals.salesAmount == 204000
+    assert selected.totals.allProductsSalesAmount == 234600
 
     filtered = reports.read(
         "product-sales",
