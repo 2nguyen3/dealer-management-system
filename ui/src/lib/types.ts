@@ -137,8 +137,7 @@ export interface Product {
 }
 
 /**
- * `AgencyResponse`. `debt` is the current debt (negative only after a late
- * verified online payment); `maxDebt` comes from the agency type and
+ * `AgencyResponse`. `debt` is the current debt; `maxDebt` comes from the agency type and
  * `remainingCreditLimit` = maxDebt − debt.
  */
 export interface Agency {
@@ -159,6 +158,7 @@ export interface Agency {
   debt: string
   maxDebt: string
   remainingCreditLimit: string
+  canDelete: boolean
   createdBy?: string | null
   updatedBy?: string | null
   createdAt?: string
