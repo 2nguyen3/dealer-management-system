@@ -305,6 +305,44 @@ describe('payment receipt workbench: transfer and PDF', () => {
     )
   })
 
+  it('retains the same request when checkout setup returns 202', async () => {
+    const doc = detail('PAYMENT_RECEIPT')
+    let attempts = 0
+    serve(doc, (path) => {
+      if (path !== '/online-payments') return response(doc)
+      attempts += 1
+      return attempts === 1
+        ? {
+            data: onlinePayment({ checkoutUrl: null }),
+            etag: null,
+            status: 202,
+          }
+        : { data: onlinePayment(), etag: null, status: 201 }
+    })
+    renderPage(
+      doc,
+      transferGrants,
+      '/payment-receipts?new=1&agencyId=401&amount=200000',
+    )
+    await screen.findByText('Thu toàn bộ nợ 500.000 ₫')
+    fireEvent.change(methodSelect(), { target: { value: 'VNPAY' } })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Tạo thanh toán & mã QR' }),
+    )
+    await screen.findByText(/Đang khởi tạo trang thanh toán/)
+    expect(
+      screen.queryByRole('dialog', { name: 'Thanh toán chuyển khoản' }),
+    ).toBeNull()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Tạo thanh toán & mã QR' }),
+    )
+    await screen.findByRole('dialog', { name: 'Thanh toán chuyển khoản' })
+    expect(writes()).toHaveLength(2)
+    expect(writes()[0]![1]?.idempotencyKey).toBe(
+      writes()[1]![1]?.idempotencyKey,
+    )
+  })
+
   it('keeps the form open with the server error when the payment is refused', async () => {
     const doc = detail('PAYMENT_RECEIPT')
     serve(
@@ -400,7 +438,7 @@ describe('TransferHandoff', () => {
     expect(screen.getByText('Chưa có liên kết')).toBeDefined()
     expect(screen.queryByTitle('Mã QR trang thanh toán VNPAY')).toBeNull()
     const link = screen.getByRole('link', {
-      name: 'Xem trong Thanh toán trực tuyến',
+      name: 'Xem chi tiết VNPAY',
     })
     expect(link.getAttribute('href')).toBe('/online-payments?paymentId=37')
   })
@@ -411,7 +449,7 @@ describe('TransferHandoff', () => {
       ['cash.receipt.prepare'],
     )
     expect(
-      screen.queryByRole('link', { name: 'Xem trong Thanh toán trực tuyến' }),
+      screen.queryByRole('link', { name: 'Xem chi tiết VNPAY' }),
     ).toBeNull()
     expect(screen.getByTitle('Mã QR trang thanh toán VNPAY')).toBeDefined()
   })
