@@ -77,7 +77,7 @@ const notes: Partial<Record<ReportKind, string>> = {
     'Mỗi dòng là một ngày có phiếu thu đã ghi sổ; phiếu đã hủy không được tính.',
   ),
   debt: t(
-    'Nợ âm nghĩa là đại lý đang trả trước (thanh toán trực tuyến đến sau khi nợ đã được trả).',
+    'Số tiền thu phải lớn hơn 0 và không vượt nợ hiện tại của đại lý tại lúc ghi sổ.',
   ),
   inventory: t('Số lượng tính theo đơn vị của từng mặt hàng.'),
 }
