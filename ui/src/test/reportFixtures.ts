@@ -62,7 +62,7 @@ export function reportFixture(
     },
     debt,
     inventory: undefined,
-    'product-sales': { salesAmount: huge },
+    'product-sales': { salesAmount: huge, allProductsSalesAmount: huge + '00' },
     collections,
   }
   return {
