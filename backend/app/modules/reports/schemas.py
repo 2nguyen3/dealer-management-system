@@ -152,6 +152,7 @@ class ProductSalesReportRow(ProductReportIdentity):
 
 class ProductSalesTotals(ApiModel):
     salesAmount: AggregateMoney
+    allProductsSalesAmount: AggregateMoney
 
 
 class ProductSalesReportResponse(ReportPeriod):
