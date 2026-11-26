@@ -236,7 +236,7 @@ def receipt(fields, view) -> str:
     debt = view.get("agencyDebt")
     if debt is not None:
         debt = Decimal(str(debt))
-        if debt < 0:  # verified money is always recorded, so a debt can be overpaid
+        if debt < 0:  # Pre-policy historical balances may still be negative.
             rows.append(("Số tiền trả dư", money(-debt), False))
         else:
             rows.append(("Công nợ còn lại", money(debt), False))
