@@ -1,7 +1,7 @@
 from operator import ge, le, lt
 from types import SimpleNamespace
 
-from sqlalchemy import String, cast, select, text
+from sqlalchemy import String, cast, literal_column, select, text
 
 from app.common.dates import parse_date
 from app.common.sql_catalogue import SqlCatalogueRepository
@@ -19,6 +19,11 @@ class AgencyRepository(SqlCatalogueRepository):
         "wardName": Ward.name,
         "maxDebt": AgencyType.max_debt,
         "remainingCreditLimit": AgencyType.max_debt - AGENCY.c.debt,
+        "canDelete": literal_column(
+            """agency.debt = 0
+            AND NOT EXISTS (SELECT 1 FROM dms.document d WHERE d."agencyId" = agency.id)
+            AND NOT EXISTS (SELECT 1 FROM dms.online_payment p WHERE p."agencyId" = agency.id)"""
+        ),
     }
     ranges = {
         "debtFrom": (AGENCY.c.debt, ge),
