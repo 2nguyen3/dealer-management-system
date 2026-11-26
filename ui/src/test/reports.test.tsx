@@ -180,7 +180,7 @@ describe('authoritative reports', { timeout: 20000 }, () => {
       // KPI strip and three chart cards (two measures + composition) with a
       // table view each.
       const kpis = within(region).getByRole('group', { name: 'Chỉ số chính' })
-      expect(kpis.children).toHaveLength(kind === 'product-sales' ? 3 : 4)
+      expect(kpis.children).toHaveLength(kind === 'product-sales' ? 5 : 4)
       expect(
         within(region).getAllByRole('radio', { name: 'Bảng số liệu' }),
       ).toHaveLength(3)
