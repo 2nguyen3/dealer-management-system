@@ -19,6 +19,10 @@ def service_with_rows(kind, rows, company=None):
         detached["companySalesAmount"] = Decimal(
             company if company is not None else sum(int(row["salesAmount"]) for row in rows)
         )
+    if kind == "product-sales":
+        detached["allProductsSalesAmount"] = Decimal(
+            company if company is not None else sum(int(row["salesAmount"]) for row in rows)
+        )
     service.queries = Mock()
     service.queries.read.return_value = detached
     return service
@@ -149,6 +153,14 @@ def test_empty_reports_have_zero_totals():
             assert all(
                 value in ("0", 0) for value in result.totals.model_dump(mode="json").values()
             )
+
+
+def test_product_sales_keeps_scope_denominator_after_product_filter():
+    row = example_row("product-sales", "1") | {"salesAmount": "204000"}
+    service = service_with_rows("product-sales", [row], company=234600)
+    result = service.read("product-sales", START, END, filters={"productId": "1"})
+    assert result.totals.salesAmount == 204000
+    assert result.totals.allProductsSalesAmount == 234600
 
 
 @pytest.mark.parametrize("kind", REPORTS)
